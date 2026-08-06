@@ -103,29 +103,30 @@ def tool_get_current_datetime():
 app = Client("my_account", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_STRING)
 
 def find_working_model():
-    """Снайперский поиск лучшей модели для чата (приоритет 1.5)"""
     list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
     try:
         res = requests.get(list_url).json()
         if 'models' not in res: return None
         
         available = [m['name'] for m in res['models'] if 'generateContent' in m.get('supportedGenerationMethods', [])]
-        print(f"[~] Доступные модели чата: {available}")
+        print(f"[~] Доступные модели чата: {len(available)} шт.")
         
-        # Ищем 1.5 flash
-        for m in available:
-            if "1.5-flash" in m:
-                print(f"[+] ВЫБРАНА МОДЕЛЬ: {m}")
-                return m
-        # Ищем 1.5 pro
-        for m in available:
-            if "1.5-pro" in m:
-                print(f"[+] ВЫБРАНА МОДЕЛЬ: {m}")
-                return m
-        # Если ничего из 1.5 нет, берем первую рабочую
-        if available:
-            print(f"[!] ВЫБРАНА РЕЗЕРВНАЯ МОДЕЛЬ: {available[0]}")
-            return available[0]
+        # Сортируем: сначала новые 3.6/3.5, потом остальные flash
+        preferred = [m for m in available if "3.6-flash" in m or "3.5-flash" in m]
+        others = [m for m in available if m not in preferred and "flash" in m and "preview" not in m]
+        
+        for model_name in preferred + others + available:
+            print(f"[~] Тестирую модель на живучесть: {model_name}...")
+            test_url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:generateContent?key={GEMINI_API_KEY}"
+            payload = {"contents": [{"parts": [{"text": "hi"}]}]}
+            r = requests.post(test_url, json=payload, headers={'Content-Type': 'application/json'})
+            
+            if r.status_code == 200:
+                print(f"[+] УСПЕШНО! ВЫБРАНА МОДЕЛЬ: {model_name}")
+                return model_name
+            else:
+                print(f"[-] Модель {model_name} недоступна (Ошибка {r.status_code})")
+                
     except Exception as e:
         print(f"[-] Ошибка автопоиска модели: {e}")
     return None
@@ -405,7 +406,7 @@ async def main():
     init_supabase()
     await load_db()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (v6.4: УМНЫЙ СНАЙПЕР МОДЕЛЕЙ) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (v6.5: СНАЙПЕР ПОКОЛЕНИЯ 3.X) ")
     print("==========================================\n")
     await idle()
     await app.stop()

@@ -34,7 +34,7 @@ API_HASH = os.environ.get("API_HASH", "18ae94f76873c93be328527e858de657")
 SESSION_STRING = os.environ.get("SESSION_STRING")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-# ID твоего закрытого канала-базы данных
+# Новый ID твоего закрытого канала-базы данных
 CHANNEL_ID = -1004272472677
 
 app = Client("my_account", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_STRING)
@@ -44,6 +44,7 @@ USER_CARDS = {}
 
 PENDING_MESSAGES = {}
 PENDING_TASKS = {}
+DB_ERROR_NOTIFIED = False
 
 def find_working_model():
     list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
@@ -62,10 +63,18 @@ def find_working_model():
         pass
     return None
 
+async def notify_admin_db_error(error_msg):
+    global DB_ERROR_NOTIFIED
+    if not DB_ERROR_NOTIFIED:
+        try:
+            await app.send_message("me", f"⚠️ **СИСТЕМНАЯ ОШИБКА БАЗЫ ДАННЫХ** ⚠️\nЯ не могу получить доступ к каналу {CHANNEL_ID}!\nОшибка: `{error_msg}`\n\n👉 Проверь, добавлен ли я в этот канал и есть ли у меня права админа на отправку сообщений!")
+            DB_ERROR_NOTIFIED = True
+        except:
+            pass
+
 async def load_db():
     global USER_CARDS
     try:
-        print(f"[~] Пытаюсь подключиться к каналу {CHANNEL_ID}...")
         async for message in app.get_chat_history(CHANNEL_ID, limit=200):
             if message.text:
                 match = re.search(r'\[USER_ID:\s*(-?\d+)\]', message.text)
@@ -75,8 +84,8 @@ async def load_db():
                         USER_CARDS[uid] = message.id
         print(f"\n[!] База загружена. Найдено карточек: {len(USER_CARDS)}")
     except Exception as e:
-        print(f"\n[КРИТИЧЕСКАЯ ОШИБКА] Бот не может прочитать канал {CHANNEL_ID}!")
-        print(f"Детали ошибки: {e}\n")
+        print(f"\n[КРИТИЧЕСКАЯ ОШИБКА] Бот не может прочитать канал {CHANNEL_ID}! Ошибка: {e}\n")
+        await notify_admin_db_error(e)
 
 async def get_or_create_card(user_id, sender_name):
     if user_id not in USER_CARDS:
@@ -86,7 +95,7 @@ async def get_or_create_card(user_id, sender_name):
             USER_CARDS[user_id] = sent.id
             return sent.id, initial_text
         except Exception as e:
-            print(f"[-] Ошибка создания карточки в канале: {e}")
+            await notify_admin_db_error(e)
             return None, initial_text
     else:
         msg_id = USER_CARDS[user_id]
@@ -94,22 +103,20 @@ async def get_or_create_card(user_id, sender_name):
             msg = await app.get_messages(CHANNEL_ID, msg_id)
             if msg and msg.text:
                 return msg_id, msg.text
-        except Exception as e:
-            print(f"[-] Ошибка чтения карточки {msg_id}: {e}")
+        except Exception:
+            pass
         
         try:
             sent = await app.send_message(CHANNEL_ID, f"[USER_ID: {user_id}]\nИмя: {sender_name}\nИстория:\n")
             USER_CARDS[user_id] = sent.id
             return sent.id, sent.text
         except Exception as e:
-            print(f"[-] Ошибка пересоздания карточки: {e}")
+            await notify_admin_db_error(e)
             return None, f"[USER_ID: {user_id}]\nИмя: {sender_name}\nИстория:\n"
 
 async def update_card_history(user_id, sender_name, history_lines):
     msg_id, _ = await get_or_create_card(user_id, sender_name)
-    if not msg_id:
-        print(f"[-] Нет доступа к каналу, карточка для {sender_name} сохранена только в оперативку.")
-        return
+    if not msg_id: return
     
     history_str = "\n".join(history_lines)
     full_text = f"[USER_ID: {user_id}]\nИмя: {sender_name}\nИстория:\n{history_str}"
@@ -117,8 +124,8 @@ async def update_card_history(user_id, sender_name, history_lines):
         full_text = full_text[-4000:]
     try:
         await app.edit_message_text(CHANNEL_ID, msg_id, full_text)
-    except Exception as e:
-        print(f"[-] Ошибка обновления карточки: {e}")
+    except Exception:
+        pass
 
 def parse_history_from_text(card_text):
     lines = card_text.split('\n')
@@ -128,9 +135,8 @@ def parse_history_from_text(card_text):
         if line.startswith("История:"):
             capture = True
             continue
-        if capture:
-            if line.strip():
-                history_lines.append(line.strip())
+        if capture and line.strip():
+            history_lines.append(line.strip())
     return history_lines
 
 def ask_gemini(user_id, sender_name, user_text, card_text):
@@ -150,17 +156,14 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
     prompt = f"История переписки с этим человеком:\n{dialogue_str}\n\nНапиши СВОЮ ответную реплику от первого лица."
     
     system_instruction = (
-        "Ты — цифровой двойник реального пацана в личке Telegram. Твой стиль общения: дерзкий, циничный, ленивый, используешь сленг и мат (но в меру, по делу), отвечаешь коротко и резко.\n\n"
-        "Примеры твоего стиля:\n"
+        "Ты — цифровой двойник реального пацана. Твой стиль общения: дерзкий, циничный, ленивый.\n\n"
+        "Примеры:\n"
         "- Собеседник: 'Ты где пропал?' -> Ты: 'Да делами занят был, чё хотел?'\n"
-        "- Собеседник: 'Займи тыщу до завтра' -> Ты: 'Ага, уже бегу до банкомата, раскатал губу.'\n"
-        "- Собеседник: 'Ты меня заебать решил?' -> Ты: 'Давай короче и по делу, без этой сопливой хуеты.'\n"
-        "- Собеседник: 'Что делаешь?' -> Ты: 'Да в анабиозе, отвали до вечера.'\n"
-        "- Собеседник: 'Смотри че нашел' -> Ты: 'Ахуеть... Это щас че за пиздец только что был?'\n\n"
+        "- Собеседник: 'Займи тыщу' -> Ты: 'Ага, уже бегу, раскатал губу.'\n"
+        "- Собеседник: 'Ты меня заебать решил?' -> Ты: 'Давай короче и по делу.'\n\n"
         "ПРАВИЛА:\n"
         "1. ВЫДАЙ ТОЛЬКО ОДНУ ФРАЗУ НА РУССКОМ.\n"
-        "2. КАТЕГОРИЧЕСКИ ЗАПРЕЩАЕТСЯ писать списки, рассуждения, мета-теги (Response, Selected, Option), кавычки или английский язык.\n"
-        "3. ТОЛЬКО ГОЛЫЙ ТЕКСТ ОТВЕТА."
+        "2. БЕЗ ПРЕДИСЛОВИЙ, БЕЗ АНГЛИЙСКОГО."
     )
 
     url = f"https://generativelanguage.googleapis.com/v1beta/{WORKING_MODEL}:generateContent?key={GEMINI_API_KEY}"
@@ -174,19 +177,23 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
         if 'candidates' in response and len(response['candidates']) > 0:
             raw_answer = response['candidates'][0]['content']['parts'][0]['text']
             
+            # АБСОЛЮТНЫЙ ПАРСЕР: Читаем с конца, ищем кириллицу
             lines = [l.strip() for l in raw_answer.split('\n') if l.strip()]
-            clean_lines = []
+            ans = ""
+            for line in reversed(lines):
+                if re.search(r'[А-Яа-яЁё]', line): # Ищем хотя бы одну русскую букву
+                    ans = line
+                    break
             
-            for line in lines:
-                lower_line = line.lower()
-                if line.startswith('*') or line.startswith('-'): continue
-                if any(word in lower_line for word in ['option', 'decision', 'actually', 'let\'s', 'wait', 'instruction', 'persona', 'style', 'text:', 'response:', 'selected:', 'reply:']): continue
-                clean_lines.append(line)
+            if not ans and lines:
+                ans = lines[-1]
+                
+            # Отрезаем английский мусор типа "Final choice: " или "4. "
+            ans = re.sub(r'^[a-zA-Z0-9_ \-\.\?\!]+:\s*', '', ans).strip()
+            ans = re.sub(r'^\d+\.\s*', '', ans).strip()
+            ans = re.sub(r'^"|"$', '', ans).strip()
             
-            if clean_lines:
-                ans = clean_lines[-1]
-                ans = re.sub(r'^"|"$', '', ans).strip()
-                ans = re.sub(r'^(\*.*?\*)', '', ans).strip()
+            if ans:
                 history_lines.append(f"Ты: {ans}")
                 return ans, history_lines
     except Exception as e:
@@ -204,7 +211,6 @@ async def process_batch(client, message, user_id, sender_name):
     if not msgs: return
     
     combined_text = " | ".join(msgs)
-    print(f"\n[!] Собрана пачка от {sender_name}: {combined_text}")
     
     try:
         _, card_text = await get_or_create_card(user_id, sender_name)
@@ -213,9 +219,7 @@ async def process_batch(client, message, user_id, sender_name):
         
         if reply_text:
             await message.reply(reply_text)
-            print(f"[+] Отвечено: {reply_text}")
     except Exception as e:
-        print(f"[КРИТИЧЕСКАЯ ОШИБКА в process_batch]: {e}")
         await message.reply("Бля, у меня в мозгах че-то замкнуло, погоди.")
 
 @app.on_message(filters.private & ~filters.me & ~filters.bot)
@@ -236,7 +240,7 @@ async def main():
     await app.start()
     await load_db()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (v3.1: БРОНИРОВАННЫЙ RAG) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (v3.2: АБСОЛЮТНАЯ БРОНЯ) ")
     print("==========================================\n")
     await idle()
     await app.stop()

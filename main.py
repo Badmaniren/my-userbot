@@ -6,7 +6,7 @@ import re
 from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from supabase import create_client, Client as SupabaseClient
-from duckduckgo_search import DDGS
+from ddgs import DDGS  # <--- ИСПРАВЛЕННАЯ БИБЛИОТЕКА ИЗ 2026 ГОДА
 
 try:
     loop = asyncio.get_event_loop()
@@ -87,7 +87,7 @@ GEMINI_TOOLS = [{
 
 def tool_web_search(query):
     try:
-        print(f"[~] Гуглю в DuckDuckGo: '{query}'")
+        print(f"[~] Гуглю в новой либе ddgs: '{query}'")
         results = DDGS().text(query, max_results=3)
         if not results: return "Ничего не найдено."
         res_str = ""
@@ -111,7 +111,6 @@ def find_working_model():
         available = [m['name'] for m in res['models'] if 'generateContent' in m.get('supportedGenerationMethods', [])]
         print(f"[~] Доступные модели чата: {len(available)} шт.")
         
-        # Сортируем: сначала новые 3.6/3.5, потом остальные flash
         preferred = [m for m in available if "3.6-flash" in m or "3.5-flash" in m]
         others = [m for m in available if m not in preferred and "flash" in m and "preview" not in m]
         
@@ -124,8 +123,6 @@ def find_working_model():
             if r.status_code == 200:
                 print(f"[+] УСПЕШНО! ВЫБРАНА МОДЕЛЬ: {model_name}")
                 return model_name
-            else:
-                print(f"[-] Модель {model_name} недоступна (Ошибка {r.status_code})")
                 
     except Exception as e:
         print(f"[-] Ошибка автопоиска модели: {e}")
@@ -406,7 +403,7 @@ async def main():
     init_supabase()
     await load_db()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (v6.5: СНАЙПЕР ПОКОЛЕНИЯ 3.X) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (v6.6: ИСЦЕЛЕНИЕ ИНТЕРНЕТА) ")
     print("==========================================\n")
     await idle()
     await app.stop()

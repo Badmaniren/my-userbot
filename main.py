@@ -34,7 +34,7 @@ API_HASH = os.environ.get("API_HASH", "18ae94f76873c93be328527e858de657")
 SESSION_STRING = os.environ.get("SESSION_STRING")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-# Новый ID твоего закрытого канала-базы данных
+# ID твоего канала-базы данных
 CHANNEL_ID = -1004272472677
 
 app = Client("my_account", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_STRING)
@@ -44,7 +44,6 @@ USER_CARDS = {}
 
 PENDING_MESSAGES = {}
 PENDING_TASKS = {}
-DB_ERROR_NOTIFIED = False
 
 def find_working_model():
     list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
@@ -63,18 +62,14 @@ def find_working_model():
         pass
     return None
 
-async def notify_admin_db_error(error_msg):
-    global DB_ERROR_NOTIFIED
-    if not DB_ERROR_NOTIFIED:
-        try:
-            await app.send_message("me", f"⚠️ **СИСТЕМНАЯ ОШИБКА БАЗЫ ДАННЫХ** ⚠️\nЯ не могу получить доступ к каналу {CHANNEL_ID}!\nОшибка: `{error_msg}`\n\n👉 Проверь, добавлен ли я в этот канал и есть ли у меня права админа на отправку сообщений!")
-            DB_ERROR_NOTIFIED = True
-        except:
-            pass
-
 async def load_db():
     global USER_CARDS
     try:
+        print(f"[~] Инициализирую канал-базу {CHANNEL_ID}...")
+        # Явно резолвим чат, чтобы Pyrogram закэшировал пир
+        chat = await app.get_chat(CHANNEL_ID)
+        print(f"[+] Успешно подключился к каналу: '{chat.title}'")
+        
         async for message in app.get_chat_history(CHANNEL_ID, limit=200):
             if message.text:
                 match = re.search(r'\[USER_ID:\s*(-?\d+)\]', message.text)
@@ -82,10 +77,9 @@ async def load_db():
                     uid = int(match.group(1))
                     if uid not in USER_CARDS:
                         USER_CARDS[uid] = message.id
-        print(f"\n[!] База загружена. Найдено карточек: {len(USER_CARDS)}")
+        print(f"[!] База загружена. Найдено карточек: {len(USER_CARDS)}")
     except Exception as e:
-        print(f"\n[КРИТИЧЕСКАЯ ОШИБКА] Бот не может прочитать канал {CHANNEL_ID}! Ошибка: {e}\n")
-        await notify_admin_db_error(e)
+        print(f"\n[-] ОШИБКА ПРИ ПОДКЛЮЧЕНИИ К КАНАЛУ: {e}\n")
 
 async def get_or_create_card(user_id, sender_name):
     if user_id not in USER_CARDS:
@@ -93,9 +87,10 @@ async def get_or_create_card(user_id, sender_name):
         try:
             sent = await app.send_message(CHANNEL_ID, initial_text)
             USER_CARDS[user_id] = sent.id
+            print(f"[+] Создана новая карточка для юзера {user_id} в канале.")
             return sent.id, initial_text
         except Exception as e:
-            await notify_admin_db_error(e)
+            print(f"[-] Не удалось создать карточку в канале: {e}")
             return None, initial_text
     else:
         msg_id = USER_CARDS[user_id]
@@ -103,15 +98,15 @@ async def get_or_create_card(user_id, sender_name):
             msg = await app.get_messages(CHANNEL_ID, msg_id)
             if msg and msg.text:
                 return msg_id, msg.text
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[-] Не удалось прочитать карточку {msg_id}: {e}")
         
         try:
             sent = await app.send_message(CHANNEL_ID, f"[USER_ID: {user_id}]\nИмя: {sender_name}\nИстория:\n")
             USER_CARDS[user_id] = sent.id
             return sent.id, sent.text
         except Exception as e:
-            await notify_admin_db_error(e)
+            print(f"[-] Не удалось пересоздать карточку: {e}")
             return None, f"[USER_ID: {user_id}]\nИмя: {sender_name}\nИстория:\n"
 
 async def update_card_history(user_id, sender_name, history_lines):
@@ -124,8 +119,9 @@ async def update_card_history(user_id, sender_name, history_lines):
         full_text = full_text[-4000:]
     try:
         await app.edit_message_text(CHANNEL_ID, msg_id, full_text)
-    except Exception:
-        pass
+        print(f"[+] Карточка юзера {user_id} успешно обновлена в канале.")
+    except Exception as e:
+        print(f"[-] Ошибка при редактировании карточки в канале: {e}")
 
 def parse_history_from_text(card_text):
     lines = card_text.split('\n')
@@ -177,18 +173,16 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
         if 'candidates' in response and len(response['candidates']) > 0:
             raw_answer = response['candidates'][0]['content']['parts'][0]['text']
             
-            # АБСОЛЮТНЫЙ ПАРСЕР: Читаем с конца, ищем кириллицу
             lines = [l.strip() for l in raw_answer.split('\n') if l.strip()]
             ans = ""
             for line in reversed(lines):
-                if re.search(r'[А-Яа-яЁё]', line): # Ищем хотя бы одну русскую букву
+                if re.search(r'[А-Яа-яЁё]', line):
                     ans = line
                     break
             
             if not ans and lines:
                 ans = lines[-1]
                 
-            # Отрезаем английский мусор типа "Final choice: " или "4. "
             ans = re.sub(r'^[a-zA-Z0-9_ \-\.\?\!]+:\s*', '', ans).strip()
             ans = re.sub(r'^\d+\.\s*', '', ans).strip()
             ans = re.sub(r'^"|"$', '', ans).strip()
@@ -220,6 +214,7 @@ async def process_batch(client, message, user_id, sender_name):
         if reply_text:
             await message.reply(reply_text)
     except Exception as e:
+        print(f"[-] Ошибка в process_batch: {e}")
         await message.reply("Бля, у меня в мозгах че-то замкнуло, погоди.")
 
 @app.on_message(filters.private & ~filters.me & ~filters.bot)
@@ -240,7 +235,7 @@ async def main():
     await app.start()
     await load_db()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (v3.2: АБСОЛЮТНАЯ БРОНЯ) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (v3.3: ИНИЦИАЛИЗАЦИЯ ПИРА) ")
     print("==========================================\n")
     await idle()
     await app.stop()

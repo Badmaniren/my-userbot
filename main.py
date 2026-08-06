@@ -1,7 +1,6 @@
 import os
 import requests
 import asyncio
-import random
 import threading
 import re
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -39,6 +38,18 @@ app = Client("my_account", api_id=API_ID, api_hash=API_HASH, session_string=SESS
 
 WORKING_MODEL = None
 HISTORY = {}
+
+# Буфер для накопления спам-сообщений
+PENDING_MESSAGES = {}
+PENDING_TASKS = {}
+
+# Словарь твоих стикеров
+STICKERS = {
+    "[LAUGH]": "AAMCAgADGQEAAVEiBmpOBifbtv867WvTc6QqTmjr3WLjAAIrDAACFTpwSJp37YXEeZ8_AQAHbQADPQQ",
+    "[SAD]": "AAMCAgADGQEAAVEiDGp0BmklGXe-xr_q4UfQTneFo2zHAALvFQACvBn5SwF3YMbxzSi5AQAHbQADPQQ",
+    "[WTF]": "AAMCAgADGQEAAVEiCmp0BlKTS7_jB4fxgYhxZAN1cZG8AAJFFAACRQL5SxYC3rjm4awTAQAHbQADPQQ",
+    "[AGRO]": "AAMCBAADGQEAAVEiCGp0BkOGHMelVbrnaKkZ3q3tFeHoAAIJAQACFXbpBwfU4SgNSTquAQAHbQADPQQ"
+}
 
 def find_working_model():
     list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
@@ -80,7 +91,7 @@ def ask_gemini(user_id, user_text):
     payload = {
         "systemInstruction": {
             "parts": [{
-                "text": "Ты дерзкий пацан. ВЫДАЙ ТОЛЬКО ОДНУ ФРАЗУ НА РУССКОМ. КАТЕГОРИЧЕСКИ ЗАПРЕЩАЕТСЯ писать списки, рассуждения, мета-теги или использовать английский язык. ТОЛЬКО ГОЛЫЙ ТЕКСТ ОТВЕТА."
+                "text": "Ты дерзкий пацан. ВЫДАЙ ТОЛЬКО ОДНУ ФРАЗУ НА РУССКОМ. КАТЕГОРИЧЕСКИ ЗАПРЕЩАЕТСЯ писать списки, мета-теги или английский язык. ИСКЛЮЧЕНИЕ: Если эмоции ЗАШКАЛИВАЮТ, ты МОЖЕШЬ добавить в конец ответа строго ОДИН из этих тегов: [LAUGH] (очень смешно), [SAD] (грусть/обида), [WTF] (шок/непонимание), [AGRO] (злость/наезд). НЕ СПАМЬ ИМИ, используй редко и только когда очень в тему."
             }]
         },
         "contents": [{
@@ -93,57 +104,88 @@ def ask_gemini(user_id, user_text):
         if 'candidates' in response and len(response['candidates']) > 0:
             raw_answer = response['candidates'][0]['content']['parts'][0]['text']
             
-            # ЖЕСТКАЯ МЯСОРУБКА: Парсим ответ и убиваем мысли вслух
             lines = [l.strip() for l in raw_answer.split('\n') if l.strip()]
             clean_lines = []
             
             for line in lines:
-                # Убиваем строки со списками и английскими словами-паразитами
                 lower_line = line.lower()
-                if line.startswith('*') or line.startswith('-'):
-                    continue
-                if any(word in lower_line for word in ['option', 'decision', 'actually', 'let\'s', 'wait', 'instruction', 'persona', 'style', 'text:', 'response:', 'selected:', 'reply:']):
-                    continue
+                if line.startswith('*') or line.startswith('-'): continue
+                if any(word in lower_line for word in ['option', 'decision', 'actually', 'let\'s', 'wait', 'instruction', 'persona', 'style', 'text:', 'response:', 'selected:', 'reply:']): continue
                 clean_lines.append(line)
             
-            # Достаем последнюю выжившую строку
             if clean_lines:
                 ans = clean_lines[-1]
-                # Срезаем кавычки по краям, если этот дебил их оставил
                 ans = re.sub(r'^"|"$', '', ans).strip()
-                ans = re.sub(r'^(\*.*?\*|\[.*?\])', '', ans).strip()
+                ans = re.sub(r'^(\*.*?\*)', '', ans).strip() # Удаляем возможные звездочки, но оставляем квадратные скобки со стикерами
                 
                 HISTORY[user_id].append({"sender": "Ты", "text": ans})
                 return ans
             else:
-                # Если он вывел ТОЛЬКО английский мусор
                 HISTORY[user_id].pop()
                 return "Давай потом, я че-то завис."
                 
     except Exception as e:
-        print(f"Ошибка: {e}")
+        print(f"Ошибка API: {e}")
         
     HISTORY[user_id].pop()
-    return "Давай потом перетрем, занят."
+    return "Занят, позже перетрем."
+
+async def process_batch(client, message, user_id, sender_name):
+    try:
+        # Ждем 4 секунды. Если собеседник печатает еще, таск будет отменен и перезапущен
+        await asyncio.sleep(4)
+    except asyncio.CancelledError:
+        return
+        
+    # Если 4 секунды тишины — забираем все накопленные сообщения
+    msgs = PENDING_MESSAGES.pop(user_id, [])
+    if not msgs: return
+    
+    combined_text = " | ".join(msgs)
+    print(f"\n[!] Собрана пачка от {sender_name}: {combined_text}")
+    
+    # Отправляем запрос к ИИ в отдельном потоке, чтобы не вешать Pyrogram
+    reply_text = await asyncio.to_thread(ask_gemini, user_id, combined_text)
+    
+    # Ищем стикеры в ответе
+    sticker_to_send = None
+    for tag, file_id in STICKERS.items():
+        if tag in reply_text:
+            sticker_to_send = file_id
+            reply_text = reply_text.replace(tag, "").strip()
+            break # Больше одного стикера за раз не кидаем
+            
+    # Отправляем текст (если он остался после вырезания тега)
+    if reply_text:
+        await message.reply(reply_text)
+        print(f"[+] Отвечено: {reply_text}")
+        
+    # Отправляем стикер
+    if sticker_to_send:
+        await message.reply_sticker(sticker_to_send)
+        print(f"[+] Отправлен стикер!")
 
 @app.on_message(filters.private & ~filters.me & ~filters.bot)
 async def auto_reply(client, message):
-    sender_name = message.from_user.first_name if message.from_user else "Кто-то"
     user_id = message.from_user.id
+    sender_name = message.from_user.first_name if message.from_user else "Кто-то"
     
-    print(f"\n[!] Личка от {sender_name}: {message.text}")
-    delay = random.randint(3, 6)
-    await asyncio.sleep(delay)
+    # Закидываем сообщение в буфер
+    if user_id not in PENDING_MESSAGES:
+        PENDING_MESSAGES[user_id] = []
+    PENDING_MESSAGES[user_id].append(message.text)
     
-    reply_text = ask_gemini(user_id, message.text)
-    
-    await message.reply(reply_text)
-    print(f"[+] Отвечено: {reply_text}")
+    # Сбрасываем таймер ожидания, если он уже был
+    if user_id in PENDING_TASKS:
+        PENDING_TASKS[user_id].cancel()
+        
+    # Запускаем новый таймер на 4 секунды
+    PENDING_TASKS[user_id] = asyncio.create_task(process_batch(client, message, user_id, sender_name))
 
 async def main():
     await app.start()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (ПОСЛЕ ЛОБОТОМИИ) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (v2.0: БУФЕР + СТИКЕРЫ) ")
     print("==========================================\n")
     await idle()
     await app.stop()

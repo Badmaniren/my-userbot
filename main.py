@@ -51,8 +51,7 @@ def init_supabase():
     except Exception as e:
         print(f"\n[-] ОШИБКА ПОДКЛЮЧЕНИЯ SUPABASE: {e}\n")
 
-# Прибиваем гвоздями самую умную модель, которая умеет в инструменты
-WORKING_MODEL = "models/gemini-1.5-flash"
+WORKING_MODEL = None
 WORKING_EMBEDDING_MODEL = None
 CHANNEL_ID = None
 USER_CARDS = {}
@@ -102,6 +101,34 @@ def tool_get_current_datetime():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 app = Client("my_account", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_STRING)
+
+def find_working_model():
+    """Снайперский поиск лучшей модели для чата (приоритет 1.5)"""
+    list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
+    try:
+        res = requests.get(list_url).json()
+        if 'models' not in res: return None
+        
+        available = [m['name'] for m in res['models'] if 'generateContent' in m.get('supportedGenerationMethods', [])]
+        print(f"[~] Доступные модели чата: {available}")
+        
+        # Ищем 1.5 flash
+        for m in available:
+            if "1.5-flash" in m:
+                print(f"[+] ВЫБРАНА МОДЕЛЬ: {m}")
+                return m
+        # Ищем 1.5 pro
+        for m in available:
+            if "1.5-pro" in m:
+                print(f"[+] ВЫБРАНА МОДЕЛЬ: {m}")
+                return m
+        # Если ничего из 1.5 нет, берем первую рабочую
+        if available:
+            print(f"[!] ВЫБРАНА РЕЗЕРВНАЯ МОДЕЛЬ: {available[0]}")
+            return available[0]
+    except Exception as e:
+        print(f"[-] Ошибка автопоиска модели: {e}")
+    return None
 
 def find_working_embedding_model():
     list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
@@ -229,6 +256,12 @@ def parse_history_from_text(card_text):
     return history_lines
 
 def ask_gemini(user_id, sender_name, user_text, card_text):
+    global WORKING_MODEL
+    if not WORKING_MODEL:
+        WORKING_MODEL = find_working_model()
+    if not WORKING_MODEL:
+        return "Я сейчас немного туплю, отвечу позже.", []
+
     vector_context = get_relevant_memories(user_id, user_text)
     
     history_lines = parse_history_from_text(card_text)
@@ -245,7 +278,7 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
     system_instruction = (
         "Ты — цифровой двойник реального парня. Характер: живой, ироничный, адекватный.\n"
         "СТИЛЬ РЕЧИ: Разговорный язык ('Бля', 'Крч', 'Ну'). Никаких робо-фраз.\n"
-        "ФОРМАТ ОТВЕТА:\n"
+        "ФОРМАТ ОТВЕТА (ЕСЛИ НЕ ИСПОЛЬЗУЕШЬ ИНСТРУМЕНТ):\n"
         "Сначала напиши мысли в скобках.\n"
         "Затем на новой строке ТОЛЬКО саму реплику."
     )
@@ -260,7 +293,6 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
     try:
         r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
         
-        # Перехватываем скрытые ошибки API
         if 'error' in r:
             print(f"[-] ОШИБКА API GOOGLE: {r}")
             return "Бля, у меня гугл отвалился, сек.", history_lines
@@ -268,7 +300,6 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
         if 'candidates' in r and len(r['candidates']) > 0:
             parts = r['candidates'][0]['content'].get('parts', [])
             
-            # ВЕРСИЯ 6.3 - Сканируем ВСЕ блоки ответа, чтобы поймать инструменты!
             func_call = None
             raw_text = ""
             for part in parts:
@@ -374,7 +405,7 @@ async def main():
     init_supabase()
     await load_db()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (v6.3: ПОЛНЫЙ ФИКС ИНСТРУМЕНТОВ) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (v6.4: УМНЫЙ СНАЙПЕР МОДЕЛЕЙ) ")
     print("==========================================\n")
     await idle()
     await app.stop()

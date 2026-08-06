@@ -8,7 +8,6 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from supabase import create_client, Client as SupabaseClient
 from duckduckgo_search import DDGS
 
-# Костыль для новых версий Python
 try:
     loop = asyncio.get_event_loop()
 except RuntimeError:
@@ -18,7 +17,6 @@ except RuntimeError:
 from pyrogram import Client, filters, idle
 from pyrogram.enums import ChatAction
 
-# Микро-вебсервер
 class DummyHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -32,7 +30,6 @@ def run_dummy_server():
 
 threading.Thread(target=run_dummy_server, daemon=True).start()
 
-# Ключи
 API_ID = int(os.environ.get("API_ID", "31001164"))
 API_HASH = os.environ.get("API_HASH", "18ae94f76873c93be328527e858de657")
 SESSION_STRING = os.environ.get("SESSION_STRING")
@@ -41,7 +38,6 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
-# Инициализация Supabase
 supabase: SupabaseClient = None
 
 def init_supabase():
@@ -55,18 +51,25 @@ def init_supabase():
     except Exception as e:
         print(f"\n[-] ОШИБКА ПОДКЛЮЧЕНИЯ SUPABASE: {e}\n")
 
-# Инструменты для Gemini (Исправлен camelCase!)
+# Жестко фиксируем умную модель 1.5 Flash для работы с функциями
+WORKING_MODEL = "models/gemini-1.5-flash"
+WORKING_EMBEDDING_MODEL = None
+CHANNEL_ID = None
+USER_CARDS = {}
+PENDING_MESSAGES = {}
+PENDING_TASKS = {}
+
 GEMINI_TOOLS = [{
     "functionDeclarations": [
         {
             "name": "web_search",
-            "description": "Поиск свежей информации в интернете. Обязательно используй эту функцию, если пользователь спрашивает текущую погоду, новости, факты, курсы валют или расписания.",
+            "description": "Искать информацию в Интернете. Вызывай СРАЗУ ЖЕ, если пользователь спрашивает текущую погоду, курсы валют (крипту), новости или факты.",
             "parameters": {
                 "type": "OBJECT",
                 "properties": {
                     "query": {
                         "type": "STRING",
-                        "description": "Точный поисковый запрос (например: 'погода Пермь сегодня' или 'курс ETH в долларах')."
+                        "description": "Точный поисковый запрос (например: 'погода Пермь сегодня' или 'курс ETH к рублю')."
                     }
                 },
                 "required": ["query"]
@@ -83,8 +86,7 @@ def tool_web_search(query):
     try:
         print(f"[~] Гуглю в DuckDuckGo: '{query}'")
         results = DDGS().text(query, max_results=3)
-        if not results:
-            return "Ничего не найдено."
+        if not results: return "Ничего не найдено."
         res_str = ""
         for i, r in enumerate(results):
             res_str += f"{i+1}. {r['title']} - {r['body']}\n"
@@ -95,33 +97,7 @@ def tool_web_search(query):
 def tool_get_current_datetime():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-# Инвайт-ссылка канала-базы
-CHANNEL_INVITE = "https://t.me/+VyP5UYDmzqkyZGZi"
 app = Client("my_account", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_STRING)
-
-WORKING_MODEL = None
-WORKING_EMBEDDING_MODEL = None
-CHANNEL_ID = None
-USER_CARDS = {}
-PENDING_MESSAGES = {}
-PENDING_TASKS = {}
-
-def find_working_model():
-    list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
-    try:
-        res = requests.get(list_url).json()
-        if 'models' not in res: return None
-        for m in res['models']:
-            model_name = m['name']
-            if 'generateContent' in m.get('supportedGenerationMethods', []):
-                test_url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:generateContent?key={GEMINI_API_KEY}"
-                payload = {"contents": [{"parts": [{"text": "hi"}]}]}
-                r = requests.post(test_url, json=payload, headers={'Content-Type': 'application/json'})
-                if r.status_code == 200:
-                    return model_name
-    except Exception:
-        pass
-    return None
 
 def find_working_embedding_model():
     list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
@@ -136,7 +112,6 @@ def find_working_embedding_model():
                 payload = {"model": model_name, "content": {"parts": [{"text": "hi"}]}}
                 r = requests.post(test_url, json=payload, headers={'Content-Type': 'application/json'})
                 if r.status_code == 200:
-                    print(f"[+] НАЙДЕНА РАБОЧАЯ МОДЕЛЬ ВЕКТОРОВ: {model_name}")
                     return model_name
     except Exception:
         pass
@@ -250,10 +225,6 @@ def parse_history_from_text(card_text):
     return history_lines
 
 def ask_gemini(user_id, sender_name, user_text, card_text):
-    global WORKING_MODEL
-    if not WORKING_MODEL: WORKING_MODEL = find_working_model()
-    if not WORKING_MODEL: return "Я сейчас немного туплю, отвечу позже.", []
-    
     vector_context = get_relevant_memories(user_id, user_text)
     
     history_lines = parse_history_from_text(card_text)
@@ -265,14 +236,14 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
     if vector_context:
         prompt += f"ФАКТЫ ИЗ ДОЛГОВРЕМЕННОЙ ПАМЯТИ:\n{vector_context}\n\n"
         
-    prompt += "Оцени последнее сообщение и напиши ответную реплику от первого лица. ВНИМАНИЕ: Если тебя спрашивают о фактах, погоде или курсах, НЕ имитируй поиск текстом, а СРАЗУ ВЫЗЫВАЙ ФУНКЦИЮ web_search через API."
+    prompt += "Оцени сообщение. Если вопрос требует свежих данных (погода, цены, время) — ВЫЗЫВАЙ ФУНКЦИЮ web_search. НЕ ВЕРЬ СТАРЫМ ФАКТАМ ИЗ ПАМЯТИ ДЛЯ ОТВЕТА НА ТАКИЕ ВОПРОСЫ!"
     
     system_instruction = (
-        "Ты — цифровой двойник реального парня. Твой характер: живой, ироничный, адекватный, но со стержнем.\n"
-        "СТИЛЬ РЕЧИ: Живой разговорный язык, междометия ('Бля', 'Крч', 'Ну', 'Ахуеть'). Никаких робо-фраз.\n"
-        "ФОРМАТ ОТВЕТА (ЕСЛИ ПРОСТО ОТВЕЧАЕШЬ):\n"
-        "Сначала напиши свои мысли в скобках.\n"
-        "Сразу после скобок на новой строке напиши ТОЛЬКО саму реплику на русском языке."
+        "Ты — цифровой двойник реального парня. Характер: живой, ироничный, адекватный.\n"
+        "СТИЛЬ РЕЧИ: Разговорный язык ('Бля', 'Крч', 'Ну'). Никаких робо-фраз и списков.\n"
+        "ФОРМАТ ОТВЕТА (ЕСЛИ НЕ ИСПОЛЬЗУЕШЬ ИНСТРУМЕНТ):\n"
+        "Сначала напиши мысли в скобках.\n"
+        "Затем на новой строке ТОЛЬКО саму реплику."
     )
 
     url = f"https://generativelanguage.googleapis.com/v1beta/{WORKING_MODEL}:generateContent?key={GEMINI_API_KEY}"
@@ -287,7 +258,7 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
         if 'candidates' in r and len(r['candidates']) > 0:
             first_part = r['candidates'][0]['content']['parts'][0]
             
-            # МАГИЯ: Проверяем, вызвал ли ИИ инструмент!
+            # Ловим системный вызов
             if 'functionCall' in first_part:
                 func_name = first_part['functionCall']['name']
                 args = first_part['functionCall'].get('args', {})
@@ -301,9 +272,7 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
                 
                 print(f"[!] РЕЗУЛЬТАТ ИНСТРУМЕНТА: {tool_result[:100]}...")
                 
-                # Подкидываем результаты поиска обратно Сеньке
-                follow_up_prompt = prompt + f"\n\n[СИСТЕМНОЕ СООБЩЕНИЕ: Ты запросил инструмент '{func_name}'. Результат из интернета:\n{tool_result}\n\nОпирайся на эти реальные данные для ответа.]"
-                
+                follow_up_prompt = prompt + f"\n\n[СИСТЕМНОЕ СООБЩЕНИЕ: Результат из интернета:\n{tool_result}\n\nОпирайся на эти данные для ответа.]"
                 payload2 = {
                     "systemInstruction": {"parts": [{"text": system_instruction}]},
                     "contents": [{"parts": [{"text": follow_up_prompt}]}]
@@ -313,7 +282,6 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
             else:
                 raw_answer = first_part.get('text', '')
             
-            # Очистка ответа от скобок и лишнего
             lines = [l.strip() for l in raw_answer.split('\n') if l.strip()]
             ans = ""
             for line in reversed(lines):
@@ -378,7 +346,7 @@ async def main():
     init_supabase()
     await load_db()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (v6.1: ИНСТРУМЕНТЫ WEB И ВРЕМЯ) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (v6.2: 1.5 FLASH + ИНСТРУМЕНТЫ) ")
     print("==========================================\n")
     await idle()
     await app.stop()

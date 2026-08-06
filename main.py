@@ -14,7 +14,7 @@ except RuntimeError:
 
 from pyrogram import Client, filters, idle
 
-# Микро-вебсервер
+# Микро-вебсервер для Render
 class DummyHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -34,22 +34,17 @@ API_HASH = os.environ.get("API_HASH", "18ae94f76873c93be328527e858de657")
 SESSION_STRING = os.environ.get("SESSION_STRING")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
+# ID твоего закрытого канала-базы данных
+CHANNEL_ID = -1004294686406
+
 app = Client("my_account", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_STRING)
 
 WORKING_MODEL = None
-HISTORY = {}
+USER_CARDS = {}  # user_id -> message_id в канале
 
-# Буфер для накопления спам-сообщений
+# Буфер для накопления сообщений (чтобы отвечать одной пачкой)
 PENDING_MESSAGES = {}
 PENDING_TASKS = {}
-
-# Словарь твоих стикеров
-STICKERS = {
-    "[LAUGH]": "AAMCAgADGQEAAVEiBmpOBifbtv867WvTc6QqTmjr3WLjAAIrDAACFTpwSJp37YXEeZ8_AQAHbQADPQQ",
-    "[SAD]": "AAMCAgADGQEAAVEiDGp0BmklGXe-xr_q4UfQTneFo2zHAALvFQACvBn5SwF3YMbxzSi5AQAHbQADPQQ",
-    "[WTF]": "AAMCAgADGQEAAVEiCmp0BlKTS7_jB4fxgYhxZAN1cZG8AAJFFAACRQL5SxYC3rjm4awTAQAHbQADPQQ",
-    "[AGRO]": "AAMCBAADGQEAAVEiCGp0BkOGHMelVbrnaKkZ3q3tFeHoAAIJAQACFXbpBwfU4SgNSTquAQAHbQADPQQ"
-}
 
 def find_working_model():
     list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
@@ -68,31 +63,98 @@ def find_working_model():
         pass
     return None
 
-def ask_gemini(user_id, user_text):
-    global WORKING_MODEL, HISTORY
+async def load_db():
+    global USER_CARDS
+    try:
+        async for message in app.get_chat_history(CHANNEL_ID, limit=200):
+            if message.text:
+                match = re.search(r'\[USER_ID:\s*(-?\d+)\]', message.text)
+                if match:
+                    uid = int(match.group(1))
+                    if uid not in USER_CARDS:
+                        USER_CARDS[uid] = message.id
+        print(f"\n[!] Загружена база памяти из канала. Найдено карточек: {len(USER_CARDS)}")
+    except Exception as e:
+        print(f"[-] Ошибка загрузки базы из канала: {e}")
+
+async def get_or_create_card(user_id, sender_name):
+    if user_id not in USER_CARDS:
+        initial_text = f"[USER_ID: {user_id}]\nИмя: {sender_name}\nИстория:\n"
+        sent = await app.send_message(CHANNEL_ID, initial_text)
+        USER_CARDS[user_id] = sent.id
+        return sent.id, initial_text
+    else:
+        msg_id = USER_CARDS[user_id]
+        try:
+            msg = await app.get_messages(CHANNEL_ID, msg_id)
+            if msg and msg.text:
+                return msg_id, msg.text
+        except Exception:
+            pass
+        sent = await app.send_message(CHANNEL_ID, f"[USER_ID: {user_id}]\nИмя: {sender_name}\nИстория:\n")
+        USER_CARDS[user_id] = sent.id
+        return sent.id, sent.text
+
+async def update_card_history(user_id, sender_name, history_lines):
+    msg_id, _ = await get_or_create_card(user_id, sender_name)
+    history_str = "\n".join(history_lines)
+    full_text = f"[USER_ID: {user_id}]\nИмя: {sender_name}\nИстория:\n{history_str}"
+    if len(full_text) > 4000:
+        full_text = full_text[-4000:]
+    try:
+        await app.edit_message_text(CHANNEL_ID, msg_id, full_text)
+    except Exception as e:
+        print(f"[-] Ошибка обновления карточки: {e}")
+
+def parse_history_from_text(card_text):
+    lines = card_text.split('\n')
+    history_lines = []
+    capture = False
+    for line in lines:
+        if line.startswith("История:"):
+            capture = True
+            continue
+        if capture:
+            if line.strip():
+                history_lines.append(line.strip())
+    return history_lines
+
+def ask_gemini(user_id, sender_name, user_text, card_text):
+    global WORKING_MODEL
     if not WORKING_MODEL:
         WORKING_MODEL = find_working_model()
     if not WORKING_MODEL:
-        return "Я сейчас немного туплю, отвечу позже."
+        return "Я сейчас немного туплю, отвечу позже.", []
     
-    if user_id not in HISTORY:
-        HISTORY[user_id] = []
+    history_lines = parse_history_from_text(card_text)
+    history_lines.append(f"Собеседник: {user_text}")
+    
+    # Держим контекст из последних 10 сообщений
+    if len(history_lines) > 10:
+        history_lines = history_lines[-10:]
         
-    HISTORY[user_id].append({"sender": "Собеседник", "text": user_text})
+    dialogue_str = "\n".join(history_lines)
     
-    if len(HISTORY[user_id]) > 8:
-        HISTORY[user_id] = HISTORY[user_id][-8:]
-        
-    dialogue = "\n".join([f"{msg['sender']}: {msg['text']}" for msg in HISTORY[user_id]])
-    
-    prompt = f"История переписки:\n{dialogue}\n\nНапиши СВОЮ реплику."
+    prompt = f"История переписки с этим человеком:\n{dialogue_str}\n\nНапиши СВОЮ ответную реплику от первого лица."
+
+    system_instruction = (
+        "Ты — цифровой двойник реального пацана в личке Telegram. Твой стиль общения: дерзкий, циничный, ленивый, используешь сленг и мат (но в меру, по делу), отвечаешь коротко и резко.\n\n"
+        "Примеры твоего стиля:\n"
+        "- Собеседник: 'Ты где пропал?' -> Ты: 'Да делами занят был, чё хотел?'\n"
+        "- Собеседник: 'Займи тыщу до завтра' -> Ты: 'Ага, уже бегу до банкомата, раскатал губу.'\n"
+        "- Собеседник: 'Ты меня заебать решил?' -> Ты: 'Давай короче и по делу, без этой сопливой хуеты.'\n"
+        "- Собеседник: 'Что делаешь?' -> Ты: 'Да в анабиозе, отвали до вечера.'\n"
+        "- Собеседник: 'Смотри че нашел' -> Ты: 'Ахуеть... Это щас че за пиздец только что был?'\n\n"
+        "ПРАВИЛА:\n"
+        "1. ВЫДАЙ ТОЛЬКО ОДНУ ФРАЗУ НА РУССКОМ.\n"
+        "2. КАТЕГОРИЧЕСКИ ЗАПРЕЩАЕТСЯ писать списки, рассуждения, мета-теги (Response, Selected, Option), кавычки или английский язык.\n"
+        "3. ТОЛЬКО ГОЛЫЙ ТЕКСТ ОТВЕТА."
+    )
 
     url = f"https://generativelanguage.googleapis.com/v1beta/{WORKING_MODEL}:generateContent?key={GEMINI_API_KEY}"
     payload = {
         "systemInstruction": {
-            "parts": [{
-                "text": "Ты дерзкий пацан. ВЫДАЙ ТОЛЬКО ОДНУ ФРАЗУ НА РУССКОМ. КАТЕГОРИЧЕСКИ ЗАПРЕЩАЕТСЯ писать списки, мета-теги или английский язык. ИСКЛЮЧЕНИЕ: Если эмоции ЗАШКАЛИВАЮТ, ты МОЖЕШЬ добавить в конец ответа строго ОДИН из этих тегов: [LAUGH] (очень смешно), [SAD] (грусть/обида), [WTF] (шок/непонимание), [AGRO] (злость/наезд). НЕ СПАМЬ ИМИ, используй редко и только когда очень в тему."
-            }]
+            "parts": [{"text": system_instruction}]
         },
         "contents": [{
             "parts": [{"text": prompt}]
@@ -116,76 +178,55 @@ def ask_gemini(user_id, user_text):
             if clean_lines:
                 ans = clean_lines[-1]
                 ans = re.sub(r'^"|"$', '', ans).strip()
-                ans = re.sub(r'^(\*.*?\*)', '', ans).strip() # Удаляем возможные звездочки, но оставляем квадратные скобки со стикерами
+                ans = re.sub(r'^(\*.*?\*)', '', ans).strip()
                 
-                HISTORY[user_id].append({"sender": "Ты", "text": ans})
-                return ans
-            else:
-                HISTORY[user_id].pop()
-                return "Давай потом, я че-то завис."
-                
+                history_lines.append(f"Ты: {ans}")
+                return ans, history_lines
     except Exception as e:
-        print(f"Ошибка API: {e}")
+        print(f"[-] Ошибка API Gemini: {e}")
         
-    HISTORY[user_id].pop()
-    return "Занят, позже перетрем."
+    return "Занят, позже перетрем.", history_lines
 
 async def process_batch(client, message, user_id, sender_name):
     try:
-        # Ждем 4 секунды. Если собеседник печатает еще, таск будет отменен и перезапущен
         await asyncio.sleep(4)
     except asyncio.CancelledError:
         return
         
-    # Если 4 секунды тишины — забираем все накопленные сообщения
     msgs = PENDING_MESSAGES.pop(user_id, [])
     if not msgs: return
     
     combined_text = " | ".join(msgs)
     print(f"\n[!] Собрана пачка от {sender_name}: {combined_text}")
     
-    # Отправляем запрос к ИИ в отдельном потоке, чтобы не вешать Pyrogram
-    reply_text = await asyncio.to_thread(ask_gemini, user_id, combined_text)
+    _, card_text = await get_or_create_card(user_id, sender_name)
+    reply_text, new_history = await asyncio.to_thread(ask_gemini, user_id, sender_name, combined_text, card_text)
     
-    # Ищем стикеры в ответе
-    sticker_to_send = None
-    for tag, file_id in STICKERS.items():
-        if tag in reply_text:
-            sticker_to_send = file_id
-            reply_text = reply_text.replace(tag, "").strip()
-            break # Больше одного стикера за раз не кидаем
-            
-    # Отправляем текст (если он остался после вырезания тега)
+    await update_card_history(user_id, sender_name, new_history)
+    
     if reply_text:
         await message.reply(reply_text)
         print(f"[+] Отвечено: {reply_text}")
-        
-    # Отправляем стикер
-    if sticker_to_send:
-        await message.reply_sticker(sticker_to_send)
-        print(f"[+] Отправлен стикер!")
 
 @app.on_message(filters.private & ~filters.me & ~filters.bot)
 async def auto_reply(client, message):
     user_id = message.from_user.id
     sender_name = message.from_user.first_name if message.from_user else "Кто-то"
     
-    # Закидываем сообщение в буфер
     if user_id not in PENDING_MESSAGES:
         PENDING_MESSAGES[user_id] = []
     PENDING_MESSAGES[user_id].append(message.text)
     
-    # Сбрасываем таймер ожидания, если он уже был
     if user_id in PENDING_TASKS:
         PENDING_TASKS[user_id].cancel()
         
-    # Запускаем новый таймер на 4 секунды
     PENDING_TASKS[user_id] = asyncio.create_task(process_batch(client, message, user_id, sender_name))
 
 async def main():
     await app.start()
+    await load_db()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (v2.0: БУФЕР + СТИКЕРЫ) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (v3.0: ТЕЛЕГРАМ-БАЗА + FEW-SHOT) ")
     print("==========================================\n")
     await idle()
     await app.stop()

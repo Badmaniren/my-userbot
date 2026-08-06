@@ -3,8 +3,10 @@ import requests
 import asyncio
 import threading
 import re
+from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from supabase import create_client, Client as SupabaseClient
+from duckduckgo_search import DDGS
 
 # Костыль для новых версий Python
 try:
@@ -45,7 +47,7 @@ supabase: SupabaseClient = None
 def init_supabase():
     global supabase
     if not SUPABASE_URL or not SUPABASE_KEY:
-        print("\n[!] ОШИБКА: SUPABASE_URL или SUPABASE_KEY не найдены в переменных Render!\n")
+        print("\n[!] ОШИБКА: SUPABASE_URL или SUPABASE_KEY не найдены!\n")
         return
     try:
         supabase = create_client(SUPABASE_URL.strip(), SUPABASE_KEY.strip())
@@ -53,16 +55,54 @@ def init_supabase():
     except Exception as e:
         print(f"\n[-] ОШИБКА ПОДКЛЮЧЕНИЯ SUPABASE: {e}\n")
 
+# Инструменты для Gemini (Function Declarations)
+GEMINI_TOOLS = [{
+    "function_declarations": [
+        {
+            "name": "web_search",
+            "description": "Поиск свежей информации в интернете. Использовать, если пользователь спрашивает факты, новости, погоду, курсы валют или то, чего ты не знаешь.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "query": {
+                        "type": "STRING",
+                        "description": "Точный поисковый запрос (например: 'погода в Москве сегодня' или 'курс доллара')."
+                    }
+                },
+                "required": ["query"]
+            }
+        },
+        {
+            "name": "get_current_datetime",
+            "description": "Получить текущее точное время и дату сервера.",
+        }
+    ]
+}]
+
+def tool_web_search(query):
+    try:
+        print(f"[~] Гуглю в DuckDuckGo: '{query}'")
+        results = DDGS().text(query, max_results=3)
+        if not results:
+            return "Ничего не найдено."
+        res_str = ""
+        for i, r in enumerate(results):
+            res_str += f"{i+1}. {r['title']} - {r['body']}\n"
+        return res_str
+    except Exception as e:
+        return f"Ошибка поиска: {e}"
+
+def tool_get_current_datetime():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
 # Инвайт-ссылка канала-базы
 CHANNEL_INVITE = "https://t.me/+VyP5UYDmzqkyZGZi"
-
 app = Client("my_account", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_STRING)
 
 WORKING_MODEL = None
 WORKING_EMBEDDING_MODEL = None
 CHANNEL_ID = None
 USER_CARDS = {}
-
 PENDING_MESSAGES = {}
 PENDING_TASKS = {}
 
@@ -84,7 +124,6 @@ def find_working_model():
     return None
 
 def find_working_embedding_model():
-    """Автоматически находит рабочую модель для генерации векторов"""
     list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
     try:
         res = requests.get(list_url).json()
@@ -94,63 +133,46 @@ def find_working_embedding_model():
             methods = m.get('supportedGenerationMethods', [])
             if 'embedContent' in methods or 'batchEmbedContents' in methods:
                 test_url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:embedContent?key={GEMINI_API_KEY}"
-                payload = {
-                    "model": model_name,
-                    "content": {"parts": [{"text": "hi"}]}
-                }
+                payload = {"model": model_name, "content": {"parts": [{"text": "hi"}]}}
                 r = requests.post(test_url, json=payload, headers={'Content-Type': 'application/json'})
                 if r.status_code == 200:
                     print(f"[+] НАЙДЕНА РАБОЧАЯ МОДЕЛЬ ВЕКТОРОВ: {model_name}")
                     return model_name
-    except Exception as e:
-        print(f"[-] Ошибка поиска модели эмбеддингов: {e}")
+    except Exception:
+        pass
     return None
 
 def get_embedding(text):
-    """Генерация вектора с динамическим подбором модели"""
     global WORKING_EMBEDDING_MODEL
     if not WORKING_EMBEDDING_MODEL:
         WORKING_EMBEDDING_MODEL = find_working_embedding_model()
-    if not WORKING_EMBEDDING_MODEL:
-        print("[-] Не удалось найти рабочую модель эмбеддингов Google API.")
-        return None
+    if not WORKING_EMBEDDING_MODEL: return None
         
     url = f"https://generativelanguage.googleapis.com/v1beta/{WORKING_EMBEDDING_MODEL}:embedContent?key={GEMINI_API_KEY}"
-    payload = {
-        "model": WORKING_EMBEDDING_MODEL,
-        "content": {"parts": [{"text": text}]}
-    }
+    payload = {"model": WORKING_EMBEDDING_MODEL, "content": {"parts": [{"text": text}]}}
     try:
         r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
         if 'embedding' in r and 'values' in r['embedding']:
             return r['embedding']['values']
-        else:
-            print(f"[-] Ошибка формата ответа Gemini: {r}")
-    except Exception as e:
-        print(f"[-] Ошибка запроса эмбеддинга: {e}")
+    except Exception:
+        pass
     return None
 
 def save_memory_to_supabase(user_id, content):
-    """Сохраняем факт переписки в векторную БД"""
-    if not supabase:
-        print("[-] Отмена записи: Supabase не инициализирован.")
-        return
+    if not supabase: return
     vector = get_embedding(content)
-    if not vector:
-        print("[-] Отмена записи: Вектор не сгенерирован.")
-        return
+    if not vector: return
     try:
         supabase.table("memories").insert({
             "user_id": user_id,
             "content": content,
             "embedding": vector
         }).execute()
-        print(f"[+] ВЕКТОРНАЯ ПАМЯТЬ УСПЕШНО СОХРАНЕНА В SUPABASE: '{content[:40]}...'")
+        print(f"[+] ВЕКТОРНАЯ ПАМЯТЬ УСПЕШНО СОХРАНЕНА: '{content[:30]}...'")
     except Exception as e:
         print(f"[-] Ошибка записи в Supabase: {e}")
 
 def get_relevant_memories(user_id, current_text):
-    """Ищем 3 самых похожих по смыслу воспоминания из базы"""
     if not supabase: return ""
     vector = get_embedding(current_text)
     if not vector: return ""
@@ -161,23 +183,18 @@ def get_relevant_memories(user_id, current_text):
             "match_count": 3,
             "p_user_id": user_id
         }).execute()
-        
         if res.data and len(res.data) > 0:
             memories_list = [item['content'] for item in res.data]
-            print(f"[!] ИЗВЛЕЧЕНО ВЕКТОРНЫХ ВОСПОМИНАНИЙ ИЗ SUPABASE: {len(memories_list)}")
             return "\n".join(memories_list)
-    except Exception as e:
-        print(f"[-] Ошибка поиска векторов в Supabase: {e}")
+    except Exception:
+        pass
     return ""
 
 async def load_db():
     global CHANNEL_ID, USER_CARDS
     try:
-        print(f"[~] Резолвлю канал через инвайт-ссылку...")
         chat = await app.get_chat(CHANNEL_INVITE)
         CHANNEL_ID = chat.id
-        print(f"[+] Успешно! Канал '{chat.title}' привязан. ID: {CHANNEL_ID}")
-        
         async for message in app.get_chat_history(CHANNEL_ID, limit=200):
             if message.text:
                 match = re.search(r'\[USER_ID:\s*(-?\d+)\]', message.text)
@@ -185,9 +202,8 @@ async def load_db():
                     uid = int(match.group(1))
                     if uid not in USER_CARDS:
                         USER_CARDS[uid] = message.id
-        print(f"[!] Канал загружен. Найдено карточек: {len(USER_CARDS)}")
-    except Exception as e:
-        print(f"\n[-] КРИТИЧЕСКАЯ ОШИБКА РЕЗОЛВА КАНАЛА: {e}\n")
+    except Exception:
+        pass
 
 async def get_or_create_card(user_id, sender_name):
     if not CHANNEL_ID: return None, ""
@@ -213,11 +229,9 @@ async def update_card_history(user_id, sender_name, history_lines):
     if not CHANNEL_ID: return
     msg_id, _ = await get_or_create_card(user_id, sender_name)
     if not msg_id: return
-    
     history_str = "\n".join(history_lines)
     full_text = f"[USER_ID: {user_id}]\nИмя: {sender_name}\nИстория:\n{history_str}"
-    if len(full_text) > 4000:
-        full_text = full_text[-4000:]
+    if len(full_text) > 4000: full_text = full_text[-4000:]
     try:
         await app.edit_message_text(CHANNEL_ID, msg_id, full_text)
     except Exception:
@@ -237,37 +251,25 @@ def parse_history_from_text(card_text):
 
 def ask_gemini(user_id, sender_name, user_text, card_text):
     global WORKING_MODEL
-    if not WORKING_MODEL:
-        WORKING_MODEL = find_working_model()
-    if not WORKING_MODEL:
-        return "Я сейчас немного туплю, отвечу позже.", []
+    if not WORKING_MODEL: WORKING_MODEL = find_working_model()
+    if not WORKING_MODEL: return "Я сейчас немного туплю, отвечу позже.", []
     
-    # 1. Запрашиваем смысловые воспоминания из Supabase
     vector_context = get_relevant_memories(user_id, user_text)
     
-    # 2. Берем последние пару сообщений из карточки
     history_lines = parse_history_from_text(card_text)
     history_lines.append(f"Собеседник: {user_text}")
-    if len(history_lines) > 8:
-        history_lines = history_lines[-8:]
-        
+    if len(history_lines) > 8: history_lines = history_lines[-8:]
     dialogue_str = "\n".join(history_lines)
     
     prompt = f"Последний диалог:\n{dialogue_str}\n\n"
     if vector_context:
-        prompt += f"ФАКТЫ ИЗ ДОЛГОВРЕМЕННОЙ ПАМЯТИ ОБ ЭТОМ ЧЕЛОВЕКЕ:\n{vector_context}\n\n"
+        prompt += f"ФАКТЫ ИЗ ДОЛГОВРЕМЕННОЙ ПАМЯТИ:\n{vector_context}\n\n"
         
-    prompt += "Оцени последнее сообщение, учитывай долгосрочные факты (если есть) и напиши ответную реплику от первого лица."
+    prompt += "Оцени последнее сообщение и напиши ответную реплику от первого лица. Если не знаешь ответ — используй инструменты."
     
     system_instruction = (
-        "Ты — цифровой двойник реального парня. Твой характер: живой, ироничный, адекватный, но со стержнем.\n\n"
-        "ПРАВИЛА ПОВЕДЕНИЯ:\n"
-        "1. ЗЕРКАЛО И ДИНАМИКА: Отвечай адекватно тону собеседника. Смещай гнев на милость, если собеседник пишет нормально.\n"
-        "2. ИСПОЛЬЗУЙ ВЕКТОРНУЮ ПАМЯТЬ: Если в блоке фактов есть нужная инфа — опирайся на нее естественно, будто реально помнишь.\n"
-        "3. Если ржет — подкалывай. Если грубит — ставь на место.\n\n"
-        "СТИЛЬ РЕЧИ:\n"
-        "- Живой разговорный язык, междометия ('Бля', 'Крч', 'Ну', 'Ахуеть').\n"
-        "- Никаких робо-фраз.\n\n"
+        "Ты — цифровой двойник реального парня. Твой характер: живой, ироничный, адекватный, но со стержнем.\n"
+        "СТИЛЬ РЕЧИ: Живой разговорный язык, междометия ('Бля', 'Крч', 'Ну', 'Ахуеть'). Никаких робо-фраз.\n"
         "ФОРМАТ ОТВЕТА:\n"
         "Сначала напиши свои мысли в скобках (например: '(вспоминаю прошлый базар)').\n"
         "Сразу после скобок на новой строке напиши ТОЛЬКО саму реплику на русском языке."
@@ -276,14 +278,42 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
     url = f"https://generativelanguage.googleapis.com/v1beta/{WORKING_MODEL}:generateContent?key={GEMINI_API_KEY}"
     payload = {
         "systemInstruction": {"parts": [{"text": system_instruction}]},
-        "contents": [{"parts": [{"text": prompt}]}]
+        "contents": [{"parts": [{"text": prompt}]}],
+        "tools": GEMINI_TOOLS
     }
     
     try:
-        response = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
-        if 'candidates' in response and len(response['candidates']) > 0:
-            raw_answer = response['candidates'][0]['content']['parts'][0]['text']
+        r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
+        if 'candidates' in r and len(r['candidates']) > 0:
+            first_part = r['candidates'][0]['content']['parts'][0]
             
+            # МАГИЯ: Проверяем, вызвал ли ИИ инструмент!
+            if 'functionCall' in first_part:
+                func_name = first_part['functionCall']['name']
+                args = first_part['functionCall'].get('args', {})
+                print(f"[!] ИИ ЗАПРОСИЛ ИНСТРУМЕНТ: {func_name} | Аргументы: {args}")
+                
+                tool_result = ""
+                if func_name == "web_search":
+                    tool_result = tool_web_search(args.get("query", ""))
+                elif func_name == "get_current_datetime":
+                    tool_result = tool_get_current_datetime()
+                
+                print(f"[!] РЕЗУЛЬТАТ ИНСТРУМЕНТА: {tool_result[:100]}...")
+                
+                # Подкидываем результаты поиска обратно Сеньке
+                follow_up_prompt = prompt + f"\n\n[СИСТЕМНОЕ СООБЩЕНИЕ: Ты запросил инструмент '{func_name}'. Результат:\n{tool_result}\n\nОпирайся на эти данные для ответа.]"
+                
+                payload2 = {
+                    "systemInstruction": {"parts": [{"text": system_instruction}]},
+                    "contents": [{"parts": [{"text": follow_up_prompt}]}]
+                }
+                r2 = requests.post(url, json=payload2, headers={'Content-Type': 'application/json'}).json()
+                raw_answer = r2['candidates'][0]['content']['parts'][0]['text']
+            else:
+                raw_answer = first_part.get('text', '')
+            
+            # Очистка ответа от скобок и лишнего
             lines = [l.strip() for l in raw_answer.split('\n') if l.strip()]
             ans = ""
             for line in reversed(lines):
@@ -291,25 +321,20 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
                     if re.search(r'[А-Яа-яЁё]', line):
                         ans = line
                         break
-            
             if not ans and lines:
                 for line in lines:
                     if not line.startswith('('):
                         ans = line
                         break
-                if not ans:
-                    ans = lines[-1]
+                if not ans: ans = lines[-1]
                 
             ans = re.sub(r'^[a-zA-Z0-9_ \-\.\?\!]+:\s*', '', ans).strip()
             ans = re.sub(r'^\d+\.\s*', '', ans).strip()
             ans = re.sub(r'^"|"$', '', ans).strip()
             
-            if not ans:
-                ans = "Чего?"
+            if not ans: ans = "Чего?"
 
-            # Сохраняем новую пару реплик в векторную память в фоновом потоке
             threading.Thread(target=save_memory_to_supabase, args=(user_id, f"Собеседник сказал: {user_text} | Ты ответил: {ans}")).start()
-
             history_lines.append(f"Ты: {ans}")
             return ans, history_lines
     except Exception as e:
@@ -320,44 +345,32 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
     return fallback, history_lines
 
 async def process_batch(client, message, user_id, sender_name):
-    try:
-        await asyncio.sleep(4)
-    except asyncio.CancelledError:
-        return
+    try: await asyncio.sleep(4)
+    except asyncio.CancelledError: return
         
     msgs = PENDING_MESSAGES.pop(user_id, [])
     if not msgs: return
-    
     combined_text = " | ".join(msgs)
     
-    try:
-        await app.send_chat_action(user_id, ChatAction.TYPING)
-    except Exception:
-        pass
+    try: await app.send_chat_action(user_id, ChatAction.TYPING)
+    except Exception: pass
     
     try:
         _, card_text = await get_or_create_card(user_id, sender_name)
         reply_text, new_history = await asyncio.to_thread(ask_gemini, user_id, sender_name, combined_text, card_text)
         await update_card_history(user_id, sender_name, new_history)
-        
-        if reply_text:
-            await message.reply(reply_text)
+        if reply_text: await message.reply(reply_text)
     except Exception as e:
-        print(f"[-] Ошибка в process_batch: {e}")
+        print(f"[-] Ошибка: {e}")
         await message.reply("Бля, у меня в мозгах че-то замкнуло, погоди.")
 
 @app.on_message(filters.private & ~filters.me & ~filters.bot)
 async def auto_reply(client, message):
     user_id = message.from_user.id
     sender_name = message.from_user.first_name if message.from_user else "Кто-то"
-    
-    if user_id not in PENDING_MESSAGES:
-        PENDING_MESSAGES[user_id] = []
+    if user_id not in PENDING_MESSAGES: PENDING_MESSAGES[user_id] = []
     PENDING_MESSAGES[user_id].append(message.text)
-    
-    if user_id in PENDING_TASKS:
-        PENDING_TASKS[user_id].cancel()
-        
+    if user_id in PENDING_TASKS: PENDING_TASKS[user_id].cancel()
     PENDING_TASKS[user_id] = asyncio.create_task(process_batch(client, message, user_id, sender_name))
 
 async def main():
@@ -365,7 +378,7 @@ async def main():
     init_supabase()
     await load_db()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (v5.2: АВТОПОИСК МОДЕЛИ ВЕКТОРОВ) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (v6.0: ИНСТРУМЕНТЫ WEB И ВРЕМЯ) ")
     print("==========================================\n")
     await idle()
     await app.stop()

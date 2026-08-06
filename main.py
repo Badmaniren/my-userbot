@@ -6,7 +6,7 @@ import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from pyrogram import Client, filters
 
-# Микро-вебсервер для обмана Render (чтобы бесплатный Web Service не отключался)
+# Микро-вебсервер для обмана Render
 class DummyHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -20,7 +20,7 @@ def run_dummy_server():
 
 threading.Thread(target=run_dummy_server, daemon=True).start()
 
-# Логика Юзербота
+# Настройки и ключи
 API_ID = int(os.environ.get("API_ID", "31001164"))
 API_HASH = os.environ.get("API_HASH", "18ae94f76873c93be328527e858de657")
 SESSION_STRING = os.environ.get("SESSION_STRING")
@@ -98,4 +98,9 @@ async def auto_reply(client, message):
     print(f"[+] Отвечено: {reply_text}")
 
 print("Юзербот стартовал на Render Web Service!")
+
+# Фикс цикла событий для новых версий Python
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+
 app.run()

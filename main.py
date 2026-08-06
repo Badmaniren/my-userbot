@@ -51,7 +51,7 @@ def init_supabase():
     except Exception as e:
         print(f"\n[-] ОШИБКА ПОДКЛЮЧЕНИЯ SUPABASE: {e}\n")
 
-# Жестко фиксируем умную модель 1.5 Flash для работы с функциями
+# Прибиваем гвоздями самую умную модель, которая умеет в инструменты
 WORKING_MODEL = "models/gemini-1.5-flash"
 WORKING_EMBEDDING_MODEL = None
 CHANNEL_ID = None
@@ -77,7 +77,11 @@ GEMINI_TOOLS = [{
         },
         {
             "name": "get_current_datetime",
-            "description": "Получить текущее точное время и дату.",
+            "description": "Получить текущее точное время и дату сервера.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {}
+            }
         }
     ]
 }]
@@ -143,7 +147,7 @@ def save_memory_to_supabase(user_id, content):
             "content": content,
             "embedding": vector
         }).execute()
-        print(f"[+] ВЕКТОРНАЯ ПАМЯТЬ УСПЕШНО СОХРАНЕНА: '{content[:30]}...'")
+        print(f"[+] ВЕКТОРНАЯ ПАМЯТЬ СОХРАНЕНА: '{content[:30]}...'")
     except Exception as e:
         print(f"[-] Ошибка записи в Supabase: {e}")
 
@@ -240,8 +244,8 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
     
     system_instruction = (
         "Ты — цифровой двойник реального парня. Характер: живой, ироничный, адекватный.\n"
-        "СТИЛЬ РЕЧИ: Разговорный язык ('Бля', 'Крч', 'Ну'). Никаких робо-фраз и списков.\n"
-        "ФОРМАТ ОТВЕТА (ЕСЛИ НЕ ИСПОЛЬЗУЕШЬ ИНСТРУМЕНТ):\n"
+        "СТИЛЬ РЕЧИ: Разговорный язык ('Бля', 'Крч', 'Ну'). Никаких робо-фраз.\n"
+        "ФОРМАТ ОТВЕТА:\n"
         "Сначала напиши мысли в скобках.\n"
         "Затем на новой строке ТОЛЬКО саму реплику."
     )
@@ -255,13 +259,27 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
     
     try:
         r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
-        if 'candidates' in r and len(r['candidates']) > 0:
-            first_part = r['candidates'][0]['content']['parts'][0]
+        
+        # Перехватываем скрытые ошибки API
+        if 'error' in r:
+            print(f"[-] ОШИБКА API GOOGLE: {r}")
+            return "Бля, у меня гугл отвалился, сек.", history_lines
             
-            # Ловим системный вызов
-            if 'functionCall' in first_part:
-                func_name = first_part['functionCall']['name']
-                args = first_part['functionCall'].get('args', {})
+        if 'candidates' in r and len(r['candidates']) > 0:
+            parts = r['candidates'][0]['content'].get('parts', [])
+            
+            # ВЕРСИЯ 6.3 - Сканируем ВСЕ блоки ответа, чтобы поймать инструменты!
+            func_call = None
+            raw_text = ""
+            for part in parts:
+                if 'functionCall' in part:
+                    func_call = part['functionCall']
+                if 'text' in part:
+                    raw_text += part['text'] + "\n"
+            
+            if func_call:
+                func_name = func_call['name']
+                args = func_call.get('args', {})
                 print(f"[!] ИИ ЗАПРОСИЛ ИНСТРУМЕНТ: {func_name} | Аргументы: {args}")
                 
                 tool_result = ""
@@ -272,15 +290,22 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
                 
                 print(f"[!] РЕЗУЛЬТАТ ИНСТРУМЕНТА: {tool_result[:100]}...")
                 
-                follow_up_prompt = prompt + f"\n\n[СИСТЕМНОЕ СООБЩЕНИЕ: Результат из интернета:\n{tool_result}\n\nОпирайся на эти данные для ответа.]"
+                follow_up_prompt = prompt + f"\n\n[СИСТЕМНОЕ СООБЩЕНИЕ: Результат инструмента:\n{tool_result}\n\nОпирайся на эти данные для ответа.]"
                 payload2 = {
                     "systemInstruction": {"parts": [{"text": system_instruction}]},
                     "contents": [{"parts": [{"text": follow_up_prompt}]}]
                 }
                 r2 = requests.post(url, json=payload2, headers={'Content-Type': 'application/json'}).json()
-                raw_answer = r2['candidates'][0]['content']['parts'][0]['text']
+                
+                if 'error' in r2:
+                    print(f"[-] ОШИБКА API GOOGLE (Этап 2): {r2}")
+                    return "Чет не могу переварить инфу из инета.", history_lines
+                    
+                raw_answer = ""
+                for p in r2['candidates'][0]['content'].get('parts', []):
+                    if 'text' in p: raw_answer += p['text'] + "\n"
             else:
-                raw_answer = first_part.get('text', '')
+                raw_answer = raw_text
             
             lines = [l.strip() for l in raw_answer.split('\n') if l.strip()]
             ans = ""
@@ -305,8 +330,11 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
             threading.Thread(target=save_memory_to_supabase, args=(user_id, f"Собеседник сказал: {user_text} | Ты ответил: {ans}")).start()
             history_lines.append(f"Ты: {ans}")
             return ans, history_lines
+        else:
+            print(f"[-] ПУСТОЙ ОТВЕТ ОТ GOOGLE: {r}")
+            
     except Exception as e:
-        print(f"[-] Ошибка API Gemini: {e}")
+        print(f"[-] КРИТИЧЕСКАЯ Ошибка API Gemini: {e}")
         
     fallback = "Чего?"
     history_lines.append(f"Ты: {fallback}")
@@ -346,7 +374,7 @@ async def main():
     init_supabase()
     await load_db()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (v6.2: 1.5 FLASH + ИНСТРУМЕНТЫ) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (v6.3: ПОЛНЫЙ ФИКС ИНСТРУМЕНТОВ) ")
     print("==========================================\n")
     await idle()
     await app.stop()

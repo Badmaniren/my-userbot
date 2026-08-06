@@ -4,7 +4,7 @@ import asyncio
 import random
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from pyrogram import Client, filters
+from pyrogram import Client, filters, idle
 
 # Микро-вебсервер для обмана Render
 class DummyHandler(BaseHTTPRequestHandler):
@@ -97,10 +97,14 @@ async def auto_reply(client, message):
     await message.reply(reply_text)
     print(f"[+] Отвечено: {reply_text}")
 
-print("Юзербот стартовал на Render Web Service!")
+# Запуск через чистый asyncio.run() под Python 3.14+
+async def main():
+    await app.start()
+    print("\n==========================================")
+    print(" ЮЗЕРБОТ УСПЕШНО СТАРТОВАЛ НА RENDER 24/7! ")
+    print("==========================================\n")
+    await idle()
+    await app.stop()
 
-# Фикс цикла событий для новых версий Python
-loop = asyncio.new_event_loop()
-asyncio.set_event_loop(loop)
-
-app.run()
+if __name__ == "__main__":
+    asyncio.run(main())

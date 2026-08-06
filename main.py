@@ -59,6 +59,7 @@ CHANNEL_INVITE = "https://t.me/+VyP5UYDmzqkyZGZi"
 app = Client("my_account", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_STRING)
 
 WORKING_MODEL = None
+WORKING_EMBEDDING_MODEL = None
 CHANNEL_ID = None
 USER_CARDS = {}
 
@@ -82,11 +83,41 @@ def find_working_model():
         pass
     return None
 
+def find_working_embedding_model():
+    """Автоматически находит рабочую модель для генерации векторов"""
+    list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
+    try:
+        res = requests.get(list_url).json()
+        if 'models' not in res: return None
+        for m in res['models']:
+            model_name = m['name']
+            methods = m.get('supportedGenerationMethods', [])
+            if 'embedContent' in methods or 'batchEmbedContents' in methods:
+                test_url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:embedContent?key={GEMINI_API_KEY}"
+                payload = {
+                    "model": model_name,
+                    "content": {"parts": [{"text": "hi"}]}
+                }
+                r = requests.post(test_url, json=payload, headers={'Content-Type': 'application/json'})
+                if r.status_code == 200:
+                    print(f"[+] НАЙДЕНА РАБОЧАЯ МОДЕЛЬ ВЕКТОРОВ: {model_name}")
+                    return model_name
+    except Exception as e:
+        print(f"[-] Ошибка поиска модели эмбеддингов: {e}")
+    return None
+
 def get_embedding(text):
-    """Генерация вектора (768 чисел) через Gemini"""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={GEMINI_API_KEY}"
+    """Генерация вектора с динамическим подбором модели"""
+    global WORKING_EMBEDDING_MODEL
+    if not WORKING_EMBEDDING_MODEL:
+        WORKING_EMBEDDING_MODEL = find_working_embedding_model()
+    if not WORKING_EMBEDDING_MODEL:
+        print("[-] Не удалось найти рабочую модель эмбеддингов Google API.")
+        return None
+        
+    url = f"https://generativelanguage.googleapis.com/v1beta/{WORKING_EMBEDDING_MODEL}:embedContent?key={GEMINI_API_KEY}"
     payload = {
-        "model": "models/text-embedding-004",
+        "model": WORKING_EMBEDDING_MODEL,
         "content": {"parts": [{"text": text}]}
     }
     try:
@@ -94,7 +125,7 @@ def get_embedding(text):
         if 'embedding' in r and 'values' in r['embedding']:
             return r['embedding']['values']
         else:
-            print(f"[-] Ошибка формата эмбеддинга Gemini: {r}")
+            print(f"[-] Ошибка формата ответа Gemini: {r}")
     except Exception as e:
         print(f"[-] Ошибка запроса эмбеддинга: {e}")
     return None
@@ -109,7 +140,7 @@ def save_memory_to_supabase(user_id, content):
         print("[-] Отмена записи: Вектор не сгенерирован.")
         return
     try:
-        res = supabase.table("memories").insert({
+        supabase.table("memories").insert({
             "user_id": user_id,
             "content": content,
             "embedding": vector
@@ -126,14 +157,14 @@ def get_relevant_memories(user_id, current_text):
     try:
         res = supabase.rpc("match_memories", {
             "query_embedding": vector,
-            "match_threshold": 0.4,
+            "match_threshold": 0.3,
             "match_count": 3,
             "p_user_id": user_id
         }).execute()
         
         if res.data and len(res.data) > 0:
             memories_list = [item['content'] for item in res.data]
-            print(f"[!] ИЗВЛЕЧЕНО ВЕКТОРНЫХ ВОСПОМИНАНИЙ: {len(memories_list)}")
+            print(f"[!] ИЗВЛЕЧЕНО ВЕКТОРНЫХ ВОСПОМИНАНИЙ ИЗ SUPABASE: {len(memories_list)}")
             return "\n".join(memories_list)
     except Exception as e:
         print(f"[-] Ошибка поиска векторов в Supabase: {e}")
@@ -331,10 +362,10 @@ async def auto_reply(client, message):
 
 async def main():
     await app.start()
-    init_supabase()  # Явная инициализация Supabase при старте!
+    init_supabase()
     await load_db()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (v5.1: ДИАГНОСТИКА ВЕКТОРОВ) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (v5.2: АВТОПОИСК МОДЕЛИ ВЕКТОРОВ) ")
     print("==========================================\n")
     await idle()
     await app.stop()

@@ -4,6 +4,15 @@ import asyncio
 import random
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
+
+# 1. ЗАБИВАЕМ КОСТЫЛЬ В САМОЕ НАЧАЛО (До инициализации Pyrogram!)
+try:
+    loop = asyncio.get_event_loop()
+except RuntimeError:
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+# 2. И только теперь импортируем капризную библиотеку
 from pyrogram import Client, filters, idle
 
 # Микро-вебсервер для обмана Render
@@ -20,7 +29,7 @@ def run_dummy_server():
 
 threading.Thread(target=run_dummy_server, daemon=True).start()
 
-# Настройки и ключи
+# Настройки и ключи (Берутся из сейфа Render, ты всё сделал правильно!)
 API_ID = int(os.environ.get("API_ID", "31001164"))
 API_HASH = os.environ.get("API_HASH", "18ae94f76873c93be328527e858de657")
 SESSION_STRING = os.environ.get("SESSION_STRING")
@@ -97,7 +106,6 @@ async def auto_reply(client, message):
     await message.reply(reply_text)
     print(f"[+] Отвечено: {reply_text}")
 
-# Запуск через чистый asyncio.run() под Python 3.14+
 async def main():
     await app.start()
     print("\n==========================================")
@@ -107,4 +115,4 @@ async def main():
     await app.stop()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    loop.run_until_complete(main())

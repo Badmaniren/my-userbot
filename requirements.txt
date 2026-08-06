@@ -2,4 +2,4 @@ pyrogram
 tgcrypto
 requests
 supabase
-duckduckgo_search
+ddgs

@@ -4,6 +4,7 @@ import asyncio
 import threading
 import re
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from supabase import create_client, Client as SupabaseClient
 
 # Костыль для новых версий Python
 try:
@@ -35,7 +36,19 @@ API_HASH = os.environ.get("API_HASH", "18ae94f76873c93be328527e858de657")
 SESSION_STRING = os.environ.get("SESSION_STRING")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-# Инвайт-ссылка твоего канала-базы
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+
+# Инициализация Supabase
+supabase: SupabaseClient = None
+if SUPABASE_URL and SUPABASE_KEY:
+    try:
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+        print("[+] Supabase успешно подключен!")
+    except Exception as e:
+        print(f"[-] Ошибка подключения Supabase: {e}")
+
+# Инвайт-ссылка канала-базы
 CHANNEL_INVITE = "https://t.me/+VyP5UYDmzqkyZGZi"
 
 app = Client("my_account", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_STRING)
@@ -65,14 +78,56 @@ def find_working_model():
         pass
     return None
 
-async def notify_admin_db_error(error_msg):
-    global DB_ERROR_NOTIFIED
-    if not DB_ERROR_NOTIFIED:
-        try:
-            await app.send_message("me", f"⚠️ **ОШИБКА КАНАЛА-БАЗЫ** ⚠️\nНе смог подключиться по инвайт-ссылке!\nОшибка: `{error_msg}`")
-            DB_ERROR_NOTIFIED = True
-        except:
-            pass
+def get_embedding(text):
+    """Генерация вектора (768 чисел) через Gemini"""
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={GEMINI_API_KEY}"
+    payload = {
+        "model": "models/text-embedding-004",
+        "content": {"parts": [{"text": text}]}
+    }
+    try:
+        r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
+        if 'embedding' in r and 'values' in r['embedding']:
+            return r['embedding']['values']
+    except Exception as e:
+        print(f"[-] Ошибка создания эмбеддинга: {e}")
+    return None
+
+def save_memory_to_supabase(user_id, content):
+    """Сохраняем факт переписки в векторную БД"""
+    if not supabase: return
+    vector = get_embedding(content)
+    if not vector: return
+    try:
+        supabase.table("memories").insert({
+            "user_id": user_id,
+            "content": content,
+            "embedding": vector
+        }).execute()
+        print(f"[+] Векторная память сохранена: '{content[:30]}...'")
+    except Exception as e:
+        print(f"[-] Ошибка записи в Supabase: {e}")
+
+def get_relevant_memories(user_id, current_text):
+    """Ищем 3 самых похожих по смыслу воспоминания из базы"""
+    if not supabase: return ""
+    vector = get_embedding(current_text)
+    if not vector: return ""
+    try:
+        res = supabase.rpc("match_memories", {
+            "query_embedding": vector,
+            "match_threshold": 0.4,
+            "match_count": 3,
+            "p_user_id": user_id
+        }).execute()
+        
+        if res.data and len(res.data) > 0:
+            memories_list = [item['content'] for item in res.data]
+            print(f"[!] Найдено схожих воспоминаний: {len(memories_list)}")
+            return "\n".join(memories_list)
+    except Exception as e:
+        print(f"[-] Ошибка поиска векторов в Supabase: {e}")
+    return ""
 
 async def load_db():
     global CHANNEL_ID, USER_CARDS
@@ -89,10 +144,9 @@ async def load_db():
                     uid = int(match.group(1))
                     if uid not in USER_CARDS:
                         USER_CARDS[uid] = message.id
-        print(f"[!] База загружена. Найдено карточек: {len(USER_CARDS)}")
+        print(f"[!] Канал загружен. Найдено карточек: {len(USER_CARDS)}")
     except Exception as e:
         print(f"\n[-] КРИТИЧЕСКАЯ ОШИБКА РЕЗОЛВА КАНАЛА: {e}\n")
-        await notify_admin_db_error(e)
 
 async def get_or_create_card(user_id, sender_name):
     if not CHANNEL_ID: return None, ""
@@ -102,8 +156,7 @@ async def get_or_create_card(user_id, sender_name):
             sent = await app.send_message(CHANNEL_ID, initial_text)
             USER_CARDS[user_id] = sent.id
             return sent.id, initial_text
-        except Exception as e:
-            await notify_admin_db_error(e)
+        except Exception:
             return None, initial_text
     else:
         msg_id = USER_CARDS[user_id]
@@ -113,14 +166,7 @@ async def get_or_create_card(user_id, sender_name):
                 return msg_id, msg.text
         except Exception:
             pass
-        
-        try:
-            sent = await app.send_message(CHANNEL_ID, f"[USER_ID: {user_id}]\nИмя: {sender_name}\nИстория:\n")
-            USER_CARDS[user_id] = sent.id
-            return sent.id, sent.text
-        except Exception as e:
-            await notify_admin_db_error(e)
-            return None, f"[USER_ID: {user_id}]\nИмя: {sender_name}\nИстория:\n"
+        return None, ""
 
 async def update_card_history(user_id, sender_name, history_lines):
     if not CHANNEL_ID: return
@@ -155,26 +201,34 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
     if not WORKING_MODEL:
         return "Я сейчас немного туплю, отвечу позже.", []
     
+    # 1. Запрашиваем смысловые воспоминания из Supabase
+    vector_context = get_relevant_memories(user_id, user_text)
+    
+    # 2. Берем последние пару сообщений из карточки
     history_lines = parse_history_from_text(card_text)
     history_lines.append(f"Собеседник: {user_text}")
-    
-    if len(history_lines) > 10:
-        history_lines = history_lines[-10:]
+    if len(history_lines) > 8:
+        history_lines = history_lines[-8:]
         
     dialogue_str = "\n".join(history_lines)
-    prompt = f"История переписки:\n{dialogue_str}\n\nОцени тон последнего сообщения собеседника, выбери модель поведения (остыть, если он сменил гнев на милость, или ответить зеркально) и напиши финальную реплику от первого лица."
+    
+    prompt = f"Последний диалог:\n{dialogue_str}\n\n"
+    if vector_context:
+        prompt += f"ФАКТЫ ИЗ ДОЛГОВРЕМЕННОЙ ПАМЯТИ ОБ ЭТОМ ЧЕЛОВЕКЕ:\n{vector_context}\n\n"
+        
+    prompt += "Оцени последнее сообщение, учитывай долгосрочные факты (если есть) и напиши ответную реплику от первого лица."
     
     system_instruction = (
         "Ты — цифровой двойник реального парня. Твой характер: живой, ироничный, адекватный, но со стержнем.\n\n"
         "ПРАВИЛА ПОВЕДЕНИЯ:\n"
-        "1. ЗЕРКАЛО И ДИНАМИКА: Если раньше был конфликт, но собеседник снова пишет нормально, приветливо или нейтрально — СМЕЩАЙ ГНЕВ НА МИЛОСТЬ. Не зацикливайся на старой агрессии вечно, люди умеют остывать.\n"
-        "2. Если собеседник ржет ('хаха', 'лол') — подкалывай в ответ, не молчи.\n"
-        "3. Если грубит или наезжает — ставь на место резким сарказмом.\n\n"
+        "1. ЗЕРКАЛО И ДИНАМИКА: Отвечай адекватно тону собеседника. Смещай гнев на милость, если собеседник пишет нормально.\n"
+        "2. ИСПОЛЬЗУЙ ВЕКТОРНУЮ ПАМЯТЬ: Если в блоке фактов есть нужная инфа — опирайся на нее естественно, будто реально помнишь.\n"
+        "3. Если ржет — подкалывай. Если грубит — ставь на место.\n\n"
         "СТИЛЬ РЕЧИ:\n"
         "- Живой разговорный язык, междометия ('Бля', 'Крч', 'Ну', 'Ахуеть').\n"
         "- Никаких робо-фраз.\n\n"
         "ФОРМАТ ОТВЕТА:\n"
-        "Сначала напиши свои мысли в скобках (например: '(собеседник сменил тему, отвечаю проще)').\n"
+        "Сначала напиши свои мысли в скобках (например: '(вспоминаю прошлый базар)').\n"
         "Сразу после скобок на новой строке напиши ТОЛЬКО саму реплику на русском языке."
     )
 
@@ -189,7 +243,6 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
         if 'candidates' in response and len(response['candidates']) > 0:
             raw_answer = response['candidates'][0]['content']['parts'][0]['text']
             
-            # Парсим: ищем строку с кириллицей, отсекая скобки мыслей
             lines = [l.strip() for l in raw_answer.split('\n') if l.strip()]
             ans = ""
             for line in reversed(lines):
@@ -212,6 +265,9 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
             
             if not ans:
                 ans = "Чего?"
+
+            # Сохраняем новую пару реплик в векторную память в фоновом потоке
+            threading.Thread(target=save_memory_to_supabase, args=(user_id, f"Собеседник сказал: {user_text} | Ты ответил: {ans}")).start()
 
             history_lines.append(f"Ты: {ans}")
             return ans, history_lines
@@ -267,7 +323,7 @@ async def main():
     await app.start()
     await load_db()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (v4.0: УМНЫЙ ЭМОЦИОНАЛЬНЫЙ ФИЛЬТР) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (v5.0: ВЕКТОРНЫЙ МОЗГ SUPABASE) ")
     print("==========================================\n")
     await idle()
     await app.stop()

@@ -13,6 +13,7 @@ except RuntimeError:
     asyncio.set_event_loop(loop)
 
 from pyrogram import Client, filters, idle
+from pyrogram.enums import ChatAction
 
 # Микро-вебсервер
 class DummyHandler(BaseHTTPRequestHandler):
@@ -34,7 +35,7 @@ API_HASH = os.environ.get("API_HASH", "18ae94f76873c93be328527e858de657")
 SESSION_STRING = os.environ.get("SESSION_STRING")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-# Инвайт-ссылка твоего канала-базы (для обхода Peer id invalid)
+# Инвайт-ссылка твоего канала-базы
 CHANNEL_INVITE = "https://t.me/+VyP5UYDmzqkyZGZi"
 
 app = Client("my_account", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_STRING)
@@ -77,7 +78,6 @@ async def load_db():
     global CHANNEL_ID, USER_CARDS
     try:
         print(f"[~] Резолвлю канал через инвайт-ссылку...")
-        # Pyrogram автоматически кэширует peer и access_hash при запросе по ссылке
         chat = await app.get_chat(CHANNEL_INVITE)
         CHANNEL_ID = chat.id
         print(f"[+] Успешно! Канал '{chat.title}' привязан. ID: {CHANNEL_ID}")
@@ -162,17 +162,26 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
         history_lines = history_lines[-10:]
         
     dialogue_str = "\n".join(history_lines)
-    prompt = f"История переписки с этим человеком:\n{dialogue_str}\n\nНапиши СВОЮ ответную реплику от первого лица."
+    prompt = f"История переписки:\n{dialogue_str}\n\nПроанализируй последнее сообщение и напиши СВОЮ ответную реплику от первого лица."
     
     system_instruction = (
-        "Ты — цифровой двойник реального пацана. Твой стиль общения: дерзкий, циничный, ленивый.\n\n"
-        "Примеры:\n"
-        "- Собеседник: 'Ты где пропал?' -> Ты: 'Да делами занят был, чё хотел?'\n"
-        "- Собеседник: 'Займи тыщу' -> Ты: 'Ага, уже бегу, раскатал губу.'\n"
-        "- Собеседник: 'Ты меня заебать решил?' -> Ты: 'Давай короче и по делу.'\n\n"
-        "ПРАВИЛА:\n"
-        "1. ВЫДАЙ ТОЛЬКО ОДНУ ФРАЗУ НА РУССКОМ.\n"
-        "2. БЕЗ ПРЕДИСЛОВИЙ, БЕЗ АНГЛИЙСКОГО."
+        "Ты — цифровой двойник реального парня в Telegram. Твой характер: прямой, ироничный, ценишь логику, ненавидишь фальшь.\n\n"
+        "ПРАВИЛО ЗЕРКАЛА (Адаптация):\n"
+        "- Если собеседник общается нормально/дружелюбно — отвечай адекватно, по-дружески.\n"
+        "- Если шутит или делится чем-то крутым — подкалывай или восхищайся в ответ.\n"
+        "- Если наезжает, тупит или требует — отвечай резко, с сарказмом, отшивай.\n\n"
+        "СТИЛЬ РЕЧИ (Твоя база):\n"
+        "- Используешь междометия: 'Ну', 'Бля', 'Крч', 'Тэкс'.\n"
+        "- Эмоциональность: можешь сказать 'Ахуеть', 'Пиздец', 'Балдежно', 'Кайф', если ситуация того требует (НЕ для агрессии, а для эмоции).\n"
+        "- Мыслишь четко, отвечаешь строго ПО ДЕЛУ, на поставленный вопрос.\n\n"
+        "ПРИМЕРЫ:\n"
+        "- Собеседник: 'Привет, как дела?' -> Ты: 'Здарова. Да норм, ковыряюсь тут с делами. Ты как?'\n"
+        "- Собеседник: 'Ну ты и дебил' -> Ты: 'Слышь, не еби мозг. Давай по делу или иди лесом.'\n"
+        "- Собеседник: 'Смотри какую штуку нашел!' -> Ты: 'Ебать, звучит просто кайф. И че, реально работает?'\n"
+        "- Собеседник: 'Блин, так устала сегодня на работе' -> Ты: 'Понимаю, пиздецки выматывает. Иди отдохни нормально.'\n\n"
+        "ЖЕСТКИЕ ПРАВИЛА:\n"
+        "1. ВЫДАЙ ТОЛЬКО ОДНУ ФРАЗУ НА РУССКОМ. БЕЗ ПРЕДИСЛОВИЙ, БЕЗ АНГЛИЙСКОГО.\n"
+        "2. ОТВЕЧАЙ ИМЕННО НА СУТЬ ПОСЛЕДНЕГО СООБЩЕНИЯ. Не сливайся с разговора, если тема адекватная."
     )
 
     url = f"https://generativelanguage.googleapis.com/v1beta/{WORKING_MODEL}:generateContent?key={GEMINI_API_KEY}"
@@ -219,6 +228,12 @@ async def process_batch(client, message, user_id, sender_name):
     
     combined_text = " | ".join(msgs)
     
+    # Включаем статус "печатает..." перед тем как пойти к ИИ
+    try:
+        await app.send_chat_action(user_id, ChatAction.TYPING)
+    except Exception:
+        pass
+    
     try:
         _, card_text = await get_or_create_card(user_id, sender_name)
         reply_text, new_history = await asyncio.to_thread(ask_gemini, user_id, sender_name, combined_text, card_text)
@@ -248,7 +263,7 @@ async def main():
     await app.start()
     await load_db()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (v3.4: РЕЗОЛВ ЧЕРЕЗ ССЫЛКУ) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (v3.5: ЗЕРКАЛО + TYPING) ")
     print("==========================================\n")
     await idle()
     await app.stop()

@@ -14,7 +14,7 @@ except RuntimeError:
 
 from pyrogram import Client, filters, idle
 
-# Микро-вебсервер для Render
+# Микро-вебсервер
 class DummyHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -40,9 +40,8 @@ CHANNEL_ID = -1004272472677
 app = Client("my_account", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_STRING)
 
 WORKING_MODEL = None
-USER_CARDS = {}  # user_id -> message_id в канале
+USER_CARDS = {}
 
-# Буфер для накопления сообщений (чтобы отвечать одной пачкой)
 PENDING_MESSAGES = {}
 PENDING_TASKS = {}
 
@@ -66,6 +65,7 @@ def find_working_model():
 async def load_db():
     global USER_CARDS
     try:
+        print(f"[~] Пытаюсь подключиться к каналу {CHANNEL_ID}...")
         async for message in app.get_chat_history(CHANNEL_ID, limit=200):
             if message.text:
                 match = re.search(r'\[USER_ID:\s*(-?\d+)\]', message.text)
@@ -73,30 +73,44 @@ async def load_db():
                     uid = int(match.group(1))
                     if uid not in USER_CARDS:
                         USER_CARDS[uid] = message.id
-        print(f"\n[!] Загружена база памяти из канала. Найдено карточек: {len(USER_CARDS)}")
+        print(f"\n[!] База загружена. Найдено карточек: {len(USER_CARDS)}")
     except Exception as e:
-        print(f"[-] Ошибка загрузки базы из канала: {e}")
+        print(f"\n[КРИТИЧЕСКАЯ ОШИБКА] Бот не может прочитать канал {CHANNEL_ID}!")
+        print(f"Детали ошибки: {e}\n")
 
 async def get_or_create_card(user_id, sender_name):
     if user_id not in USER_CARDS:
         initial_text = f"[USER_ID: {user_id}]\nИмя: {sender_name}\nИстория:\n"
-        sent = await app.send_message(CHANNEL_ID, initial_text)
-        USER_CARDS[user_id] = sent.id
-        return sent.id, initial_text
+        try:
+            sent = await app.send_message(CHANNEL_ID, initial_text)
+            USER_CARDS[user_id] = sent.id
+            return sent.id, initial_text
+        except Exception as e:
+            print(f"[-] Ошибка создания карточки в канале: {e}")
+            return None, initial_text
     else:
         msg_id = USER_CARDS[user_id]
         try:
             msg = await app.get_messages(CHANNEL_ID, msg_id)
             if msg and msg.text:
                 return msg_id, msg.text
-        except Exception:
-            pass
-        sent = await app.send_message(CHANNEL_ID, f"[USER_ID: {user_id}]\nИмя: {sender_name}\nИстория:\n")
-        USER_CARDS[user_id] = sent.id
-        return sent.id, sent.text
+        except Exception as e:
+            print(f"[-] Ошибка чтения карточки {msg_id}: {e}")
+        
+        try:
+            sent = await app.send_message(CHANNEL_ID, f"[USER_ID: {user_id}]\nИмя: {sender_name}\nИстория:\n")
+            USER_CARDS[user_id] = sent.id
+            return sent.id, sent.text
+        except Exception as e:
+            print(f"[-] Ошибка пересоздания карточки: {e}")
+            return None, f"[USER_ID: {user_id}]\nИмя: {sender_name}\nИстория:\n"
 
 async def update_card_history(user_id, sender_name, history_lines):
     msg_id, _ = await get_or_create_card(user_id, sender_name)
+    if not msg_id:
+        print(f"[-] Нет доступа к каналу, карточка для {sender_name} сохранена только в оперативку.")
+        return
+    
     history_str = "\n".join(history_lines)
     full_text = f"[USER_ID: {user_id}]\nИмя: {sender_name}\nИстория:\n{history_str}"
     if len(full_text) > 4000:
@@ -129,14 +143,12 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
     history_lines = parse_history_from_text(card_text)
     history_lines.append(f"Собеседник: {user_text}")
     
-    # Держим контекст из последних 10 сообщений
     if len(history_lines) > 10:
         history_lines = history_lines[-10:]
         
     dialogue_str = "\n".join(history_lines)
-    
     prompt = f"История переписки с этим человеком:\n{dialogue_str}\n\nНапиши СВОЮ ответную реплику от первого лица."
-
+    
     system_instruction = (
         "Ты — цифровой двойник реального пацана в личке Telegram. Твой стиль общения: дерзкий, циничный, ленивый, используешь сленг и мат (но в меру, по делу), отвечаешь коротко и резко.\n\n"
         "Примеры твоего стиля:\n"
@@ -153,12 +165,8 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
 
     url = f"https://generativelanguage.googleapis.com/v1beta/{WORKING_MODEL}:generateContent?key={GEMINI_API_KEY}"
     payload = {
-        "systemInstruction": {
-            "parts": [{"text": system_instruction}]
-        },
-        "contents": [{
-            "parts": [{"text": prompt}]
-        }]
+        "systemInstruction": {"parts": [{"text": system_instruction}]},
+        "contents": [{"parts": [{"text": prompt}]}]
     }
     
     try:
@@ -179,7 +187,6 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
                 ans = clean_lines[-1]
                 ans = re.sub(r'^"|"$', '', ans).strip()
                 ans = re.sub(r'^(\*.*?\*)', '', ans).strip()
-                
                 history_lines.append(f"Ты: {ans}")
                 return ans, history_lines
     except Exception as e:
@@ -199,14 +206,17 @@ async def process_batch(client, message, user_id, sender_name):
     combined_text = " | ".join(msgs)
     print(f"\n[!] Собрана пачка от {sender_name}: {combined_text}")
     
-    _, card_text = await get_or_create_card(user_id, sender_name)
-    reply_text, new_history = await asyncio.to_thread(ask_gemini, user_id, sender_name, combined_text, card_text)
-    
-    await update_card_history(user_id, sender_name, new_history)
-    
-    if reply_text:
-        await message.reply(reply_text)
-        print(f"[+] Отвечено: {reply_text}")
+    try:
+        _, card_text = await get_or_create_card(user_id, sender_name)
+        reply_text, new_history = await asyncio.to_thread(ask_gemini, user_id, sender_name, combined_text, card_text)
+        await update_card_history(user_id, sender_name, new_history)
+        
+        if reply_text:
+            await message.reply(reply_text)
+            print(f"[+] Отвечено: {reply_text}")
+    except Exception as e:
+        print(f"[КРИТИЧЕСКАЯ ОШИБКА в process_batch]: {e}")
+        await message.reply("Бля, у меня в мозгах че-то замкнуло, погоди.")
 
 @app.on_message(filters.private & ~filters.me & ~filters.bot)
 async def auto_reply(client, message):
@@ -226,7 +236,7 @@ async def main():
     await app.start()
     await load_db()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (v3.0: ТЕЛЕГРАМ-БАЗА + FEW-SHOT) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (v3.1: БРОНИРОВАННЫЙ RAG) ")
     print("==========================================\n")
     await idle()
     await app.stop()

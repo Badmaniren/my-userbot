@@ -41,12 +41,17 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
 # Инициализация Supabase
 supabase: SupabaseClient = None
-if SUPABASE_URL and SUPABASE_KEY:
+
+def init_supabase():
+    global supabase
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        print("\n[!] ОШИБКА: SUPABASE_URL или SUPABASE_KEY не найдены в переменных Render!\n")
+        return
     try:
-        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-        print("[+] Supabase успешно подключен!")
+        supabase = create_client(SUPABASE_URL.strip(), SUPABASE_KEY.strip())
+        print("\n[+] SUPABASE УСПЕШНО ПОДКЛЮЧЕН!\n")
     except Exception as e:
-        print(f"[-] Ошибка подключения Supabase: {e}")
+        print(f"\n[-] ОШИБКА ПОДКЛЮЧЕНИЯ SUPABASE: {e}\n")
 
 # Инвайт-ссылка канала-базы
 CHANNEL_INVITE = "https://t.me/+VyP5UYDmzqkyZGZi"
@@ -59,7 +64,6 @@ USER_CARDS = {}
 
 PENDING_MESSAGES = {}
 PENDING_TASKS = {}
-DB_ERROR_NOTIFIED = False
 
 def find_working_model():
     list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
@@ -89,22 +93,28 @@ def get_embedding(text):
         r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
         if 'embedding' in r and 'values' in r['embedding']:
             return r['embedding']['values']
+        else:
+            print(f"[-] Ошибка формата эмбеддинга Gemini: {r}")
     except Exception as e:
-        print(f"[-] Ошибка создания эмбеддинга: {e}")
+        print(f"[-] Ошибка запроса эмбеддинга: {e}")
     return None
 
 def save_memory_to_supabase(user_id, content):
     """Сохраняем факт переписки в векторную БД"""
-    if not supabase: return
+    if not supabase:
+        print("[-] Отмена записи: Supabase не инициализирован.")
+        return
     vector = get_embedding(content)
-    if not vector: return
+    if not vector:
+        print("[-] Отмена записи: Вектор не сгенерирован.")
+        return
     try:
-        supabase.table("memories").insert({
+        res = supabase.table("memories").insert({
             "user_id": user_id,
             "content": content,
             "embedding": vector
         }).execute()
-        print(f"[+] Векторная память сохранена: '{content[:30]}...'")
+        print(f"[+] ВЕКТОРНАЯ ПАМЯТЬ УСПЕШНО СОХРАНЕНА В SUPABASE: '{content[:40]}...'")
     except Exception as e:
         print(f"[-] Ошибка записи в Supabase: {e}")
 
@@ -123,7 +133,7 @@ def get_relevant_memories(user_id, current_text):
         
         if res.data and len(res.data) > 0:
             memories_list = [item['content'] for item in res.data]
-            print(f"[!] Найдено схожих воспоминаний: {len(memories_list)}")
+            print(f"[!] ИЗВЛЕЧЕНО ВЕКТОРНЫХ ВОСПОМИНАНИЙ: {len(memories_list)}")
             return "\n".join(memories_list)
     except Exception as e:
         print(f"[-] Ошибка поиска векторов в Supabase: {e}")
@@ -321,9 +331,10 @@ async def auto_reply(client, message):
 
 async def main():
     await app.start()
+    init_supabase()  # Явная инициализация Supabase при старте!
     await load_db()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (v5.0: ВЕКТОРНЫЙ МОЗГ SUPABASE) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (v5.1: ДИАГНОСТИКА ВЕКТОРОВ) ")
     print("==========================================\n")
     await idle()
     await app.stop()

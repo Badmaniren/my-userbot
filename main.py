@@ -35,7 +35,7 @@ SESSION_STRING = os.environ.get("SESSION_STRING")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 # ID твоего закрытого канала-базы данных
-CHANNEL_ID = -1004294686406
+CHANNEL_ID = -1004272472677
 
 app = Client("my_account", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_STRING)
 

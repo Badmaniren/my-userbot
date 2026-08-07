@@ -178,7 +178,7 @@ def get_relevant_memories(user_id, current_text):
     vector = get_embedding(current_text)
     if not vector: return ""
     try:
-        res = supabase.rpc("match_memories", {"query_embedding": vector, "match_threshold": 0.3, "match_count": 3, "p_user_id": user_id}).execute()
+        res = supabase.rpc("match_memories", {"query_embedding": vector, "match_threshold": 0.3, "match_count": 5, "p_user_id": user_id}).execute()
         if res.data and len(res.data) > 0:
             return "\n".join([item['content'] for item in res.data])
     except Exception: pass
@@ -238,25 +238,31 @@ def parse_history_from_text(card_text):
     return history_lines
 
 ARCHIVIST_SYSTEM_PROMPT = """
-Ты — строгий ИИ-Архивариус. Твоя задача: анализировать свежую историю диалога и сравнивать ее со СТАРЫМИ фактами из БД.
+Ты — строгий ИИ-Архивариус. Твоя задача: анализировать свежую историю диалога и извлекать долгосрочные факты.
+В диалоге участвуют двое:
+- "Ты" (это ИИ-агент Сенька, чей аккаунт работает как бот).
+- "Собеседник" (это человек, который пишет Сеньке).
+
 Правила:
-1. Игнорируй пост-иронию и временные эмоции.
-2. Ищи противоречия. Если в диалоге выяснилось, что старый факт (с ID) оказался ложью, шуткой, или устарел — ДОБАВЬ ЕГО ID В to_delete_ids.
-3. Если узнал новый, чистый факт, которого еще нет в базе — добавь в to_insert.
-4. Отвечай СТРОГО в формате JSON без markdown-форматирования (без ```json):
+1. Игнорируй пост-иронию, временные эмоции и пустой треп.
+2. Ищи противоречия. Если старый факт (с ID) оказался ложью или устарел — ДОБАВЬ ЕГО ID В to_delete_ids.
+3. УЗНАЛ О СОБЕСЕДНИКЕ: Если Собеседник рассказывает о себе (имя, вкусы, жизнь) — добавь в user_facts.
+4. УЗНАЛ О СЕНЬКЕ (САМОРЕФЛЕКСИЯ): Если Сенька ("Ты") сам подтверждает факты о себе (где живет, что любит, как себя чувствует) — добавь в senka_facts. Игнорируй догадки Собеседника о Сеньке, если Сенька их не подтвердил!
+5. Отвечай СТРОГО в формате JSON без markdown:
 {
-  "insights": ["Твои дедуктивные мысли о юзере"],
+  "insights": ["Твои дедуктивные мысли"],
   "to_delete_ids": [14, 25], 
-  "to_insert": ["Новый факт 1"]
+  "user_facts": ["Собеседник любит фиолетовый цвет"],
+  "senka_facts": ["Сенька живет на Садовой", "У Сеньки крепкий организм"]
 }
-Если удалять нечего, оставь "to_delete_ids": []. Если новых фактов нет, оставь "to_insert": [].
+Если удалять нечего, оставь "to_delete_ids": [].
 """
 
 def run_archivist(user_id, sender_name, history_lines):
     global WORKING_MODEL
     if not WORKING_MODEL: WORKING_MODEL = find_working_model()
     
-    print(f"\n[!] АРХИВАРИУС ПРОСНУЛСЯ. Строк диалога: {len(history_lines)}...")
+    print(f"\n[!] АРХИВАРИУС ПРОСНУЛСЯ ДЛЯ ЮЗЕРА {user_id}. Строк диалога: {len(history_lines)}...")
     full_history = "\n".join(history_lines)
     
     old_facts_text = "База пуста."
@@ -278,7 +284,7 @@ def run_archivist(user_id, sender_name, history_lines):
     
     try:
         r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
-        if 'error' in r: return "Сбой в матрице снов."
+        if 'error' in r: return "Сбой API."
         
         raw_answer = ""
         for p in r.get('candidates', [{}])[0].get('content', {}).get('parts', []):
@@ -293,55 +299,84 @@ def run_archivist(user_id, sender_name, history_lines):
                     to_delete = [int(i) for i in to_delete]
                     supabase.table("memories").delete().in_("id", to_delete).execute()
                 
-                inserts = data.get("to_insert", [])
+                inserts = []
+                for uf in data.get("user_facts", []): inserts.append(f"[О СОБЕСЕДНИКЕ]: {uf}")
+                for sf in data.get("senka_facts", []): inserts.append(f"[О СЕНЬКЕ]: {sf}")
+                # На случай если старая логика проскочит
+                for old_f in data.get("to_insert", []): inserts.append(f"[ФАКТ]: {old_f}")
+                
                 if inserts:
                     for fact in inserts:
                         threading.Thread(target=save_memory_to_supabase, args=(user_id, fact)).start()
         except Exception:
             pass
 
-        return "Память оптимизирована."
+        return "ОК"
     except Exception as e:
-        return f"Кошмарный сон: {e}"
+        return f"Сбой: {e}"
 
-@app.on_message(filters.private & filters.command("sleep", prefixes="!"))
+# ГЛОБАЛЬНЫЙ СПЯЩИЙ РЕЖИМ (ЗАПУСКАЕТСЯ ТОЛЬКО С ТВОЕГО АККАУНТА)
+@app.on_message(filters.me & filters.command("sleep", prefixes="!"))
 async def sleep_command(client, message):
-    user_id = message.from_user.id
-    sender_name = message.from_user.first_name if message.from_user else "Кто-то"
-    await message.reply("*(закрывает глаза)* Ушел в спящий режим. Анализирую...")
+    await message.reply("*(система)* Инициирован глобальный анализ памяти. Запускаю пылесос чатов...")
     
-    last_msg_id = 0
-    if supabase:
-        try:
-            res = supabase.table("bookmarks").select("last_msg_id").eq("user_id", user_id).execute()
-            if res.data: last_msg_id = res.data[0]["last_msg_id"]
-        except Exception: pass
-
-    history_lines = []
-    max_id_seen = last_msg_id
-    fetch_limit = 50 if last_msg_id == 0 else 500
-    
-    async for msg in client.get_chat_history(user_id, limit=fetch_limit):
-        if last_msg_id > 0 and msg.id <= last_msg_id: break
-        if msg.id > max_id_seen: max_id_seen = msg.id
-        
-        if msg.text and not msg.text.startswith("!"):
-            speaker = sender_name if msg.from_user.id == user_id else "Ты"
-            ts = msg.date.strftime("%d.%m %H:%M") if msg.date else datetime.now().strftime("%d.%m %H:%M")
-            history_lines.append(f"[{ts}] {speaker}: {msg.text}")
-            
-    if not history_lines:
-        await message.reply("*(открывает глаза)* А анализировать-то нечего, нового текста не было.")
+    active_users = list(USER_CARDS.keys())
+    if not active_users:
+        await message.reply("*(система)* Ни одного активного диалога в кэше нет. Иду спать дальше.")
         return
+    
+    success_count = 0
+    
+    for target_uid in active_users:
+        try:
+            user_info = await app.get_users(target_uid)
+            sender_name = user_info.first_name if user_info else "Собеседник"
+        except Exception:
+            sender_name = "Собеседник"
+            
+        last_msg_id = 0
+        if supabase:
+            try:
+                res = supabase.table("bookmarks").select("last_msg_id").eq("user_id", target_uid).execute()
+                if res.data: last_msg_id = res.data[0]["last_msg_id"]
+            except Exception: pass
 
-    history_lines.reverse()
-    
-    if supabase and max_id_seen > last_msg_id:
-        try: supabase.table("bookmarks").upsert({"user_id": user_id, "last_msg_id": max_id_seen}).execute()
-        except Exception: pass
-    
-    result = await asyncio.to_thread(run_archivist, user_id, sender_name, history_lines)
-    await message.reply(f"*(открывает глаза)* Фух. {result}")
+        history_lines = []
+        max_id_seen = last_msg_id
+        fetch_limit = 50 if last_msg_id == 0 else 500
+        
+        try:
+            async for msg in client.get_chat_history(target_uid, limit=fetch_limit):
+                if last_msg_id > 0 and msg.id <= last_msg_id: break
+                if msg.id > max_id_seen: max_id_seen = msg.id
+                
+                if msg.text and not msg.text.startswith("!"):
+                    # Если сообщение от target_uid, значит это Собеседник. Иначе это Ты (бот/владелец)
+                    speaker = sender_name if msg.from_user and msg.from_user.id == target_uid else "Ты"
+                    ts = msg.date.strftime("%d.%m %H:%M") if msg.date else datetime.now().strftime("%d.%m %H:%M")
+                    history_lines.append(f"[{ts}] {speaker}: {msg.text}")
+        except Exception as e:
+            print(f"[-] Ошибка чтения истории с {target_uid}: {e}")
+            continue
+                
+        if not history_lines:
+            continue # Нет новых сообщений для этого юзера
+
+        history_lines.reverse()
+        
+        if supabase and max_id_seen > last_msg_id:
+            try: supabase.table("bookmarks").upsert({"user_id": target_uid, "last_msg_id": max_id_seen}).execute()
+            except Exception: pass
+        
+        # Анализируем чат
+        await asyncio.to_thread(run_archivist, target_uid, sender_name, history_lines)
+        success_count += 1
+        
+        # Анти-бан от Google (Rate Limit)
+        await asyncio.sleep(4)
+        
+    await message.reply(f"*(система)* Глобальный сон завершен. Обновлено чатов: {success_count} из {len(active_users)}.")
+
 
 def ask_gemini(user_id, sender_name, user_text, card_text):
     global WORKING_MODEL
@@ -360,13 +395,13 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
     
     prompt = f"[Системное время: {current_time_str}]\nТекущий диалог:\n{dialogue_str}\n\n"
     if vector_context: 
-        prompt += f"[СЕКРЕТНОЕ ДОСЬЕ: ФАКТЫ О ПОЛЬЗОВАТЕЛЕ (КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО УПОМИНАТЬ, ЕСЛИ НЕ СПРОСЯТ)]:\n{vector_context}\n\n"
+        prompt += f"[СЕКРЕТНОЕ ДОСЬЕ: ФАКТЫ О ПОЛЬЗОВАТЕЛЕ И О СЕБЕ]:\n{vector_context}\n\n"
         
     system_instruction = (
-        "Ты — цифровой двойник реального парня. Характер: живой, ироничный, адекватный. Не будь услужливым роботом.\n"
+        "Ты — цифровой двойник реального парня по имени Сенька. Характер: живой, ироничный, адекватный. Не будь услужливым роботом.\n"
         "СТИЛЬ РЕЧИ: Разговорный язык ('Бля', 'Крч', 'Ну').\n"
         "ВНИМАНИЕ: Каждая реплика в истории имеет метку времени [ДД.ММ ЧЧ:ММ]. Строго следи за контекстом времени, паузами между сообщениями и логикой событий!\n"
-        "ПРАВИЛО: НЕ упоминай факты из досье, если собеседник сам о них не заговорил.\n"
+        "В ДОСЬЕ есть два типа фактов: [О СОБЕСЕДНИКЕ] (информация о человеке, с которым говоришь) и [О СЕНЬКЕ] (твоя собственная личность, история и лор, который ты выстроил с этим человеком). Опирайся на оба типа фактов, чтобы поддерживать целостность личности, но НЕ упоминай их прямо, если к слову не придется.\n"
         "ФОРМАТ ОТВЕТА:\n"
         "Сначала напиши свои мысли в скобках (например: (Думаю, что ответить...)).\n"
         "Затем ОБЯЗАТЕЛЬНО на новой строке ТОЛЬКО саму реплику без дополнительных меток, префиксов и действий."
@@ -492,7 +527,7 @@ async def main():
     init_supabase()
     await load_db()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (v8.3: АНТИ-БУФЕР ОБМЕНА) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (vBETA-1: ДВОЙНАЯ ПАМЯТЬ) ")
     print("==========================================\n")
     await idle()
     await app.stop()

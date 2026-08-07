@@ -35,10 +35,8 @@ API_ID = int(os.environ.get("API_ID", "31001164"))
 API_HASH = os.environ.get("API_HASH", "18ae94f76873c93be328527e858de657")
 SESSION_STRING = os.environ.get("SESSION_STRING")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
-CHANNEL_INVITE = os.environ.get("CHANNEL_INVITE", "")
 
 API_BASE = "https" + "://" + "generativelanguage.googleapis.com/v1beta/"
 
@@ -57,10 +55,9 @@ def init_supabase():
 
 WORKING_MODEL = None
 WORKING_EMBEDDING_MODEL = None
-CHANNEL_ID = None
-USER_CARDS = {}
 PENDING_MESSAGES = {}
 PENDING_TASKS = {}
+ACTIVE_USERS = set()
 
 SAFETY_SETTINGS = [
     {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
@@ -183,59 +180,6 @@ def get_relevant_memories(user_id, current_text):
     except Exception: pass
     return ""
 
-async def load_db():
-    global CHANNEL_ID, USER_CARDS
-    if not CHANNEL_INVITE:
-        print("[-] ВНИМАНИЕ: CHANNEL_INVITE не задан!")
-        return
-    try:
-        chat = await app.get_chat(CHANNEL_INVITE)
-        CHANNEL_ID = chat.id
-        async for message in app.get_chat_history(CHANNEL_ID, limit=200):
-            if message.text:
-                match = re.search(r'\[USER_ID:\s*(-?\d+)\]', message.text)
-                if match: USER_CARDS[int(match.group(1))] = message.id
-    except Exception as e:
-        print(f"[-] Ошибка загрузки базы карт: {e}")
-
-async def get_or_create_card(user_id, sender_name):
-    if not CHANNEL_ID: return None, ""
-    if user_id not in USER_CARDS:
-        initial_text = f"[USER_ID: {user_id}]\nИмя: {sender_name}\nИстория:\n"
-        try:
-            sent = await app.send_message(CHANNEL_ID, initial_text)
-            USER_CARDS[user_id] = sent.id
-            return sent.id, initial_text
-        except Exception: return None, initial_text
-    else:
-        msg_id = USER_CARDS[user_id]
-        try:
-            msg = await app.get_messages(CHANNEL_ID, msg_id)
-            if msg and msg.text: return msg_id, msg.text
-        except Exception: pass
-        return None, ""
-
-async def update_card_history(user_id, sender_name, history_lines):
-    if not CHANNEL_ID: return
-    msg_id, _ = await get_or_create_card(user_id, sender_name)
-    if not msg_id: return
-    history_str = "\n".join(history_lines)
-    full_text = f"[USER_ID: {user_id}]\nИмя: {sender_name}\nИстория:\n{history_str}"
-    if len(full_text) > 4000: full_text = full_text[-4000:]
-    try: await app.edit_message_text(CHANNEL_ID, msg_id, full_text)
-    except Exception: pass
-
-def parse_history_from_text(card_text):
-    lines = card_text.split('\n')
-    history_lines = []
-    capture = False
-    for line in lines:
-        if line.startswith("История:"):
-            capture = True
-            continue
-        if capture and line.strip(): history_lines.append(line.strip())
-    return history_lines
-
 ARCHIVIST_SYSTEM_PROMPT = """
 Ты — строгий ИИ-Архивариус. Твоя задача: анализировать историю диалога и извлекать долгосрочные факты.
 В диалоге участвуют двое: "Ты" (ИИ Сенька) и "Собеседник" (человек).
@@ -304,24 +248,27 @@ def run_archivist(user_id, sender_name, history_lines):
                 if inserts:
                     for fact in inserts:
                         threading.Thread(target=save_memory_to_supabase, args=(user_id, fact)).start()
-        except Exception:
-            pass
-
+        except Exception: pass
         return "ОК"
-    except Exception as e:
-        return f"Сбой: {e}"
+    except Exception as e: return f"Сбой: {e}"
 
 @app.on_message(filters.private & filters.command("sleep", prefixes="!"))
 async def sleep_command(client, message):
     await message.reply("*(система)* Инициирован глобальный анализ памяти. Запускаю пылесос чатов...")
     
-    active_users = list(USER_CARDS.keys())
-    if not active_users:
+    if not ACTIVE_USERS and supabase:
+        try:
+            res = supabase.table("bookmarks").select("user_id").execute()
+            if res.data:
+                for row in res.data: ACTIVE_USERS.add(row["user_id"])
+        except Exception: pass
+        
+    if not ACTIVE_USERS:
         await message.reply("*(система)* Ни одного активного диалога в кэше нет.")
         return
     
     success_count = 0
-    for target_uid in active_users:
+    for target_uid in list(ACTIVE_USERS):
         try:
             user_info = await app.get_users(target_uid)
             sender_name = user_info.first_name if user_info else "Собеседник"
@@ -339,14 +286,18 @@ async def sleep_command(client, message):
         fetch_limit = 50 if last_msg_id == 0 else 500
         
         try:
+            # Архивариус выкачивает ДО 500 сообщений за раз с момента последней закладки!
             async for msg in client.get_chat_history(target_uid, limit=fetch_limit):
                 if last_msg_id > 0 and msg.id <= last_msg_id: break
                 if msg.id > max_id_seen: max_id_seen = msg.id
                 
-                if msg.text and not msg.text.startswith("!"):
-                    speaker = sender_name if msg.from_user and msg.from_user.id == target_uid else "Ты"
-                    ts = msg.date.strftime("%d.%m %H:%M") if msg.date else datetime.now().strftime("%d.%m %H:%M")
-                    history_lines.append(f"[{ts}] {speaker}: {msg.text}")
+                if not msg.text and not msg.caption: continue
+                if msg.text and msg.text.startswith("!"): continue
+                
+                speaker = sender_name if msg.from_user and msg.from_user.id == target_uid else "Ты"
+                ts = msg.date.strftime("%d.%m %H:%M") if msg.date else datetime.now().strftime("%d.%m %H:%M")
+                text_content = msg.text or msg.caption or "[Медиа]"
+                history_lines.append(f"[{ts}] {speaker}: {text_content}")
         except Exception as e: continue
                 
         if not history_lines: continue
@@ -362,22 +313,16 @@ async def sleep_command(client, message):
         
     await message.reply(f"*(система)* Глобальный сон завершен. Обновлено чатов: {success_count}.")
 
-def ask_gemini(user_id, sender_name, user_text, card_text):
+def ask_gemini(user_id, sender_name, combined_text, dialogue_str):
     global WORKING_MODEL
     if not WORKING_MODEL: WORKING_MODEL = find_working_model()
-    if not WORKING_MODEL: return "[ОШИБКА]: Модель не найдена.", []
+    if not WORKING_MODEL: return "[ОШИБКА]: Модель не найдена."
 
-    vector_context = get_relevant_memories(user_id, user_text)
-    
-    history_lines = parse_history_from_text(card_text)
-    history_lines.append(user_text)
-    
-    if len(history_lines) > 8: history_lines = history_lines[-8:]
-    dialogue_str = "\n".join(history_lines)
+    vector_context = get_relevant_memories(user_id, combined_text)
     
     current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M")
     
-    prompt = f"[Текущее системное время: {current_time_str}]\nТекущий диалог:\n{dialogue_str}\n\n"
+    prompt = f"[Текущее системное время: {current_time_str}]\nПоследние сообщения чата:\n{dialogue_str}\n\n"
     if vector_context: 
         prompt += f"[СЕКРЕТНОЕ ДОСЬЕ: ФАКТЫ О ПОЛЬЗОВАТЕЛЕ И О СЕБЕ]:\n{vector_context}\n\n"
         
@@ -410,7 +355,7 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
     try:
         r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
         if 'error' in r: 
-            return f"[ОШИБКА GOOGLE API]: {r['error'].get('message', '')}", history_lines
+            return f"[ОШИБКА GOOGLE API]: {r['error'].get('message', '')}"
             
         if 'candidates' in r and len(r['candidates']) > 0:
             parts = r['candidates'][0]['content'].get('parts', [])
@@ -438,7 +383,7 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
                     "safetySettings": SAFETY_SETTINGS
                 }
                 r2 = requests.post(url, json=payload2, headers={'Content-Type': 'application/json'}).json()
-                if 'error' in r2: return "[ОШИБКА]: Сбой инструмента.", history_lines
+                if 'error' in r2: return "[ОШИБКА]: Сбой инструмента."
                     
                 raw_answer = ""
                 for p in r2['candidates'][0]['content'].get('parts', []):
@@ -453,16 +398,11 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
             ans = re.sub(r'^"|"$', '', ans).strip()
             
             if not ans: ans = "..."
-
-            ts_now = datetime.now().strftime("%d.%m %H:%M")
-            history_lines.append(f"[{ts_now}] Ты: {ans}")
-            return ans, history_lines
+            return ans
     except Exception as e:
-        error_str = f"[КРИТ. ОШИБКА СЕТИ]: {str(e)}"
-        history_lines.append(f"Ты: {error_str}")
-        return error_str, history_lines
+        return f"[КРИТ. ОШИБКА СЕТИ]: {str(e)}"
         
-    return "[ОШИБКА]: Бот не смог сгенерировать ответ.", history_lines
+    return "[ОШИБКА]: Бот не смог сгенерировать ответ."
 
 async def process_batch(client, message, user_id, sender_name):
     try: await asyncio.sleep(4)
@@ -480,9 +420,31 @@ async def process_batch(client, message, user_id, sender_name):
     except Exception: pass
     
     try:
-        _, card_text = await get_or_create_card(user_id, sender_name)
-        reply_text, new_history = await asyncio.to_thread(ask_gemini, user_id, sender_name, combined_text, card_text)
-        await update_card_history(user_id, sender_name, new_history)
+        # УМНЫЙ СБОР ОПЕРАТИВНОГО КОНТЕКСТА:
+        # Скачиваем глубокий пласт (до 100 объектов), но собираем ровно 30 полезных реплик
+        history_lines = []
+        async for msg in app.get_chat_history(user_id, limit=100):
+            if len(history_lines) >= 30: 
+                break # Собрали 30 полноценных сообщений — хватит
+                
+            speaker = sender_name if msg.from_user and msg.from_user.id == user_id else "Ты"
+            ts = msg.date.strftime("%d.%m %H:%M") if msg.date else datetime.now().strftime("%d.%m %H:%M")
+            
+            if msg.text:
+                if msg.text.startswith("!"): continue # Игнорируем команды
+                history_lines.append(f"[{ts}] {speaker}: {msg.text}")
+            elif msg.sticker:
+                history_lines.append(f"[{ts}] {speaker}: [Отправил стикер]")
+            elif msg.photo or msg.video or msg.animation:
+                caption = f" (подпись: {msg.caption})" if msg.caption else ""
+                history_lines.append(f"[{ts}] {speaker}: [Отправил медиафайл{caption}]")
+            elif msg.voice or msg.audio:
+                history_lines.append(f"[{ts}] {speaker}: [Голосовое/Аудио сообщение]")
+
+        history_lines.reverse()
+        dialogue_str = "\n".join(history_lines)
+
+        reply_text = await asyncio.to_thread(ask_gemini, user_id, sender_name, combined_text, dialogue_str)
         if reply_text: await message.reply(reply_text)
     except Exception as e:
         await message.reply(f"[ОШИБКА ОБРАБОТКИ]: {e}")
@@ -494,21 +456,20 @@ async def auto_reply(client, message):
 
     user_id = message.from_user.id
     sender_name = message.from_user.first_name if message.from_user else "Кто-то"
+    
+    ACTIVE_USERS.add(user_id)
+    
     if user_id not in PENDING_MESSAGES: PENDING_MESSAGES[user_id] = []
     
-    ts = message.date.strftime("%d.%m %H:%M") if message.date else datetime.now().strftime("%d.%m %H:%M")
-    formatted_msg = f"[{ts}] Собеседник: {message.text}"
-    
-    PENDING_MESSAGES[user_id].append(formatted_msg)
+    PENDING_MESSAGES[user_id].append(message.text)
     if user_id in PENDING_TASKS: PENDING_TASKS[user_id].cancel()
     PENDING_TASKS[user_id] = asyncio.create_task(process_batch(client, message, user_id, sender_name))
 
 async def main():
     await app.start()
     init_supabase()
-    await load_db()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (vBETA-3.1: ВОЗВРАЩЕНИЕ МОЗГА) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (vBETA-4.1: ГЛУБОКИЙ УМНЫЙ КОНТЕКСТ) ")
     print("==========================================\n")
     await idle()
     await app.stop()

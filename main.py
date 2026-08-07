@@ -34,7 +34,23 @@ threading.Thread(target=run_dummy_server, daemon=True).start()
 API_ID = int(os.environ.get("API_ID", "31001164"))
 API_HASH = os.environ.get("API_HASH", "18ae94f76873c93be328527e858de657")
 SESSION_STRING = os.environ.get("SESSION_STRING")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+
+# Разбираем мульти-ключи из переменной GEMINI_API_KEY (через запятую)
+RAW_KEYS = os.environ.get("GEMINI_API_KEY", "")
+API_KEYS = [k.strip() for k in RAW_KEYS.split(",") if k.strip()]
+CURRENT_KEY_INDEX = 0
+
+def get_current_api_key():
+    global CURRENT_KEY_INDEX
+    if not API_KEYS: return ""
+    return API_KEYS[CURRENT_KEY_INDEX % len(API_KEYS)]
+
+def rotate_api_key():
+    global CURRENT_KEY_INDEX
+    if len(API_KEYS) > 1:
+        CURRENT_KEY_INDEX = (CURRENT_KEY_INDEX + 1) % len(API_KEYS)
+        print(f"[!] ПЕРЕКЛЮЧЕНИЕ НА СЛЕДУЮЩИЙ API КЛЮЧ: Индекс {CURRENT_KEY_INDEX}")
+
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
@@ -115,23 +131,30 @@ def tool_get_current_datetime():
 app = Client("my_account", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_STRING)
 
 def find_working_model():
-    list_url = f"{API_BASE}models?key={GEMINI_API_KEY}"
+    key = get_current_api_key()
+    list_url = f"{API_BASE}models?key={key}"
     try:
         res = requests.get(list_url).json()
         if 'models' not in res: return None
         available = [m['name'] for m in res['models'] if 'generateContent' in m.get('supportedGenerationMethods', [])]
-        preferred = [m for m in available if "3.6-flash" in m or "3.5-flash" in m]
-        others = [m for m in available if m not in preferred and "flash" in m and "preview" not in m]
-        for model_name in preferred + others + available:
-            test_url = f"{API_BASE}{model_name}:generateContent?key={GEMINI_API_KEY}"
+        
+        # ПРИОРИТЕТ ДЛЯ FLASH-LITE (у них 500 запросов в день вместо 20!)
+        preferred = [m for m in available if "flash-lite" in m]
+        secondary = [m for m in available if "flash" in m and m not in preferred and "preview" not in m]
+        
+        for model_name in preferred + secondary + available:
+            test_url = f"{API_BASE}{model_name}:generateContent?key={key}"
             payload = {"contents": [{"parts": [{"text": "hi"}]}], "safetySettings": SAFETY_SETTINGS}
             r = requests.post(test_url, json=payload, headers={'Content-Type': 'application/json'})
-            if r.status_code == 200: return model_name
+            if r.status_code == 200: 
+                print(f"[+] ВЫБРАНА РАБОЧАЯ МОДЕЛЬ: {model_name}")
+                return model_name
     except Exception: pass
     return None
 
 def find_working_embedding_model():
-    list_url = f"{API_BASE}models?key={GEMINI_API_KEY}"
+    key = get_current_api_key()
+    list_url = f"{API_BASE}models?key={key}"
     try:
         res = requests.get(list_url).json()
         if 'models' not in res: return None
@@ -139,7 +162,7 @@ def find_working_embedding_model():
             model_name = m['name']
             methods = m.get('supportedGenerationMethods', [])
             if 'embedContent' in methods or 'batchEmbedContents' in methods:
-                test_url = f"{API_BASE}{model_name}:embedContent?key={GEMINI_API_KEY}"
+                test_url = f"{API_BASE}{model_name}:embedContent?key={key}"
                 payload = {"model": model_name, "content": {"parts": [{"text": "hi"}]}}
                 r = requests.post(test_url, json=payload, headers={'Content-Type': 'application/json'})
                 if r.status_code == 200: return model_name
@@ -151,7 +174,9 @@ def get_embedding(text):
     if not WORKING_EMBEDDING_MODEL:
         WORKING_EMBEDDING_MODEL = find_working_embedding_model()
     if not WORKING_EMBEDDING_MODEL: return None
-    url = f"{API_BASE}{WORKING_EMBEDDING_MODEL}:embedContent?key={GEMINI_API_KEY}"
+    
+    key = get_current_api_key()
+    url = f"{API_BASE}{WORKING_EMBEDDING_MODEL}:embedContent?key={key}"
     payload = {"model": WORKING_EMBEDDING_MODEL, "content": {"parts": [{"text": text}]}}
     try:
         r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
@@ -186,7 +211,7 @@ ARCHIVIST_SYSTEM_PROMPT = """
 
 Правила:
 1. Игнорируй пост-иронию, временные эмоции и пустой треп.
-2. ЖЕСТКИЙ ПОИСК ПРОТИВОРЕЧИЙ: Если новый диалог отменяет или логически исключает старый факт — это КОНФЛИКТ. Вноси ID ошибочных старых фактов в to_delete_ids! Не плоди двойников.
+2. ЖЕСТКИЙ ПОИСК ПРОТИВОРЕЧИЙ: Если новый диалог отменяет или логически исключает старый факт — это КОНФЛИКТ. Вноси ID ошибочных старых фактов в to_delete_ids!
 3. УЗНАЛ О СОБЕСЕДНИКЕ: Факты только о Собеседнике -> user_facts.
 4. УЗНАЛ О СЕНЬКЕ (САМОРЕФЛЕКСИЯ): Подтвержденные Сенькой факты о себе -> senka_facts.
 5. Отвечай СТРОГО в формате JSON без markdown:
@@ -216,7 +241,8 @@ def run_archivist(user_id, sender_name, history_lines):
 
     prompt_text = f"СТАРЫЕ ФАКТЫ ИЗ БАЗЫ:\n{old_facts_text}\n\nСВЕЖАЯ ИСТОРИЯ ДИАЛОГА:\n{full_history}"
     
-    url = f"{API_BASE}{WORKING_MODEL}:generateContent?key={GEMINI_API_KEY}"
+    key = get_current_api_key()
+    url = f"{API_BASE}{WORKING_MODEL}:generateContent?key={key}"
     payload = {
         "systemInstruction": {"parts": [{"text": ARCHIVIST_SYSTEM_PROMPT}]},
         "contents": [{"parts": [{"text": prompt_text}]}],
@@ -225,8 +251,9 @@ def run_archivist(user_id, sender_name, history_lines):
     
     try:
         r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
-        if 'error' in r: return "Сбой API."
-        
+        if 'error' in r and ('429' in str(r['error']) or 'quota' in str(r['error']).lower()):
+            rotate_api_key() # Переключаем ключ при исчерпании лимита
+            
         raw_answer = ""
         for p in r.get('candidates', [{}])[0].get('content', {}).get('parts', []):
             if 'text' in p: raw_answer += p['text'] + "\n"
@@ -243,7 +270,6 @@ def run_archivist(user_id, sender_name, history_lines):
                 inserts = []
                 for uf in data.get("user_facts", []): inserts.append(f"[О СОБЕСЕДНИКЕ]: {uf}")
                 for sf in data.get("senka_facts", []): inserts.append(f"[О СЕНЬКЕ]: {sf}")
-                for old_f in data.get("to_insert", []): inserts.append(f"[ФАКТ]: {old_f}")
                 
                 if inserts:
                     for fact in inserts:
@@ -286,7 +312,6 @@ async def sleep_command(client, message):
         fetch_limit = 50 if last_msg_id == 0 else 500
         
         try:
-            # Архивариус выкачивает ДО 500 сообщений за раз с момента последней закладки!
             async for msg in client.get_chat_history(target_uid, limit=fetch_limit):
                 if last_msg_id > 0 and msg.id <= last_msg_id: break
                 if msg.id > max_id_seen: max_id_seen = msg.id
@@ -338,7 +363,8 @@ def ask_gemini(user_id, sender_name, combined_text, dialogue_str):
     )
 
     clean_model_name = WORKING_MODEL.strip()
-    url = f"{API_BASE}{clean_model_name}:generateContent?key={GEMINI_API_KEY}"
+    key = get_current_api_key()
+    url = f"{API_BASE}{clean_model_name}:generateContent?key={key}"
     
     payload = {
         "systemInstruction": {"parts": [{"text": system_instruction}]},
@@ -354,8 +380,13 @@ def ask_gemini(user_id, sender_name, combined_text, dialogue_str):
     
     try:
         r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
-        if 'error' in r: 
-            return f"[ОШИБКА GOOGLE API]: {r['error'].get('message', '')}"
+        
+        # Если уперлись в лимит 429 — меняем ключ и просим перевыбрать модель
+        if 'error' in r and ('429' in str(r['error']) or 'quota' in str(r['error']).lower()):
+            print("[-] ЛИМИТ КЛЮЧА ИСЧЕРПАН. Переключаю ключ...")
+            rotate_api_key()
+            WORKING_MODEL = find_working_model()
+            return ask_gemini(user_id, sender_name, combined_text, dialogue_str)
             
         if 'candidates' in r and len(r['candidates']) > 0:
             parts = r['candidates'][0]['content'].get('parts', [])
@@ -420,18 +451,15 @@ async def process_batch(client, message, user_id, sender_name):
     except Exception: pass
     
     try:
-        # УМНЫЙ СБОР ОПЕРАТИВНОГО КОНТЕКСТА:
-        # Скачиваем глубокий пласт (до 100 объектов), но собираем ровно 30 полезных реплик
         history_lines = []
         async for msg in app.get_chat_history(user_id, limit=100):
-            if len(history_lines) >= 30: 
-                break # Собрали 30 полноценных сообщений — хватит
+            if len(history_lines) >= 30: break
                 
             speaker = sender_name if msg.from_user and msg.from_user.id == user_id else "Ты"
             ts = msg.date.strftime("%d.%m %H:%M") if msg.date else datetime.now().strftime("%d.%m %H:%M")
             
             if msg.text:
-                if msg.text.startswith("!"): continue # Игнорируем команды
+                if msg.text.startswith("!"): continue
                 history_lines.append(f"[{ts}] {speaker}: {msg.text}")
             elif msg.sticker:
                 history_lines.append(f"[{ts}] {speaker}: [Отправил стикер]")
@@ -469,7 +497,7 @@ async def main():
     await app.start()
     init_supabase()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (vBETA-4.1: ГЛУБОКИЙ УМНЫЙ КОНТЕКСТ) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (vBETA-5: МУЛЬТИ-КЛЮЧИ И LITE ПРИОРИТЕТ) ")
     print("==========================================\n")
     await idle()
     await app.stop()

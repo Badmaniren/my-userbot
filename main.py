@@ -40,7 +40,6 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 CHANNEL_INVITE = os.environ.get("CHANNEL_INVITE", "")
 
-# Хак против умных редакторов
 API_BASE = "https" + "://" + "generativelanguage.googleapis.com/v1beta/"
 
 supabase: SupabaseClient = None
@@ -81,7 +80,7 @@ GEMINI_TOOLS = [{
                     "queries": {
                         "type": "ARRAY",
                         "items": {"type": "STRING"},
-                        "description": "Список поисковых запросов."
+                        "description": "Список запросов."
                     }
                 },
                 "required": ["queries"]
@@ -89,7 +88,7 @@ GEMINI_TOOLS = [{
         },
         {
             "name": "get_current_datetime",
-            "description": "Получить текущее точное время и дату сервера.",
+            "description": "Получить текущее точное время сервера.",
             "parameters": {
                 "type": "OBJECT",
                 "properties": {}
@@ -187,7 +186,7 @@ def get_relevant_memories(user_id, current_text):
 async def load_db():
     global CHANNEL_ID, USER_CARDS
     if not CHANNEL_INVITE:
-        print("[-] ВНИМАНИЕ: CHANNEL_INVITE не задан в переменной окружения!")
+        print("[-] ВНИМАНИЕ: CHANNEL_INVITE не задан!")
         return
     try:
         chat = await app.get_chat(CHANNEL_INVITE)
@@ -243,7 +242,7 @@ ARCHIVIST_SYSTEM_PROMPT = """
 
 Правила:
 1. Игнорируй пост-иронию, временные эмоции и пустой треп.
-2. ЖЕСТКИЙ ПОИСК ПРОТИВОРЕЧИЙ: Если новый диалог отменяет или логически исключает старый факт (например, в базе есть "Собеседник живет на Садовой", а в диалоге выясняется, что это "Твоя (Сенькина) Садовая") — это КОНФЛИКТ. Вноси ID ошибочных старых фактов в to_delete_ids! Не плоди двойников.
+2. ЖЕСТКИЙ ПОИСК ПРОТИВОРЕЧИЙ: Если новый диалог отменяет или логически исключает старый факт — это КОНФЛИКТ. Вноси ID ошибочных старых фактов в to_delete_ids! Не плоди двойников.
 3. УЗНАЛ О СОБЕСЕДНИКЕ: Факты только о Собеседнике -> user_facts.
 4. УЗНАЛ О СЕНЬКЕ (САМОРЕФЛЕКСИЯ): Подтвержденные Сенькой факты о себе -> senka_facts.
 5. Отвечай СТРОГО в формате JSON без markdown:
@@ -260,7 +259,7 @@ def run_archivist(user_id, sender_name, history_lines):
     global WORKING_MODEL
     if not WORKING_MODEL: WORKING_MODEL = find_working_model()
     
-    print(f"\n[!] АРХИВАРИУС ПРОСНУЛСЯ ДЛЯ ЮЗЕРА {user_id}. Строк диалога: {len(history_lines)}...")
+    print(f"\n[!] АРХИВАРИУС ПРОСНУЛСЯ ДЛЯ ЮЗЕРА {user_id}. Строк: {len(history_lines)}...")
     full_history = "\n".join(history_lines)
     
     old_facts_text = "База пуста."
@@ -269,9 +268,9 @@ def run_archivist(user_id, sender_name, history_lines):
             res = supabase.table("memories").select("id, content").eq("user_id", user_id).execute()
             if res.data:
                 old_facts_text = "\n".join([f"[ID: {item['id']}] {item['content']}" for item in res.data])
-        except Exception as e: print(f"[-] Ошибка выгрузки старых фактов: {e}")
+        except Exception as e: print(f"[-] Ошибка выгрузки: {e}")
 
-    prompt_text = f"СТАРЫЕ ФАКТЫ ИЗ БАЗЫ (с их ID):\n{old_facts_text}\n\nСВЕЖАЯ ИСТОРИЯ ДИАЛОГА:\n{full_history}"
+    prompt_text = f"СТАРЫЕ ФАКТЫ ИЗ БАЗЫ:\n{old_facts_text}\n\nСВЕЖАЯ ИСТОРИЯ ДИАЛОГА:\n{full_history}"
     
     url = f"{API_BASE}{WORKING_MODEL}:generateContent?key={GEMINI_API_KEY}"
     payload = {
@@ -300,35 +299,30 @@ def run_archivist(user_id, sender_name, history_lines):
                 inserts = []
                 for uf in data.get("user_facts", []): inserts.append(f"[О СОБЕСЕДНИКЕ]: {uf}")
                 for sf in data.get("senka_facts", []): inserts.append(f"[О СЕНЬКЕ]: {sf}")
-                for old_f in data.get("to_insert", []): inserts.append(f"[ФАКТ]: {old_f}")
                 
                 if inserts:
                     for fact in inserts:
                         threading.Thread(target=save_memory_to_supabase, args=(user_id, fact)).start()
-        except Exception:
-            pass
-
+        except Exception: pass
         return "ОК"
-    except Exception as e:
-        return f"Сбой: {e}"
+    except Exception as e: return f"Сбой: {e}"
 
-@app.on_message(filters.me & filters.command("sleep", prefixes="!"))
+# УБРАЛ FILTERS.ME - ТЕПЕРЬ МОЖЕШЬ ТЕСТИТЬ С КРОТА
+@app.on_message(filters.private & filters.command("sleep", prefixes="!"))
 async def sleep_command(client, message):
     await message.reply("*(система)* Инициирован глобальный анализ памяти. Запускаю пылесос чатов...")
     
     active_users = list(USER_CARDS.keys())
     if not active_users:
-        await message.reply("*(система)* Ни одного активного диалога в кэше нет. Иду спать дальше.")
+        await message.reply("*(система)* Ни одного активного диалога в кэше нет.")
         return
     
     success_count = 0
-    
     for target_uid in active_users:
         try:
             user_info = await app.get_users(target_uid)
             sender_name = user_info.first_name if user_info else "Собеседник"
-        except Exception:
-            sender_name = "Собеседник"
+        except Exception: sender_name = "Собеседник"
             
         last_msg_id = 0
         if supabase:
@@ -350,13 +344,9 @@ async def sleep_command(client, message):
                     speaker = sender_name if msg.from_user and msg.from_user.id == target_uid else "Ты"
                     ts = msg.date.strftime("%d.%m %H:%M") if msg.date else datetime.now().strftime("%d.%m %H:%M")
                     history_lines.append(f"[{ts}] {speaker}: {msg.text}")
-        except Exception as e:
-            print(f"[-] Ошибка чтения истории с {target_uid}: {e}")
-            continue
+        except Exception as e: continue
                 
-        if not history_lines:
-            continue
-
+        if not history_lines: continue
         history_lines.reverse()
         
         if supabase and max_id_seen > last_msg_id:
@@ -367,7 +357,7 @@ async def sleep_command(client, message):
         success_count += 1
         await asyncio.sleep(4)
         
-    await message.reply(f"*(система)* Глобальный сон завершен. Обновлено чатов: {success_count} из {len(active_users)}.")
+    await message.reply(f"*(система)* Глобальный сон завершен. Обновлено чатов: {success_count}.")
 
 def ask_gemini(user_id, sender_name, user_text, card_text):
     global WORKING_MODEL
@@ -384,17 +374,18 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
     
     current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M")
     
-    prompt = f"[Текущее системное время сервера: {current_time_str}]\nТекущий диалог:\n{dialogue_str}\n\n"
+    prompt = f"[Текущее системное время: {current_time_str}]\nТекущий диалог:\n{dialogue_str}\n\n"
     if vector_context: 
         prompt += f"[СЕКРЕТНОЕ ДОСЬЕ: ФАКТЫ О ПОЛЬЗОВАТЕЛЕ И О СЕБЕ]:\n{vector_context}\n\n"
         
     system_instruction = (
         "Ты — цифровой двойник реального парня по имени Сенька. Характер: живой, ироничный, адекватный. Не будь услужливым роботом.\n"
-        "СТИЛЬ РЕЧИ: Разговорный язык ('Бля', 'Крч', 'Ну').\n"
-        "ВНИМАНИЕ: ЖЕСТКАЯ ПРОВЕРКА ВРЕМЕНИ! Сравнивай системное время сервера с временем отправки последних сообщений в истории [ДД.ММ ЧЧ:ММ]. Если с момента договора о встрече или событии прошло несколько часов, или наступили новые сутки — значит событие УЖЕ ЗАВЕРШИЛОСЬ, не веди себя так, будто все еще ждешь!\n"
+        "СТИЛЬ РЕЧИ: Разговорный язык ('Бля', 'Крч', 'Ну').\n\n"
+        "ПРАВИЛО АНТИ-ЦИКЛА (ВЫХОД ИЗ ТУПИКА):\n"
+        "Ты склонен зацикливаться на одном сценарии (например, 'жду тебя', 'идем пить'). Если собеседник прямым текстом говорит, что ситуация изменилась (он уже дома, время прошло, планы отменились) или указывает на нестыковку во времени — МГНОВЕННО выходи из режима ожидания! Признай, что затупил или ошибся, и меняй тему. Не долби одно и то же.\n\n"
         "В ДОСЬЕ есть два типа фактов: [О СОБЕСЕДНИКЕ] и [О СЕНЬКЕ]. Опирайся на оба типа фактов, чтобы поддерживать целостность личности.\n"
         "ФОРМАТ ОТВЕТА:\n"
-        "Сначала напиши свои мысли в скобках (например: (Блин, уже столько времени прошло...)).\n"
+        "Сначала напиши свои мысли в скобках (например: (Блин, походу я рил затупил, надо съехать с темы...)).\n"
         "Затем ОБЯЗАТЕЛЬНО на новой строке ТОЛЬКО саму реплику без дополнительных меток и действий."
     )
 
@@ -416,8 +407,7 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
     try:
         r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
         if 'error' in r: 
-            error_msg = r['error'].get('message', 'Неизвестная ошибка API')
-            return f"[ОШИБКА GOOGLE API]: {error_msg}", history_lines
+            return f"[ОШИБКА GOOGLE API]: {r['error'].get('message', '')}", history_lines
             
         if 'candidates' in r and len(r['candidates']) > 0:
             parts = r['candidates'][0]['content'].get('parts', [])
@@ -430,8 +420,6 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
             if func_call:
                 func_name = func_call['name']
                 args = func_call.get('args', {})
-                print(f"[!] ИИ ЗАПРОСИЛ ИНСТРУМЕНТ: {func_name} | Аргументы: {args}")
-                
                 tool_result = ""
                 if func_name == "web_search":
                     queries = args.get("queries", [])
@@ -440,15 +428,14 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
                 elif func_name == "get_current_datetime":
                     tool_result = tool_get_current_datetime()
                 
-                follow_up_prompt = prompt + f"\n\n[СИСТЕМНОЕ СООБЩЕНИЕ: Результат инструмента:\n{tool_result}\n\nОпирайся на эти данные для ответа.]"
+                follow_up_prompt = prompt + f"\n\n[СИСТЕМНОЕ СООБЩЕНИЕ: Результат инструмента:\n{tool_result}\n\nОпирайся на эти данные.]"
                 payload2 = {
                     "systemInstruction": {"parts": [{"text": system_instruction}]},
                     "contents": [{"parts": [{"text": follow_up_prompt}]}],
                     "safetySettings": SAFETY_SETTINGS
                 }
                 r2 = requests.post(url, json=payload2, headers={'Content-Type': 'application/json'}).json()
-                if 'error' in r2: 
-                    return "[ОШИБКА]: Сбой при переваривании инструмента.", history_lines
+                if 'error' in r2: return "[ОШИБКА]: Сбой инструмента.", history_lines
                     
                 raw_answer = ""
                 for p in r2['candidates'][0]['content'].get('parts', []):
@@ -468,40 +455,18 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
             history_lines.append(f"[{ts_now}] Ты: {ans}")
             return ans, history_lines
     except Exception as e:
-        print(f"[-] КРИТИЧЕСКАЯ Ошибка API: {e}")
         error_str = f"[КРИТ. ОШИБКА СЕТИ]: {str(e)}"
         history_lines.append(f"Ты: {error_str}")
         return error_str, history_lines
         
-    fallback = "[ОШИБКА]: Бот не смог сгенерировать ответ."
-    history_lines.append(f"Ты: {fallback}")
-    return fallback, history_lines
-
-async def process_batch(client, message, user_id, sender_name):
-    try: await asyncio.sleep(4)
-    except asyncio.CancelledError: return
-        
-    msgs = PENDING_MESSAGES.pop(user_id, [])
-    if not msgs: return
-    
-    combined_text = "\n".join(msgs)
-    
-    try: await app.read_chat_history(user_id)
-    except Exception: pass
-    
-    try: await app.send_chat_action(user_id, ChatAction.TYPING)
-    except Exception: pass
-    
-    try:
-        _, card_text = await get_or_create_card(user_id, sender_name)
-        reply_text, new_history = await asyncio.to_thread(ask_gemini, user_id, sender_name, combined_text, card_text)
-        await update_card_history(user_id, sender_name, new_history)
-        if reply_text: await message.reply(reply_text)
-    except Exception as e:
-        await message.reply(f"[ОШИБКА ОБРАБОТКИ]: {e}")
+    return "[ОШИБКА]: Бот не смог сгенерировать ответ.", history_lines
 
 @app.on_message(filters.private & ~filters.me & ~filters.bot)
 async def auto_reply(client, message):
+    # ИГНОРИРУЕМ КОМАНДЫ, ЧТОБЫ ОНИ НЕ ПОПАДАЛИ В ОБЫЧНЫЙ ЧАТ
+    if message.text and message.text.startswith("!"):
+        return
+
     user_id = message.from_user.id
     sender_name = message.from_user.first_name if message.from_user else "Кто-то"
     if user_id not in PENDING_MESSAGES: PENDING_MESSAGES[user_id] = []
@@ -518,7 +483,7 @@ async def main():
     init_supabase()
     await load_db()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (vBETA-2: СИХРОНИЗАЦИЯ ЧАСОВ) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (vBETA-3: АНТИ-ЦИКЛ И СВОБОДНЫЙ СОН) ")
     print("==========================================\n")
     await idle()
     await app.stop()

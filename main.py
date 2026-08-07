@@ -63,7 +63,7 @@ GEMINI_TOOLS = [{
     "functionDeclarations": [
         {
             "name": "web_search",
-            "description": "Искать информацию в Интернете. Вызывай СРАЗУ ЖЕ, если нужны факты, курсы или погода. Можно искать несколько вещей сразу.",
+            "description": "Искать информацию в Интернете. Вызывай СРАЗУ ЖЕ, если нужны факты, курсы или погода.",
             "parameters": {
                 "type": "OBJECT",
                 "properties": {
@@ -119,9 +119,7 @@ def find_working_model():
             test_url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:generateContent?key={GEMINI_API_KEY}"
             payload = {"contents": [{"parts": [{"text": "hi"}]}]}
             r = requests.post(test_url, json=payload, headers={'Content-Type': 'application/json'})
-            if r.status_code == 200:
-                print(f"[+] УСПЕШНО! ВЫБРАНА МОДЕЛЬ: {model_name}")
-                return model_name
+            if r.status_code == 200: return model_name
     except Exception: pass
     return None
 
@@ -143,15 +141,13 @@ def find_working_embedding_model():
 
 def get_embedding(text):
     global WORKING_EMBEDDING_MODEL
-    if not WORKING_EMBEDDING_MODEL:
-        WORKING_EMBEDDING_MODEL = find_working_embedding_model()
+    if not WORKING_EMBEDDING_MODEL: WORKING_EMBEDDING_MODEL = find_working_embedding_model()
     if not WORKING_EMBEDDING_MODEL: return None
     url = f"https://generativelanguage.googleapis.com/v1beta/{WORKING_EMBEDDING_MODEL}:embedContent?key={GEMINI_API_KEY}"
     payload = {"model": WORKING_EMBEDDING_MODEL, "content": {"parts": [{"text": text}]}}
     try:
         r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
-        if 'embedding' in r and 'values' in r['embedding']:
-            return r['embedding']['values']
+        if 'embedding' in r and 'values' in r['embedding']: return r['embedding']['values']
     except Exception: pass
     return None
 
@@ -160,12 +156,8 @@ def save_memory_to_supabase(user_id, content):
     vector = get_embedding(content)
     if not vector: return
     try:
-        supabase.table("memories").insert({
-            "user_id": user_id,
-            "content": content,
-            "embedding": vector
-        }).execute()
-        print(f"[+] ВЕКТОРНАЯ ПАМЯТЬ СОХРАНЕНА: '{content[:30]}...'")
+        supabase.table("memories").insert({"user_id": user_id, "content": content, "embedding": vector}).execute()
+        print(f"[+] ФАКТ СОХРАНЕН В БАЗУ: '{content[:30]}...'")
     except Exception as e:
         print(f"[-] Ошибка записи в Supabase: {e}")
 
@@ -174,154 +166,177 @@ def get_relevant_memories(user_id, current_text):
     vector = get_embedding(current_text)
     if not vector: return ""
     try:
-        res = supabase.rpc("match_memories", {
-            "query_embedding": vector,
-            "match_threshold": 0.3,
-            "match_count": 3,
-            "p_user_id": user_id
-        }).execute()
-        if res.data and len(res.data) > 0:
-            memories_list = [item['content'] for item in res.data]
-            return "\n".join(memories_list)
+        res = supabase.rpc("match_memories", {"query_embedding": vector, "match_threshold": 0.3, "match_count": 3, "p_user_id": user_id}).execute()
+        if res.data and len(res.data) > 0: return "\n".join([item['content'] for item in res.data])
     except Exception: pass
     return ""
 
 async def load_db():
     global CHANNEL_ID, USER_CARDS
     try:
-        chat = await app.get_chat(CHANNEL_INVITE)
+        chat = await app.get_chat(CHANNEL_INVITE) # Убедись, что переменная CHANNEL_INVITE определена в твоем окружении или коде
         CHANNEL_ID = chat.id
         async for message in app.get_chat_history(CHANNEL_ID, limit=200):
             if message.text:
                 match = re.search(r'\[USER_ID:\s*(-?\d+)\]', message.text)
-                if match:
-                    uid = int(match.group(1))
-                    if uid not in USER_CARDS:
-                        USER_CARDS[uid] = message.id
+                if match: USER_CARDS[int(match.group(1))] = message.id
     except Exception: pass
 
+def parse_card_info(card_text):
+    history_lines = []
+    last_msg_id = 0
+    sender_name = "Кто-то"
+    capture = False
+    
+    m_name = re.search(r'Имя:\s*(.*)', card_text)
+    if m_name: sender_name = m_name.group(1).strip()
+        
+    m_id = re.search(r'Last_Msg_ID:\s*(\d+)', card_text)
+    if m_id: last_msg_id = int(m_id.group(1))
+
+    for line in card_text.split('\n'):
+        if line.startswith("История:"): capture = True; continue
+        if capture and line.strip(): history_lines.append(line.strip())
+            
+    return sender_name, last_msg_id, history_lines
+
 async def get_or_create_card(user_id, sender_name):
-    if not CHANNEL_ID: return None, ""
+    if not CHANNEL_ID: return None, "", 0
     if user_id not in USER_CARDS:
-        initial_text = f"[USER_ID: {user_id}]\nИмя: {sender_name}\nИстория:\n"
+        initial_text = f"[USER_ID: {user_id}]\nИмя: {sender_name}\nLast_Msg_ID: 0\nИстория:\n"
         try:
             sent = await app.send_message(CHANNEL_ID, initial_text)
             USER_CARDS[user_id] = sent.id
-            return sent.id, initial_text
-        except Exception:
-            return None, initial_text
+            return sent.id, initial_text, 0
+        except Exception: return None, initial_text, 0
     else:
         msg_id = USER_CARDS[user_id]
         try:
             msg = await app.get_messages(CHANNEL_ID, msg_id)
-            if msg and msg.text: return msg_id, msg.text
+            if msg and msg.text:
+                _, last_msg_id, _ = parse_card_info(msg.text)
+                return msg_id, msg.text, last_msg_id
         except Exception: pass
-        return None, ""
+        return None, "", 0
 
-async def update_card_history(user_id, sender_name, history_lines):
+async def update_card_history(user_id, sender_name, history_lines, last_msg_id):
     if not CHANNEL_ID: return
-    msg_id, _ = await get_or_create_card(user_id, sender_name)
+    msg_id, _, _ = await get_or_create_card(user_id, sender_name)
     if not msg_id: return
     history_str = "\n".join(history_lines)
-    full_text = f"[USER_ID: {user_id}]\nИмя: {sender_name}\nИстория:\n{history_str}"
+    full_text = f"[USER_ID: {user_id}]\nИмя: {sender_name}\nLast_Msg_ID: {last_msg_id}\nИстория:\n{history_str}"
     if len(full_text) > 4000: full_text = full_text[-4000:]
-    try:
-        await app.edit_message_text(CHANNEL_ID, msg_id, full_text)
+    try: await app.edit_message_text(CHANNEL_ID, msg_id, full_text)
     except Exception: pass
 
-def parse_history_from_text(card_text):
-    lines = card_text.split('\n')
-    history_lines = []
-    capture = False
-    for line in lines:
-        if line.startswith("История:"):
-            capture = True
-            continue
-        if capture and line.strip():
-            history_lines.append(line.strip())
-    return history_lines
-
 # ==========================================
-# МОДУЛЬ "НОЧНОЙ АРХИВАРИУС" v2.0
+# МОДУЛЬ "ГЛОБАЛЬНЫЙ НОЧНОЙ АРХИВАРИУС" v3.0
 # ==========================================
 ARCHIVIST_SYSTEM_PROMPT = """
-Ты — строгий ИИ-Архивариус. Твоя задача: проанализировать историю диалога за день.
-Правила:
-1. Игнорируй пост-иронию, откровенный абсурд, рофлы и временные эмоции. Будь параноиком к абсурду.
-2. Вычлени только НАСТОЯЩИЕ, твердые факты о собеседнике (предпочтения, локация, важные детали).
-3. Если человек пошутил, а потом сказал правду — игнорируй шутку, сохраняй правду.
-4. Верни ответ СТРОГО в формате JSON без markdown разметки и лишнего текста:
+Ты — хирургически точный ИИ-Архивариус. Твоя задача: обновить векторную базу знаний пользователя.
+Тебе предоставлены:
+1. ТЕКУЩАЯ БАЗА (у каждого факта есть свой [ID]).
+2. НОВЫЙ ДИАЛОГ.
+
+Правила анализа:
+1. Игнорируй пост-иронию, спам и рофлы. Выделяй только твердые, новые факты.
+2. КОНФЛИКТЫ: Если в новом диалоге есть факт, который опровергает старый факт из базы (например, юзер переехал, или признался, что старый факт был шуткой) — добавь ID старого факта в "to_delete_ids", а новую правду в "to_insert".
+3. ДУБЛИКАТЫ: Если факт УЖЕ есть в ТЕКУЩЕЙ БАЗЕ — не добавляй его снова!
+4. Выдавай ответ СТРОГО в JSON:
 {
-  "insights": ["Тут твои мысли о психологии юзера"],
-  "to_insert": ["Факт 1", "Факт 2 (если есть)"]
+  "insights": ["Анализ психологии и контекста"],
+  "to_delete_ids": [15, 42],
+  "to_insert": ["Свежий проверенный факт 1"]
 }
 """
 
-def run_archivist(user_id, sender_name, history_lines):
+def run_archivist_for_user(user_id, sender_name, new_messages):
     global WORKING_MODEL
     if not WORKING_MODEL: WORKING_MODEL = find_working_model()
     
-    print(f"\n[!] АРХИВАРИУС ПРОСНУЛСЯ. Анализирую живую историю ({len(history_lines)} строк)...")
-    full_history = "\n".join(history_lines)
+    print(f"\n[!] АРХИВАРИУС: Анализирую {sender_name} ({len(new_messages)} новых строк)...")
+    
+    # 1. Достаем старую память из Supabase
+    existing_memories = []
+    memories_str = "База пуста."
+    try:
+        if supabase:
+            existing_memories = supabase.table("memories").select("id, content").eq("user_id", user_id).execute().data
+            if existing_memories:
+                memories_str = "\n".join([f"[ID: {m['id']}] {m['content']}" for m in existing_memories])
+    except Exception as e: print(f"[-] Ошибка выгрузки БД: {e}")
+
+    full_history = "\n".join(new_messages)
+    prompt_text = f"ТЕКУЩАЯ БАЗА ЗНАНИЙ:\n{memories_str}\n\nНОВЫЙ ДИАЛОГ:\n{full_history}"
     
     url = f"https://generativelanguage.googleapis.com/v1beta/{WORKING_MODEL}:generateContent?key={GEMINI_API_KEY}"
     payload = {
         "systemInstruction": {"parts": [{"text": ARCHIVIST_SYSTEM_PROMPT}]},
-        "contents": [{"parts": [{"text": f"История диалога:\n{full_history}"}]}]
+        "contents": [{"parts": [{"text": prompt_text}]}]
     }
     
     try:
         r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
-        if 'error' in r:
-            print(f"[-] Ошибка Архивариуса: {r}")
-            return "Сбой в матрице снов."
-        
         raw_answer = ""
         for p in r.get('candidates', [{}])[0].get('content', {}).get('parts', []):
             if 'text' in p: raw_answer += p['text'] + "\n"
             
-        print(f"\n==========================================")
-        print(f"[!] ОТВЕТ АРХИВАРИУСА:\n{raw_answer.strip()}")
-        print(f"==========================================\n")
+        print(f"\n[!] ОТВЕТ АРХИВАРИУСА ДЛЯ {sender_name}:\n{raw_answer.strip()}\n")
         
-        # МАГИЯ: Парсим JSON и отправляем в память!
-        try:
-            json_match = re.search(r'\{.*\}', raw_answer.strip(), re.DOTALL)
-            if json_match:
-                data = json.loads(json_match.group(0))
-                inserts = data.get("to_insert", [])
-                if inserts:
-                    print(f"[+] Архивариус нашел {len(inserts)} чистых фактов! Отправляю в Supabase...")
-                    for fact in inserts:
-                        # Асинхронно кидаем в векторную базу
-                        threading.Thread(target=save_memory_to_supabase, args=(user_id, fact)).start()
-        except Exception as e:
-            print(f"[-] Ошибка парсинга JSON от Архивариуса: {e}")
-
-        return "Память оптимизирована, мусор выкинут."
-    except Exception as e:
-        return f"Кошмарный сон: {e}"
-
-@app.on_message(filters.private & filters.command("sleep", prefixes="!"))
-async def sleep_command(client, message):
-    user_id = message.from_user.id
-    sender_name = message.from_user.first_name if message.from_user else "Кто-то"
-    
-    await message.reply("*(закрывает глаза)* Ушел в спящий режим. Анализирую сегодняшний день...")
-    
-    # ВЕРСИЯ 6.9: Качаем РЕАЛЬНУЮ ИСТОРИЮ прямо из лички (50 последних сообщений)
-    history_lines = []
-    async for msg in client.get_chat_history(user_id, limit=50):
-        if msg.text and not msg.text.startswith("!"):
-            speaker = sender_name if msg.from_user.id == user_id else "Ты"
-            history_lines.append(f"{speaker}: {msg.text}")
+        # 2. Парсим JSON и хирургически режем базу
+        json_match = re.search(r'\{.*\}', raw_answer.strip(), re.DOTALL)
+        if json_match and supabase:
+            data = json.loads(json_match.group(0))
             
-    history_lines.reverse() # Переворачиваем, чтобы старые были сверху
+            # Удаляем старье
+            to_delete = data.get("to_delete_ids", [])
+            for d_id in to_delete:
+                supabase.table("memories").delete().eq("id", d_id).execute()
+                print(f"[-] Уничтожен старый/ошибочный вектор ID: {d_id}")
+                
+            # Добавляем новьё
+            to_insert = data.get("to_insert", [])
+            for fact in to_insert:
+                threading.Thread(target=save_memory_to_supabase, args=(user_id, fact)).start()
+                
+        return True
+    except Exception as e:
+        print(f"[-] Ошибка Архивариуса для {sender_name}: {e}")
+        return False
+
+@app.on_message(filters.command("sleep", prefixes="!"))
+async def global_sleep_command(client, message):
+    await message.reply("*(закрывает глаза)* Ухожу в глубокий сон. Индексирую ВСЕ активные чаты...")
     
-    # Запускаем Архивариуса в отдельном потоке
-    result = await asyncio.to_thread(run_archivist, user_id, sender_name, history_lines)
-    
-    await message.reply(f"*(открывает глаза)* Фух, ну и бред мы сегодня несли. {result}")
+    processed_chats = 0
+    # Проходимся по всем известным пользователям
+    for u_id in list(USER_CARDS.keys()):
+        msg_id, card_text, last_msg_id = await get_or_create_card(u_id, "Unknown")
+        sender_name, _, history_lines = parse_card_info(card_text)
+        
+        new_messages = []
+        latest_id = last_msg_id
+        
+        # Качаем историю до закладки
+        try:
+            async for msg in client.get_chat_history(u_id, limit=200):
+                if msg.id <= last_msg_id: break
+                if msg.id > latest_id: latest_id = msg.id
+                
+                # Фильтруем стикеры и команды!
+                if msg.text and not msg.text.startswith("!"):
+                    speaker = sender_name if msg.from_user and msg.from_user.id == u_id else "Ты"
+                    new_messages.append(f"{speaker}: {msg.text}")
+        except Exception: continue
+            
+        if new_messages:
+            new_messages.reverse() # Хронологический порядок
+            await asyncio.to_thread(run_archivist_for_user, u_id, sender_name, new_messages)
+            await update_card_history(u_id, sender_name, history_lines, latest_id)
+            processed_chats += 1
+            await asyncio.sleep(5) # Пауза между юзерами для API
+            
+    await message.reply(f"*(открывает глаза)* Я проснулся. Обновлено чатов: {processed_chats}. Мозг кристально чист.")
 # ==========================================
 
 def ask_gemini(user_id, sender_name, user_text, card_text):
@@ -331,7 +346,7 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
 
     vector_context = get_relevant_memories(user_id, user_text)
     
-    history_lines = parse_history_from_text(card_text)
+    sender_name_parsed, last_msg_id, history_lines = parse_card_info(card_text)
     history_lines.append(f"Собеседник: {user_text}")
     if len(history_lines) > 8: history_lines = history_lines[-8:]
     dialogue_str = "\n".join(history_lines)
@@ -370,8 +385,6 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
             if func_call:
                 func_name = func_call['name']
                 args = func_call.get('args', {})
-                print(f"[!] ИИ ЗАПРОСИЛ ИНСТРУМЕНТ: {func_name} | Аргументы: {args}")
-                
                 tool_result = ""
                 if func_name == "web_search":
                     queries = args.get("queries", [])
@@ -398,14 +411,10 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
             ans = ""
             for line in reversed(lines):
                 if not line.startswith('(') and not line.endswith(')'):
-                    if re.search(r'[А-Яа-яЁё]', line):
-                        ans = line
-                        break
+                    if re.search(r'[А-Яа-яЁё]', line): ans = line; break
             if not ans and lines:
                 for line in lines:
-                    if not line.startswith('('):
-                        ans = line
-                        break
+                    if not line.startswith('('): ans = line; break
                 if not ans: ans = lines[-1]
                 
             ans = re.sub(r'^[a-zA-Z0-9_ \-\.\?\!]+:\s*', '', ans).strip()
@@ -413,11 +422,13 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
             ans = re.sub(r'^"|"$', '', ans).strip()
             if not ans: ans = "Чего?"
 
-            threading.Thread(target=save_memory_to_supabase, args=(user_id, f"Собеседник сказал: {user_text} | Ты ответил: {ans}")).start()
+            # Отключаем автосохранение каждого пука! Теперь это делает Архивариус ночью.
+            # threading.Thread(target=save_memory_to_supabase, args=(user_id, f"Собеседник сказал: {user_text} | Ты ответил: {ans}")).start()
+            
             history_lines.append(f"Ты: {ans}")
             return ans, history_lines
     except Exception as e:
-        print(f"[-] КРИТИЧЕСКАЯ Ошибка API: {e}")
+        print(f"[-] Ошибка API: {e}")
         
     fallback = "Чего?"
     history_lines.append(f"Ты: {fallback}")
@@ -435,9 +446,9 @@ async def process_batch(client, message, user_id, sender_name):
     except Exception: pass
     
     try:
-        _, card_text = await get_or_create_card(user_id, sender_name)
+        _, card_text, last_msg_id = await get_or_create_card(user_id, sender_name)
         reply_text, new_history = await asyncio.to_thread(ask_gemini, user_id, sender_name, combined_text, card_text)
-        await update_card_history(user_id, sender_name, new_history)
+        await update_card_history(user_id, sender_name, new_history, last_msg_id)
         if reply_text: await message.reply(reply_text)
     except Exception as e:
         await message.reply("Бля, у меня в мозгах че-то замкнуло, погоди.")
@@ -456,7 +467,7 @@ async def main():
     init_supabase()
     await load_db()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (v6.9: ТОТАЛЬНЫЙ ВСПОМНИТЬ ВСЁ) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (v7.0: ГЛОБАЛЬНЫЙ ФИЛЬТР) ")
     print("==========================================\n")
     await idle()
     await app.stop()

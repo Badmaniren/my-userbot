@@ -40,6 +40,9 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 CHANNEL_INVITE = os.environ.get("CHANNEL_INVITE", "")
 
+# Хак против умных редакторов, оборачивающих ссылки в скобки
+API_BASE = "https" + "://" + "generativelanguage.googleapis.com/v1beta/"
+
 supabase: SupabaseClient = None
 
 def init_supabase():
@@ -116,7 +119,7 @@ def tool_get_current_datetime():
 app = Client("my_account", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_STRING)
 
 def find_working_model():
-    list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
+    list_url = f"{API_BASE}models?key={GEMINI_API_KEY}"
     try:
         res = requests.get(list_url).json()
         if 'models' not in res: return None
@@ -124,7 +127,7 @@ def find_working_model():
         preferred = [m for m in available if "3.6-flash" in m or "3.5-flash" in m]
         others = [m for m in available if m not in preferred and "flash" in m and "preview" not in m]
         for model_name in preferred + others + available:
-            test_url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:generateContent?key={GEMINI_API_KEY}"
+            test_url = f"{API_BASE}{model_name}:generateContent?key={GEMINI_API_KEY}"
             payload = {"contents": [{"parts": [{"text": "hi"}]}], "safetySettings": SAFETY_SETTINGS}
             r = requests.post(test_url, json=payload, headers={'Content-Type': 'application/json'})
             if r.status_code == 200: return model_name
@@ -132,7 +135,7 @@ def find_working_model():
     return None
 
 def find_working_embedding_model():
-    list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
+    list_url = f"{API_BASE}models?key={GEMINI_API_KEY}"
     try:
         res = requests.get(list_url).json()
         if 'models' not in res: return None
@@ -140,7 +143,7 @@ def find_working_embedding_model():
             model_name = m['name']
             methods = m.get('supportedGenerationMethods', [])
             if 'embedContent' in methods or 'batchEmbedContents' in methods:
-                test_url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:embedContent?key={GEMINI_API_KEY}"
+                test_url = f"{API_BASE}{model_name}:embedContent?key={GEMINI_API_KEY}"
                 payload = {"model": model_name, "content": {"parts": [{"text": "hi"}]}}
                 r = requests.post(test_url, json=payload, headers={'Content-Type': 'application/json'})
                 if r.status_code == 200: return model_name
@@ -152,7 +155,7 @@ def get_embedding(text):
     if not WORKING_EMBEDDING_MODEL:
         WORKING_EMBEDDING_MODEL = find_working_embedding_model()
     if not WORKING_EMBEDDING_MODEL: return None
-    url = f"https://generativelanguage.googleapis.com/v1beta/{WORKING_EMBEDDING_MODEL}:embedContent?key={GEMINI_API_KEY}"
+    url = f"{API_BASE}{WORKING_EMBEDDING_MODEL}:embedContent?key={GEMINI_API_KEY}"
     payload = {"model": WORKING_EMBEDDING_MODEL, "content": {"parts": [{"text": text}]}}
     try:
         r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
@@ -266,7 +269,7 @@ def run_archivist(user_id, sender_name, history_lines):
 
     prompt_text = f"СТАРЫЕ ФАКТЫ ИЗ БАЗЫ (с их ID):\n{old_facts_text}\n\nСВЕЖАЯ ИСТОРИЯ ДИАЛОГА:\n{full_history}"
     
-    url = f"[https://generativelanguage.googleapis.com/v1beta/](https://generativelanguage.googleapis.com/v1beta/){WORKING_MODEL}:generateContent?key={GEMINI_API_KEY}"
+    url = f"{API_BASE}{WORKING_MODEL}:generateContent?key={GEMINI_API_KEY}"
     payload = {
         "systemInstruction": {"parts": [{"text": ARCHIVIST_SYSTEM_PROMPT}]},
         "contents": [{"parts": [{"text": prompt_text}]}],
@@ -324,7 +327,6 @@ async def sleep_command(client, message):
         
         if msg.text and not msg.text.startswith("!"):
             speaker = sender_name if msg.from_user.id == user_id else "Ты"
-            # Извлекаем дату сообщения
             ts = msg.date.strftime("%d.%m %H:%M") if msg.date else datetime.now().strftime("%d.%m %H:%M")
             history_lines.append(f"[{ts}] {speaker}: {msg.text}")
             
@@ -349,7 +351,6 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
     vector_context = get_relevant_memories(user_id, user_text)
     
     history_lines = parse_history_from_text(card_text)
-    # user_text уже содержит метки времени и имена, так как мы склеиваем PENDING_MESSAGES
     history_lines.append(user_text)
     
     if len(history_lines) > 8: history_lines = history_lines[-8:]
@@ -371,9 +372,8 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
         "Затем ОБЯЗАТЕЛЬНО на новой строке ТОЛЬКО саму реплику без дополнительных меток, префиксов и действий."
     )
 
-    # Жесткая очистка URL от лишних пробелов, чтобы requests не давился
     clean_model_name = WORKING_MODEL.strip()
-    url = f"[https://generativelanguage.googleapis.com/v1beta/](https://generativelanguage.googleapis.com/v1beta/){clean_model_name}:generateContent?key={GEMINI_API_KEY}"
+    url = f"{API_BASE}{clean_model_name}:generateContent?key={GEMINI_API_KEY}"
     
     payload = {
         "systemInstruction": {"parts": [{"text": system_instruction}]},
@@ -430,7 +430,6 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
             else:
                 raw_answer = raw_text
             
-            # ЯДЕРНЫЙ ПАРСЕР
             ans = raw_answer.strip()
             ans = re.sub(r'^\s*\(+.*?\)+\s*', '', ans, flags=re.DOTALL)
             ans = re.sub(r'\*.*?(Search|Гуглю).*?\*\s*', '', ans, flags=re.IGNORECASE)
@@ -439,13 +438,11 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
             
             if not ans: ans = "..."
 
-            # Записываем реплику бота с текущим временем
             ts_now = datetime.now().strftime("%d.%m %H:%M")
             history_lines.append(f"[{ts_now}] Ты: {ans}")
             return ans, history_lines
     except Exception as e:
         print(f"[-] КРИТИЧЕСКАЯ Ошибка API: {e}")
-        # Выводим реальную ошибку в чат, а не "Чего?"
         error_str = f"[КРИТ. ОШИБКА СЕТИ]: {str(e)}"
         history_lines.append(f"Ты: {error_str}")
         return error_str, history_lines
@@ -461,7 +458,6 @@ async def process_batch(client, message, user_id, sender_name):
     msgs = PENDING_MESSAGES.pop(user_id, [])
     if not msgs: return
     
-    # Теперь сообщения склеиваются через перенос строки, каждое со своим таймстемпом
     combined_text = "\n".join(msgs)
     
     try: await app.read_chat_history(user_id)
@@ -484,7 +480,6 @@ async def auto_reply(client, message):
     sender_name = message.from_user.first_name if message.from_user else "Кто-то"
     if user_id not in PENDING_MESSAGES: PENDING_MESSAGES[user_id] = []
     
-    # Сразу формируем строку с таймстемпом
     ts = message.date.strftime("%d.%m %H:%M") if message.date else datetime.now().strftime("%d.%m %H:%M")
     formatted_msg = f"[{ts}] Собеседник: {message.text}"
     
@@ -497,7 +492,7 @@ async def main():
     init_supabase()
     await load_db()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (v8.2: ТАЙМСТЕМПЫ И ФИКС СЕТИ) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (v8.3: АНТИ-БУФЕР ОБМЕНА) ")
     print("==========================================\n")
     await idle()
     await app.stop()

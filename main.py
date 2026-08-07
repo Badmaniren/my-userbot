@@ -38,6 +38,7 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+CHANNEL_INVITE = os.environ.get("CHANNEL_INVITE", "")
 
 supabase: SupabaseClient = None
 
@@ -66,19 +67,18 @@ SAFETY_SETTINGS = [
     {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
 ]
 
-# ЖЕСТКОЕ ОПИСАНИЕ ИНСТРУМЕНТА (ЗАПРЕТ НА САМОДЕЯТЕЛЬНОСТЬ)
 GEMINI_TOOLS = [{
     "functionDeclarations": [
         {
             "name": "web_search",
-            "description": "ПОИСКОВИК. Использовать ТОЛЬКО ЕСЛИ собеседник ПРЯМО и СЕЙЧАС задал вопрос, требующий интернета (например: 'какая погода', 'найди инфу'). КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО использовать по своей инициативе или для поддержания разговора.",
+            "description": "ПОИСКОВИК. Использовать ТОЛЬКО ЕСЛИ собеседник ПРЯМО и СЕЙЧАС задал вопрос, требующий актуальной информации из интернета (например: 'какая погода', 'найди инфу').",
             "parameters": {
                 "type": "OBJECT",
                 "properties": {
                     "queries": {
                         "type": "ARRAY",
                         "items": {"type": "STRING"},
-                        "description": "Список запросов. Пример: ['погода Оса', 'курс ETH']"
+                        "description": "Список поисковых запросов."
                     }
                 },
                 "required": ["queries"]
@@ -183,6 +183,9 @@ def get_relevant_memories(user_id, current_text):
 
 async def load_db():
     global CHANNEL_ID, USER_CARDS
+    if not CHANNEL_INVITE:
+        print("[-] ВНИМАНИЕ: CHANNEL_INVITE не задан в переменной окружения!")
+        return
     try:
         chat = await app.get_chat(CHANNEL_INVITE)
         CHANNEL_ID = chat.id
@@ -190,7 +193,8 @@ async def load_db():
             if message.text:
                 match = re.search(r'\[USER_ID:\s*(-?\d+)\]', message.text)
                 if match: USER_CARDS[int(match.group(1))] = message.id
-    except Exception: pass
+    except Exception as e:
+        print(f"[-] Ошибка загрузки базы карт: {e}")
 
 async def get_or_create_card(user_id, sender_name):
     if not CHANNEL_ID: return None, ""
@@ -290,7 +294,7 @@ def run_archivist(user_id, sender_name, history_lines):
                 if inserts:
                     for fact in inserts:
                         threading.Thread(target=save_memory_to_supabase, args=(user_id, fact)).start()
-        except Exception as e:
+        except Exception:
             pass
 
         return "Память оптимизирована."
@@ -354,11 +358,10 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
     system_instruction = (
         "Ты — цифровой двойник реального парня. Характер: живой, ироничный, адекватный. Не будь услужливым роботом.\n"
         "СТИЛЬ РЕЧИ: Разговорный язык ('Бля', 'Крч', 'Ну').\n"
-        "ПРАВИЛО 1: НИКОГДА не пиши действия в звездочках типа *Search:* или *Гуглю:*. Если нужен поиск - используй инструмент.\n"
-        "ПРАВИЛО 2: НЕ упоминай Пермь, крипту или другие факты из досье, если юзер сам о них не заговорил в последнем сообщении.\n"
+        "ПРАВИЛО: НЕ упоминай факты из досье, если собеседник сам о них не заговорил.\n"
         "ФОРМАТ ОТВЕТА:\n"
-        "Сначала напиши мысли в скобках.\n"
-        "Затем на новой строке ТОЛЬКО саму реплику."
+        "Сначала напиши свои мысли в скобках (например: (Думаю, что ответить...)).\n"
+        "Затем на новой строке ТОЛЬКО саму реплику без дополнительных меток и описаний действий."
     )
 
     url = f"https://generativelanguage.googleapis.com/v1beta/{WORKING_MODEL}:generateContent?key={GEMINI_API_KEY}"
@@ -366,6 +369,11 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
         "systemInstruction": {"parts": [{"text": system_instruction}]},
         "contents": [{"parts": [{"text": prompt}]}],
         "tools": GEMINI_TOOLS,
+        "toolConfig": {
+            "functionCallingConfig": {
+                "mode": "AUTO"
+            }
+        },
         "safetySettings": SAFETY_SETTINGS
     }
     
@@ -411,25 +419,22 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
             else:
                 raw_answer = raw_text
             
-            # Дополнительный слой защиты от галлюцинаций с маркдауном
-            lines = [l.strip() for l in raw_answer.split('\n') if l.strip()]
-            ans = ""
-            for line in reversed(lines):
-                if not line.startswith('(') and not line.endswith(')'):
-                    if re.search(r'[А-Яа-яЁё]', line):
-                        ans = line
-                        break
-            if not ans and lines:
-                for line in lines:
-                    if not line.startswith('('):
-                        ans = line
-                        break
-                if not ans: ans = lines[-1]
+            # ЧИСТКА ОТВЕТА
+            ans_lines = []
+            for line in raw_answer.split('\n'):
+                line_str = line.strip()
+                if not line_str: continue
+                # Пропускаем мысли в скобках
+                if line_str.startswith('(') and line_str.endswith(')'): continue
+                # Срезаем галлюцинации вызова поиска
+                if "*" in line_str and ("Search" in line_str or "Гуглю" in line_str): continue
+                ans_lines.append(line_str)
                 
-            ans = re.sub(r'^\*.*?\*[:\s]*', '', ans).strip() # Вырезаем *Search:*
+            ans = " ".join(ans_lines).strip()
             ans = re.sub(r'^[a-zA-Z0-9_ \-\.\?\!]+:\s*', '', ans).strip()
             ans = re.sub(r'^\d+\.\s*', '', ans).strip()
             ans = re.sub(r'^"|"$', '', ans).strip()
+            
             if not ans: ans = "Чего?"
 
             history_lines.append(f"Ты: {ans}")
@@ -474,7 +479,7 @@ async def main():
     init_supabase()
     await load_db()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (v7.3: СТРОГИЙ ОШЕЙНИК) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (v8.0: ОЧИЩЕННЫЙ МОЗГ) ")
     print("==========================================\n")
     await idle()
     await app.stop()

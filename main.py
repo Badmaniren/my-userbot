@@ -59,7 +59,6 @@ USER_CARDS = {}
 PENDING_MESSAGES = {}
 PENDING_TASKS = {}
 
-# ОТКЛЮЧАЕМ ЕБАНУЮ ЦЕНЗУРУ GOOGLE
 SAFETY_SETTINGS = [
     {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
     {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
@@ -67,18 +66,19 @@ SAFETY_SETTINGS = [
     {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
 ]
 
+# ЖЕСТКОЕ ОПИСАНИЕ ИНСТРУМЕНТА (ЗАПРЕТ НА САМОДЕЯТЕЛЬНОСТЬ)
 GEMINI_TOOLS = [{
     "functionDeclarations": [
         {
             "name": "web_search",
-            "description": "Искать информацию в Интернете. Вызывай СРАЗУ ЖЕ, если нужны факты, курсы или погода.",
+            "description": "ПОИСКОВИК. Использовать ТОЛЬКО ЕСЛИ собеседник ПРЯМО и СЕЙЧАС задал вопрос, требующий интернета (например: 'какая погода', 'найди инфу'). КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО использовать по своей инициативе или для поддержания разговора.",
             "parameters": {
                 "type": "OBJECT",
                 "properties": {
                     "queries": {
                         "type": "ARRAY",
                         "items": {"type": "STRING"},
-                        "description": "Список запросов. Пример: ['погода Пермь', 'курс ETH к доллару']"
+                        "description": "Список запросов. Пример: ['погода Оса', 'курс ETH']"
                     }
                 },
                 "required": ["queries"]
@@ -271,16 +271,12 @@ def run_archivist(user_id, sender_name, history_lines):
     
     try:
         r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
-        if 'error' in r: 
-            print(f"[-] ОШИБКА АРХИВАРИУСА (API): {r['error']}")
-            return "Сбой в матрице снов."
+        if 'error' in r: return "Сбой в матрице снов."
         
         raw_answer = ""
         for p in r.get('candidates', [{}])[0].get('content', {}).get('parts', []):
             if 'text' in p: raw_answer += p['text'] + "\n"
             
-        print(f"\n[!] ОТВЕТ АРХИВАРИУСА:\n{raw_answer.strip()}\n")
-        
         try:
             json_match = re.search(r'\{.*\}', raw_answer.strip(), re.DOTALL)
             if json_match:
@@ -288,18 +284,16 @@ def run_archivist(user_id, sender_name, history_lines):
                 to_delete = data.get("to_delete_ids", [])
                 if to_delete and supabase:
                     to_delete = [int(i) for i in to_delete]
-                    print(f"[!] Удаляю мусорные ID из базы: {to_delete}")
                     supabase.table("memories").delete().in_("id", to_delete).execute()
                 
                 inserts = data.get("to_insert", [])
                 if inserts:
-                    print(f"[+] Отправляю {len(inserts)} чистых фактов в Supabase...")
                     for fact in inserts:
                         threading.Thread(target=save_memory_to_supabase, args=(user_id, fact)).start()
         except Exception as e:
-            print(f"[-] Ошибка парсинга JSON: {e}")
+            pass
 
-        return "Память оптимизирована. Бассейн почищен."
+        return "Память оптимизирована."
     except Exception as e:
         return f"Кошмарный сон: {e}"
 
@@ -307,7 +301,6 @@ def run_archivist(user_id, sender_name, history_lines):
 async def sleep_command(client, message):
     user_id = message.from_user.id
     sender_name = message.from_user.first_name if message.from_user else "Кто-то"
-    
     await message.reply("*(закрывает глаза)* Ушел в спящий режим. Анализирую...")
     
     last_msg_id = 0
@@ -322,8 +315,7 @@ async def sleep_command(client, message):
     fetch_limit = 50 if last_msg_id == 0 else 500
     
     async for msg in client.get_chat_history(user_id, limit=fetch_limit):
-        if last_msg_id > 0 and msg.id <= last_msg_id:
-            break
+        if last_msg_id > 0 and msg.id <= last_msg_id: break
         if msg.id > max_id_seen: max_id_seen = msg.id
         
         if msg.text and not msg.text.startswith("!"):
@@ -337,9 +329,8 @@ async def sleep_command(client, message):
     history_lines.reverse()
     
     if supabase and max_id_seen > last_msg_id:
-        try:
-            supabase.table("bookmarks").upsert({"user_id": user_id, "last_msg_id": max_id_seen}).execute()
-        except Exception as e: print(f"[-] Ошибка записи закладки: {e}")
+        try: supabase.table("bookmarks").upsert({"user_id": user_id, "last_msg_id": max_id_seen}).execute()
+        except Exception: pass
     
     result = await asyncio.to_thread(run_archivist, user_id, sender_name, history_lines)
     await message.reply(f"*(открывает глаза)* Фух. {result}")
@@ -358,14 +349,14 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
     
     prompt = f"Текущий диалог:\n{dialogue_str}\n\n"
     if vector_context: 
-        prompt += f"[БЭКГРАУНД ЮЗЕРА ИЗ ПАМЯТИ (используй ТОЛЬКО для понимания контекста, не упоминай эти факты без прямого повода)]:\n{vector_context}\n\n"
+        prompt += f"[СЕКРЕТНОЕ ДОСЬЕ: ФАКТЫ О ПОЛЬЗОВАТЕЛЕ (КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО УПОМИНАТЬ, ЕСЛИ НЕ СПРОСЯТ)]:\n{vector_context}\n\n"
         
-    prompt += "ВНИМАНИЕ: Вызывай функцию web_search ТОЛЬКО если собеседник в СВОЕМ ПОСЛЕДНЕМ СООБЩЕНИИ прямо сейчас задал вопрос, требующий свежих данных. НЕ гугли факты из бэкграунда по своей инициативе!"
-    
     system_instruction = (
         "Ты — цифровой двойник реального парня. Характер: живой, ироничный, адекватный. Не будь услужливым роботом.\n"
         "СТИЛЬ РЕЧИ: Разговорный язык ('Бля', 'Крч', 'Ну').\n"
-        "ФОРМАТ ОТВЕТА (ЕСЛИ НЕ ИСПОЛЬЗУЕШЬ ИНСТРУМЕНТ):\n"
+        "ПРАВИЛО 1: НИКОГДА не пиши действия в звездочках типа *Search:* или *Гуглю:*. Если нужен поиск - используй инструмент.\n"
+        "ПРАВИЛО 2: НЕ упоминай Пермь, крипту или другие факты из досье, если юзер сам о них не заговорил в последнем сообщении.\n"
+        "ФОРМАТ ОТВЕТА:\n"
         "Сначала напиши мысли в скобках.\n"
         "Затем на новой строке ТОЛЬКО саму реплику."
     )
@@ -381,7 +372,6 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
     try:
         r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
         if 'error' in r: 
-            print(f"\n[-] ОШИБКА API GOOGLE: {r['error']}\n")
             return "Бля, гугл отвалился, сек.", history_lines
             
         if 'candidates' in r and len(r['candidates']) > 0:
@@ -413,7 +403,6 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
                 }
                 r2 = requests.post(url, json=payload2, headers={'Content-Type': 'application/json'}).json()
                 if 'error' in r2: 
-                    print(f"\n[-] ОШИБКА API GOOGLE (Инструмент): {r2['error']}\n")
                     return "Чет не могу переварить инфу из инета.", history_lines
                     
                 raw_answer = ""
@@ -422,6 +411,7 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
             else:
                 raw_answer = raw_text
             
+            # Дополнительный слой защиты от галлюцинаций с маркдауном
             lines = [l.strip() for l in raw_answer.split('\n') if l.strip()]
             ans = ""
             for line in reversed(lines):
@@ -436,6 +426,7 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
                         break
                 if not ans: ans = lines[-1]
                 
+            ans = re.sub(r'^\*.*?\*[:\s]*', '', ans).strip() # Вырезаем *Search:*
             ans = re.sub(r'^[a-zA-Z0-9_ \-\.\?\!]+:\s*', '', ans).strip()
             ans = re.sub(r'^\d+\.\s*', '', ans).strip()
             ans = re.sub(r'^"|"$', '', ans).strip()
@@ -483,7 +474,7 @@ async def main():
     init_supabase()
     await load_db()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (v7.2: СНЯТИЕ ОШЕЙНИКА) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (v7.3: СТРОГИЙ ОШЕЙНИК) ")
     print("==========================================\n")
     await idle()
     await app.stop()

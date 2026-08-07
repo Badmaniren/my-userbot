@@ -258,6 +258,56 @@ def parse_history_from_text(card_text):
             history_lines.append(line.strip())
     return history_lines
 
+# Промпт для Архивариуса (Хладнокровный аналитик)
+ARCHIVIST_SYSTEM_PROMPT = """
+Ты — ИИ-Архивариус. Твоя задача: проанализировать историю диалога и текущую векторную память.
+Цель: 
+1. Найти противоречия (например, если юзер сначала сказал одно, а потом опроверг).
+2. Выделить важные поведенческие факты (стиль, интересы).
+3. Сформировать JSON-отчет с инструкциями для БД:
+{
+  "to_delete": ["id_старой_записи_1", "id_старой_записи_2"],
+  "to_insert": ["новый_факт_1", "новый_факт_2"],
+  "trait_updates": ["новый_психологический_портрет_юзера"]
+}
+Если все хорошо — верни просто {"status": "ok"}.
+"""
+
+async def run_archivist(user_id, sender_name, history_lines):
+    print(f"[!] АРХИВАРИУС ПРОСНУЛСЯ. Анализирую историю...")
+    
+    # Склеиваем историю в один большой блок
+    full_history = "\n".join(history_lines)
+    
+    # Запрос к Gemini (используем ту же модель, но с другим промптом)
+    # Здесь мы не используем GEMINI_TOOLS, Архивариусу они не нужны
+    url = f"https://generativelanguage.googleapis.com/v1beta/{WORKING_MODEL}:generateContent?key={GEMINI_API_KEY}"
+    payload = {
+        "systemInstruction": {"parts": [{"text": ARCHIVIST_SYSTEM_PROMPT}]},
+        "contents": [{"parts": [{"text": f"История диалога:\n{full_history}"}]}]
+    }
+    
+    r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
+    
+    # Тут будет логика разбора JSON ответа от Архивариуса
+    print(f"[!] ОТЧЕТ АРХИВАРИУСА: {r.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')}")
+    return "Сон завершен, факты упорядочены."
+
+# И добавим команду в обработчик сообщений
+@app.on_message(filters.private & filters.command("sleep"))
+async def sleep_command(client, message):
+    user_id = message.from_user.id
+    sender_name = message.from_user.first_name
+    await message.reply("*(зевает)* Окей, пошел спать. Не кантовать до утра.")
+    
+    # Достаем историю
+    msg_id, card_text = await get_or_create_card(user_id, sender_name)
+    history_lines = parse_history_from_text(card_text)
+    
+    # Запускаем сон
+    result = await asyncio.to_thread(run_archivist, user_id, sender_name, history_lines)
+    await message.reply(f"*(потягивается)* Ну, вроде всё почистил. {result}")
+
 def ask_gemini(user_id, sender_name, user_text, card_text):
     global WORKING_MODEL
     if not WORKING_MODEL:

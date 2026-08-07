@@ -58,7 +58,6 @@ USER_CARDS = {}
 PENDING_MESSAGES = {}
 PENDING_TASKS = {}
 
-# ВЕРСИЯ 6.7: МАССИВ ЗАПРОСОВ (ARRAY)
 GEMINI_TOOLS = [{
     "functionDeclarations": [
         {
@@ -88,7 +87,7 @@ GEMINI_TOOLS = [{
 }]
 
 def tool_web_search(queries):
-    if isinstance(queries, str): queries = [queries] # Защита от дурака
+    if isinstance(queries, str): queries = [queries]
     try:
         res_str = ""
         for q in queries:
@@ -114,23 +113,17 @@ def find_working_model():
         if 'models' not in res: return None
         
         available = [m['name'] for m in res['models'] if 'generateContent' in m.get('supportedGenerationMethods', [])]
-        print(f"[~] Доступные модели чата: {len(available)} шт.")
-        
         preferred = [m for m in available if "3.6-flash" in m or "3.5-flash" in m]
         others = [m for m in available if m not in preferred and "flash" in m and "preview" not in m]
         
         for model_name in preferred + others + available:
-            print(f"[~] Тестирую модель на живучесть: {model_name}...")
             test_url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:generateContent?key={GEMINI_API_KEY}"
             payload = {"contents": [{"parts": [{"text": "hi"}]}]}
             r = requests.post(test_url, json=payload, headers={'Content-Type': 'application/json'})
-            
             if r.status_code == 200:
                 print(f"[+] УСПЕШНО! ВЫБРАНА МОДЕЛЬ: {model_name}")
                 return model_name
-                
-    except Exception as e:
-        print(f"[-] Ошибка автопоиска модели: {e}")
+    except Exception: pass
     return None
 
 def find_working_embedding_model():
@@ -147,8 +140,7 @@ def find_working_embedding_model():
                 r = requests.post(test_url, json=payload, headers={'Content-Type': 'application/json'})
                 if r.status_code == 200:
                     return model_name
-    except Exception:
-        pass
+    except Exception: pass
     return None
 
 def get_embedding(text):
@@ -163,8 +155,7 @@ def get_embedding(text):
         r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
         if 'embedding' in r and 'values' in r['embedding']:
             return r['embedding']['values']
-    except Exception:
-        pass
+    except Exception: pass
     return None
 
 def save_memory_to_supabase(user_id, content):
@@ -195,8 +186,7 @@ def get_relevant_memories(user_id, current_text):
         if res.data and len(res.data) > 0:
             memories_list = [item['content'] for item in res.data]
             return "\n".join(memories_list)
-    except Exception:
-        pass
+    except Exception: pass
     return ""
 
 async def load_db():
@@ -211,8 +201,7 @@ async def load_db():
                     uid = int(match.group(1))
                     if uid not in USER_CARDS:
                         USER_CARDS[uid] = message.id
-    except Exception:
-        pass
+    except Exception: pass
 
 async def get_or_create_card(user_id, sender_name):
     if not CHANNEL_ID: return None, ""
@@ -228,10 +217,8 @@ async def get_or_create_card(user_id, sender_name):
         msg_id = USER_CARDS[user_id]
         try:
             msg = await app.get_messages(CHANNEL_ID, msg_id)
-            if msg and msg.text:
-                return msg_id, msg.text
-        except Exception:
-            pass
+            if msg and msg.text: return msg_id, msg.text
+        except Exception: pass
         return None, ""
 
 async def update_card_history(user_id, sender_name, history_lines):
@@ -243,8 +230,7 @@ async def update_card_history(user_id, sender_name, history_lines):
     if len(full_text) > 4000: full_text = full_text[-4000:]
     try:
         await app.edit_message_text(CHANNEL_ID, msg_id, full_text)
-    except Exception:
-        pass
+    except Exception: pass
 
 def parse_history_from_text(card_text):
     lines = card_text.split('\n')
@@ -258,62 +244,74 @@ def parse_history_from_text(card_text):
             history_lines.append(line.strip())
     return history_lines
 
-# Промпт для Архивариуса (Хладнокровный аналитик)
+# ==========================================
+# МОДУЛЬ "НОЧНОЙ АРХИВАРИУС"
+# ==========================================
 ARCHIVIST_SYSTEM_PROMPT = """
-Ты — ИИ-Архивариус. Твоя задача: проанализировать историю диалога и текущую векторную память.
+Ты — ИИ-Архивариус. Твоя задача: проанализировать историю диалога.
 Цель: 
-1. Найти противоречия (например, если юзер сначала сказал одно, а потом опроверг).
-2. Выделить важные поведенческие факты (стиль, интересы).
-3. Сформировать JSON-отчет с инструкциями для БД:
+1. Найти противоречия (например, если юзер сначала сказал одно, а потом опроверг или пошутил).
+2. Выделить важные поведенческие факты.
+3. Сформировать JSON-отчет. Отвечай СТРОГО в формате JSON без лишнего текста.
+Пример формата:
 {
-  "to_delete": ["id_старой_записи_1", "id_старой_записи_2"],
-  "to_insert": ["новый_факт_1", "новый_факт_2"],
-  "trait_updates": ["новый_психологический_портрет_юзера"]
+  "insights": [
+    "Собеседник пошутил про двухслойную бумагу, на самом деле предпочитает трехслойную",
+    "Собеседник любит подкалывать бота"
+  ]
 }
-Если все хорошо — верни просто {"status": "ok"}.
 """
 
-async def run_archivist(user_id, sender_name, history_lines):
-    print(f"[!] АРХИВАРИУС ПРОСНУЛСЯ. Анализирую историю...")
+def run_archivist(user_id, sender_name, history_lines):
+    global WORKING_MODEL
+    if not WORKING_MODEL: WORKING_MODEL = find_working_model()
     
-    # Склеиваем историю в один большой блок
+    print(f"\n[!] АРХИВАРИУС ПРОСНУЛСЯ. Анализирую историю ({len(history_lines)} строк)...")
     full_history = "\n".join(history_lines)
     
-    # Запрос к Gemini (используем ту же модель, но с другим промптом)
-    # Здесь мы не используем GEMINI_TOOLS, Архивариусу они не нужны
     url = f"https://generativelanguage.googleapis.com/v1beta/{WORKING_MODEL}:generateContent?key={GEMINI_API_KEY}"
     payload = {
         "systemInstruction": {"parts": [{"text": ARCHIVIST_SYSTEM_PROMPT}]},
         "contents": [{"parts": [{"text": f"История диалога:\n{full_history}"}]}]
     }
     
-    r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
-    
-    # Тут будет логика разбора JSON ответа от Архивариуса
-    print(f"[!] ОТЧЕТ АРХИВАРИУСА: {r.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')}")
-    return "Сон завершен, факты упорядочены."
+    try:
+        r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
+        if 'error' in r:
+            print(f"[-] Ошибка Архивариуса: {r}")
+            return "Сбой в матрице снов."
+        
+        raw_answer = ""
+        for p in r.get('candidates', [{}])[0].get('content', {}).get('parts', []):
+            if 'text' in p: raw_answer += p['text'] + "\n"
+            
+        print(f"\n==========================================")
+        print(f"[!] ОТЧЕТ АРХИВАРИУСА:\n{raw_answer.strip()}")
+        print(f"==========================================\n")
+        return "Сон завершен, файлы упорядочены."
+    except Exception as e:
+        return f"Кошмарный сон: {e}"
 
-# И добавим команду в обработчик сообщений
-@app.on_message(filters.private & filters.command("sleep"))
+@app.on_message(filters.private & filters.command("sleep", prefixes="!"))
 async def sleep_command(client, message):
     user_id = message.from_user.id
-    sender_name = message.from_user.first_name
-    await message.reply("*(зевает)* Окей, пошел спать. Не кантовать до утра.")
+    sender_name = message.from_user.first_name if message.from_user else "Кто-то"
     
-    # Достаем историю
+    await message.reply("*(зевает)* Окей, пошел спать. Не кантовать пару минут.")
+    
     msg_id, card_text = await get_or_create_card(user_id, sender_name)
     history_lines = parse_history_from_text(card_text)
     
-    # Запускаем сон
+    # Запускаем Архивариуса в отдельном потоке, чтобы не блочить бота
     result = await asyncio.to_thread(run_archivist, user_id, sender_name, history_lines)
-    await message.reply(f"*(потягивается)* Ну, вроде всё почистил. {result}")
+    
+    await message.reply(f"*(потягивается)* Ну, вроде всё разложил по полочкам. {result}")
+# ==========================================
 
 def ask_gemini(user_id, sender_name, user_text, card_text):
     global WORKING_MODEL
-    if not WORKING_MODEL:
-        WORKING_MODEL = find_working_model()
-    if not WORKING_MODEL:
-        return "Я сейчас немного туплю, отвечу позже.", []
+    if not WORKING_MODEL: WORKING_MODEL = find_working_model()
+    if not WORKING_MODEL: return "Я сейчас немного туплю, отвечу позже.", []
 
     vector_context = get_relevant_memories(user_id, user_text)
     
@@ -323,9 +321,7 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
     dialogue_str = "\n".join(history_lines)
     
     prompt = f"Последний диалог:\n{dialogue_str}\n\n"
-    if vector_context:
-        prompt += f"ФАКТЫ ИЗ ДОЛГОВРЕМЕННОЙ ПАМЯТИ:\n{vector_context}\n\n"
-        
+    if vector_context: prompt += f"ФАКТЫ ИЗ ДОЛГОВРЕМЕННОЙ ПАМЯТИ:\n{vector_context}\n\n"
     prompt += "Оцени сообщение. Если вопрос требует данных из интернета — СРАЗУ ВЫЗЫВАЙ ФУНКЦИЮ web_search."
     
     system_instruction = (
@@ -345,9 +341,7 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
     
     try:
         r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
-        
-        if 'error' in r:
-            return "Бля, гугл отвалился, сек.", history_lines
+        if 'error' in r: return "Бля, гугл отвалился, сек.", history_lines
             
         if 'candidates' in r and len(r['candidates']) > 0:
             parts = r['candidates'][0]['content'].get('parts', [])
@@ -355,10 +349,8 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
             func_call = None
             raw_text = ""
             for part in parts:
-                if 'functionCall' in part:
-                    func_call = part['functionCall']
-                if 'text' in part:
-                    raw_text += part['text'] + "\n"
+                if 'functionCall' in part: func_call = part['functionCall']
+                if 'text' in part: raw_text += part['text'] + "\n"
             
             if func_call:
                 func_name = func_call['name']
@@ -367,7 +359,6 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
                 
                 tool_result = ""
                 if func_name == "web_search":
-                    # Поддержка как массива queries, так и старого query на всякий случай
                     queries = args.get("queries", [])
                     if "query" in args and not queries: queries = [args["query"]]
                     tool_result = tool_web_search(queries)
@@ -380,9 +371,7 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
                     "contents": [{"parts": [{"text": follow_up_prompt}]}]
                 }
                 r2 = requests.post(url, json=payload2, headers={'Content-Type': 'application/json'}).json()
-                
-                if 'error' in r2:
-                    return "Чет не могу переварить инфу из инета.", history_lines
+                if 'error' in r2: return "Чет не могу переварить инфу из инета.", history_lines
                     
                 raw_answer = ""
                 for p in r2['candidates'][0]['content'].get('parts', []):
@@ -407,13 +396,11 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
             ans = re.sub(r'^[a-zA-Z0-9_ \-\.\?\!]+:\s*', '', ans).strip()
             ans = re.sub(r'^\d+\.\s*', '', ans).strip()
             ans = re.sub(r'^"|"$', '', ans).strip()
-            
             if not ans: ans = "Чего?"
 
             threading.Thread(target=save_memory_to_supabase, args=(user_id, f"Собеседник сказал: {user_text} | Ты ответил: {ans}")).start()
             history_lines.append(f"Ты: {ans}")
             return ans, history_lines
-            
     except Exception as e:
         print(f"[-] КРИТИЧЕСКАЯ Ошибка API: {e}")
         
@@ -454,7 +441,7 @@ async def main():
     init_supabase()
     await load_db()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (v6.7: МНОГОПОТОЧНЫЙ ПОИСК) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (v6.8: АРХИВАРИУС И РЕЖИМ СНА) ")
     print("==========================================\n")
     await idle()
     await app.stop()

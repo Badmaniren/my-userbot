@@ -408,6 +408,68 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
                 payload2 = {
                     "systemInstruction": {"parts": [{"text": system_instruction}]},
                     "contents": [{"parts": [{"text": follow_up_prompt}]}]
+def ask_gemini(user_id, sender_name, user_text, card_text):
+    global WORKING_MODEL
+    if not WORKING_MODEL: WORKING_MODEL = find_working_model()
+    if not WORKING_MODEL: return "Я сейчас немного туплю, отвечу позже.", []
+
+    vector_context = get_relevant_memories(user_id, user_text)
+    
+    history_lines = parse_history_from_text(card_text)
+    history_lines.append(f"Собеседник: {user_text}")
+    if len(history_lines) > 8: history_lines = history_lines[-8:]
+    dialogue_str = "\n".join(history_lines)
+    
+    prompt = f"Текущий диалог:\n{dialogue_str}\n\n"
+    if vector_context: 
+        prompt += f"[БЭКГРАУНД ЮЗЕРА ИЗ ПАМЯТИ (используй ТОЛЬКО для понимания контекста, не упоминай эти факты без прямого повода)]:\n{vector_context}\n\n"
+        
+    prompt += "ВНИМАНИЕ: Вызывай функцию web_search ТОЛЬКО если собеседник в СВОЕМ ПОСЛЕДНЕМ СООБЩЕНИИ прямо сейчас задал вопрос, требующий свежих данных. НЕ гугли факты из бэкграунда по своей инициативе!"
+    
+    system_instruction = (
+        "Ты — цифровой двойник реального парня. Характер: живой, ироничный, адекватный. Не будь услужливым роботом.\n"
+        "СТИЛЬ РЕЧИ: Разговорный язык ('Бля', 'Крч', 'Ну').\n"
+        "ФОРМАТ ОТВЕТА (ЕСЛИ НЕ ИСПОЛЬЗУЕШЬ ИНСТРУМЕНТ):\n"
+        "Сначала напиши мысли в скобках.\n"
+        "Затем на новой строке ТОЛЬКО саму реплику."
+    )
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/{WORKING_MODEL}:generateContent?key={GEMINI_API_KEY}"
+    payload = {
+        "systemInstruction": {"parts": [{"text": system_instruction}]},
+        "contents": [{"parts": [{"text": prompt}]}],
+        "tools": GEMINI_TOOLS
+    }
+    
+    try:
+        r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
+        if 'error' in r: return "Бля, гугл отвалился, сек.", history_lines
+            
+        if 'candidates' in r and len(r['candidates']) > 0:
+            parts = r['candidates'][0]['content'].get('parts', [])
+            func_call = None
+            raw_text = ""
+            for part in parts:
+                if 'functionCall' in part: func_call = part['functionCall']
+                if 'text' in part: raw_text += part['text'] + "\n"
+            
+            if func_call:
+                func_name = func_call['name']
+                args = func_call.get('args', {})
+                print(f"[!] ИИ ЗАПРОСИЛ ИНСТРУМЕНТ: {func_name} | Аргументы: {args}")
+                
+                tool_result = ""
+                if func_name == "web_search":
+                    queries = args.get("queries", [])
+                    if "query" in args and not queries: queries = [args["query"]]
+                    tool_result = tool_web_search(queries)
+                elif func_name == "get_current_datetime":
+                    tool_result = tool_get_current_datetime()
+                
+                follow_up_prompt = prompt + f"\n\n[СИСТЕМНОЕ СООБЩЕНИЕ: Результат инструмента:\n{tool_result}\n\nОпирайся на эти данные для ответа.]"
+                payload2 = {
+                    "systemInstruction": {"parts": [{"text": system_instruction}]},
+                    "contents": [{"parts": [{"text": follow_up_prompt}]}]
                 }
                 r2 = requests.post(url, json=payload2, headers={'Content-Type': 'application/json'}).json()
                 if 'error' in r2: return "Чет не могу переварить инфу из инета.", history_lines

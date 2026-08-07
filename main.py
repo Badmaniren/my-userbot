@@ -71,7 +71,7 @@ GEMINI_TOOLS = [{
     "functionDeclarations": [
         {
             "name": "web_search",
-            "description": "ПОИСКОВИК. Использовать ТОЛЬКО ЕСЛИ собеседник ПРЯМО и СЕЙЧАС задал вопрос, требующий актуальной информации из интернета (например: 'какая погода', 'найди инфу').",
+            "description": "ПОИСКОВИК. Использовать ТОЛЬКО ЕСЛИ собеседник ПРЯМО и СЕЙЧАС задал вопрос, требующий актуальной информации из интернета.",
             "parameters": {
                 "type": "OBJECT",
                 "properties": {
@@ -240,7 +240,7 @@ ARCHIVIST_SYSTEM_PROMPT = """
 1. Игнорируй пост-иронию и временные эмоции.
 2. Ищи противоречия. Если в диалоге выяснилось, что старый факт (с ID) оказался ложью, шуткой, или устарел — ДОБАВЬ ЕГО ID В to_delete_ids.
 3. Если узнал новый, чистый факт, которого еще нет в базе — добавь в to_insert.
-4. Отвечай СТРОГО в формате JSON:
+4. Отвечай СТРОГО в формате JSON без markdown-форматирования (без ```json):
 {
   "insights": ["Твои дедуктивные мысли о юзере"],
   "to_delete_ids": [14, 25], 
@@ -266,7 +266,7 @@ def run_archivist(user_id, sender_name, history_lines):
 
     prompt_text = f"СТАРЫЕ ФАКТЫ ИЗ БАЗЫ (с их ID):\n{old_facts_text}\n\nСВЕЖАЯ ИСТОРИЯ ДИАЛОГА:\n{full_history}"
     
-    url = f"https://generativelanguage.googleapis.com/v1beta/{WORKING_MODEL}:generateContent?key={GEMINI_API_KEY}"
+    url = f"[https://generativelanguage.googleapis.com/v1beta/](https://generativelanguage.googleapis.com/v1beta/){WORKING_MODEL}:generateContent?key={GEMINI_API_KEY}"
     payload = {
         "systemInstruction": {"parts": [{"text": ARCHIVIST_SYSTEM_PROMPT}]},
         "contents": [{"parts": [{"text": prompt_text}]}],
@@ -282,6 +282,7 @@ def run_archivist(user_id, sender_name, history_lines):
             if 'text' in p: raw_answer += p['text'] + "\n"
             
         try:
+            # Усиленный парсер JSON
             json_match = re.search(r'\{.*\}', raw_answer.strip(), re.DOTALL)
             if json_match:
                 data = json.loads(json_match.group(0))
@@ -351,20 +352,24 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
     if len(history_lines) > 8: history_lines = history_lines[-8:]
     dialogue_str = "\n".join(history_lines)
     
-    prompt = f"Текущий диалог:\n{dialogue_str}\n\n"
+    # ИНЪЕКЦИЯ СИСТЕМНОГО ВРЕМЕНИ
+    current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    
+    prompt = f"[Системное время: {current_time_str}]\nТекущий диалог:\n{dialogue_str}\n\n"
     if vector_context: 
         prompt += f"[СЕКРЕТНОЕ ДОСЬЕ: ФАКТЫ О ПОЛЬЗОВАТЕЛЕ (КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО УПОМИНАТЬ, ЕСЛИ НЕ СПРОСЯТ)]:\n{vector_context}\n\n"
         
     system_instruction = (
         "Ты — цифровой двойник реального парня. Характер: живой, ироничный, адекватный. Не будь услужливым роботом.\n"
         "СТИЛЬ РЕЧИ: Разговорный язык ('Бля', 'Крч', 'Ну').\n"
+        "ВНИМАНИЕ: Строго следи за контекстом времени, логикой событий и сменой локаций в диалоге. Учитывай время сервера!\n"
         "ПРАВИЛО: НЕ упоминай факты из досье, если собеседник сам о них не заговорил.\n"
         "ФОРМАТ ОТВЕТА:\n"
         "Сначала напиши свои мысли в скобках (например: (Думаю, что ответить...)).\n"
-        "Затем на новой строке ТОЛЬКО саму реплику без дополнительных меток и описаний действий."
+        "Затем ОБЯЗАТЕЛЬНО на новой строке ТОЛЬКО саму реплику без дополнительных меток и действий."
     )
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/{WORKING_MODEL}:generateContent?key={GEMINI_API_KEY}"
+    url = f"[https://generativelanguage.googleapis.com/v1beta/](https://generativelanguage.googleapis.com/v1beta/){WORKING_MODEL}:generateContent?key={GEMINI_API_KEY}"
     payload = {
         "systemInstruction": {"parts": [{"text": system_instruction}]},
         "contents": [{"parts": [{"text": prompt}]}],
@@ -419,20 +424,16 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
             else:
                 raw_answer = raw_text
             
-            # ЧИСТКА ОТВЕТА
-            ans_lines = []
-            for line in raw_answer.split('\n'):
-                line_str = line.strip()
-                if not line_str: continue
-                # Пропускаем мысли в скобках
-                if line_str.startswith('(') and line_str.endswith(')'): continue
-                # Срезаем галлюцинации вызова поиска
-                if "*" in line_str and ("Search" in line_str or "Гуглю" in line_str): continue
-                ans_lines.append(line_str)
-                
-            ans = " ".join(ans_lines).strip()
+            # ЯДЕРНЫЙ ПАРСЕР ОТВЕТА (ВЫЖИГАЕМ СКОБКИ)
+            ans = raw_answer.strip()
+            # Удаляем любые скобки с их содержимым в начале строки (даже если их много и есть переносы)
+            ans = re.sub(r'^\s*\(+.*?\)+\s*', '', ans, flags=re.DOTALL)
+            
+            # Добиваем случайные остатки действий в звездочках, если проскочат
+            ans = re.sub(r'\*.*?(Search|Гуглю).*?\*\s*', '', ans, flags=re.IGNORECASE)
+            
+            # Убираем возможные кавычки и префиксы
             ans = re.sub(r'^[a-zA-Z0-9_ \-\.\?\!]+:\s*', '', ans).strip()
-            ans = re.sub(r'^\d+\.\s*', '', ans).strip()
             ans = re.sub(r'^"|"$', '', ans).strip()
             
             if not ans: ans = "Чего?"
@@ -453,6 +454,10 @@ async def process_batch(client, message, user_id, sender_name):
     msgs = PENDING_MESSAGES.pop(user_id, [])
     if not msgs: return
     combined_text = " | ".join(msgs)
+    
+    # ПОМЕЧАЕМ СООБЩЕНИЯ ПРОЧИТАННЫМИ
+    try: await app.read_chat_history(user_id)
+    except Exception: pass
     
     try: await app.send_chat_action(user_id, ChatAction.TYPING)
     except Exception: pass
@@ -479,7 +484,7 @@ async def main():
     init_supabase()
     await load_db()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (v8.0: ОЧИЩЕННЫЙ МОЗГ) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (v8.1: ПОЧИНЕННОЕ ВРЕМЯ) ")
     print("==========================================\n")
     await idle()
     await app.stop()

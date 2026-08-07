@@ -59,6 +59,14 @@ USER_CARDS = {}
 PENDING_MESSAGES = {}
 PENDING_TASKS = {}
 
+# ОТКЛЮЧАЕМ ЕБАНУЮ ЦЕНЗУРУ GOOGLE
+SAFETY_SETTINGS = [
+    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
+]
+
 GEMINI_TOOLS = [{
     "functionDeclarations": [
         {
@@ -117,7 +125,7 @@ def find_working_model():
         others = [m for m in available if m not in preferred and "flash" in m and "preview" not in m]
         for model_name in preferred + others + available:
             test_url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:generateContent?key={GEMINI_API_KEY}"
-            payload = {"contents": [{"parts": [{"text": "hi"}]}]}
+            payload = {"contents": [{"parts": [{"text": "hi"}]}], "safetySettings": SAFETY_SETTINGS}
             r = requests.post(test_url, json=payload, headers={'Content-Type': 'application/json'})
             if r.status_code == 200: return model_name
     except Exception: pass
@@ -222,9 +230,6 @@ def parse_history_from_text(card_text):
         if capture and line.strip(): history_lines.append(line.strip())
     return history_lines
 
-# ==========================================
-# МОДУЛЬ "НОЧНОЙ АРХИВАРИУС" v3.0 (Фильтр Бассейна)
-# ==========================================
 ARCHIVIST_SYSTEM_PROMPT = """
 Ты — строгий ИИ-Архивариус. Твоя задача: анализировать свежую историю диалога и сравнивать ее со СТАРЫМИ фактами из БД.
 Правила:
@@ -247,7 +252,6 @@ def run_archivist(user_id, sender_name, history_lines):
     print(f"\n[!] АРХИВАРИУС ПРОСНУЛСЯ. Строк диалога: {len(history_lines)}...")
     full_history = "\n".join(history_lines)
     
-    # ВЫГРУЖАЕМ СТАРЫЕ ФАКТЫ С ИХ ID
     old_facts_text = "База пуста."
     if supabase:
         try:
@@ -261,12 +265,15 @@ def run_archivist(user_id, sender_name, history_lines):
     url = f"https://generativelanguage.googleapis.com/v1beta/{WORKING_MODEL}:generateContent?key={GEMINI_API_KEY}"
     payload = {
         "systemInstruction": {"parts": [{"text": ARCHIVIST_SYSTEM_PROMPT}]},
-        "contents": [{"parts": [{"text": prompt_text}]}]
+        "contents": [{"parts": [{"text": prompt_text}]}],
+        "safetySettings": SAFETY_SETTINGS
     }
     
     try:
         r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
-        if 'error' in r: return "Сбой в матрице снов."
+        if 'error' in r: 
+            print(f"[-] ОШИБКА АРХИВАРИУСА (API): {r['error']}")
+            return "Сбой в матрице снов."
         
         raw_answer = ""
         for p in r.get('candidates', [{}])[0].get('content', {}).get('parts', []):
@@ -278,15 +285,12 @@ def run_archivist(user_id, sender_name, history_lines):
             json_match = re.search(r'\{.*\}', raw_answer.strip(), re.DOTALL)
             if json_match:
                 data = json.loads(json_match.group(0))
-                
-                # 1. ХИРУРГИЧЕСКОЕ УДАЛЕНИЕ СТАРОГО МУСОРА
                 to_delete = data.get("to_delete_ids", [])
                 if to_delete and supabase:
                     to_delete = [int(i) for i in to_delete]
                     print(f"[!] Удаляю мусорные ID из базы: {to_delete}")
                     supabase.table("memories").delete().in_("id", to_delete).execute()
                 
-                # 2. ЗАПИСЬ НОВЫХ ФАКТОВ
                 inserts = data.get("to_insert", [])
                 if inserts:
                     print(f"[+] Отправляю {len(inserts)} чистых фактов в Supabase...")
@@ -315,7 +319,6 @@ async def sleep_command(client, message):
 
     history_lines = []
     max_id_seen = last_msg_id
-    
     fetch_limit = 50 if last_msg_id == 0 else 500
     
     async for msg in client.get_chat_history(user_id, limit=fetch_limit):
@@ -340,7 +343,6 @@ async def sleep_command(client, message):
     
     result = await asyncio.to_thread(run_archivist, user_id, sender_name, history_lines)
     await message.reply(f"*(открывает глаза)* Фух. {result}")
-# ==========================================
 
 def ask_gemini(user_id, sender_name, user_text, card_text):
     global WORKING_MODEL
@@ -372,12 +374,15 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
     payload = {
         "systemInstruction": {"parts": [{"text": system_instruction}]},
         "contents": [{"parts": [{"text": prompt}]}],
-        "tools": GEMINI_TOOLS
+        "tools": GEMINI_TOOLS,
+        "safetySettings": SAFETY_SETTINGS
     }
     
     try:
         r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
-        if 'error' in r: return "Бля, гугл отвалился, сек.", history_lines
+        if 'error' in r: 
+            print(f"\n[-] ОШИБКА API GOOGLE: {r['error']}\n")
+            return "Бля, гугл отвалился, сек.", history_lines
             
         if 'candidates' in r and len(r['candidates']) > 0:
             parts = r['candidates'][0]['content'].get('parts', [])
@@ -403,10 +408,13 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
                 follow_up_prompt = prompt + f"\n\n[СИСТЕМНОЕ СООБЩЕНИЕ: Результат инструмента:\n{tool_result}\n\nОпирайся на эти данные для ответа.]"
                 payload2 = {
                     "systemInstruction": {"parts": [{"text": system_instruction}]},
-                    "contents": [{"parts": [{"text": follow_up_prompt}]}]
+                    "contents": [{"parts": [{"text": follow_up_prompt}]}],
+                    "safetySettings": SAFETY_SETTINGS
                 }
                 r2 = requests.post(url, json=payload2, headers={'Content-Type': 'application/json'}).json()
-                if 'error' in r2: return "Чет не могу переварить инфу из инета.", history_lines
+                if 'error' in r2: 
+                    print(f"\n[-] ОШИБКА API GOOGLE (Инструмент): {r2['error']}\n")
+                    return "Чет не могу переварить инфу из инета.", history_lines
                     
                 raw_answer = ""
                 for p in r2['candidates'][0]['content'].get('parts', []):
@@ -475,7 +483,7 @@ async def main():
     init_supabase()
     await load_db()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (v7.1: ФИКС ПТСР И СКОБОК) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (v7.2: СНЯТИЕ ОШЕЙНИКА) ")
     print("==========================================\n")
     await idle()
     await app.stop()

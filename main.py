@@ -282,7 +282,6 @@ def run_archivist(user_id, sender_name, history_lines):
                 # 1. ХИРУРГИЧЕСКОЕ УДАЛЕНИЕ СТАРОГО МУСОРА
                 to_delete = data.get("to_delete_ids", [])
                 if to_delete and supabase:
-                    # Конвертируем все в int на всякий случай
                     to_delete = [int(i) for i in to_delete]
                     print(f"[!] Удаляю мусорные ID из базы: {to_delete}")
                     supabase.table("memories").delete().in_("id", to_delete).execute()
@@ -307,7 +306,6 @@ async def sleep_command(client, message):
     
     await message.reply("*(закрывает глаза)* Ушел в спящий режим. Анализирую...")
     
-    # Ищем закладку
     last_msg_id = 0
     if supabase:
         try:
@@ -318,16 +316,13 @@ async def sleep_command(client, message):
     history_lines = []
     max_id_seen = last_msg_id
     
-    # Качаем историю. Если закладки нет - берем 50 последних. Если есть - читаем до нее.
     fetch_limit = 50 if last_msg_id == 0 else 500
     
     async for msg in client.get_chat_history(user_id, limit=fetch_limit):
         if last_msg_id > 0 and msg.id <= last_msg_id:
-            break # Дошли до того, что уже читали вчера
-        
+            break
         if msg.id > max_id_seen: max_id_seen = msg.id
         
-        # Защита от спама: ТОЛЬКО ТЕКСТ. Никаких стикеров!
         if msg.text and not msg.text.startswith("!"):
             speaker = sender_name if msg.from_user.id == user_id else "Ты"
             history_lines.append(f"{speaker}: {msg.text}")
@@ -338,7 +333,6 @@ async def sleep_command(client, message):
 
     history_lines.reverse()
     
-    # Обновляем закладку на будущее
     if supabase and max_id_seen > last_msg_id:
         try:
             supabase.table("bookmarks").upsert({"user_id": user_id, "last_msg_id": max_id_seen}).execute()
@@ -348,66 +342,6 @@ async def sleep_command(client, message):
     await message.reply(f"*(открывает глаза)* Фух. {result}")
 # ==========================================
 
-def ask_gemini(user_id, sender_name, user_text, card_text):
-    global WORKING_MODEL
-    if not WORKING_MODEL: WORKING_MODEL = find_working_model()
-    if not WORKING_MODEL: return "Я сейчас немного туплю, отвечу позже.", []
-
-    vector_context = get_relevant_memories(user_id, user_text)
-    
-    history_lines = parse_history_from_text(card_text)
-    history_lines.append(f"Собеседник: {user_text}")
-    if len(history_lines) > 8: history_lines = history_lines[-8:]
-    dialogue_str = "\n".join(history_lines)
-    
-    prompt = f"Последний диалог:\n{dialogue_str}\n\n"
-    if vector_context: prompt += f"ФАКТЫ ИЗ ДОЛГОВРЕМЕННОЙ ПАМЯТИ:\n{vector_context}\n\n"
-    prompt += "Оцени сообщение. Если вопрос требует данных из интернета — СРАЗУ ВЫЗЫВАЙ ФУНКЦИЮ web_search."
-    
-    system_instruction = (
-        "Ты — цифровой двойник реального парня. Характер: живой, ироничный, адекватный.\n"
-        "СТИЛЬ РЕЧИ: Разговорный язык ('Бля', 'Крч', 'Ну'). Никаких робо-фраз.\n"
-        "ФОРМАТ ОТВЕТА (ЕСЛИ НЕ ИСПОЛЬЗУЕШЬ ИНСТРУМЕНТ):\n"
-        "Сначала напиши мысли в скобках.\n"
-        "Затем на новой строке ТОЛЬКО саму реплику."
-    )
-
-    url = f"https://generativelanguage.googleapis.com/v1beta/{WORKING_MODEL}:generateContent?key={GEMINI_API_KEY}"
-    payload = {
-        "systemInstruction": {"parts": [{"text": system_instruction}]},
-        "contents": [{"parts": [{"text": prompt}]}],
-        "tools": GEMINI_TOOLS
-    }
-    
-    try:
-        r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
-        if 'error' in r: return "Бля, гугл отвалился, сек.", history_lines
-            
-        if 'candidates' in r and len(r['candidates']) > 0:
-            parts = r['candidates'][0]['content'].get('parts', [])
-            func_call = None
-            raw_text = ""
-            for part in parts:
-                if 'functionCall' in part: func_call = part['functionCall']
-                if 'text' in part: raw_text += part['text'] + "\n"
-            
-            if func_call:
-                func_name = func_call['name']
-                args = func_call.get('args', {})
-                print(f"[!] ИИ ЗАПРОСИЛ ИНСТРУМЕНТ: {func_name} | Аргументы: {args}")
-                
-                tool_result = ""
-                if func_name == "web_search":
-                    queries = args.get("queries", [])
-                    if "query" in args and not queries: queries = [args["query"]]
-                    tool_result = tool_web_search(queries)
-                elif func_name == "get_current_datetime":
-                    tool_result = tool_get_current_datetime()
-                
-                follow_up_prompt = prompt + f"\n\n[СИСТЕМНОЕ СООБЩЕНИЕ: Результат инструмента:\n{tool_result}\n\nОпирайся на эти данные для ответа.]"
-                payload2 = {
-                    "systemInstruction": {"parts": [{"text": system_instruction}]},
-                    "contents": [{"parts": [{"text": follow_up_prompt}]}]
 def ask_gemini(user_id, sender_name, user_text, card_text):
     global WORKING_MODEL
     if not WORKING_MODEL: WORKING_MODEL = find_working_model()
@@ -541,7 +475,7 @@ async def main():
     init_supabase()
     await load_db()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (v7.0: ГЛОБАЛЬНЫЙ ФИЛЬТР БАССЕЙНА) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (v7.1: ФИКС ПТСР И СКОБОК) ")
     print("==========================================\n")
     await idle()
     await app.stop()

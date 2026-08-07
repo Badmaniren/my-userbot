@@ -3,6 +3,7 @@ import requests
 import asyncio
 import threading
 import re
+import json
 from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from supabase import create_client, Client as SupabaseClient
@@ -69,7 +70,7 @@ GEMINI_TOOLS = [{
                     "queries": {
                         "type": "ARRAY",
                         "items": {"type": "STRING"},
-                        "description": "Список запросов. РАЗДЕЛЯЙ разные темы! Пример: ['погода Пермь', 'курс ETH к доллару']"
+                        "description": "Список запросов. Пример: ['погода Пермь', 'курс ETH к доллару']"
                     }
                 },
                 "required": ["queries"]
@@ -111,11 +112,9 @@ def find_working_model():
     try:
         res = requests.get(list_url).json()
         if 'models' not in res: return None
-        
         available = [m['name'] for m in res['models'] if 'generateContent' in m.get('supportedGenerationMethods', [])]
         preferred = [m for m in available if "3.6-flash" in m or "3.5-flash" in m]
         others = [m for m in available if m not in preferred and "flash" in m and "preview" not in m]
-        
         for model_name in preferred + others + available:
             test_url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:generateContent?key={GEMINI_API_KEY}"
             payload = {"contents": [{"parts": [{"text": "hi"}]}]}
@@ -138,8 +137,7 @@ def find_working_embedding_model():
                 test_url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:embedContent?key={GEMINI_API_KEY}"
                 payload = {"model": model_name, "content": {"parts": [{"text": "hi"}]}}
                 r = requests.post(test_url, json=payload, headers={'Content-Type': 'application/json'})
-                if r.status_code == 200:
-                    return model_name
+                if r.status_code == 200: return model_name
     except Exception: pass
     return None
 
@@ -148,7 +146,6 @@ def get_embedding(text):
     if not WORKING_EMBEDDING_MODEL:
         WORKING_EMBEDDING_MODEL = find_working_embedding_model()
     if not WORKING_EMBEDDING_MODEL: return None
-        
     url = f"https://generativelanguage.googleapis.com/v1beta/{WORKING_EMBEDDING_MODEL}:embedContent?key={GEMINI_API_KEY}"
     payload = {"model": WORKING_EMBEDDING_MODEL, "content": {"parts": [{"text": text}]}}
     try:
@@ -245,20 +242,18 @@ def parse_history_from_text(card_text):
     return history_lines
 
 # ==========================================
-# МОДУЛЬ "НОЧНОЙ АРХИВАРИУС"
+# МОДУЛЬ "НОЧНОЙ АРХИВАРИУС" v2.0
 # ==========================================
 ARCHIVIST_SYSTEM_PROMPT = """
-Ты — ИИ-Архивариус. Твоя задача: проанализировать историю диалога.
-Цель: 
-1. Найти противоречия (например, если юзер сначала сказал одно, а потом опроверг или пошутил).
-2. Выделить важные поведенческие факты.
-3. Сформировать JSON-отчет. Отвечай СТРОГО в формате JSON без лишнего текста.
-Пример формата:
+Ты — строгий ИИ-Архивариус. Твоя задача: проанализировать историю диалога за день.
+Правила:
+1. Игнорируй пост-иронию, откровенный абсурд, рофлы и временные эмоции. Будь параноиком к абсурду.
+2. Вычлени только НАСТОЯЩИЕ, твердые факты о собеседнике (предпочтения, локация, важные детали).
+3. Если человек пошутил, а потом сказал правду — игнорируй шутку, сохраняй правду.
+4. Верни ответ СТРОГО в формате JSON без markdown разметки и лишнего текста:
 {
-  "insights": [
-    "Собеседник пошутил про двухслойную бумагу, на самом деле предпочитает трехслойную",
-    "Собеседник любит подкалывать бота"
-  ]
+  "insights": ["Тут твои мысли о психологии юзера"],
+  "to_insert": ["Факт 1", "Факт 2 (если есть)"]
 }
 """
 
@@ -266,7 +261,7 @@ def run_archivist(user_id, sender_name, history_lines):
     global WORKING_MODEL
     if not WORKING_MODEL: WORKING_MODEL = find_working_model()
     
-    print(f"\n[!] АРХИВАРИУС ПРОСНУЛСЯ. Анализирую историю ({len(history_lines)} строк)...")
+    print(f"\n[!] АРХИВАРИУС ПРОСНУЛСЯ. Анализирую живую историю ({len(history_lines)} строк)...")
     full_history = "\n".join(history_lines)
     
     url = f"https://generativelanguage.googleapis.com/v1beta/{WORKING_MODEL}:generateContent?key={GEMINI_API_KEY}"
@@ -286,9 +281,24 @@ def run_archivist(user_id, sender_name, history_lines):
             if 'text' in p: raw_answer += p['text'] + "\n"
             
         print(f"\n==========================================")
-        print(f"[!] ОТЧЕТ АРХИВАРИУСА:\n{raw_answer.strip()}")
+        print(f"[!] ОТВЕТ АРХИВАРИУСА:\n{raw_answer.strip()}")
         print(f"==========================================\n")
-        return "Сон завершен, файлы упорядочены."
+        
+        # МАГИЯ: Парсим JSON и отправляем в память!
+        try:
+            json_match = re.search(r'\{.*\}', raw_answer.strip(), re.DOTALL)
+            if json_match:
+                data = json.loads(json_match.group(0))
+                inserts = data.get("to_insert", [])
+                if inserts:
+                    print(f"[+] Архивариус нашел {len(inserts)} чистых фактов! Отправляю в Supabase...")
+                    for fact in inserts:
+                        # Асинхронно кидаем в векторную базу
+                        threading.Thread(target=save_memory_to_supabase, args=(user_id, fact)).start()
+        except Exception as e:
+            print(f"[-] Ошибка парсинга JSON от Архивариуса: {e}")
+
+        return "Память оптимизирована, мусор выкинут."
     except Exception as e:
         return f"Кошмарный сон: {e}"
 
@@ -297,15 +307,21 @@ async def sleep_command(client, message):
     user_id = message.from_user.id
     sender_name = message.from_user.first_name if message.from_user else "Кто-то"
     
-    await message.reply("*(зевает)* Окей, пошел спать. Не кантовать пару минут.")
+    await message.reply("*(закрывает глаза)* Ушел в спящий режим. Анализирую сегодняшний день...")
     
-    msg_id, card_text = await get_or_create_card(user_id, sender_name)
-    history_lines = parse_history_from_text(card_text)
+    # ВЕРСИЯ 6.9: Качаем РЕАЛЬНУЮ ИСТОРИЮ прямо из лички (50 последних сообщений)
+    history_lines = []
+    async for msg in client.get_chat_history(user_id, limit=50):
+        if msg.text and not msg.text.startswith("!"):
+            speaker = sender_name if msg.from_user.id == user_id else "Ты"
+            history_lines.append(f"{speaker}: {msg.text}")
+            
+    history_lines.reverse() # Переворачиваем, чтобы старые были сверху
     
-    # Запускаем Архивариуса в отдельном потоке, чтобы не блочить бота
+    # Запускаем Архивариуса в отдельном потоке
     result = await asyncio.to_thread(run_archivist, user_id, sender_name, history_lines)
     
-    await message.reply(f"*(потягивается)* Ну, вроде всё разложил по полочкам. {result}")
+    await message.reply(f"*(открывает глаза)* Фух, ну и бред мы сегодня несли. {result}")
 # ==========================================
 
 def ask_gemini(user_id, sender_name, user_text, card_text):
@@ -345,7 +361,6 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
             
         if 'candidates' in r and len(r['candidates']) > 0:
             parts = r['candidates'][0]['content'].get('parts', [])
-            
             func_call = None
             raw_text = ""
             for part in parts:
@@ -441,7 +456,7 @@ async def main():
     init_supabase()
     await load_db()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (v6.8: АРХИВАРИУС И РЕЖИМ СНА) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (v6.9: ТОТАЛЬНЫЙ ВСПОМНИТЬ ВСЁ) ")
     print("==========================================\n")
     await idle()
     await app.stop()

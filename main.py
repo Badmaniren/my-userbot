@@ -282,7 +282,6 @@ def run_archivist(user_id, sender_name, history_lines):
             if 'text' in p: raw_answer += p['text'] + "\n"
             
         try:
-            # Усиленный парсер JSON
             json_match = re.search(r'\{.*\}', raw_answer.strip(), re.DOTALL)
             if json_match:
                 data = json.loads(json_match.group(0))
@@ -325,7 +324,9 @@ async def sleep_command(client, message):
         
         if msg.text and not msg.text.startswith("!"):
             speaker = sender_name if msg.from_user.id == user_id else "Ты"
-            history_lines.append(f"{speaker}: {msg.text}")
+            # Извлекаем дату сообщения
+            ts = msg.date.strftime("%d.%m %H:%M") if msg.date else datetime.now().strftime("%d.%m %H:%M")
+            history_lines.append(f"[{ts}] {speaker}: {msg.text}")
             
     if not history_lines:
         await message.reply("*(открывает глаза)* А анализировать-то нечего, нового текста не было.")
@@ -343,16 +344,17 @@ async def sleep_command(client, message):
 def ask_gemini(user_id, sender_name, user_text, card_text):
     global WORKING_MODEL
     if not WORKING_MODEL: WORKING_MODEL = find_working_model()
-    if not WORKING_MODEL: return "Я сейчас немного туплю, отвечу позже.", []
+    if not WORKING_MODEL: return "[ОШИБКА]: Модель не найдена.", []
 
     vector_context = get_relevant_memories(user_id, user_text)
     
     history_lines = parse_history_from_text(card_text)
-    history_lines.append(f"Собеседник: {user_text}")
+    # user_text уже содержит метки времени и имена, так как мы склеиваем PENDING_MESSAGES
+    history_lines.append(user_text)
+    
     if len(history_lines) > 8: history_lines = history_lines[-8:]
     dialogue_str = "\n".join(history_lines)
     
-    # ИНЪЕКЦИЯ СИСТЕМНОГО ВРЕМЕНИ
     current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M")
     
     prompt = f"[Системное время: {current_time_str}]\nТекущий диалог:\n{dialogue_str}\n\n"
@@ -362,14 +364,17 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
     system_instruction = (
         "Ты — цифровой двойник реального парня. Характер: живой, ироничный, адекватный. Не будь услужливым роботом.\n"
         "СТИЛЬ РЕЧИ: Разговорный язык ('Бля', 'Крч', 'Ну').\n"
-        "ВНИМАНИЕ: Строго следи за контекстом времени, логикой событий и сменой локаций в диалоге. Учитывай время сервера!\n"
+        "ВНИМАНИЕ: Каждая реплика в истории имеет метку времени [ДД.ММ ЧЧ:ММ]. Строго следи за контекстом времени, паузами между сообщениями и логикой событий!\n"
         "ПРАВИЛО: НЕ упоминай факты из досье, если собеседник сам о них не заговорил.\n"
         "ФОРМАТ ОТВЕТА:\n"
         "Сначала напиши свои мысли в скобках (например: (Думаю, что ответить...)).\n"
-        "Затем ОБЯЗАТЕЛЬНО на новой строке ТОЛЬКО саму реплику без дополнительных меток и действий."
+        "Затем ОБЯЗАТЕЛЬНО на новой строке ТОЛЬКО саму реплику без дополнительных меток, префиксов и действий."
     )
 
-    url = f"[https://generativelanguage.googleapis.com/v1beta/](https://generativelanguage.googleapis.com/v1beta/){WORKING_MODEL}:generateContent?key={GEMINI_API_KEY}"
+    # Жесткая очистка URL от лишних пробелов, чтобы requests не давился
+    clean_model_name = WORKING_MODEL.strip()
+    url = f"[https://generativelanguage.googleapis.com/v1beta/](https://generativelanguage.googleapis.com/v1beta/){clean_model_name}:generateContent?key={GEMINI_API_KEY}"
+    
     payload = {
         "systemInstruction": {"parts": [{"text": system_instruction}]},
         "contents": [{"parts": [{"text": prompt}]}],
@@ -385,7 +390,8 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
     try:
         r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
         if 'error' in r: 
-            return "Бля, гугл отвалился, сек.", history_lines
+            error_msg = r['error'].get('message', 'Неизвестная ошибка API')
+            return f"[ОШИБКА GOOGLE API]: {error_msg}", history_lines
             
         if 'candidates' in r and len(r['candidates']) > 0:
             parts = r['candidates'][0]['content'].get('parts', [])
@@ -416,7 +422,7 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
                 }
                 r2 = requests.post(url, json=payload2, headers={'Content-Type': 'application/json'}).json()
                 if 'error' in r2: 
-                    return "Чет не могу переварить инфу из инета.", history_lines
+                    return "[ОШИБКА]: Сбой при переваривании инструмента.", history_lines
                     
                 raw_answer = ""
                 for p in r2['candidates'][0]['content'].get('parts', []):
@@ -424,26 +430,27 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
             else:
                 raw_answer = raw_text
             
-            # ЯДЕРНЫЙ ПАРСЕР ОТВЕТА (ВЫЖИГАЕМ СКОБКИ)
+            # ЯДЕРНЫЙ ПАРСЕР
             ans = raw_answer.strip()
-            # Удаляем любые скобки с их содержимым в начале строки (даже если их много и есть переносы)
             ans = re.sub(r'^\s*\(+.*?\)+\s*', '', ans, flags=re.DOTALL)
-            
-            # Добиваем случайные остатки действий в звездочках, если проскочат
             ans = re.sub(r'\*.*?(Search|Гуглю).*?\*\s*', '', ans, flags=re.IGNORECASE)
-            
-            # Убираем возможные кавычки и префиксы
             ans = re.sub(r'^[a-zA-Z0-9_ \-\.\?\!]+:\s*', '', ans).strip()
             ans = re.sub(r'^"|"$', '', ans).strip()
             
-            if not ans: ans = "Чего?"
+            if not ans: ans = "..."
 
-            history_lines.append(f"Ты: {ans}")
+            # Записываем реплику бота с текущим временем
+            ts_now = datetime.now().strftime("%d.%m %H:%M")
+            history_lines.append(f"[{ts_now}] Ты: {ans}")
             return ans, history_lines
     except Exception as e:
         print(f"[-] КРИТИЧЕСКАЯ Ошибка API: {e}")
+        # Выводим реальную ошибку в чат, а не "Чего?"
+        error_str = f"[КРИТ. ОШИБКА СЕТИ]: {str(e)}"
+        history_lines.append(f"Ты: {error_str}")
+        return error_str, history_lines
         
-    fallback = "Чего?"
+    fallback = "[ОШИБКА]: Бот не смог сгенерировать ответ."
     history_lines.append(f"Ты: {fallback}")
     return fallback, history_lines
 
@@ -453,9 +460,10 @@ async def process_batch(client, message, user_id, sender_name):
         
     msgs = PENDING_MESSAGES.pop(user_id, [])
     if not msgs: return
-    combined_text = " | ".join(msgs)
     
-    # ПОМЕЧАЕМ СООБЩЕНИЯ ПРОЧИТАННЫМИ
+    # Теперь сообщения склеиваются через перенос строки, каждое со своим таймстемпом
+    combined_text = "\n".join(msgs)
+    
     try: await app.read_chat_history(user_id)
     except Exception: pass
     
@@ -468,14 +476,19 @@ async def process_batch(client, message, user_id, sender_name):
         await update_card_history(user_id, sender_name, new_history)
         if reply_text: await message.reply(reply_text)
     except Exception as e:
-        await message.reply("Бля, у меня в мозгах че-то замкнуло, погоди.")
+        await message.reply(f"[ОШИБКА ОБРАБОТКИ]: {e}")
 
 @app.on_message(filters.private & ~filters.me & ~filters.bot)
 async def auto_reply(client, message):
     user_id = message.from_user.id
     sender_name = message.from_user.first_name if message.from_user else "Кто-то"
     if user_id not in PENDING_MESSAGES: PENDING_MESSAGES[user_id] = []
-    PENDING_MESSAGES[user_id].append(message.text)
+    
+    # Сразу формируем строку с таймстемпом
+    ts = message.date.strftime("%d.%m %H:%M") if message.date else datetime.now().strftime("%d.%m %H:%M")
+    formatted_msg = f"[{ts}] Собеседник: {message.text}"
+    
+    PENDING_MESSAGES[user_id].append(formatted_msg)
     if user_id in PENDING_TASKS: PENDING_TASKS[user_id].cancel()
     PENDING_TASKS[user_id] = asyncio.create_task(process_batch(client, message, user_id, sender_name))
 
@@ -484,7 +497,7 @@ async def main():
     init_supabase()
     await load_db()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (v8.1: ПОЧИНЕННОЕ ВРЕМЯ) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (v8.2: ТАЙМСТЕМПЫ И ФИКС СЕТИ) ")
     print("==========================================\n")
     await idle()
     await app.stop()

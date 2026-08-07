@@ -299,15 +299,18 @@ def run_archivist(user_id, sender_name, history_lines):
                 inserts = []
                 for uf in data.get("user_facts", []): inserts.append(f"[О СОБЕСЕДНИКЕ]: {uf}")
                 for sf in data.get("senka_facts", []): inserts.append(f"[О СЕНЬКЕ]: {sf}")
+                for old_f in data.get("to_insert", []): inserts.append(f"[ФАКТ]: {old_f}")
                 
                 if inserts:
                     for fact in inserts:
                         threading.Thread(target=save_memory_to_supabase, args=(user_id, fact)).start()
-        except Exception: pass
-        return "ОК"
-    except Exception as e: return f"Сбой: {e}"
+        except Exception:
+            pass
 
-# УБРАЛ FILTERS.ME - ТЕПЕРЬ МОЖЕШЬ ТЕСТИТЬ С КРОТА
+        return "ОК"
+    except Exception as e:
+        return f"Сбой: {e}"
+
 @app.on_message(filters.private & filters.command("sleep", prefixes="!"))
 async def sleep_command(client, message):
     await message.reply("*(система)* Инициирован глобальный анализ памяти. Запускаю пылесос чатов...")
@@ -461,9 +464,31 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
         
     return "[ОШИБКА]: Бот не смог сгенерировать ответ.", history_lines
 
+async def process_batch(client, message, user_id, sender_name):
+    try: await asyncio.sleep(4)
+    except asyncio.CancelledError: return
+        
+    msgs = PENDING_MESSAGES.pop(user_id, [])
+    if not msgs: return
+    
+    combined_text = "\n".join(msgs)
+    
+    try: await app.read_chat_history(user_id)
+    except Exception: pass
+    
+    try: await app.send_chat_action(user_id, ChatAction.TYPING)
+    except Exception: pass
+    
+    try:
+        _, card_text = await get_or_create_card(user_id, sender_name)
+        reply_text, new_history = await asyncio.to_thread(ask_gemini, user_id, sender_name, combined_text, card_text)
+        await update_card_history(user_id, sender_name, new_history)
+        if reply_text: await message.reply(reply_text)
+    except Exception as e:
+        await message.reply(f"[ОШИБКА ОБРАБОТКИ]: {e}")
+
 @app.on_message(filters.private & ~filters.me & ~filters.bot)
 async def auto_reply(client, message):
-    # ИГНОРИРУЕМ КОМАНДЫ, ЧТОБЫ ОНИ НЕ ПОПАДАЛИ В ОБЫЧНЫЙ ЧАТ
     if message.text and message.text.startswith("!"):
         return
 
@@ -483,7 +508,7 @@ async def main():
     init_supabase()
     await load_db()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (vBETA-3: АНТИ-ЦИКЛ И СВОБОДНЫЙ СОН) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (vBETA-3.1: ВОЗВРАЩЕНИЕ МОЗГА) ")
     print("==========================================\n")
     await idle()
     await app.stop()

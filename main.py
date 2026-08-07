@@ -141,13 +141,15 @@ def find_working_embedding_model():
 
 def get_embedding(text):
     global WORKING_EMBEDDING_MODEL
-    if not WORKING_EMBEDDING_MODEL: WORKING_EMBEDDING_MODEL = find_working_embedding_model()
+    if not WORKING_EMBEDDING_MODEL:
+        WORKING_EMBEDDING_MODEL = find_working_embedding_model()
     if not WORKING_EMBEDDING_MODEL: return None
     url = f"https://generativelanguage.googleapis.com/v1beta/{WORKING_EMBEDDING_MODEL}:embedContent?key={GEMINI_API_KEY}"
     payload = {"model": WORKING_EMBEDDING_MODEL, "content": {"parts": [{"text": text}]}}
     try:
         r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
-        if 'embedding' in r and 'values' in r['embedding']: return r['embedding']['values']
+        if 'embedding' in r and 'values' in r['embedding']:
+            return r['embedding']['values']
     except Exception: pass
     return None
 
@@ -157,9 +159,8 @@ def save_memory_to_supabase(user_id, content):
     if not vector: return
     try:
         supabase.table("memories").insert({"user_id": user_id, "content": content, "embedding": vector}).execute()
-        print(f"[+] ФАКТ СОХРАНЕН В БАЗУ: '{content[:30]}...'")
-    except Exception as e:
-        print(f"[-] Ошибка записи в Supabase: {e}")
+        print(f"[+] ВЕКТОРНАЯ ПАМЯТЬ СОХРАНЕНА: '{content[:30]}...'")
+    except Exception as e: print(f"[-] Ошибка записи в Supabase: {e}")
 
 def get_relevant_memories(user_id, current_text):
     if not supabase: return ""
@@ -167,14 +168,15 @@ def get_relevant_memories(user_id, current_text):
     if not vector: return ""
     try:
         res = supabase.rpc("match_memories", {"query_embedding": vector, "match_threshold": 0.3, "match_count": 3, "p_user_id": user_id}).execute()
-        if res.data and len(res.data) > 0: return "\n".join([item['content'] for item in res.data])
+        if res.data and len(res.data) > 0:
+            return "\n".join([item['content'] for item in res.data])
     except Exception: pass
     return ""
 
 async def load_db():
     global CHANNEL_ID, USER_CARDS
     try:
-        chat = await app.get_chat(CHANNEL_INVITE) # Убедись, что переменная CHANNEL_INVITE определена в твоем окружении или коде
+        chat = await app.get_chat(CHANNEL_INVITE)
         CHANNEL_ID = chat.id
         async for message in app.get_chat_history(CHANNEL_ID, limit=200):
             if message.text:
@@ -182,92 +184,79 @@ async def load_db():
                 if match: USER_CARDS[int(match.group(1))] = message.id
     except Exception: pass
 
-def parse_card_info(card_text):
-    history_lines = []
-    last_msg_id = 0
-    sender_name = "Кто-то"
-    capture = False
-    
-    m_name = re.search(r'Имя:\s*(.*)', card_text)
-    if m_name: sender_name = m_name.group(1).strip()
-        
-    m_id = re.search(r'Last_Msg_ID:\s*(\d+)', card_text)
-    if m_id: last_msg_id = int(m_id.group(1))
-
-    for line in card_text.split('\n'):
-        if line.startswith("История:"): capture = True; continue
-        if capture and line.strip(): history_lines.append(line.strip())
-            
-    return sender_name, last_msg_id, history_lines
-
 async def get_or_create_card(user_id, sender_name):
-    if not CHANNEL_ID: return None, "", 0
+    if not CHANNEL_ID: return None, ""
     if user_id not in USER_CARDS:
-        initial_text = f"[USER_ID: {user_id}]\nИмя: {sender_name}\nLast_Msg_ID: 0\nИстория:\n"
+        initial_text = f"[USER_ID: {user_id}]\nИмя: {sender_name}\nИстория:\n"
         try:
             sent = await app.send_message(CHANNEL_ID, initial_text)
             USER_CARDS[user_id] = sent.id
-            return sent.id, initial_text, 0
-        except Exception: return None, initial_text, 0
+            return sent.id, initial_text
+        except Exception: return None, initial_text
     else:
         msg_id = USER_CARDS[user_id]
         try:
             msg = await app.get_messages(CHANNEL_ID, msg_id)
-            if msg and msg.text:
-                _, last_msg_id, _ = parse_card_info(msg.text)
-                return msg_id, msg.text, last_msg_id
+            if msg and msg.text: return msg_id, msg.text
         except Exception: pass
-        return None, "", 0
+        return None, ""
 
-async def update_card_history(user_id, sender_name, history_lines, last_msg_id):
+async def update_card_history(user_id, sender_name, history_lines):
     if not CHANNEL_ID: return
-    msg_id, _, _ = await get_or_create_card(user_id, sender_name)
+    msg_id, _ = await get_or_create_card(user_id, sender_name)
     if not msg_id: return
     history_str = "\n".join(history_lines)
-    full_text = f"[USER_ID: {user_id}]\nИмя: {sender_name}\nLast_Msg_ID: {last_msg_id}\nИстория:\n{history_str}"
+    full_text = f"[USER_ID: {user_id}]\nИмя: {sender_name}\nИстория:\n{history_str}"
     if len(full_text) > 4000: full_text = full_text[-4000:]
     try: await app.edit_message_text(CHANNEL_ID, msg_id, full_text)
     except Exception: pass
 
+def parse_history_from_text(card_text):
+    lines = card_text.split('\n')
+    history_lines = []
+    capture = False
+    for line in lines:
+        if line.startswith("История:"):
+            capture = True
+            continue
+        if capture and line.strip(): history_lines.append(line.strip())
+    return history_lines
+
 # ==========================================
-# МОДУЛЬ "ГЛОБАЛЬНЫЙ НОЧНОЙ АРХИВАРИУС" v3.0
+# МОДУЛЬ "НОЧНОЙ АРХИВАРИУС" v3.0 (Фильтр Бассейна)
 # ==========================================
 ARCHIVIST_SYSTEM_PROMPT = """
-Ты — хирургически точный ИИ-Архивариус. Твоя задача: обновить векторную базу знаний пользователя.
-Тебе предоставлены:
-1. ТЕКУЩАЯ БАЗА (у каждого факта есть свой [ID]).
-2. НОВЫЙ ДИАЛОГ.
-
-Правила анализа:
-1. Игнорируй пост-иронию, спам и рофлы. Выделяй только твердые, новые факты.
-2. КОНФЛИКТЫ: Если в новом диалоге есть факт, который опровергает старый факт из базы (например, юзер переехал, или признался, что старый факт был шуткой) — добавь ID старого факта в "to_delete_ids", а новую правду в "to_insert".
-3. ДУБЛИКАТЫ: Если факт УЖЕ есть в ТЕКУЩЕЙ БАЗЕ — не добавляй его снова!
-4. Выдавай ответ СТРОГО в JSON:
+Ты — строгий ИИ-Архивариус. Твоя задача: анализировать свежую историю диалога и сравнивать ее со СТАРЫМИ фактами из БД.
+Правила:
+1. Игнорируй пост-иронию и временные эмоции.
+2. Ищи противоречия. Если в диалоге выяснилось, что старый факт (с ID) оказался ложью, шуткой, или устарел — ДОБАВЬ ЕГО ID В to_delete_ids.
+3. Если узнал новый, чистый факт, которого еще нет в базе — добавь в to_insert.
+4. Отвечай СТРОГО в формате JSON:
 {
-  "insights": ["Анализ психологии и контекста"],
-  "to_delete_ids": [15, 42],
-  "to_insert": ["Свежий проверенный факт 1"]
+  "insights": ["Твои дедуктивные мысли о юзере"],
+  "to_delete_ids": [14, 25], 
+  "to_insert": ["Новый факт 1"]
 }
+Если удалять нечего, оставь "to_delete_ids": []. Если новых фактов нет, оставь "to_insert": [].
 """
 
-def run_archivist_for_user(user_id, sender_name, new_messages):
+def run_archivist(user_id, sender_name, history_lines):
     global WORKING_MODEL
     if not WORKING_MODEL: WORKING_MODEL = find_working_model()
     
-    print(f"\n[!] АРХИВАРИУС: Анализирую {sender_name} ({len(new_messages)} новых строк)...")
+    print(f"\n[!] АРХИВАРИУС ПРОСНУЛСЯ. Строк диалога: {len(history_lines)}...")
+    full_history = "\n".join(history_lines)
     
-    # 1. Достаем старую память из Supabase
-    existing_memories = []
-    memories_str = "База пуста."
-    try:
-        if supabase:
-            existing_memories = supabase.table("memories").select("id, content").eq("user_id", user_id).execute().data
-            if existing_memories:
-                memories_str = "\n".join([f"[ID: {m['id']}] {m['content']}" for m in existing_memories])
-    except Exception as e: print(f"[-] Ошибка выгрузки БД: {e}")
+    # ВЫГРУЖАЕМ СТАРЫЕ ФАКТЫ С ИХ ID
+    old_facts_text = "База пуста."
+    if supabase:
+        try:
+            res = supabase.table("memories").select("id, content").eq("user_id", user_id).execute()
+            if res.data:
+                old_facts_text = "\n".join([f"[ID: {item['id']}] {item['content']}" for item in res.data])
+        except Exception as e: print(f"[-] Ошибка выгрузки старых фактов: {e}")
 
-    full_history = "\n".join(new_messages)
-    prompt_text = f"ТЕКУЩАЯ БАЗА ЗНАНИЙ:\n{memories_str}\n\nНОВЫЙ ДИАЛОГ:\n{full_history}"
+    prompt_text = f"СТАРЫЕ ФАКТЫ ИЗ БАЗЫ (с их ID):\n{old_facts_text}\n\nСВЕЖАЯ ИСТОРИЯ ДИАЛОГА:\n{full_history}"
     
     url = f"https://generativelanguage.googleapis.com/v1beta/{WORKING_MODEL}:generateContent?key={GEMINI_API_KEY}"
     payload = {
@@ -277,66 +266,86 @@ def run_archivist_for_user(user_id, sender_name, new_messages):
     
     try:
         r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
+        if 'error' in r: return "Сбой в матрице снов."
+        
         raw_answer = ""
         for p in r.get('candidates', [{}])[0].get('content', {}).get('parts', []):
             if 'text' in p: raw_answer += p['text'] + "\n"
             
-        print(f"\n[!] ОТВЕТ АРХИВАРИУСА ДЛЯ {sender_name}:\n{raw_answer.strip()}\n")
+        print(f"\n[!] ОТВЕТ АРХИВАРИУСА:\n{raw_answer.strip()}\n")
         
-        # 2. Парсим JSON и хирургически режем базу
-        json_match = re.search(r'\{.*\}', raw_answer.strip(), re.DOTALL)
-        if json_match and supabase:
-            data = json.loads(json_match.group(0))
-            
-            # Удаляем старье
-            to_delete = data.get("to_delete_ids", [])
-            for d_id in to_delete:
-                supabase.table("memories").delete().eq("id", d_id).execute()
-                print(f"[-] Уничтожен старый/ошибочный вектор ID: {d_id}")
-                
-            # Добавляем новьё
-            to_insert = data.get("to_insert", [])
-            for fact in to_insert:
-                threading.Thread(target=save_memory_to_supabase, args=(user_id, fact)).start()
-                
-        return True
-    except Exception as e:
-        print(f"[-] Ошибка Архивариуса для {sender_name}: {e}")
-        return False
-
-@app.on_message(filters.command("sleep", prefixes="!"))
-async def global_sleep_command(client, message):
-    await message.reply("*(закрывает глаза)* Ухожу в глубокий сон. Индексирую ВСЕ активные чаты...")
-    
-    processed_chats = 0
-    # Проходимся по всем известным пользователям
-    for u_id in list(USER_CARDS.keys()):
-        msg_id, card_text, last_msg_id = await get_or_create_card(u_id, "Unknown")
-        sender_name, _, history_lines = parse_card_info(card_text)
-        
-        new_messages = []
-        latest_id = last_msg_id
-        
-        # Качаем историю до закладки
         try:
-            async for msg in client.get_chat_history(u_id, limit=200):
-                if msg.id <= last_msg_id: break
-                if msg.id > latest_id: latest_id = msg.id
+            json_match = re.search(r'\{.*\}', raw_answer.strip(), re.DOTALL)
+            if json_match:
+                data = json.loads(json_match.group(0))
                 
-                # Фильтруем стикеры и команды!
-                if msg.text and not msg.text.startswith("!"):
-                    speaker = sender_name if msg.from_user and msg.from_user.id == u_id else "Ты"
-                    new_messages.append(f"{speaker}: {msg.text}")
-        except Exception: continue
+                # 1. ХИРУРГИЧЕСКОЕ УДАЛЕНИЕ СТАРОГО МУСОРА
+                to_delete = data.get("to_delete_ids", [])
+                if to_delete and supabase:
+                    # Конвертируем все в int на всякий случай
+                    to_delete = [int(i) for i in to_delete]
+                    print(f"[!] Удаляю мусорные ID из базы: {to_delete}")
+                    supabase.table("memories").delete().in_("id", to_delete).execute()
+                
+                # 2. ЗАПИСЬ НОВЫХ ФАКТОВ
+                inserts = data.get("to_insert", [])
+                if inserts:
+                    print(f"[+] Отправляю {len(inserts)} чистых фактов в Supabase...")
+                    for fact in inserts:
+                        threading.Thread(target=save_memory_to_supabase, args=(user_id, fact)).start()
+        except Exception as e:
+            print(f"[-] Ошибка парсинга JSON: {e}")
+
+        return "Память оптимизирована. Бассейн почищен."
+    except Exception as e:
+        return f"Кошмарный сон: {e}"
+
+@app.on_message(filters.private & filters.command("sleep", prefixes="!"))
+async def sleep_command(client, message):
+    user_id = message.from_user.id
+    sender_name = message.from_user.first_name if message.from_user else "Кто-то"
+    
+    await message.reply("*(закрывает глаза)* Ушел в спящий режим. Анализирую...")
+    
+    # Ищем закладку
+    last_msg_id = 0
+    if supabase:
+        try:
+            res = supabase.table("bookmarks").select("last_msg_id").eq("user_id", user_id).execute()
+            if res.data: last_msg_id = res.data[0]["last_msg_id"]
+        except Exception: pass
+
+    history_lines = []
+    max_id_seen = last_msg_id
+    
+    # Качаем историю. Если закладки нет - берем 50 последних. Если есть - читаем до нее.
+    fetch_limit = 50 if last_msg_id == 0 else 500
+    
+    async for msg in client.get_chat_history(user_id, limit=fetch_limit):
+        if last_msg_id > 0 and msg.id <= last_msg_id:
+            break # Дошли до того, что уже читали вчера
+        
+        if msg.id > max_id_seen: max_id_seen = msg.id
+        
+        # Защита от спама: ТОЛЬКО ТЕКСТ. Никаких стикеров!
+        if msg.text and not msg.text.startswith("!"):
+            speaker = sender_name if msg.from_user.id == user_id else "Ты"
+            history_lines.append(f"{speaker}: {msg.text}")
             
-        if new_messages:
-            new_messages.reverse() # Хронологический порядок
-            await asyncio.to_thread(run_archivist_for_user, u_id, sender_name, new_messages)
-            await update_card_history(u_id, sender_name, history_lines, latest_id)
-            processed_chats += 1
-            await asyncio.sleep(5) # Пауза между юзерами для API
-            
-    await message.reply(f"*(открывает глаза)* Я проснулся. Обновлено чатов: {processed_chats}. Мозг кристально чист.")
+    if not history_lines:
+        await message.reply("*(открывает глаза)* А анализировать-то нечего, нового текста не было.")
+        return
+
+    history_lines.reverse()
+    
+    # Обновляем закладку на будущее
+    if supabase and max_id_seen > last_msg_id:
+        try:
+            supabase.table("bookmarks").upsert({"user_id": user_id, "last_msg_id": max_id_seen}).execute()
+        except Exception as e: print(f"[-] Ошибка записи закладки: {e}")
+    
+    result = await asyncio.to_thread(run_archivist, user_id, sender_name, history_lines)
+    await message.reply(f"*(открывает глаза)* Фух. {result}")
 # ==========================================
 
 def ask_gemini(user_id, sender_name, user_text, card_text):
@@ -346,7 +355,7 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
 
     vector_context = get_relevant_memories(user_id, user_text)
     
-    sender_name_parsed, last_msg_id, history_lines = parse_card_info(card_text)
+    history_lines = parse_history_from_text(card_text)
     history_lines.append(f"Собеседник: {user_text}")
     if len(history_lines) > 8: history_lines = history_lines[-8:]
     dialogue_str = "\n".join(history_lines)
@@ -385,6 +394,8 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
             if func_call:
                 func_name = func_call['name']
                 args = func_call.get('args', {})
+                print(f"[!] ИИ ЗАПРОСИЛ ИНСТРУМЕНТ: {func_name} | Аргументы: {args}")
+                
                 tool_result = ""
                 if func_name == "web_search":
                     queries = args.get("queries", [])
@@ -411,10 +422,14 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
             ans = ""
             for line in reversed(lines):
                 if not line.startswith('(') and not line.endswith(')'):
-                    if re.search(r'[А-Яа-яЁё]', line): ans = line; break
+                    if re.search(r'[А-Яа-яЁё]', line):
+                        ans = line
+                        break
             if not ans and lines:
                 for line in lines:
-                    if not line.startswith('('): ans = line; break
+                    if not line.startswith('('):
+                        ans = line
+                        break
                 if not ans: ans = lines[-1]
                 
             ans = re.sub(r'^[a-zA-Z0-9_ \-\.\?\!]+:\s*', '', ans).strip()
@@ -422,13 +437,10 @@ def ask_gemini(user_id, sender_name, user_text, card_text):
             ans = re.sub(r'^"|"$', '', ans).strip()
             if not ans: ans = "Чего?"
 
-            # Отключаем автосохранение каждого пука! Теперь это делает Архивариус ночью.
-            # threading.Thread(target=save_memory_to_supabase, args=(user_id, f"Собеседник сказал: {user_text} | Ты ответил: {ans}")).start()
-            
             history_lines.append(f"Ты: {ans}")
             return ans, history_lines
     except Exception as e:
-        print(f"[-] Ошибка API: {e}")
+        print(f"[-] КРИТИЧЕСКАЯ Ошибка API: {e}")
         
     fallback = "Чего?"
     history_lines.append(f"Ты: {fallback}")
@@ -446,9 +458,9 @@ async def process_batch(client, message, user_id, sender_name):
     except Exception: pass
     
     try:
-        _, card_text, last_msg_id = await get_or_create_card(user_id, sender_name)
+        _, card_text = await get_or_create_card(user_id, sender_name)
         reply_text, new_history = await asyncio.to_thread(ask_gemini, user_id, sender_name, combined_text, card_text)
-        await update_card_history(user_id, sender_name, new_history, last_msg_id)
+        await update_card_history(user_id, sender_name, new_history)
         if reply_text: await message.reply(reply_text)
     except Exception as e:
         await message.reply("Бля, у меня в мозгах че-то замкнуло, погоди.")
@@ -467,7 +479,7 @@ async def main():
     init_supabase()
     await load_db()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (v7.0: ГЛОБАЛЬНЫЙ ФИЛЬТР) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (v7.0: ГЛОБАЛЬНЫЙ ФИЛЬТР БАССЕЙНА) ")
     print("==========================================\n")
     await idle()
     await app.stop()

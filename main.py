@@ -38,7 +38,9 @@ SESSION_STRING = os.environ.get("SESSION_STRING")
 RAW_KEYS = os.environ.get("GEMINI_API_KEY", "")
 API_KEYS = [k.strip() for k in RAW_KEYS.split(",") if k.strip()]
 CURRENT_KEY_INDEX = 0
-KEY_LOCK = threading.Lock()
+
+# ФИКС ДЕДЛОКА: Заменили Lock на рекурсивный RLock!
+KEY_LOCK = threading.RLock()
 
 def get_current_api_key():
     global CURRENT_KEY_INDEX
@@ -200,7 +202,8 @@ def get_relevant_memories(user_id, current_text):
     vector = get_embedding(current_text)
     if not vector: return ""
     try:
-        res = supabase.rpc("match_memories", {"query_embedding": vector, "match_threshold": 0.6, "match_count": 5, "p_user_id": user_id}).execute()
+        # ПОДНЯЛИ ПОРОГ ДО 0.65 ДЛЯ ИДЕАЛЬНОЙ ЧИСТОТЫ КОНТЕКСТА
+        res = supabase.rpc("match_memories", {"query_embedding": vector, "match_threshold": 0.65, "match_count": 5, "p_user_id": user_id}).execute()
         if res.data and len(res.data) > 0:
             return "\n".join([item['content'] for item in res.data])
     except Exception: pass
@@ -339,8 +342,14 @@ async def sleep_command(client, message):
         
     await message.reply(f"*(система)* Глобальный сон завершен. Обновлено чатов: {success_count}.")
 
-def ask_gemini(user_id, sender_name, combined_text, dialogue_str):
+# ФИКС БЕСКОНЕЧНОЙ РЕКУРСИИ: Добавили параметр retries
+def ask_gemini(user_id, sender_name, combined_text, dialogue_str, retries=0):
     global WORKING_MODEL
+    
+    # Защита от бесконечного цикла, если ВСЕ ключи умерли
+    if retries >= len(API_KEYS) and len(API_KEYS) > 0:
+        return "[ОШИБКА]: Все API-ключи исчерпали дневной лимит."
+
     if not WORKING_MODEL: WORKING_MODEL = find_working_model()
     if not WORKING_MODEL: return "[ОШИБКА]: Модель не найдена."
 
@@ -386,7 +395,8 @@ def ask_gemini(user_id, sender_name, combined_text, dialogue_str):
             print("[-] ЛИМИТ КЛЮЧА ИСЧЕРПАН. Переключаю ключ...")
             rotate_api_key()
             WORKING_MODEL = find_working_model()
-            return ask_gemini(user_id, sender_name, combined_text, dialogue_str)
+            # Передаем retries + 1 для защиты от Stack Overflow
+            return ask_gemini(user_id, sender_name, combined_text, dialogue_str, retries + 1)
             
         if 'candidates' in r and len(r['candidates']) > 0:
             parts = r['candidates'][0]['content'].get('parts', [])
@@ -452,11 +462,10 @@ async def process_batch(client, message, user_id, sender_name):
     
     try:
         history_lines = []
-        text_count = 0 # Безопасный счетчик именно ТЕКСТОВЫХ реплик
+        text_count = 0
         
-        # Безопасный разумный лимит 40 за раз (защита от FloodWait)
         async for msg in app.get_chat_history(user_id, limit=40):
-            if text_count >= 25: break # Набрали 25 плотных текстовых реплик — прерываем
+            if text_count >= 25: break
                 
             speaker = sender_name if msg.from_user and msg.from_user.id == user_id else "Ты"
             ts = msg.date.strftime("%d.%m %H:%M") if msg.date else datetime.now().strftime("%d.%m %H:%M")
@@ -466,7 +475,6 @@ async def process_batch(client, message, user_id, sender_name):
                 history_lines.append(f"[{ts}] {speaker}: {msg.text}")
                 text_count += 1
             elif msg.sticker:
-                # Не спамим одинаковыми строками, добавляем лаконично
                 if not history_lines or "[Отправил стикер]" not in history_lines[-1]:
                     history_lines.append(f"[{ts}] {speaker}: [Отправил стикер]")
             elif msg.photo or msg.video or msg.animation:
@@ -506,7 +514,7 @@ async def main():
     await app.start()
     init_supabase()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (vBETA-5.2: ПЕКИНСКАЯ ЗАЩИТА ОТ FLOODWAIT) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (vBETA-6.0: ФИНАЛЬНЫЙ МОНОЛИТ) ")
     print("==========================================\n")
     await idle()
     await app.stop()

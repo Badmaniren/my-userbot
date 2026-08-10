@@ -35,21 +35,23 @@ API_ID = int(os.environ.get("API_ID", "31001164"))
 API_HASH = os.environ.get("API_HASH", "18ae94f76873c93be328527e858de657")
 SESSION_STRING = os.environ.get("SESSION_STRING")
 
-# Разбираем мульти-ключи из переменной GEMINI_API_KEY (через запятую)
 RAW_KEYS = os.environ.get("GEMINI_API_KEY", "")
 API_KEYS = [k.strip() for k in RAW_KEYS.split(",") if k.strip()]
 CURRENT_KEY_INDEX = 0
+KEY_LOCK = threading.Lock() # Блокировка против Race Condition при ротации
 
 def get_current_api_key():
     global CURRENT_KEY_INDEX
     if not API_KEYS: return ""
-    return API_KEYS[CURRENT_KEY_INDEX % len(API_KEYS)]
+    with KEY_LOCK:
+        return API_KEYS[CURRENT_KEY_INDEX % len(API_KEYS)]
 
 def rotate_api_key():
     global CURRENT_KEY_INDEX
-    if len(API_KEYS) > 1:
-        CURRENT_KEY_INDEX = (CURRENT_KEY_INDEX + 1) % len(API_KEYS)
-        print(f"[!] ПЕРЕКЛЮЧЕНИЕ НА СЛЕДУЮЩИЙ API КЛЮЧ: Индекс {CURRENT_KEY_INDEX}")
+    with KEY_LOCK:
+        if len(API_KEYS) > 1:
+            CURRENT_KEY_INDEX = (CURRENT_KEY_INDEX + 1) % len(API_KEYS)
+            print(f"[!] ПЕРЕКЛЮЧЕНИЕ НА СЛЕДУЮЩИЙ API КЛЮЧ: Индекс {CURRENT_KEY_INDEX}")
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
@@ -138,7 +140,6 @@ def find_working_model():
         if 'models' not in res: return None
         available = [m['name'] for m in res['models'] if 'generateContent' in m.get('supportedGenerationMethods', [])]
         
-        # ПРИОРИТЕТ ДЛЯ FLASH-LITE (у них 500 запросов в день вместо 20!)
         preferred = [m for m in available if "flash-lite" in m]
         secondary = [m for m in available if "flash" in m and m not in preferred and "preview" not in m]
         
@@ -199,7 +200,8 @@ def get_relevant_memories(user_id, current_text):
     vector = get_embedding(current_text)
     if not vector: return ""
     try:
-        res = supabase.rpc("match_memories", {"query_embedding": vector, "match_threshold": 0.3, "match_count": 5, "p_user_id": user_id}).execute()
+        # ПОДНЯЛИ ПОРОГ СХОДСТВА ДО 0.6 ПО СОВЕТУ КОЛЛЕГИ
+        res = supabase.rpc("match_memories", {"query_embedding": vector, "match_threshold": 0.6, "match_count": 5, "p_user_id": user_id}).execute()
         if res.data and len(res.data) > 0:
             return "\n".join([item['content'] for item in res.data])
     except Exception: pass
@@ -252,7 +254,7 @@ def run_archivist(user_id, sender_name, history_lines):
     try:
         r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
         if 'error' in r and ('429' in str(r['error']) or 'quota' in str(r['error']).lower()):
-            rotate_api_key() # Переключаем ключ при исчерпании лимита
+            rotate_api_key()
             
         raw_answer = ""
         for p in r.get('candidates', [{}])[0].get('content', {}).get('parts', []):
@@ -271,9 +273,10 @@ def run_archivist(user_id, sender_name, history_lines):
                 for uf in data.get("user_facts", []): inserts.append(f"[О СОБЕСЕДНИКЕ]: {uf}")
                 for sf in data.get("senka_facts", []): inserts.append(f"[О СЕНЬКЕ]: {sf}")
                 
+                # ПОПОЛНЯЕМ БАЗУ ПОСЛЕДОВАТЕЛЬНО, БЕЗ СЫРЫХ ПОТОКОВ (ФИКС УТЕЧКИ)
                 if inserts:
                     for fact in inserts:
-                        threading.Thread(target=save_memory_to_supabase, args=(user_id, fact)).start()
+                        save_memory_to_supabase(user_id, fact)
         except Exception: pass
         return "ОК"
     except Exception as e: return f"Сбой: {e}"
@@ -321,7 +324,7 @@ async def sleep_command(client, message):
                 
                 speaker = sender_name if msg.from_user and msg.from_user.id == target_uid else "Ты"
                 ts = msg.date.strftime("%d.%m %H:%M") if msg.date else datetime.now().strftime("%d.%m %H:%M")
-                text_content = msg.text or msg.caption or "[Медиа]"
+                text_content = msg.text or msg.caption or "[Медиа/Стикер]"
                 history_lines.append(f"[{ts}] {speaker}: {text_content}")
         except Exception as e: continue
                 
@@ -381,7 +384,6 @@ def ask_gemini(user_id, sender_name, combined_text, dialogue_str):
     try:
         r = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}).json()
         
-        # Если уперлись в лимит 429 — меняем ключ и просим перевыбрать модель
         if 'error' in r and ('429' in str(r['error']) or 'quota' in str(r['error']).lower()):
             print("[-] ЛИМИТ КЛЮЧА ИСЧЕРПАН. Переключаю ключ...")
             rotate_api_key()
@@ -489,7 +491,10 @@ async def auto_reply(client, message):
     
     if user_id not in PENDING_MESSAGES: PENDING_MESSAGES[user_id] = []
     
-    PENDING_MESSAGES[user_id].append(message.text)
+    # ФИКС БАГА СО СТИКЕРАМИ И МЕДИА: Защита от NoneType при join
+    text_to_save = message.text or message.caption or "[Медиа/Стикер]"
+    
+    PENDING_MESSAGES[user_id].append(text_to_save)
     if user_id in PENDING_TASKS: PENDING_TASKS[user_id].cancel()
     PENDING_TASKS[user_id] = asyncio.create_task(process_batch(client, message, user_id, sender_name))
 
@@ -497,7 +502,7 @@ async def main():
     await app.start()
     init_supabase()
     print("\n==========================================")
-    print(" ЮЗЕРБОТ СТАРТОВАЛ (vBETA-5: МУЛЬТИ-КЛЮЧИ И LITE ПРИОРИТЕТ) ")
+    print(" ЮЗЕРБОТ СТАРТОВАЛ (vBETA-5.1: БРОНЕБОЙНЫЙ) ")
     print("==========================================\n")
     await idle()
     await app.stop()

@@ -21,3 +21,7 @@ jobs:
       - name: Запуск гладиаторских тестов
         run: |
           python -m unittest discover -s . -p "test_*.py"
+
+      - name: Установка зависимостей
+        run: |
+          pip install requests

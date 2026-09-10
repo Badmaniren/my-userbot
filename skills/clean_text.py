@@ -1,18 +1,42 @@
 import re
-from html import unescape
+from html.parser import HTMLParser
+
+class _HTMLFilter(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.reset()
+        self.strict = False
+        self.convert_charrefs = True
+        self.text = []
+
+    def handle_data(self, d):
+        self.text.append(d)
+
+    def handle_entityref(self, name):
+        self.text.append(f'&{name};')
+
+    def handle_charref(self, name):
+        self.text.append(f'&#{name};')
 
 def clean(text: str) -> str:
     if not isinstance(text, str):
         raise TypeError("Input must be a string")
     
-    text = re.sub(r'<script.*?>.*?</script>', '', text, flags=re.IGNORECASE | re.DOTALL)
-    text = re.sub(r'<[^>]+>', '', text)
-    text = unescape(text)
+    parser = _HTMLFilter()
+    parser.feed(text)
+    parser.close()
+    raw_text = "".join(parser.text)
     
-    unprintable_chars = ''.join(chr(i) for i in range(32) if i not in (9, 10, 13)) + ''.join(chr(i) for i in range(127, 160))
-    translation_table = str.maketrans('', '', unprintable_chars)
-    text = text.translate(translation_table)
-    
-    text = re.sub(r'\s+', ' ', text)
-    
-    return text.strip()
+    cleaned_chars = []
+    for char in raw_text:
+        cat = ord(char)
+        if cat < 32 and char not in ('\n', '\r', '\t'):
+            continue
+        if cat == 127:
+            continue
+        cleaned_chars.append(char)
+        
+    res = "".join(cleaned_chars)
+    res = res.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
+    res = re.sub(r'\s+', ' ', res)
+    return res.strip()

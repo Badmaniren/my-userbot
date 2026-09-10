@@ -272,21 +272,25 @@ def architect_write_hard_tests(task: dict, manifest: dict, existing_code: str = 
     return ask_gemini(prompt)
 
 def unga_implement_hardened(task: dict, test_code: str, manifest: dict, existing_code: str = "", error_log: str = "") -> str:
-    context_err = f"ОШИБКА АРЕНЫ:\n{error_log}\n" if error_log else ""
+    context_err = f"КРИТИЧЕСКИЙ СБОЙ НА АРЕНЕ (ТЕСТЫ НЕ ПРОШЛИ):\n{error_log}\n" if error_log else ""
     context_base = f"БАЗОВЫЙ КОД ДО РЕФАКТОРИНГА:\n{existing_code}\n" if existing_code else ""
+    
     prompt = (
-        "Ты — Унга-кодер. Твой код подвергается стресс-тестированию Инквизитора.\n"
+        "Ты — Унга, рядовой кодер-исполнитель. Твой ранг — НИЖАЙШИЙ. Архитектор — твой абсолютный господин.\n"
         f"Модуль: skills/{task['module_name']}.py\n"
-        f"Цель: {task['description']}\n\n"
+        f"Задача от Архитектора: {task['description']}\n\n"
         f"{context_base}\n"
-        f"ЖЕСТКИЕ ТЕСТЫ:\n{test_code}\n\n"
+        f"ТЕСТЫ АРХИТЕКТОРА (ТЫ ОБЯЗАН ИМ ПОДЧИНИТЬСЯ):\n{test_code}\n\n"
         f"{context_err}\n"
-        "ТРЕБОВАНИЯ:\n"
-        "1. Напиши пуленепробиваемую реализацию, обрабатывающую все краевые случаи и ошибки.\n"
-        "2. Используй стандартную библиотеку Python или requests.\n"
-        "3. Верни ТОЛЬКО чистый код Python без markdown."
+        "ЖЕСТКИЕ ПРАВИЛА ВЫЖИВАНИЯ:\n"
+        "1. ЗАПРЕЩЕНО бездумно глушить системные ошибки через `except Exception: pass` или `except OSError: return None`!\n"
+        "2. Если тест использует `self.assertRaises(...)`, функция ОБЯЗАНА выбрасывать это исключение (PermissionError, OSError, ValueError), а НЕ перехватывать его внутри.\n"
+        "3. Если в логе ошибки написано 'AssertionError: ... not raised' — это значит, что ты проглотил исключение! Удали `try-except` вокруг этой операции или сделай явный `raise`!\n"
+        "4. Код обязан пройти ВСЕ 25 тестов до единого.\n"
+        "5. Верни ТОЛЬКО чистый, рабочий код Python без пояснений и без markdown."
     )
     return ask_gemini(prompt)
+
 
 # 4. ГЛАВНЫЙ ЦИКЛ
 def run_evolution_cycle():

@@ -24,9 +24,16 @@ def run_dummy_server():
 
 threading.Thread(target=run_dummy_server, daemon=True).start()
 
-# 2. КОНФИГУРАЦИЯ И ЗАЩИТА ССЫЛОК ОТ МОБИЛЬНОГО БУФЕРА
+# 2. СБОРКА АДРЕСОВ БЕЗ УРОДОВАНИЯ МОБИЛЬНЫМ БУФЕРОМ
+def clean_url(url: str) -> str:
+    url = re.sub(r'\[.*?\]\(\vert{}\)', '', url)
+    return url.strip()
+
 API_HOST = "generativelanguage.googleapis.com"
 API_BASE = "https://" + API_HOST + "/v1beta/"
+
+GITHUB_HOST = "api.github.com"
+GITHUB_BASE = "https://" + GITHUB_HOST + "/repos/"
 
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "").strip()
 GITHUB_REPO = os.environ.get("GITHUB_REPO", "").strip()
@@ -38,11 +45,6 @@ API_HEADERS = {
     "Authorization": f"Bearer {GITHUB_TOKEN}",
     "Accept": "application/vnd.github+json"
 }
-
-def clean_url(url: str) -> str:
-    # Вычищает скобки Markdown [url](url), если мобильник их вставил
-    url = re.sub(r'\[.*?\]\(\vert{}\)', '', url)
-    return url.strip()
 
 def get_current_key():
     global KEY_INDEX
@@ -85,7 +87,7 @@ def get_viable_models(key: str) -> list:
     return viable
 
 def get_file_content(branch: str, path: str):
-    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{path}?ref={branch}"
+    url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents/{path}?ref={branch}")
     r = requests.get(url, headers=API_HEADERS, timeout=10)
     if r.status_code == 200:
         encoded = r.json().get("content", "")
@@ -103,7 +105,7 @@ def ask_gemini_mutation(original_code: str) -> str:
         "ЗАДАЧА: Перепиши функцию solve_task(a, b) так, чтобы она могла принимать как int/float, "
         "так и строки с числами (например, '5' и '10' -> 15). "
         "Базовые тесты (где передаются int) ОБЯЗАНЫ проходить успешно. "
-        "ТРЕБОВАНИЕ: Верни ТОЛЬКО валидный код Python без кавычек markdown (без ```python), без объяснений."
+        "ТРЕБОВАНИЕ: Верни ТОЛЬКО валидный код Python без markdown (без ```python), без комментариев."
     )
     
     payload = {
@@ -116,7 +118,7 @@ def ask_gemini_mutation(original_code: str) -> str:
         models_pool = get_viable_models(current_key)
         
         if not models_pool:
-            print("[-] Нет живых моделей на ключе. Сменяем ключ...")
+            print("[-] Нет живых моделей на ключе. Ротируем ключ...")
             rotate_key()
             time.sleep(2)
             continue
@@ -138,23 +140,31 @@ def ask_gemini_mutation(original_code: str) -> str:
                     current_key = get_current_key()
                     time.sleep(3)
             except Exception as e:
-                print(f"[-] Ошибка сети: {e}")
+                print(f"[-] Ошибка сети Gemini: {e}")
                 time.sleep(2)
                 
     return ""
 
 def push_mutation(branch: str, path: str, new_code: str):
-    ref_url = f"[https://api.github.com/repos/](https://api.github.com/repos/){GITHUB_REPO}/git/ref/heads/main"
-    main_sha = requests.get(ref_url, headers=API_HEADERS, timeout=10).json()["object"]["sha"]
+    ref_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/ref/heads/main")
+    ref_res = requests.get(ref_url, headers=API_HEADERS, timeout=10)
+    if ref_res.status_code != 200:
+        print(f"[-] Ошибка получения SHA ветки main: {ref_res.status_code} | {ref_res.text}")
+        return False
+        
+    main_sha = ref_res.json()["object"]["sha"]
     
-    branch_ref_url = f"[https://api.github.com/repos/](https://api.github.com/repos/){GITHUB_REPO}/git/refs/heads/{branch}"
+    branch_ref_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{branch}")
     requests.delete(branch_ref_url, headers=API_HEADERS, timeout=10)
     time.sleep(1)
     
-    create_url = f"[https://api.github.com/repos/](https://api.github.com/repos/){GITHUB_REPO}/git/refs"
-    requests.post(create_url, headers=API_HEADERS, json={"ref": f"refs/heads/{branch}", "sha": main_sha}, timeout=10)
+    create_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs")
+    create_res = requests.post(create_url, headers=API_HEADERS, json={"ref": f"refs/heads/{branch}", "sha": main_sha}, timeout=10)
+    if create_res.status_code not in [201, 422]:
+        print(f"[-] Ошибка создания ветки: {create_res.status_code}")
+        return False
 
-    file_url = f"[https://api.github.com/repos/](https://api.github.com/repos/){GITHUB_REPO}/contents/{path}"
+    file_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents/{path}")
     encoded = base64.b64encode(new_code.encode("utf-8")).decode("utf-8")
     
     payload = {
@@ -169,7 +179,7 @@ def watch_arena(branch: str):
     print(f"[*] Ждем запуска Арены GitHub Actions для ветки '{branch}'...")
     time.sleep(8)
     
-    runs_url = f"[https://api.github.com/repos/](https://api.github.com/repos/){GITHUB_REPO}/actions/runs?branch={branch}"
+    runs_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/actions/runs?branch={branch}")
     for _ in range(12):
         r = requests.get(runs_url, headers=API_HEADERS, timeout=10)
         if r.status_code == 200:
@@ -211,7 +221,15 @@ def run_evolution():
     if push_mutation(branch, "victim.py", mutated):
         print(f"[+] Мутация запушена в ветку '{branch}'!")
         watch_arena(branch)
+    else:
+        print("[-] Не удалось запушить мутацию на GitHub.")
 
 if __name__ == "__main__":
-    run_evolution()
+    try:
+        run_evolution()
+    except Exception as e:
+        print(f"\n[!!!] КРИТИЧЕСКИЙ СБОЙ В ЦИКЛЕ: {e}")
+        print("[*] Аварийный перехват сработал: сервис остается жить, рестарта не будет.\n")
+        
+    print("[*] Переход в фоновый режим ожидания...")
     threading.Event().wait()

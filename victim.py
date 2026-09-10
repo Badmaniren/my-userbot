@@ -3,4 +3,4 @@ def solve_task(a, b):
         res = float(a) + float(b)
         return int(res) if res.is_integer() else res
     except (TypeError, ValueError):
-        return str(a) + str(b)
+        raise ValueError("Invalid input: arguments must be numeric or convertible to numeric")

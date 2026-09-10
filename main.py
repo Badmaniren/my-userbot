@@ -31,6 +31,31 @@ API_HEADERS = {
     "Accept": "application/vnd.github+json"
 }
 
+def get_working_gemini_model(key: str) -> str:
+    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={key}"
+    try:
+        r = requests.get(url, timeout=10)
+        if r.status_code != 200:
+            print(f"[-] Ошибка получения списка моделей: {r.status_code} | {r.text}")
+            return ""
+        
+        models = r.json().get("models", [])
+        # Ищем только модели, умеющие генерировать текст
+        gen_models = [m["name"] for m in models if "generateContent" in m.get("supportedGenerationMethods", [])]
+        
+        # Приоритет: flash -> lite -> любая оставшаяся
+        preferred = [m for m in gen_models if "flash" in m.lower() and "preview" not in m.lower()]
+        fallback = [m for m in gen_models if "flash" in m.lower()]
+        
+        pool = preferred or fallback or gen_models
+        if pool:
+            chosen = pool[0] # берем первый доступный flash
+            print(f"[+] НАЙДЕНА ЖИВАЯ МОДЕЛЬ: {chosen}")
+            return chosen
+    except Exception as e:
+        print(f"[-] Сбой при поиске модели: {e}")
+    return ""
+
 def get_file_content(branch: str, path: str):
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{path}?ref={branch}"
     r = requests.get(url, headers=API_HEADERS, timeout=10)
@@ -45,8 +70,11 @@ def ask_gemini_mutation(original_code: str) -> str:
         return ""
     
     key = API_KEYS[0]
-    # Используем стабильную быструю модель
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={key}"
+    model_name = get_working_gemini_model(key)
+    if not model_name:
+        return ""
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:generateContent?key={key}"
     
     prompt = (
         "Ты — автономный мутатор кода. Вот файл victim.py:\n\n"
@@ -65,27 +93,23 @@ def ask_gemini_mutation(original_code: str) -> str:
     r = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=20)
     if r.status_code == 200:
         ans = r.json()['candidates'][0]['content']['parts'][0]['text']
-        # Вычищаем markdown, если модель все-таки намусорила
         clean_code = re.sub(r'```[a-zA-Z]*', '', ans).replace('```', '').strip()
         return clean_code
     else:
-        print(f"[-] Сбой Gemini API: {r.status_code} | {r.text}")
+        print(f"[-] Сбой генерации: {r.status_code} | {r.text}")
         return ""
 
 def push_mutation(branch: str, path: str, new_code: str):
-    # Получаем SHA main
     ref_url = f"[https://api.github.com/repos/](https://api.github.com/repos/){GITHUB_REPO}/git/ref/heads/main"
     main_sha = requests.get(ref_url, headers=API_HEADERS, timeout=10).json()["object"]["sha"]
     
-    # Создаем или пересоздаем ветку
     branch_ref_url = f"[https://api.github.com/repos/](https://api.github.com/repos/){GITHUB_REPO}/git/refs/heads/{branch}"
-    del_r = requests.delete(branch_ref_url, headers=API_HEADERS, timeout=10) # удаляем старую попытку если была
+    requests.delete(branch_ref_url, headers=API_HEADERS, timeout=10)
     time.sleep(1)
     
     create_url = f"[https://api.github.com/repos/](https://api.github.com/repos/){GITHUB_REPO}/git/refs"
     requests.post(create_url, headers=API_HEADERS, json={"ref": f"refs/heads/{branch}", "sha": main_sha}, timeout=10)
 
-    # Пушим файл
     file_url = f"[https://api.github.com/repos/](https://api.github.com/repos/){GITHUB_REPO}/contents/{path}"
     encoded = base64.b64encode(new_code.encode("utf-8")).decode("utf-8")
     
@@ -102,7 +126,7 @@ def watch_arena(branch: str):
     time.sleep(10)
     
     runs_url = f"[https://api.github.com/repos/](https://api.github.com/repos/){GITHUB_REPO}/actions/runs?branch={branch}"
-    for _ in range(12): # Ждем максимум минуту
+    for _ in range(12):
         r = requests.get(runs_url, headers=API_HEADERS, timeout=10)
         if r.status_code == 200:
             runs = r.json().get("workflow_runs", [])
@@ -132,7 +156,7 @@ def run_evolution():
         print("[-] Не найден victim.py в ветке main!")
         return
         
-    print(f"[*] Текущий код:\n{original}\n")
+    print(f"[*] Исходный код:\n{original}\n")
     mutated = ask_gemini_mutation(original)
     if not mutated:
         print("[-] Мутация сорвалась.")

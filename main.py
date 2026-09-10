@@ -62,7 +62,7 @@ def rotate_key():
     global KEY_INDEX, MODELS_CACHE
     if len(API_KEYS) > 1:
         KEY_INDEX = (KEY_INDEX + 1) % len(API_KEYS)
-        MODELS_CACHE["expires_at"] = 0  # Сбрасываем кэш при смене ключа
+        MODELS_CACHE["expires_at"] = 0
         print(f"[!] Ротация ключа Gemini -> #{KEY_INDEX}")
 
 def get_viable_models(key: str) -> list:
@@ -145,12 +145,10 @@ def get_file_content(branch: str, path: str):
 
 def prepare_branch(branch: str, base_sha: str) -> bool:
     ref_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{branch}")
-    # Пытаемся безопасно обновить ref с силой (без race condition удаления)
     patch_res = requests.patch(ref_url, headers=API_HEADERS, json={"sha": base_sha, "force": True}, timeout=10)
     if patch_res.status_code == 200:
         return True
     
-    # Если ветки нет — создаем
     create_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs")
     res = requests.post(create_url, headers=API_HEADERS, json={"ref": f"refs/heads/{branch}", "sha": base_sha}, timeout=10)
     return res.status_code in [200, 201]
@@ -178,8 +176,8 @@ def watch_arena_by_sha(expected_sha: str):
         return False, None
     time.sleep(10)
     runs_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/actions/runs")
+    last_seen_id = None
     
-    # 30 проверок по 10 сек = до 5 минут честного ожидания раннера
     for _ in range(30):
         r = requests.get(runs_url, headers=API_HEADERS, timeout=10)
         if r.status_code == 200:
@@ -187,13 +185,13 @@ def watch_arena_by_sha(expected_sha: str):
             target_run = next((run for run in runs if run.get("head_sha") == expected_sha), None)
             
             if target_run:
-                run_id = target_run.get("id")
+                last_seen_id = target_run.get("id")
                 if target_run.get("status") == "completed":
-                    return target_run.get("conclusion") == "success", run_id
+                    return target_run.get("conclusion") == "success", last_seen_id
         time.sleep(10)
-    return False, None
+    return False, last_seen_id
 
-# 5. ХИРУРГИЧЕСКИЙ ПАРСИНГ ТРЕЙСБЕКА С НАЧАЛА ОШИБКИ
+# 5. ХИРУРГИЧЕСКИЙ ПАРСИНГ ТРЕЙСБЕКА
 def extract_clean_test_traceback(run_id: int) -> str:
     if not run_id:
         return "Не удалось определить run_id шага тестирования."
@@ -217,13 +215,11 @@ def extract_clean_test_traceback(run_id: int) -> str:
 
     for line in lines:
         cleaned = re.sub(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\s*', '', line).strip()
-        # Старт захвата при возникновении реального падения
         if any(marker in cleaned for marker in ["FAIL:", "ERROR:", "Traceback (most recent call last):", "SyntaxError:", "ImportError:"]):
             capture = True
         if capture:
             if not cleaned.startswith("[command]") and "node-20" not in cleaned.lower():
                 error_buffer.append(cleaned)
-            # Если захватили 40 строк с момента старта ошибки — отдаем, это и есть суть падения
             if len(error_buffer) >= 40:
                 break
             if cleaned.startswith("FAILED ("):
@@ -233,7 +229,7 @@ def extract_clean_test_traceback(run_id: int) -> str:
         return "\n".join(error_buffer)
     return "Тесты провалены, но блок ошибки не идентифицирован."
 
-# 6. ГЛУБОКИЙ АНТИЧИТ ЧЕРЕЗ AST.WALK
+# 6. ГЛУБОКИЙ АНТИЧИТ (AST.WALK + БАН НА EXCEPT: PASS)
 def inspect_code_for_cheating(code: str, existing_skills: list, target_module: str) -> str:
     try:
         tree = ast.parse(code)
@@ -244,8 +240,20 @@ def inspect_code_for_cheating(code: str, existing_skills: list, target_module: s
         if isinstance(node, (ast.ClassDef, ast.FunctionDef)):
             if node.name in existing_skills and node.name != target_module:
                 return (
-                    f"ЧИТЕРСТВО ОБНАРУЖЕНО: Ты объявил фиктивный '{node.name}'! "
+                    f"ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный '{node.name}'! "
                     f"Запрещено создавать заглушки. Используй честный импорт: 'from skills.{node.name} import ...'"
+                )
+        if isinstance(node, ast.ExceptHandler):
+            is_broad = False
+            if node.type is None:
+                is_broad = True
+            elif isinstance(node.type, ast.Name) and node.type.id in ["Exception", "BaseException"]:
+                is_broad = True
+            
+            if is_broad and len(node.body) == 1 and isinstance(node.body[0], ast.Pass):
+                return (
+                    "АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! "
+                    "Обработай ошибку предсказуемо или пробрось наружу через raise."
                 )
     return ""
 
@@ -285,7 +293,7 @@ def dream_action(manifest: dict) -> dict:
         "ВЫБЕРИ ДЕЙСТВИЕ:\n"
         "1. 'create': Новый модуль (RSS-парсер, ротатор юзер-агентов, замерщик памяти, парсер JSON).\n"
         "2. 'refactor': Устранение слабостей существующего модуля.\n\n"
-        "ТРЕБОВАНИЯ: Только стандартная библиотека Python или requests.\n"
+        "ТРЕБОВАНИЯ: Стандартная библиотека Python или requests.\n"
         "Верни СТРОГО JSON:\n"
         "{\n"
         '  "action": "create" или "refactor",\n'
@@ -374,8 +382,9 @@ def run_evolution_cycle():
     test_path = f"test_{mod_name}.py"
     skill_path = f"skills/{mod_name}.py"
     
-    commit_file_to_branch(branch, "skills/__init__.py", "# unga package\n", "Init package")
-    commit_file_to_branch(branch, test_path, test_code, f"Тесты для {mod_name}")
+    # [skip ci] на черновиках: раннер запускается ТОЛЬКО на коде Унги
+    commit_file_to_branch(branch, "skills/__init__.py", "# unga package\n", "Init package [skip ci]")
+    commit_file_to_branch(branch, test_path, test_code, f"Тесты для {mod_name} [skip ci]")
 
     print("\n[3/4] УНГА: Первичная реализация...")
     impl_code = unga_implement_hardened(decision, test_code, manifest, existing_code=current_code)
@@ -413,7 +422,6 @@ def run_evolution_cycle():
             "base": "main", "head": branch, "commit_message": f"ЭВОЛЮЦИЯ: Вливание skills/{mod_name}.py"
         }, timeout=10)
         
-        # Удаляем ветку ТОЛЬКО при успешном слиянии
         if m_res.status_code in [200, 201, 204]:
             requests.delete(clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{branch}"), headers=API_HEADERS)
             print(f"[+] Успешно влито в main, ветка зачищена.")

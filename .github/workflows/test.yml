@@ -1,0 +1,23 @@
+name: Unga Arena
+
+on:
+  push:
+    branches:
+      - 'main'
+      - 'unga-*'
+
+jobs:
+  arena-run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Загрузка репозитория
+        uses: actions/checkout@v4
+
+      - name: Подготовка Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Запуск гладиаторских тестов
+        run: |
+          python -m unittest discover -s . -p "test_*.py"

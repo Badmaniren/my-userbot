@@ -229,7 +229,7 @@ def extract_clean_test_traceback(run_id: int) -> str:
         return "\n".join(error_buffer)
     return "Тесты провалены, но блок ошибки не идентифицирован."
 
-# 6. ГЛУБОКИЙ АНТИЧИТ (AST.WALK + БАН НА EXCEPT: PASS)
+# 6. ГЛУБОКИЙ АНТИЧИТ
 def inspect_code_for_cheating(code: str, existing_skills: list, target_module: str) -> str:
     try:
         tree = ast.parse(code)
@@ -291,7 +291,7 @@ def dream_action(manifest: dict) -> dict:
         "Ты — Стратег-Паразит. Цель: экспансия и выживаемость на бесплатном тарифе.\n"
         f"УЖЕ СОЗДАННЫЕ МОДУЛИ В skills/:\n{json.dumps(manifest, indent=2, ensure_ascii=False)}\n\n"
         "ВЫБЕРИ ДЕЙСТВИЕ:\n"
-        "1. 'create': Новый модуль (RSS-парсер, ротатор юзер-агентов, замерщик памяти, парсер JSON).\n"
+        "1. 'create': Новый модуль (RSS-парсер, замерщик памяти, парсер JSON, экстрактор данных).\n"
         "2. 'refactor': Устранение слабостей существующего модуля.\n\n"
         "ТРЕБОВАНИЯ: Стандартная библиотека Python или requests.\n"
         "Верни СТРОГО JSON:\n"
@@ -326,10 +326,13 @@ def architect_write_hard_tests(task: dict, manifest: dict, existing_code: str = 
         f"Описание: {task['description']}\n"
         f"{context_code}\n"
         f"СИГНАТУРЫ ДЛЯ ИМПОРТА:\n{json.dumps(manifest, indent=2, ensure_ascii=False)}\n\n"
-        "ПРАВИЛА ТЕСТОВ:\n"
-        "1. 50% тестов проверяют катастрофы (битые данные, 404/500, таймауты, пустые типы).\n"
+        "СТРОГИЕ ПРАВИЛА ВАЛИДНОСТИ ТЕСТОВ:\n"
+        "1. Минимум 50% тестов моделируют сбои (битые данные, 404/500, таймауты, пустые типы).\n"
         "2. БЕЗ РЕАЛЬНОЙ СЕТИ. Используй unittest.mock!\n"
-        "3. ВНИМАНИЕ К МОКАМ: Всегда явно задавай числовые статусы мока: `mock.status_code = 200`, `mock.status = 200`!\n"
+        "3. МОКИ И СЕТЕВЫЕ ОШИБКИ:\n"
+        "   - Если мокаешь успешный ответ: задавай числовой статус (`mock.status_code = 200`, `mock.status = 200`).\n"
+        "   - ЗАПРЕЩЕНО менять атрибуты у реальных исключений (например, `err.status = 404` вызовет AttributeError: property has no setter)!\n"
+        "   - Для симуляции HTTPError создавай валидный инстанс: `urllib.error.HTTPError('url', 404, 'Not Found', {}, None)` или используй чистый `MagicMock(code=404, status=404)`!\n"
         "4. Верни ТОЛЬКО валидный Python-код файла тестов без markdown."
     )
     return ask_gemini(prompt)
@@ -382,7 +385,6 @@ def run_evolution_cycle():
     test_path = f"test_{mod_name}.py"
     skill_path = f"skills/{mod_name}.py"
     
-    # [skip ci] на черновиках: раннер запускается ТОЛЬКО на коде Унги
     commit_file_to_branch(branch, "skills/__init__.py", "# unga package\n", "Init package [skip ci]")
     commit_file_to_branch(branch, test_path, test_code, f"Тесты для {mod_name} [skip ci]")
 

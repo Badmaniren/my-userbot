@@ -7,7 +7,7 @@ def solve_task(a, b):
         b = float(b)
     except (TypeError, ValueError):
         pass
-    res = a + b
-    if isinstance(res, float) and res.is_integer():
-        return int(res)
-    return res
+    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+        res = a + b
+        return int(res) if isinstance(res, float) and res.is_integer() else res
+    return str(a) + str(b)

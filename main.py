@@ -11,7 +11,7 @@ class DummyHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"Unga is alive and mutating!")
+        self.wfile.write(b"Unga is evolving!")
 
     def do_HEAD(self):
         self.send_response(200)
@@ -24,7 +24,7 @@ def run_dummy_server():
 
 threading.Thread(target=run_dummy_server, daemon=True).start()
 
-# 2. КОНФИГУРАЦИЯ И ССЫЛКИ
+# 2. КОНФИГУРАЦИЯ
 def clean_url(url: str) -> str:
     url = re.sub(r'\[.*?\]\(\vert{}\)', '', url)
     return url.strip()
@@ -70,13 +70,11 @@ def get_viable_models(key: str) -> list:
             other_models = [m for m in available if m not in flash_models]
             
             candidates = flash_models + other_models
-            print(f"[*] Прощупываем кандидатов (лимит: 3)...")
             for m in candidates:
                 test_url = clean_url(f"{API_BASE}{m}:generateContent?key={key}")
                 try:
                     res = requests.post(test_url, json={"contents": [{"parts": [{"text": "hi"}]}]}, timeout=8)
                     if res.status_code == 200:
-                        print(f"[+] Подтверждена живая модель: {m}")
                         viable.append(m)
                         if len(viable) >= 3:
                             break
@@ -118,15 +116,12 @@ def ask_gemini_mutation(original_code: str) -> str:
         models_pool = get_viable_models(current_key)
         
         if not models_pool:
-            print("[-] Нет живых моделей на ключе. Ротируем ключ...")
             rotate_key()
             time.sleep(2)
             continue
 
         for model_name in models_pool:
             url = clean_url(f"{API_BASE}{model_name}:generateContent?key={current_key}")
-            print(f"[~] Генерация через {model_name} (ключ #{KEY_INDEX})...")
-            
             try:
                 r = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=25)
                 if r.status_code == 200:
@@ -134,13 +129,11 @@ def ask_gemini_mutation(original_code: str) -> str:
                     clean_code = re.sub(r'```[a-zA-Z]*', '', ans).replace('```', '').strip()
                     return clean_code
                 
-                print(f"[-] Сбой {model_name}: код {r.status_code}")
                 if r.status_code in [429, 503]:
                     rotate_key()
                     current_key = get_current_key()
                     time.sleep(3)
             except Exception as e:
-                print(f"[-] Ошибка сети Gemini: {e}")
                 time.sleep(2)
                 
     return ""
@@ -149,31 +142,23 @@ def push_mutation(branch: str, path: str, new_code: str):
     ref_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/ref/heads/main")
     ref_res = requests.get(ref_url, headers=API_HEADERS, timeout=10)
     if ref_res.status_code != 200:
-        print(f"[-] Ошибка получения SHA main: {ref_res.status_code}")
         return False
         
     main_sha = ref_res.json()["object"]["sha"]
     
-    # 1. Сносим старую ветку если есть
     branch_ref_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{branch}")
     requests.delete(branch_ref_url, headers=API_HEADERS, timeout=10)
     time.sleep(1)
     
-    # 2. Создаем чистую ветку от main
     create_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs")
     create_res = requests.post(create_url, headers=API_HEADERS, json={"ref": f"refs/heads/{branch}", "sha": main_sha}, timeout=10)
     if create_res.status_code not in [201, 422]:
-        print(f"[-] Ошибка создания ветки: {create_res.status_code} | {create_res.text}")
         return False
 
-    # 3. Вытаскиваем SHA существующего файла в новой ветке
     file_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents/{path}?ref={branch}")
     file_info = requests.get(file_url, headers=API_HEADERS, timeout=10)
-    current_file_sha = None
-    if file_info.status_code == 200:
-        current_file_sha = file_info.json().get("sha")
+    current_file_sha = file_info.json().get("sha") if file_info.status_code == 200 else None
 
-    # 4. Перезаписываем файл с указанием SHA
     encoded = base64.b64encode(new_code.encode("utf-8")).decode("utf-8")
     payload = {
         "message": "Эволюционная мутация: адаптация типов solve_task",
@@ -185,14 +170,35 @@ def push_mutation(branch: str, path: str, new_code: str):
 
     put_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents/{path}")
     r = requests.put(put_url, headers=API_HEADERS, json=payload, timeout=10)
-    if r.status_code in [200, 201]:
+    return r.status_code in [200, 201]
+
+def merge_to_main(branch: str) -> bool:
+    print(f"[*] Слияние мутации из '{branch}' в основную ветку 'main'...")
+    merge_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/merges")
+    payload = {
+        "base": "main",
+        "head": branch,
+        "commit_message": "ЭВОЛЮЦИЯ: Вливание успешной мутации в ядро"
+    }
+    r = requests.post(merge_url, headers=API_HEADERS, json=payload, timeout=10)
+    if r.status_code in [201, 204]:
+        print("[+] СЛИЯНИЕ ПРОШЛО УСПЕШНО! Код стал частью main.")
         return True
     else:
-        print(f"[-] Ошибка перезаписи файла на GitHub: код {r.status_code} | {r.text}")
+        print(f"[-] Ошибка слияния: код {r.status_code} | {r.text}")
         return False
 
-def watch_arena(branch: str):
-    print(f"[*] Ждем запуска Арены GitHub Actions для ветки '{branch}'...")
+def delete_branch(branch: str):
+    print(f"[*] Зачистка временной ветки '{branch}'...")
+    branch_ref_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{branch}")
+    r = requests.delete(branch_ref_url, headers=API_HEADERS, timeout=10)
+    if r.status_code == 204:
+        print(f"[+] Ветка '{branch}' успешно удалена.")
+    else:
+        print(f"[-] Не удалось удалить ветку: код {r.status_code}")
+
+def watch_arena(branch: str) -> bool:
+    print(f"[*] Ждем вердикта Арены GitHub Actions для '{branch}'...")
     time.sleep(8)
     
     runs_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/actions/runs?branch={branch}")
@@ -211,22 +217,24 @@ def watch_arena(branch: str):
                         print("\n==========================================")
                         print("  [+] ЭВОЛЮЦИЯ УСПЕШНА! ТЕСТЫ ПРОЙДЕНЫ!   ")
                         print("==========================================\n")
+                        return True
                     else:
                         print("\n==========================================")
                         print("  [-] ПРИМАТ ПОГИБ: ТЕСТЫ ПРОВАЛЕНЫ!      ")
                         print("==========================================\n")
-                    return
+                        return False
         time.sleep(5)
     print("[-] Таймаут ожидания тестов.")
+    return False
 
 def run_evolution():
-    print("\n[!] ЗАПУСК ЦИКЛА МУТАЦИИ...")
+    print("\n[!] ЗАПУСК ПОЛНОГО ЭВОЛЮЦИОННОГО ЦИКЛА...")
     original = get_file_content("main", "victim.py")
     if not original:
         print("[-] Не найден victim.py в ветке main!")
         return
         
-    print(f"[*] Исходник:\n{original}\n")
+    print(f"[*] Исходник из main:\n{original}\n")
     mutated = ask_gemini_mutation(original)
     if not mutated:
         print("[-] Мутация сорвалась.")
@@ -235,10 +243,18 @@ def run_evolution():
     print(f"[*] Сгенерированный код:\n{mutated}\n")
     branch = "unga-mutation-v1"
     if push_mutation(branch, "victim.py", mutated):
-        print(f"[+] Мутация запушена в ветку '{branch}'!")
-        watch_arena(branch)
+        print(f"[+] Мутация запушена в '{branch}'!")
+        is_alive = watch_arena(branch)
+        
+        if is_alive:
+            # Если тесты пройдены — забираем в main и стираем черновик
+            if merge_to_main(branch):
+                delete_branch(branch)
+        else:
+            print("[-] Мутация забракована. main остается в безопасности.")
+            delete_branch(branch)
     else:
-        print("[-] Не удалось запушить мутацию на GitHub.")
+        print("[-] Не удалось отправить ветку.")
 
 if __name__ == "__main__":
     try:

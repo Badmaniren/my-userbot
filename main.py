@@ -24,7 +24,7 @@ def run_dummy_server():
 
 threading.Thread(target=run_dummy_server, daemon=True).start()
 
-# 2. СБОРКА АДРЕСОВ БЕЗ УРОДОВАНИЯ МОБИЛЬНЫМ БУФЕРОМ
+# 2. КОНФИГУРАЦИЯ И ССЫЛКИ
 def clean_url(url: str) -> str:
     url = re.sub(r'\[.*?\]\(\vert{}\)', '', url)
     return url.strip()
@@ -149,31 +149,47 @@ def push_mutation(branch: str, path: str, new_code: str):
     ref_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/ref/heads/main")
     ref_res = requests.get(ref_url, headers=API_HEADERS, timeout=10)
     if ref_res.status_code != 200:
-        print(f"[-] Ошибка получения SHA ветки main: {ref_res.status_code} | {ref_res.text}")
+        print(f"[-] Ошибка получения SHA main: {ref_res.status_code}")
         return False
         
     main_sha = ref_res.json()["object"]["sha"]
     
+    # 1. Сносим старую ветку если есть
     branch_ref_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{branch}")
     requests.delete(branch_ref_url, headers=API_HEADERS, timeout=10)
     time.sleep(1)
     
+    # 2. Создаем чистую ветку от main
     create_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs")
     create_res = requests.post(create_url, headers=API_HEADERS, json={"ref": f"refs/heads/{branch}", "sha": main_sha}, timeout=10)
     if create_res.status_code not in [201, 422]:
-        print(f"[-] Ошибка создания ветки: {create_res.status_code}")
+        print(f"[-] Ошибка создания ветки: {create_res.status_code} | {create_res.text}")
         return False
 
-    file_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents/{path}")
+    # 3. Вытаскиваем SHA существующего файла в новой ветке
+    file_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents/{path}?ref={branch}")
+    file_info = requests.get(file_url, headers=API_HEADERS, timeout=10)
+    current_file_sha = None
+    if file_info.status_code == 200:
+        current_file_sha = file_info.json().get("sha")
+
+    # 4. Перезаписываем файл с указанием SHA
     encoded = base64.b64encode(new_code.encode("utf-8")).decode("utf-8")
-    
     payload = {
         "message": "Эволюционная мутация: адаптация типов solve_task",
         "content": encoded,
         "branch": branch
     }
-    r = requests.put(file_url, headers=API_HEADERS, json=payload, timeout=10)
-    return r.status_code in [200, 201]
+    if current_file_sha:
+        payload["sha"] = current_file_sha
+
+    put_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents/{path}")
+    r = requests.put(put_url, headers=API_HEADERS, json=payload, timeout=10)
+    if r.status_code in [200, 201]:
+        return True
+    else:
+        print(f"[-] Ошибка перезаписи файла на GitHub: код {r.status_code} | {r.text}")
+        return False
 
 def watch_arena(branch: str):
     print(f"[*] Ждем запуска Арены GitHub Actions для ветки '{branch}'...")
@@ -228,8 +244,7 @@ if __name__ == "__main__":
     try:
         run_evolution()
     except Exception as e:
-        print(f"\n[!!!] КРИТИЧЕСКИЙ СБОЙ В ЦИКЛЕ: {e}")
-        print("[*] Аварийный перехват сработал: сервис остается жить, рестарта не будет.\n")
+        print(f"\n[!!!] КРИТИЧЕСКИЙ СБОЙ: {e}")
         
     print("[*] Переход в фоновый режим ожидания...")
     threading.Event().wait()

@@ -6,7 +6,7 @@ import requests
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-# 1. СЕРВЕР ЖИЗНИ ДЛЯ RENDER (С ПОДДЕРЖКОЙ HEAD И GET)
+# 1. СЕРВЕР ЖИЗНИ ДЛЯ RENDER
 class DummyHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -24,48 +24,60 @@ def run_dummy_server():
 
 threading.Thread(target=run_dummy_server, daemon=True).start()
 
-# 2. КОНФИГУРАЦИЯ
+# 2. КОНФИГУРАЦИЯ И КЛЮЧИ
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "").strip()
 GITHUB_REPO = os.environ.get("GITHUB_REPO", "").strip()
 RAW_KEYS = os.environ.get("GEMINI_API_KEY", "").strip()
 API_KEYS = [k.strip() for k in RAW_KEYS.split(",") if k.strip()]
+KEY_INDEX = 0
 
 API_HEADERS = {
     "Authorization": f"Bearer {GITHUB_TOKEN}",
     "Accept": "application/vnd.github+json"
 }
 
-# ЖЕСТКИЙ ПРОЗВОН МОДЕЛЕЙ БОЕВЫМ МИКРО-ЗАПРОСОМ
-def find_working_gemini_model(key: str) -> str:
-    list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={key}"
-    try:
-        r = requests.get(list_url, timeout=10)
-        if r.status_code != 200:
-            print(f"[-] Ошибка получения списка моделей: {r.status_code}")
-            return ""
-        
-        models = r.json().get("models", [])
-        available = [m["name"] for m in models if "generateContent" in m.get("supportedGenerationMethods", [])]
-        
-        # Сортируем: сначала свежие flash, потом остальные
-        flash_models = [m for m in available if "flash" in m.lower() and "preview" not in m.lower()]
-        candidates = flash_models + [m for m in available if m not in flash_models]
+def get_current_key():
+    global KEY_INDEX
+    if not API_KEYS:
+        return ""
+    return API_KEYS[KEY_INDEX % len(API_KEYS)]
 
-        print(f"[*] Прощупываем кандидатов на боевом запросе (всего: {len(candidates)})...")
-        for model_name in candidates:
-            test_url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:generateContent?key={key}"
-            payload = {"contents": [{"parts": [{"text": "ping"}]}]}
+def rotate_key():
+    global KEY_INDEX
+    if len(API_KEYS) > 1:
+        KEY_INDEX = (KEY_INDEX + 1) % len(API_KEYS)
+        print(f"[!] СМЕНА КЛЮЧА GEMINI. Новый индекс: {KEY_INDEX}")
+
+def get_viable_models(key: str) -> list:
+    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={key}"
+    viable = []
+    try:
+        r = requests.get(url, timeout=10)
+        if r.status_code == 200:
+            models = r.json().get("models", [])
+            available = [m["name"] for m in models if "generateContent" in m.get("supportedGenerationMethods", [])]
+            # Отдаем приоритет flash-моделям без preview
+            flash_models = [m for m in available if "flash" in m.lower() and "preview" not in m.lower()]
+            other_models = [m for m in available if m not in flash_models]
             
-            test_res = requests.post(test_url, json=payload, headers={"Content-Type": "application/json"}, timeout=10)
-            if test_res.status_code == 200:
-                print(f"[+] НАЙДЕНА РЕАЛЬНО РАБОЧАЯ МОДЕЛЬ: {model_name}")
-                return model_name
-            else:
-                print(f"[-] {model_name} отклонена (код {test_res.status_code})")
-                
+            candidates = flash_models + other_models
+            print(f"[*] Прощупываем кандидатов (проверим до 3 рабочих)...")
+            for m in candidates:
+                test_url = f"https://generativelanguage.googleapis.com/v1beta/{m}:generateContent?key={key}"
+                try:
+                    res = requests.post(test_url, json={"contents": [{"parts": [{"text": "hi"}]}]}, timeout=8)
+                    if res.status_code == 200:
+                        print(f"[+] Рабочая модель: {m}")
+                        viable.append(m)
+                        if len(viable) >= 3:
+                            break
+                    else:
+                        print(f"[-] Пропуск {m} (код {res.status_code})")
+                except Exception:
+                    continue
     except Exception as e:
-        print(f"[-] Сбой при поиске модели: {e}")
-    return ""
+        print(f"[-] Ошибка опроса моделей: {e}")
+    return viable
 
 def get_file_content(branch: str, path: str):
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{path}?ref={branch}"
@@ -77,39 +89,56 @@ def get_file_content(branch: str, path: str):
 
 def ask_gemini_mutation(original_code: str) -> str:
     if not API_KEYS:
-        print("[-] Нет ключей GEMINI_API_KEY!")
-        return ""
-    
-    key = API_KEYS[0]
-    model_name = find_working_gemini_model(key)
-    if not model_name:
-        print("[-] Не найдено ни одной живой модели для генерации.")
+        print("[-] Ошибка: список GEMINI_API_KEY пуст.")
         return ""
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:generateContent?key={key}"
-    
     prompt = (
         "Ты — мутатор кода. Вот файл victim.py:\n\n"
         f"{original_code}\n\n"
         "ЗАДАЧА: Перепиши функцию solve_task(a, b) так, чтобы она могла принимать как int/float, "
         "так и строки с числами (например, '5' и '10' -> 15). "
         "Базовые тесты (где передаются int) ОБЯЗАНЫ проходить успешно. "
-        "ТРЕБОВАНИЕ: Верни ТОЛЬКО валидный код Python без markdown (без ```python), без пояснений."
+        "ТРЕБОВАНИЕ: Верни ТОЛЬКО валидный код Python без кавычек markdown (без ```python), без объяснений."
     )
     
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": 0.2}
     }
-    
-    r = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=25)
-    if r.status_code == 200:
-        ans = r.json()['candidates'][0]['content']['parts'][0]['text']
-        clean_code = re.sub(r'```[a-zA-Z]*', '', ans).replace('```', '').strip()
-        return clean_code
-    else:
-        print(f"[-] Сбой генерации: {r.status_code} | {r.text}")
-        return ""
+
+    # Делаем до 5 попыток пробить генерацию через разные ключи и модели
+    for attempt in range(5):
+        current_key = get_current_key()
+        models_pool = get_viable_models(current_key)
+        
+        if not models_pool:
+            print("[-] На текущем ключе нет живых моделей. Ротируем ключ...")
+            rotate_key()
+            time.sleep(2)
+            continue
+
+        for model_name in models_pool:
+            url = f"[https://generativelanguage.googleapis.com/v1beta/](https://generativelanguage.googleapis.com/v1beta/){model_name}:generateContent?key={current_key}"
+            print(f"[~] Попытка генерации через {model_name} (ключ #{KEY_INDEX})...")
+            
+            try:
+                r = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=25)
+                if r.status_code == 200:
+                    ans = r.json()['candidates'][0]['content']['parts'][0]['text']
+                    clean_code = re.sub(r'```[a-zA-Z]*', '', ans).replace('```', '').strip()
+                    return clean_code
+                
+                print(f"[-] Сбой {model_name}: код {r.status_code}")
+                # Если 503 (перегруз) или 429 (лимит), пробуем переключить ключ
+                if r.status_code in [429, 503]:
+                    rotate_key()
+                    current_key = get_current_key()
+                    time.sleep(3)
+            except Exception as e:
+                print(f"[-] Ошибка сети: {e}")
+                time.sleep(2)
+                
+    return ""
 
 def push_mutation(branch: str, path: str, new_code: str):
     ref_url = f"[https://api.github.com/repos/](https://api.github.com/repos/){GITHUB_REPO}/git/ref/heads/main"
@@ -134,7 +163,7 @@ def push_mutation(branch: str, path: str, new_code: str):
     return r.status_code in [200, 201]
 
 def watch_arena(branch: str):
-    print(f"[*] Ждем вердикта Арены GitHub Actions для '{branch}'...")
+    print(f"[*] Ждем запуска Арены GitHub Actions для ветки '{branch}'...")
     time.sleep(8)
     
     runs_url = f"[https://api.github.com/repos/](https://api.github.com/repos/){GITHUB_REPO}/actions/runs?branch={branch}"
@@ -151,18 +180,18 @@ def watch_arena(branch: str):
                 if status == "completed":
                     if conclusion == "success":
                         print("\n==========================================")
-                        print("  [+] ЭВОЛЮЦИЯ УСПЕШНА! ТЕСТЫ ВЫДЕРЖАНЫ! ")
+                        print("  [+] ЭВОЛЮЦИЯ УСПЕШНА! ТЕСТЫ ПРОЙДЕНЫ!   ")
                         print("==========================================\n")
                     else:
                         print("\n==========================================")
-                        print("  [-] МУТАЦИЯ ПРОВАЛИЛАСЬ: КОД КАЗНЕН!   ")
+                        print("  [-] ПРИМАТ ПОГИБ: ТЕСТЫ ПРОВАЛЕНЫ!      ")
                         print("==========================================\n")
                     return
         time.sleep(5)
     print("[-] Таймаут ожидания тестов.")
 
 def run_evolution():
-    print("\n[!] ЗАПУСК ЦИКЛА ЭВОЛЮЦИИ...")
+    print("\n[!] ЗАПУСК ЦИКЛА МУТАЦИИ...")
     original = get_file_content("main", "victim.py")
     if not original:
         print("[-] Не найден victim.py в ветке main!")
@@ -171,13 +200,13 @@ def run_evolution():
     print(f"[*] Исходник:\n{original}\n")
     mutated = ask_gemini_mutation(original)
     if not mutated:
-        print("[-] Мутация сорвалась.")
+        print("[-] Мутация сорвалась: не удалось пробить API.")
         return
         
     print(f"[*] Сгенерированный код:\n{mutated}\n")
     branch = "unga-mutation-v1"
     if push_mutation(branch, "victim.py", mutated):
-        print(f"[+] Мутация запушена в '{branch}'!")
+        print(f"[+] Мутация запушена в ветку '{branch}'!")
         watch_arena(branch)
 
 if __name__ == "__main__":

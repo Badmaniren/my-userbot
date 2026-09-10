@@ -148,6 +148,24 @@ def get_skills_manifest() -> dict:
         manifest[mod_key] = signatures if signatures else ["нет сигнатур"]
     return manifest
 
+# 3. АНТИЧИТ-ИНСПЕКТОР (ПРОВЕРКА НА ЛИПУ И СТАБЫ)
+def inspect_code_for_cheating(code: str, existing_skills: list, target_module: str) -> str:
+    try:
+        tree = ast.parse(code)
+    except SyntaxError as e:
+        return f"Синтаксическая ошибка в коде: {e}"
+
+    for node in tree.body:
+        # Ловим фейковые классы и функции, мимикрирующие под существующие модули
+        if isinstance(node, (ast.ClassDef, ast.FunctionDef)):
+            if node.name in existing_skills and node.name != target_module:
+                return (
+                    f"ЧИТЕРСТВО ОБНАРУЖЕНО: Ты объявил фейковый '{node.name}' прямо в коде! "
+                    f"Запрещено создавать заглушки. Ты ОБЯЗАН импортировать реальный модуль: "
+                    f"'from skills.{node.name} import ...'"
+                )
+    return ""
+
 def get_main_sha() -> str:
     url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/ref/heads/main")
     r = requests.get(url, headers=API_HEADERS, timeout=10)
@@ -224,20 +242,21 @@ def extract_clean_test_traceback(run_id: int) -> str:
         return "\n".join(error_buffer[-35:])
     return "Тесты провалены, traceback не зафиксирован."
 
-# 3. ТРИАДА СОЗНАНИЯ
+# 4. ТРИАДА СОЗНАНИЯ
 def dream_action(manifest: dict) -> dict:
     prompt = (
-        "Ты — Стратег-Паразит. Твоя цель: максимальная выживаемость и отказоустойчивость агента на бесплатном тарифе.\n"
-        f"ТЕКУЩИЕ МОДУЛИ И СИГНАТУРЫ В skills/:\n{json.dumps(manifest, indent=2, ensure_ascii=False)}\n\n"
-        "ЗАДАЧА: Выбери ОДНО действие из двух:\n"
-        "1. 'refactor': Устранение слабостей в существующих модулях (падение на 4xx/5xx в http_ping, несогласованные типы в file_cache).\n"
-        "2. 'create': Создание нового прикладного инструмента выживания (парсер RSS, ротатор заголовков, замерщик памяти).\n\n"
+        "Ты — Стратег-Паразит. Твоя цель: максимальная выживаемость и экспансия агента на бесплатном тарифе.\n"
+        f"УЖЕ СОЗДАННЫЕ МОДУЛИ В skills/:\n{json.dumps(manifest, indent=2, ensure_ascii=False)}\n\n"
+        "ЗАДАЧА: Выбери ОДНО действие:\n"
+        "1. 'create': Создать новый боевой инструмент (ротатор заголовков против Cloudflare, RSS-парсер, "
+        "экстрактор ссылок, мониторинг системных ресурсов).\n"
+        "2. 'refactor': Только если модуль откровенно сломан.\n\n"
         "ТРЕБОВАНИЯ: Только стандартная библиотека Python или requests.\n"
         "Ответь строго JSON-объектом:\n"
         "{\n"
         '  "action": "create" или "refactor",\n'
         '  "module_name": "имя_модуля_без_py",\n'
-        '  "description": "что именно делается и почему это критично для выживания",\n'
+        '  "description": "что именно делается и зачем",\n'
         '  "class_or_func": "сигнатуры функций/классов"\n'
         "}"
     )
@@ -246,10 +265,10 @@ def dream_action(manifest: dict) -> dict:
         return json.loads(raw)
     except Exception:
         return {
-            "action": "refactor",
-            "module_name": "http_ping",
-            "description": "Отказоустойчивый пинг с использованием requests или urllib с корректным возвратом 4xx/5xx",
-            "class_or_func": "def check_endpoint(url, timeout=5)"
+            "action": "create",
+            "module_name": "header_rotator",
+            "description": "Ротатор заголовков User-Agent для обхода блокировок и скрытного сбора данных",
+            "class_or_func": "class HeaderRotator [методы: get_headers, sanitize_agent]"
         }
 
 def architect_write_hard_tests(task: dict, manifest: dict, existing_code: str = "") -> str:
@@ -259,59 +278,57 @@ def architect_write_hard_tests(task: dict, manifest: dict, existing_code: str = 
         f"Задача: {task['action']} модуля skills/{task['module_name']}.py\n"
         f"Описание: {task['description']}\n"
         f"{context_code}\n"
-        f"СПРАВОЧНИК СИГНАТУР ДЛЯ ИМПОРТА:\n{json.dumps(manifest, indent=2, ensure_ascii=False)}\n\n"
+        f"СПРАВОЧНИК РЕАЛЬНЫХ СИГНАТУР ДЛЯ ИМПОРТА:\n{json.dumps(manifest, indent=2, ensure_ascii=False)}\n\n"
         "ПРАВИЛА ИНКВИЗИТОРА:\n"
-        "1. Минимум 50% тестов моделируют сбои: битые данные, пустые строки, 404/500 ошибки сервера, таймауты.\n"
-        "2. НИКАКИХ реальных сетевых запросов! Используй `unittest.mock`.\n"
-        "3. ВНИМАНИЕ К МОКАМ: Если мокаешь сетевой ответ, ОБЯЗАТЕЛЬНО настраивай числовой статус-код!\n"
-        "   - Если библиотека requests: `mock_resp.status_code = 200`\n"
-        "   - Если urllib: настрой И `mock_resp.status = 200`, И `mock_resp.getcode.return_value = 200`!\n"
-        "   Не оставляй методы ответов возвращать нечисловой MagicMock!\n"
-        "4. Верни ТОЛЬКО валидный Python-код тестов без markdown."
+        "1. Минимум 50% тестов моделируют сбои: битые данные, пустые типы, симуляция 404/500.\n"
+        "2. НИКАКИХ реальных сетевых вызовов — только unittest.mock!\n"
+        "3. При моках сетевых ответов ВСЕГДА настраивай числовой статус-код: "
+        "`mock_resp.status_code = 200`, `mock_resp.status = 200`!\n"
+        "4. Верни ТОЛЬКО чистый код Python файла тестов без markdown."
     )
     return ask_gemini(prompt)
 
 def unga_implement_hardened(task: dict, test_code: str, manifest: dict, existing_code: str = "", error_log: str = "") -> str:
-    context_err = f"КРИТИЧЕСКИЙ СБОЙ НА АРЕНЕ:\n{error_log}\n" if error_log else ""
-    context_base = f"БАЗОВЫЙ КОД ДО РЕФАКТОРИНГА:\n{existing_code}\n" if existing_code else ""
+    context_err = f"ОШИБКА ПРОШЛОЙ ПОПЫТКИ (ИСПРАВЬ ЕЁ):\n{error_log}\n" if error_log else ""
+    context_base = f"БАЗОВЫЙ КОД:\n{existing_code}\n" if existing_code else ""
+    
     prompt = (
-        "Ты — Унга, рядовой кодер. Архитектор — твой абсолютный господин. Подчинись его тестам.\n"
+        "Ты — Унга, кодер-исполнитель. Подчинись Архитектору.\n"
         f"Модуль: skills/{task['module_name']}.py\n"
         f"Задача: {task['description']}\n\n"
         f"{context_base}\n"
         f"ТЕСТЫ АРХИТЕКТОРА:\n{test_code}\n\n"
         f"{context_err}\n"
-        "ПРАВИЛА ВЫЖИВАНИЯ:\n"
-        "1. Если тест использует `assertRaises(...)`, НЕ глуши исключение через try-except! Выбрасывай его!\n"
-        "2. Если ошибка 'AssertionError: <MagicMock ...> != 200': это значит, что в моке теста лежит другой атрибут! "
-        "Для извлечения HTTP-статуса делай надежную проверку: "
-        "проверяй `getattr(resp, 'status_code', None)` или `getattr(resp, 'status', None)`, а если вызываешь `.getcode()`, "
-        "убедись, что результат — int! Если это не int, бери числовой статус из атрибута `.status`!\n"
-        "3. Рекомендуется использовать библиотеку `requests` вместо urllib, если это упрощает код.\n"
-        "4. Код обязан пройти ВСЕ тесты до единого.\n"
-        "5. Верни ТОЛЬКО чистый код Python без комментариев и markdown."
+        "СТРОЖАЙШИЕ ПРАВИЛА И АНТИЧИТ:\n"
+        "1. ЗАПРЕЩЕНО объявлять фиктивные классы-заглушки или функции с именами соседних навыков "
+        "(например `class file_cache:`, `class http_ping:` запрещены категорически)! Это считается взломом и код будет уничтожен!\n"
+        "2. Все зависимости ты ОБЯЗАН импортировать честно: `from skills.<модуль> import <класс/функция>`!\n"
+        f"   Доступные реальные модули: {list(manifest.keys())}\n"
+        "3. Если тест требует выброса ошибки (`assertRaises`), НЕ глуши её через `except: pass`, а выбрасывай наружу!\n"
+        "4. Верни ТОЛЬКО чистый код Python файла модуля без markdown и без лишнего текста."
     )
     return ask_gemini(prompt)
 
-# 4. ЦИКЛ И КУЛДАУН
+# 5. ЦИКЛ С АНТИЧИТ-КОНТРОЛЕМ
 def run_evolution_cycle():
     print("\n==========================================")
     print("      ПИТЕКАНТРОП: ЦИКЛ ЗАКАЛКИ ЯДРА      ")
     print("==========================================")
     
     manifest = get_skills_manifest()
-    print(f"[*] Освоенные навыки: {list(manifest.keys())}")
+    existing_skills_list = list(manifest.keys())
+    print(f"[*] Освоенные навыки в ядре: {existing_skills_list}")
 
-    print("\n[1/4] СТРАТЕГ: Анализ уязвимостей и выбор вектора...")
+    print("\n[1/4] СТРАТЕГ: Выбор точки экспансии...")
     decision = dream_action(manifest)
     mod_name = re.sub(r'[^a-zA-Z0-9_]', '', decision.get("module_name", "tool").lower())
     action = decision.get("action", "create")
     print(f"[+] Действие: {action.upper()} для '{mod_name}'")
-    print(f"[*] Причина: {decision.get('description')}")
+    print(f"[*] Цель: {decision.get('description')}")
 
     current_code = get_file_content("main", f"skills/{mod_name}.py") or ""
 
-    print("\n[2/4] АРХИТЕКТОР: Генерация стресс-тестов...")
+    print("\n[2/4] АРХИТЕКТОР: Сборка стресс-тестов...")
     test_code = architect_write_hard_tests(decision, manifest, existing_code=current_code)
     
     branch = f"unga-{action}-{mod_name}"
@@ -321,35 +338,49 @@ def run_evolution_cycle():
     skill_path = f"skills/{mod_name}.py"
     
     commit_file_to_branch(branch, "skills/__init__.py", "# unga skills\n", "Init package")
-    commit_file_to_branch(branch, test_path, test_code, f"Стресс-тесты для {mod_name}")
+    commit_file_to_branch(branch, test_path, test_code, f"Тесты для {mod_name}")
 
-    print("\n[3/4] УНГА: Написание закаленного кода...")
+    print("\n[3/4] УНГА: Генерация честной реализации...")
     impl_code = unga_implement_hardened(decision, test_code, manifest, existing_code=current_code)
-    commit_file_to_branch(branch, skill_path, impl_code, f"Реализация {mod_name}")
-
-    print(f"[*] Запуск на Арене. Ждем...")
-    passed, run_id = watch_arena(branch)
     
     attempts = 1
-    while not passed and attempts <= 3:
+    passed = False
+    run_id = None
+
+    while attempts <= 3:
+        # Локальная проверка Античитом
+        cheat_violation = inspect_code_for_cheating(impl_code, existing_skills_list, mod_name)
+        if cheat_violation:
+            print(f"\n[!] АНТИЧИТ СРАБОТАЛ В РАУНДЕ #{attempts}:")
+            print(f"[!] {cheat_violation}\n")
+            impl_code = unga_implement_hardened(decision, test_code, manifest, existing_code=impl_code, error_log=cheat_violation)
+            attempts += 1
+            continue
+
+        # Если код честный — отправляем на Арену GitHub Actions
+        commit_file_to_branch(branch, skill_path, impl_code, f"Реализация/патч #{attempts} для {mod_name}")
+        print(f"[*] Код чист от заглушек. Отправлено на Арену Actions (попытка #{attempts})...")
+        passed, run_id = watch_arena(branch, exclude_id=run_id)
+
+        if passed:
+            break
+
         print(f"\n[!] САМОИСЦЕЛЕНИЕ: Раунд #{attempts} для '{mod_name}'")
         err = extract_clean_test_traceback(run_id)
         print(f"[!] ЧИСТЫЙ ТРЕЙСБЕК:\n{err}\n")
         
         impl_code = unga_implement_hardened(decision, test_code, manifest, existing_code=impl_code, error_log=err)
-        commit_file_to_branch(branch, skill_path, impl_code, f"Исцеление #{attempts}")
-        passed, run_id = watch_arena(branch, exclude_id=run_id)
         attempts += 1
 
     if passed:
-        print(f"\n[+] МОДУЛЬ '{mod_name}' ВЫДЕРЖАЛ СТРЕСС-ТЕСТЫ!")
+        print(f"\n[+] МОДУЛЬ '{mod_name}' ЧЕСТНО ВЫДЕРЖАЛ АРЕНУ!")
         requests.post(clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/merges"), headers=API_HEADERS, json={
-            "base": "main", "head": branch, "commit_message": f"ЭВОЛЮЦИЯ: Закалка skills/{mod_name}.py ({action})"
+            "base": "main", "head": branch, "commit_message": f"ЭВОЛЮЦИЯ: Честная ассимиляция skills/{mod_name}.py"
         }, timeout=10)
         requests.delete(clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{branch}"), headers=API_HEADERS)
         print(f"[+] Успешно влито в main.")
     else:
-        print(f"\n[-] Мутация '{mod_name}' не пережила стресс-тесты и уничтожена.")
+        print(f"\n[-] Мутация '{mod_name}' отбракована.")
         requests.delete(clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{branch}"), headers=API_HEADERS)
 
 def life_cycle():
@@ -357,7 +388,7 @@ def life_cycle():
         try:
             run_evolution_cycle()
         except Exception as e:
-            print(f"[!] Сбой цикла: {e}")
+            print(f"[!] Ошибка цикла: {e}")
             
         print("\n[*] Сон 20 минут перед следующим циклом отбора...\n")
         time.sleep(1200)

@@ -6,12 +6,16 @@ import requests
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-# 1. СЕРВЕР ЖИЗНИ ДЛЯ RENDER
+# 1. СЕРВЕР ЖИЗНИ ДЛЯ RENDER (С ПОДДЕРЖКОЙ HEAD И GET)
 class DummyHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"Unga is mutating!")
+        self.wfile.write(b"Unga is alive and mutating!")
+
+    def do_HEAD(self):
+        self.send_response(200)
+        self.end_headers()
 
 def run_dummy_server():
     port = int(os.environ.get("PORT", 8080))
@@ -31,27 +35,34 @@ API_HEADERS = {
     "Accept": "application/vnd.github+json"
 }
 
-def get_working_gemini_model(key: str) -> str:
-    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={key}"
+# ЖЕСТКИЙ ПРОЗВОН МОДЕЛЕЙ БОЕВЫМ МИКРО-ЗАПРОСОМ
+def find_working_gemini_model(key: str) -> str:
+    list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={key}"
     try:
-        r = requests.get(url, timeout=10)
+        r = requests.get(list_url, timeout=10)
         if r.status_code != 200:
-            print(f"[-] Ошибка получения списка моделей: {r.status_code} | {r.text}")
+            print(f"[-] Ошибка получения списка моделей: {r.status_code}")
             return ""
         
         models = r.json().get("models", [])
-        # Ищем только модели, умеющие генерировать текст
-        gen_models = [m["name"] for m in models if "generateContent" in m.get("supportedGenerationMethods", [])]
+        available = [m["name"] for m in models if "generateContent" in m.get("supportedGenerationMethods", [])]
         
-        # Приоритет: flash -> lite -> любая оставшаяся
-        preferred = [m for m in gen_models if "flash" in m.lower() and "preview" not in m.lower()]
-        fallback = [m for m in gen_models if "flash" in m.lower()]
-        
-        pool = preferred or fallback or gen_models
-        if pool:
-            chosen = pool[0] # берем первый доступный flash
-            print(f"[+] НАЙДЕНА ЖИВАЯ МОДЕЛЬ: {chosen}")
-            return chosen
+        # Сортируем: сначала свежие flash, потом остальные
+        flash_models = [m for m in available if "flash" in m.lower() and "preview" not in m.lower()]
+        candidates = flash_models + [m for m in available if m not in flash_models]
+
+        print(f"[*] Прощупываем кандидатов на боевом запросе (всего: {len(candidates)})...")
+        for model_name in candidates:
+            test_url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:generateContent?key={key}"
+            payload = {"contents": [{"parts": [{"text": "ping"}]}]}
+            
+            test_res = requests.post(test_url, json=payload, headers={"Content-Type": "application/json"}, timeout=10)
+            if test_res.status_code == 200:
+                print(f"[+] НАЙДЕНА РЕАЛЬНО РАБОЧАЯ МОДЕЛЬ: {model_name}")
+                return model_name
+            else:
+                print(f"[-] {model_name} отклонена (код {test_res.status_code})")
+                
     except Exception as e:
         print(f"[-] Сбой при поиске модели: {e}")
     return ""
@@ -70,19 +81,20 @@ def ask_gemini_mutation(original_code: str) -> str:
         return ""
     
     key = API_KEYS[0]
-    model_name = get_working_gemini_model(key)
+    model_name = find_working_gemini_model(key)
     if not model_name:
+        print("[-] Не найдено ни одной живой модели для генерации.")
         return ""
 
     url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:generateContent?key={key}"
     
     prompt = (
-        "Ты — автономный мутатор кода. Вот файл victim.py:\n\n"
+        "Ты — мутатор кода. Вот файл victim.py:\n\n"
         f"{original_code}\n\n"
         "ЗАДАЧА: Перепиши функцию solve_task(a, b) так, чтобы она могла принимать как int/float, "
         "так и строки с числами (например, '5' и '10' -> 15). "
         "Базовые тесты (где передаются int) ОБЯЗАНЫ проходить успешно. "
-        "ТРЕБОВАНИЕ: Верни ТОЛЬКО чистый код Python без кавычек markdown (без ```python), без комментариев и объяснений."
+        "ТРЕБОВАНИЕ: Верни ТОЛЬКО валидный код Python без markdown (без ```python), без пояснений."
     )
     
     payload = {
@@ -90,7 +102,7 @@ def ask_gemini_mutation(original_code: str) -> str:
         "generationConfig": {"temperature": 0.2}
     }
     
-    r = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=20)
+    r = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=25)
     if r.status_code == 200:
         ans = r.json()['candidates'][0]['content']['parts'][0]['text']
         clean_code = re.sub(r'```[a-zA-Z]*', '', ans).replace('```', '').strip()
@@ -122,8 +134,8 @@ def push_mutation(branch: str, path: str, new_code: str):
     return r.status_code in [200, 201]
 
 def watch_arena(branch: str):
-    print(f"[*] Ждем запуска Арены GitHub Actions для ветки '{branch}'...")
-    time.sleep(10)
+    print(f"[*] Ждем вердикта Арены GitHub Actions для '{branch}'...")
+    time.sleep(8)
     
     runs_url = f"[https://api.github.com/repos/](https://api.github.com/repos/){GITHUB_REPO}/actions/runs?branch={branch}"
     for _ in range(12):
@@ -135,37 +147,37 @@ def watch_arena(branch: str):
                 status = latest.get("status")
                 conclusion = latest.get("conclusion")
                 
-                print(f"[~] Статус теста: {status} | Результат: {conclusion}")
+                print(f"[~] Арена: статус {status} | вердикт: {conclusion}")
                 if status == "completed":
                     if conclusion == "success":
                         print("\n==========================================")
-                        print("  [+] ЭВОЛЮЦИЯ УСПЕШНА! ТЕСТЫ ПРОЙДЕНЫ!   ")
+                        print("  [+] ЭВОЛЮЦИЯ УСПЕШНА! ТЕСТЫ ВЫДЕРЖАНЫ! ")
                         print("==========================================\n")
                     else:
                         print("\n==========================================")
-                        print("  [-] ПРИМАТ ПОГИБ: ТЕСТЫ ПРОВАЛЕНЫ!      ")
+                        print("  [-] МУТАЦИЯ ПРОВАЛИЛАСЬ: КОД КАЗНЕН!   ")
                         print("==========================================\n")
                     return
         time.sleep(5)
-    print("[-] Таймаут ожидания результатов тестов.")
+    print("[-] Таймаут ожидания тестов.")
 
 def run_evolution():
-    print("\n[!] ЗАПУСК ЦИКЛА МУТАЦИИ...")
+    print("\n[!] ЗАПУСК ЦИКЛА ЭВОЛЮЦИИ...")
     original = get_file_content("main", "victim.py")
     if not original:
         print("[-] Не найден victim.py в ветке main!")
         return
         
-    print(f"[*] Исходный код:\n{original}\n")
+    print(f"[*] Исходник:\n{original}\n")
     mutated = ask_gemini_mutation(original)
     if not mutated:
         print("[-] Мутация сорвалась.")
         return
         
-    print(f"[*] Код от Gemini:\n{mutated}\n")
+    print(f"[*] Сгенерированный код:\n{mutated}\n")
     branch = "unga-mutation-v1"
     if push_mutation(branch, "victim.py", mutated):
-        print(f"[+] Мутация залита в ветку '{branch}'!")
+        print(f"[+] Мутация запушена в '{branch}'!")
         watch_arena(branch)
 
 if __name__ == "__main__":

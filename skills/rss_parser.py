@@ -5,13 +5,15 @@ from skills import cached_ping
 def parse_feed(url: str, timeout: int = 5) -> list:
     response = cached_ping.ping_and_cache(url, timeout=timeout)
     
-    if hasattr(response, 'status_code') and response.status_code >= 400:
-        raise urllib.error.HTTPError(url, response.status_code, "Bad Status Code", {}, None)
-    
     if response is None:
         raise ValueError("Payload is None")
+
+    if hasattr(response, 'status_code') and response.status_code >= 400:
+        raise urllib.error.HTTPError(url, response.status_code, "Bad Status Code", {}, None)
         
     raw_data = response.read()
+    if raw_data is None:
+        raise ValueError("Payload read returned None")
     if not raw_data:
         return []
         
@@ -41,7 +43,6 @@ def parse_feed(url: str, timeout: int = 5) -> list:
             
     # Atom Feed
     elif 'feed' in tag_lower or root.find('{http://www.w3.org/2005/Atom}entry') is not None or root.find('entry') is not None:
-        # Handle namespaces cleanly by checking local names or standard Atom namespace
         entries = root.findall('{http://www.w3.org/2005/Atom}entry')
         if not entries:
             entries = root.findall('entry')

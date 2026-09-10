@@ -1,8 +1,9 @@
 import os
+import time
+import base64
+import re
 import requests
 import threading
-import base64
-import json
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # 1. СЕРВЕР ЖИЗНИ ДЛЯ RENDER
@@ -10,7 +11,7 @@ class DummyHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"Unga-Bunga is breathing!")
+        self.wfile.write(b"Unga is mutating!")
 
 def run_dummy_server():
     port = int(os.environ.get("PORT", 8080))
@@ -19,84 +20,130 @@ def run_dummy_server():
 
 threading.Thread(target=run_dummy_server, daemon=True).start()
 
-# 2. РАБОТА С GITHUB API
+# 2. КОНФИГУРАЦИЯ
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "").strip()
 GITHUB_REPO = os.environ.get("GITHUB_REPO", "").strip()
+RAW_KEYS = os.environ.get("GEMINI_API_KEY", "").strip()
+API_KEYS = [k.strip() for k in RAW_KEYS.split(",") if k.strip()]
 
 API_HEADERS = {
     "Authorization": f"Bearer {GITHUB_TOKEN}",
     "Accept": "application/vnd.github+json"
 }
 
-def get_main_sha():
-    url = f"https://api.github.com/repos/{GITHUB_REPO}/git/ref/heads/main"
+def get_file_content(branch: str, path: str):
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{path}?ref={branch}"
     r = requests.get(url, headers=API_HEADERS, timeout=10)
     if r.status_code == 200:
-        return r.json()["object"]["sha"]
+        encoded = r.json().get("content", "")
+        return base64.b64decode(encoded).decode("utf-8")
     return None
 
-def create_branch(branch_name, source_sha):
-    url = f"https://api.github.com/repos/{GITHUB_REPO}/git/refs"
+def ask_gemini_mutation(original_code: str) -> str:
+    if not API_KEYS:
+        print("[-] Нет ключей GEMINI_API_KEY!")
+        return ""
+    
+    key = API_KEYS[0]
+    # Используем стабильную быструю модель
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={key}"
+    
+    prompt = (
+        "Ты — автономный мутатор кода. Вот файл victim.py:\n\n"
+        f"{original_code}\n\n"
+        "ЗАДАЧА: Перепиши функцию solve_task(a, b) так, чтобы она могла принимать как int/float, "
+        "так и строки с числами (например, '5' и '10' -> 15). "
+        "Базовые тесты (где передаются int) ОБЯЗАНЫ проходить успешно. "
+        "ТРЕБОВАНИЕ: Верни ТОЛЬКО чистый код Python без кавычек markdown (без ```python), без комментариев и объяснений."
+    )
+    
     payload = {
-        "ref": f"refs/heads/{branch_name}",
-        "sha": source_sha
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.2}
     }
-    r = requests.post(url, headers=API_HEADERS, json=payload, timeout=10)
-    if r.status_code == 201:
-        print(f"[+] Ветка '{branch_name}' успешно создана.")
-        return True
-    elif r.status_code == 422:
-        print(f"[*] Ветка '{branch_name}' уже существует, работаем в ней.")
-        return True
+    
+    r = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=20)
+    if r.status_code == 200:
+        ans = r.json()['candidates'][0]['content']['parts'][0]['text']
+        # Вычищаем markdown, если модель все-таки намусорила
+        clean_code = re.sub(r'```[a-zA-Z]*', '', ans).replace('```', '').strip()
+        return clean_code
     else:
-        print(f"[-] Ошибка создания ветки: {r.status_code} | {r.text}")
-        return False
+        print(f"[-] Сбой Gemini API: {r.status_code} | {r.text}")
+        return ""
 
-def push_test_file(branch_name, file_path, content_str):
-    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{file_path}"
+def push_mutation(branch: str, path: str, new_code: str):
+    # Получаем SHA main
+    ref_url = f"[https://api.github.com/repos/](https://api.github.com/repos/){GITHUB_REPO}/git/ref/heads/main"
+    main_sha = requests.get(ref_url, headers=API_HEADERS, timeout=10).json()["object"]["sha"]
     
-    # GitHub требует контент строго в base64
-    encoded_content = base64.b64encode(content_str.encode("utf-8")).decode("utf-8")
+    # Создаем или пересоздаем ветку
+    branch_ref_url = f"[https://api.github.com/repos/](https://api.github.com/repos/){GITHUB_REPO}/git/refs/heads/{branch}"
+    del_r = requests.delete(branch_ref_url, headers=API_HEADERS, timeout=10) # удаляем старую попытку если была
+    time.sleep(1)
     
-    # Проверяем, существует ли уже файл (чтобы забрать его sha при обновлении)
-    sha = None
-    check_r = requests.get(f"{url}?ref={branch_name}", headers=API_HEADERS, timeout=10)
-    if check_r.status_code == 200:
-        sha = check_r.json().get("sha")
+    create_url = f"[https://api.github.com/repos/](https://api.github.com/repos/){GITHUB_REPO}/git/refs"
+    requests.post(create_url, headers=API_HEADERS, json={"ref": f"refs/heads/{branch}", "sha": main_sha}, timeout=10)
 
+    # Пушим файл
+    file_url = f"[https://api.github.com/repos/](https://api.github.com/repos/){GITHUB_REPO}/contents/{path}"
+    encoded = base64.b64encode(new_code.encode("utf-8")).decode("utf-8")
+    
     payload = {
-        "message": "Унга-бунга оставил след на скале (тест записи)",
-        "content": encoded_content,
-        "branch": branch_name
+        "message": "Эволюционная мутация: адаптация типов solve_task",
+        "content": encoded,
+        "branch": branch
     }
-    if sha:
-        payload["sha"] = sha
+    r = requests.put(file_url, headers=API_HEADERS, json=payload, timeout=10)
+    return r.status_code in [200, 201]
 
-    r = requests.put(url, headers=API_HEADERS, json=payload, timeout=10)
-    if r.status_code in [200, 201]:
-        print(f"[+] Файл '{file_path}' успешно запушен в ветку '{branch_name}'!")
-        return True
-    else:
-        print(f"[-] Ошибка записи файла: {r.status_code} | {r.text}")
-        return False
-
-def test_motor_skills():
-    print("\n==========================================")
-    print("   УНГА-БУНГА: ТЕСТ МОТОРИКИ (ЗАПИСЬ)    ")
-    print("==========================================")
+def watch_arena(branch: str):
+    print(f"[*] Ждем запуска Арены GitHub Actions для ветки '{branch}'...")
+    time.sleep(10)
     
-    main_sha = get_main_sha()
-    if not main_sha:
-        print("[-] Не удалось получить SHA ветки main.")
+    runs_url = f"[https://api.github.com/repos/](https://api.github.com/repos/){GITHUB_REPO}/actions/runs?branch={branch}"
+    for _ in range(12): # Ждем максимум минуту
+        r = requests.get(runs_url, headers=API_HEADERS, timeout=10)
+        if r.status_code == 200:
+            runs = r.json().get("workflow_runs", [])
+            if runs:
+                latest = runs[0]
+                status = latest.get("status")
+                conclusion = latest.get("conclusion")
+                
+                print(f"[~] Статус теста: {status} | Результат: {conclusion}")
+                if status == "completed":
+                    if conclusion == "success":
+                        print("\n==========================================")
+                        print("  [+] ЭВОЛЮЦИЯ УСПЕШНА! ТЕСТЫ ПРОЙДЕНЫ!   ")
+                        print("==========================================\n")
+                    else:
+                        print("\n==========================================")
+                        print("  [-] ПРИМАТ ПОГИБ: ТЕСТЫ ПРОВАЛЕНЫ!      ")
+                        print("==========================================\n")
+                    return
+        time.sleep(5)
+    print("[-] Таймаут ожидания результатов тестов.")
+
+def run_evolution():
+    print("\n[!] ЗАПУСК ЦИКЛА МУТАЦИИ...")
+    original = get_file_content("main", "victim.py")
+    if not original:
+        print("[-] Не найден victim.py в ветке main!")
         return
         
-    print(f"[*] Базовый коммит main: {main_sha[:7]}")
-    
-    test_branch = "unga-mutation-test"
-    if create_branch(test_branch, main_sha):
-        push_test_file(test_branch, "dna.txt", "Унга-бунга сделал первую палку-копалку.")
+    print(f"[*] Текущий код:\n{original}\n")
+    mutated = ask_gemini_mutation(original)
+    if not mutated:
+        print("[-] Мутация сорвалась.")
+        return
+        
+    print(f"[*] Код от Gemini:\n{mutated}\n")
+    branch = "unga-mutation-v1"
+    if push_mutation(branch, "victim.py", mutated):
+        print(f"[+] Мутация залита в ветку '{branch}'!")
+        watch_arena(branch)
 
 if __name__ == "__main__":
-    test_motor_skills()
-    print("\n[*] Ожидание дальнейших инструкций...\n")
+    run_evolution()
     threading.Event().wait()

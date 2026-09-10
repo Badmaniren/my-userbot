@@ -24,7 +24,10 @@ def run_dummy_server():
 
 threading.Thread(target=run_dummy_server, daemon=True).start()
 
-# 2. КОНФИГУРАЦИЯ И КЛЮЧИ
+# 2. КОНФИГУРАЦИЯ И ЗАЩИТА ССЫЛОК ОТ МОБИЛЬНОГО БУФЕРА
+API_HOST = "generativelanguage.googleapis.com"
+API_BASE = "https://" + API_HOST + "/v1beta/"
+
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "").strip()
 GITHUB_REPO = os.environ.get("GITHUB_REPO", "").strip()
 RAW_KEYS = os.environ.get("GEMINI_API_KEY", "").strip()
@@ -35,6 +38,11 @@ API_HEADERS = {
     "Authorization": f"Bearer {GITHUB_TOKEN}",
     "Accept": "application/vnd.github+json"
 }
+
+def clean_url(url: str) -> str:
+    # Вычищает скобки Markdown [url](url), если мобильник их вставил
+    url = re.sub(r'\[.*?\]\(\vert{}\)', '', url)
+    return url.strip()
 
 def get_current_key():
     global KEY_INDEX
@@ -49,30 +57,27 @@ def rotate_key():
         print(f"[!] СМЕНА КЛЮЧА GEMINI. Новый индекс: {KEY_INDEX}")
 
 def get_viable_models(key: str) -> list:
-    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={key}"
+    url = clean_url(f"{API_BASE}models?key={key}")
     viable = []
     try:
         r = requests.get(url, timeout=10)
         if r.status_code == 200:
             models = r.json().get("models", [])
             available = [m["name"] for m in models if "generateContent" in m.get("supportedGenerationMethods", [])]
-            # Отдаем приоритет flash-моделям без preview
             flash_models = [m for m in available if "flash" in m.lower() and "preview" not in m.lower()]
             other_models = [m for m in available if m not in flash_models]
             
             candidates = flash_models + other_models
-            print(f"[*] Прощупываем кандидатов (проверим до 3 рабочих)...")
+            print(f"[*] Прощупываем кандидатов (лимит: 3)...")
             for m in candidates:
-                test_url = f"https://generativelanguage.googleapis.com/v1beta/{m}:generateContent?key={key}"
+                test_url = clean_url(f"{API_BASE}{m}:generateContent?key={key}")
                 try:
                     res = requests.post(test_url, json={"contents": [{"parts": [{"text": "hi"}]}]}, timeout=8)
                     if res.status_code == 200:
-                        print(f"[+] Рабочая модель: {m}")
+                        print(f"[+] Подтверждена живая модель: {m}")
                         viable.append(m)
                         if len(viable) >= 3:
                             break
-                    else:
-                        print(f"[-] Пропуск {m} (код {res.status_code})")
                 except Exception:
                     continue
     except Exception as e:
@@ -106,20 +111,19 @@ def ask_gemini_mutation(original_code: str) -> str:
         "generationConfig": {"temperature": 0.2}
     }
 
-    # Делаем до 5 попыток пробить генерацию через разные ключи и модели
     for attempt in range(5):
         current_key = get_current_key()
         models_pool = get_viable_models(current_key)
         
         if not models_pool:
-            print("[-] На текущем ключе нет живых моделей. Ротируем ключ...")
+            print("[-] Нет живых моделей на ключе. Сменяем ключ...")
             rotate_key()
             time.sleep(2)
             continue
 
         for model_name in models_pool:
-            url = f"[https://generativelanguage.googleapis.com/v1beta/](https://generativelanguage.googleapis.com/v1beta/){model_name}:generateContent?key={current_key}"
-            print(f"[~] Попытка генерации через {model_name} (ключ #{KEY_INDEX})...")
+            url = clean_url(f"{API_BASE}{model_name}:generateContent?key={current_key}")
+            print(f"[~] Генерация через {model_name} (ключ #{KEY_INDEX})...")
             
             try:
                 r = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=25)
@@ -129,7 +133,6 @@ def ask_gemini_mutation(original_code: str) -> str:
                     return clean_code
                 
                 print(f"[-] Сбой {model_name}: код {r.status_code}")
-                # Если 503 (перегруз) или 429 (лимит), пробуем переключить ключ
                 if r.status_code in [429, 503]:
                     rotate_key()
                     current_key = get_current_key()
@@ -200,7 +203,7 @@ def run_evolution():
     print(f"[*] Исходник:\n{original}\n")
     mutated = ask_gemini_mutation(original)
     if not mutated:
-        print("[-] Мутация сорвалась: не удалось пробить API.")
+        print("[-] Мутация сорвалась.")
         return
         
     print(f"[*] Сгенерированный код:\n{mutated}\n")

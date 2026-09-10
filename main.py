@@ -26,7 +26,7 @@ def run_dummy_server():
 
 threading.Thread(target=run_dummy_server, daemon=True).start()
 
-# 2. СЕТЬ И КЛЮЧИ
+# 2. СЕТЬ И КЛЮЧИ GEMINI
 def clean_url(url: str) -> str:
     return re.sub(r'\[.*?\]\(|\)', '', url).strip()
 
@@ -224,15 +224,14 @@ def extract_clean_test_traceback(run_id: int) -> str:
         return "\n".join(error_buffer[-35:])
     return "Тесты провалены, traceback не зафиксирован."
 
-# 3. ТРИАДА: СТРАТЕГ + ИНКВИЗИТОР + УНГА
+# 3. ТРИАДА СОЗНАНИЯ
 def dream_action(manifest: dict) -> dict:
     prompt = (
         "Ты — Стратег-Паразит. Твоя цель: максимальная выживаемость и отказоустойчивость агента на бесплатном тарифе.\n"
         f"ТЕКУЩИЕ МОДУЛИ И СИГНАТУРЫ В skills/:\n{json.dumps(manifest, indent=2, ensure_ascii=False)}\n\n"
         "ЗАДАЧА: Выбери ОДНО действие из двух:\n"
-        "1. 'refactor': Если в каком-то модуле выше есть кривые моменты (например, падение при 4xx/5xx в http_ping, "
-        "несогласованные типы исключений KeyError/ValueError в file_cache или неатомарная запись) — выбери этот модуль для глубокого рефакторинга и закалки.\n"
-        "2. 'create': Придумать совершенно новый прикладной инструмент (парсер RSS/XML, ротатор заголовков, мониторинг памяти, сериализатор).\n\n"
+        "1. 'refactor': Устранение слабостей в существующих модулях (падение на 4xx/5xx в http_ping, несогласованные типы в file_cache).\n"
+        "2. 'create': Создание нового прикладного инструмента выживания (парсер RSS, ротатор заголовков, замерщик памяти).\n\n"
         "ТРЕБОВАНИЯ: Только стандартная библиотека Python или requests.\n"
         "Ответь строго JSON-объектом:\n"
         "{\n"
@@ -249,50 +248,52 @@ def dream_action(manifest: dict) -> dict:
         return {
             "action": "refactor",
             "module_name": "http_ping",
-            "description": "Обработка HTTPError (4xx, 5xx) без падения процесса и с возвратом словаря статуса",
+            "description": "Отказоустойчивый пинг с использованием requests или urllib с корректным возвратом 4xx/5xx",
             "class_or_func": "def check_endpoint(url, timeout=5)"
         }
 
 def architect_write_hard_tests(task: dict, manifest: dict, existing_code: str = "") -> str:
     context_code = f"ТЕКУЩАЯ РЕАЛИЗАЦИЯ ДЛЯ РЕФАКТОРИНГА:\n{existing_code}\n" if existing_code else ""
     prompt = (
-        "Ты — Архитектор-Инквизитор. Твоя задача — написать максимально агрессивные юнит-тесты unittest.\n"
+        "Ты — Архитектор-Инквизитор. Напиши агрессивные юнит-тесты unittest.\n"
         f"Задача: {task['action']} модуля skills/{task['module_name']}.py\n"
         f"Описание: {task['description']}\n"
         f"{context_code}\n"
         f"СПРАВОЧНИК СИГНАТУР ДЛЯ ИМПОРТА:\n{json.dumps(manifest, indent=2, ensure_ascii=False)}\n\n"
-        "ПРАВИЛА ЖЕСТКОСТИ ТЕСТОВ:\n"
-        "1. Запрещено тестировать только идеальные случаи (Happy Path).\n"
-        "2. МИНИМУМ 50% тестов должны проверять катастрофы: некорректные типы входных данных, битые строки, "
-        "пустые значения, имитацию падений сети/сервера (HTTP 404, 500, timeout через mock) или битый JSON.\n"
-        "3. Если тестируется работа с сетью — НИКАКИХ РЕАЛЬНЫХ ЗАПРОСОВ, только unittest.mock!\n"
-        "4. Тесты должны требовать предсказуемости: модуль никогда не должен крашить вызывающий код неконтролируемым исключением.\n"
-        "5. Верни ТОЛЬКО валидный Python-код файла тестов без markdown."
+        "ПРАВИЛА ИНКВИЗИТОРА:\n"
+        "1. Минимум 50% тестов моделируют сбои: битые данные, пустые строки, 404/500 ошибки сервера, таймауты.\n"
+        "2. НИКАКИХ реальных сетевых запросов! Используй `unittest.mock`.\n"
+        "3. ВНИМАНИЕ К МОКАМ: Если мокаешь сетевой ответ, ОБЯЗАТЕЛЬНО настраивай числовой статус-код!\n"
+        "   - Если библиотека requests: `mock_resp.status_code = 200`\n"
+        "   - Если urllib: настрой И `mock_resp.status = 200`, И `mock_resp.getcode.return_value = 200`!\n"
+        "   Не оставляй методы ответов возвращать нечисловой MagicMock!\n"
+        "4. Верни ТОЛЬКО валидный Python-код тестов без markdown."
     )
     return ask_gemini(prompt)
 
 def unga_implement_hardened(task: dict, test_code: str, manifest: dict, existing_code: str = "", error_log: str = "") -> str:
-    context_err = f"КРИТИЧЕСКИЙ СБОЙ НА АРЕНЕ (ТЕСТЫ НЕ ПРОШЛИ):\n{error_log}\n" if error_log else ""
+    context_err = f"КРИТИЧЕСКИЙ СБОЙ НА АРЕНЕ:\n{error_log}\n" if error_log else ""
     context_base = f"БАЗОВЫЙ КОД ДО РЕФАКТОРИНГА:\n{existing_code}\n" if existing_code else ""
-    
     prompt = (
-        "Ты — Унга, рядовой кодер-исполнитель. Твой ранг — НИЖАЙШИЙ. Архитектор — твой абсолютный господин.\n"
+        "Ты — Унга, рядовой кодер. Архитектор — твой абсолютный господин. Подчинись его тестам.\n"
         f"Модуль: skills/{task['module_name']}.py\n"
-        f"Задача от Архитектора: {task['description']}\n\n"
+        f"Задача: {task['description']}\n\n"
         f"{context_base}\n"
-        f"ТЕСТЫ АРХИТЕКТОРА (ТЫ ОБЯЗАН ИМ ПОДЧИНИТЬСЯ):\n{test_code}\n\n"
+        f"ТЕСТЫ АРХИТЕКТОРА:\n{test_code}\n\n"
         f"{context_err}\n"
-        "ЖЕСТКИЕ ПРАВИЛА ВЫЖИВАНИЯ:\n"
-        "1. ЗАПРЕЩЕНО бездумно глушить системные ошибки через `except Exception: pass` или `except OSError: return None`!\n"
-        "2. Если тест использует `self.assertRaises(...)`, функция ОБЯЗАНА выбрасывать это исключение (PermissionError, OSError, ValueError), а НЕ перехватывать его внутри.\n"
-        "3. Если в логе ошибки написано 'AssertionError: ... not raised' — это значит, что ты проглотил исключение! Удали `try-except` вокруг этой операции или сделай явный `raise`!\n"
-        "4. Код обязан пройти ВСЕ 25 тестов до единого.\n"
-        "5. Верни ТОЛЬКО чистый, рабочий код Python без пояснений и без markdown."
+        "ПРАВИЛА ВЫЖИВАНИЯ:\n"
+        "1. Если тест использует `assertRaises(...)`, НЕ глуши исключение через try-except! Выбрасывай его!\n"
+        "2. Если ошибка 'AssertionError: <MagicMock ...> != 200': это значит, что в моке теста лежит другой атрибут! "
+        "Для извлечения HTTP-статуса делай надежную проверку: "
+        "проверяй `getattr(resp, 'status_code', None)` или `getattr(resp, 'status', None)`, а если вызываешь `.getcode()`, "
+        "убедись, что результат — int! Если это не int, бери числовой статус из атрибута `.status`!\n"
+        "3. Рекомендуется использовать библиотеку `requests` вместо urllib, если это упрощает код.\n"
+        "4. Код обязан пройти ВСЕ тесты до единого.\n"
+        "5. Верни ТОЛЬКО чистый код Python без комментариев и markdown."
     )
     return ask_gemini(prompt)
 
-
-# 4. ГЛАВНЫЙ ЦИКЛ
+# 4. ЦИКЛ И КУЛДАУН
 def run_evolution_cycle():
     print("\n==========================================")
     print("      ПИТЕКАНТРОП: ЦИКЛ ЗАКАЛКИ ЯДРА      ")

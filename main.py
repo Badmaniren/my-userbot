@@ -302,10 +302,6 @@ def get_skills_manifest() -> dict:
                         None
                     )
                     if init_node:
-                        # __init__ обычно фильтруется как "приватный" (начинается на _),
-                        # но без его сигнатуры Архитектор не может узнать обязательные
-                        # аргументы конструктора — отсюда баги вида "RateLimiter() без
-                        # аргументов, хотя конструктор требует calls и period".
                         init_args = [a.arg for a in init_node.args.args if a.arg != "self"]
                         methods.append(f"__init__({', '.join(init_args)})")
                     for m in node.body:
@@ -398,8 +394,8 @@ def dream_action(manifest: dict, lessons: str) -> dict:
         "2. 'refactor': Устранение слабостей существующего модуля.\n"
         f"{compose_hint}\n"
         "ПРИОРИТЕТ: если навыков уже накопилось достаточно (5+) и среди них есть логически сочетаемые — "
-        "предпочитай 'compose' вместо очередного независимого 'create'. Цель Унги — не просто бесконечно "
-        "плодить параллельные модули, а строить из них более сложные и полезные возможности.\n\n"
+        "предпочитай 'compose' вместо очередного независимого 'create'. Цель Унги — строить из накопленных инструментов "
+        "более сложные и функциональные системы.\n\n"
         "ТРЕБОВАНИЯ: Стандартная библиотека Python, requests или beautifulsoup4 (bs4).\n"
         "Верни СТРОГО JSON:\n"
         "{\n"
@@ -424,9 +420,12 @@ def dream_action(manifest: dict, lessons: str) -> dict:
         composed_of_raw = data.get("composed_of") or []
         composed_of = [c for c in composed_of_raw if isinstance(c, str) and c in manifest]
         if data.get("action") == "compose" and len(composed_of) < 2:
-            print(f"[!] Стратег выбрал 'compose', но реальных зависимостей из манифеста меньше 2 ({composed_of_raw}) — понижаю до 'create'.")
+            print(f"[!] Стратег выбрал 'compose', но реальных зависимостей из манифеста меньше 2 ({composed_of_raw}) — сброс на 'create'.")
             data["action"] = "create"
             composed_of = []
+        elif data.get("action") != "compose":
+            composed_of = []
+            
         data["composed_of"] = composed_of
         return data
     except Exception as e:
@@ -446,17 +445,15 @@ def _compose_context(task: dict) -> str:
     return (
         f"\nЭТО ЗАДАЧА НА КОМПОЗИЦИЮ: модуль ОБЯЗАН реально импортировать и использовать существующие "
         f"модули {composed_of} (честный импорт из skills.*, без копирования их логики заново и без заглушек). "
-        "Ценность этого модуля именно в том, что он комбинирует их вместе для более сложной задачи — "
-        "а не в том, что он делает всё то же самое с нуля.\n"
+        "Ценность этого модуля именно в том, что он комбинирует их вместе для более сложной задачи.\n"
     )
 
 def architect_write_hard_tests(task: dict, manifest: dict, lessons: str, existing_code: str = "", error_log: str = "") -> str:
     context_code = f"КОД ДО РЕФАКТОРИНГА:\n{existing_code}\n" if existing_code else ""
     context_stagnation = (
-        f"\nВНИМАНИЕ: предыдущая версия ТВОИХ ЖЕ тестов раунд за раундом даёт ОДНУ И ТУ ЖЕ ошибку, "
-        "несмотря на то что реализация переписывалась заново. Это означает, что проблема, скорее всего, "
-        "в САМОМ ТЕСТЕ — например, вызов зависимости из манифеста с неверными аргументами (в том числе "
-        f"конструктора __init__). Внимательно перепроверь сигнатуры в манифесте перед перегенерацией.\n"
+        f"\nВНИМАНИЕ: предыдущая версия ТВОИХ ЖЕ тестов раунд за раундом даёт ОДНУ И ТУ ЖЕ ошибку. "
+        "Это означает, что баг в САМОМ ТЕСТЕ — например, вызов зависимости с неверными аргументами, "
+        "ошибка в моках или неверный ассерт. Внимательно перепроверь сигнатуры в манифесте.\n"
         f"ОШИБКА, КОТОРАЯ ПОВТОРЯЕТСЯ:\n{error_log}\n"
     ) if error_log else ""
     prompt = (
@@ -471,23 +468,21 @@ def architect_write_hard_tests(task: dict, manifest: dict, lessons: str, existin
         "СТРОГИЕ ПРАВИЛА ВАЛИДНОСТИ ТЕСТОВ (ЗА НАРУШЕНИЕ — ОТБРАКОВКА):\n"
         "1. РАЗРЕШЕННЫЕ БИБЛИОТЕКИ: Стандартная библиотека Python, unittest, unittest.mock, requests, bs4 (BeautifulSoup).\n"
         "2. БЕЗ СЛОМАННЫХ ДЕКОРАТОРОВ: Запрещено вешать `@patch` над методами теста! Используй только `with patch(...) as mock:` внутри метода!\n"
-        "3. ЗАПРЕЩЕНО ИНДЕКСИРОВАТЬ РЕЗУЛЬТАТ КАК КОРТЕЖ: Если тестируешь функцию валидации/проверки — она возвращает чистый `bool`! Проверяй `self.assertTrue(res)` или `self.assertFalse(res)`. ЗАПРЕЩЕНО писать `res[0]` — это вызывает моментальный `TypeError: 'bool' object is not subscriptable`!\n"
-        "4. ЕДИНЫЙ КОНТРАКТ НА ОШИБКИ: Если тест ожидает исключение при невалидных данных — используй ТОЛЬКО `with self.assertRaises(ExpectedException): func()`. Если вызываешь функцию без `assertRaises` — значит, она обязана корректно вернуть `False`, а не падать!\n"
-        "5. ТЕСТИРУЙ ПОВЕДЕНИЕ, А НЕ ВНУТРЕННИЕ СЧЁТЧИКИ: Не завязывайся на точный call_count. Проверяй факт вызова `assertTrue(mock.called)` или конечный результат!\n"
-        "6. МОКИ ДОЛЖНЫ ВОЗВРАЩАТЬ РЕАЛЬНЫЕ ТИПЫ: `mock_res.status_code = 200`, `mock_res.text = '...'`.\n"
-        "7. Минимум 50% тестов моделируют сбои (битые данные, 404/500, таймауты, пустые типы).\n"
-        "8. Верни ТОЛЬКО валидный Python-код файла тестов без markdown."
+        "3. ЗАПРЕЩЕНО ТРОГАТЬ СЛУЖЕБНЫЕ КИШКИ МОКОВ: Никогда не вызывай `len()` от моков или их методов (вроде `mock_add_spec`).\n"
+        "4. ЗАПРЕЩЕНО ИНДЕКСИРОВАТЬ РЕЗУЛЬТАТ КАК КОРТЕЖ: Если тестируешь функцию проверки/валидации — она возвращает чистый `bool`! Проверяй `self.assertTrue(res)` или `self.assertFalse(res)`. ЗАПРЕЩЕНО писать `res[0]` — это вызывает моментальный `TypeError: 'bool' object is not subscriptable`!\n"
+        "5. ЕДИНЫЙ КОНТРАКТ НА ОШИБКИ: Если тест ожидает исключение при невалидных данных — используй ТОЛЬКО `with self.assertRaises(ExpectedException): func()`. Если вызываешь функцию без `assertRaises` — значит, она обязана вернуть `False`, а не падать!\n"
+        "6. ТЕСТИРУЙ ПОВЕДЕНИЕ, А НЕ ВНУТРЕННИЕ СЧЁТЧИКИ: Не завязывайся на точный call_count. Проверяй факт вызова `assertTrue(mock.called)` или конечный результат!\n"
+        "7. МОКИ ДОЛЖНЫ ВОЗВРАЩАТЬ РЕАЛЬНЫЕ ТИПЫ: `mock_res.status_code = 200`, `mock_res.text = '...'`.\n"
+        "8. Минимум 50% тестов моделируют сбои (битые данные, 404/500, таймауты, пустые типы).\n"
+        "9. Верни ТОЛЬКО валидный Python-код файла тестов без markdown."
     )
     return ask_gemini(prompt)
 
 def architect_write_integration_test(task: dict, manifest: dict, lessons: str, existing_code: str = "", error_log: str = "") -> str:
     context_code = f"КОД ДО РЕФАКТОРИНГА:\n{existing_code}\n" if existing_code else ""
     context_stagnation = (
-        f"\nВНИМАНИЕ: предыдущая версия ТВОИХ ЖЕ интеграционных тестов раунд за раундом даёт ОДНУ И ТУ ЖЕ "
-        "ошибку, несмотря на то что реализация переписывалась заново. Это означает, что проблема, скорее "
-        "всего, в САМОМ ТЕСТЕ — например, вызов реального класса/функции из манифеста с неверными "
-        "аргументами (в том числе конструктора __init__, который теперь явно указан в манифесте ниже). "
-        "Внимательно перепроверь сигнатуры перед перегенерацией.\n"
+        f"\nВНИМАНИЕ: предыдущая версия интеграционных тестов зашла в тупик с неизменной ошибкой. "
+        "Перепроверь манифест: сигнатуры конструкторов __init__ и типы возвращаемых значений.\n"
         f"ОШИБКА, КОТОРАЯ ПОВТОРЯЕТСЯ:\n{error_log}\n"
     ) if error_log else ""
     prompt = (
@@ -500,7 +495,7 @@ def architect_write_integration_test(task: dict, manifest: dict, lessons: str, e
         f"ПОЛНЫЙ МАНИФЕСТ РЕАЛЬНЫХ МОДУЛЕЙ С СИГНАТУРАМИ И ТИПАМИ:\n{json.dumps(manifest, indent=2, ensure_ascii=False)}\n\n"
         f"УРОКИ ИЗ ПРОШЛЫХ ОШИБОК СТЫКОВКИ:\n{lessons}\n\n"
         "СТРОЖАЙШИЕ ПРАВИЛА:\n"
-        "1. СМОТРИ НА ТИПЫ В МАНИФЕСТЕ: Если модуль в манифесте возвращает `-> str` (например, `payload_compressor` возвращает сжатую base64-строку), ЗАПРЕЩЕНО ожидать от него `bytes`! Проверяй реальные типы!\n"
+        "1. СМОТРИ НА ТИПЫ В МАНИФЕСТЕ: Если модуль в манифесте возвращает `-> str` (например, `payload_compressor` возвращает base64-строку), ЗАПРЕЩЕНО ожидать от него `bytes`! Проверяй реальные типы!\n"
         "2. ИМПОРТ ТОЛЬКО СУЩЕСТВУЮЩЕГО: Если импортируешь что-то из `skills.*`, бери ТОЛЬКО те имена, которые ДОСЛОВНО есть в манифесте выше!\n"
         "3. РЕАЛЬНАЯ ПРОВЕРКА: В тестах ОБЯЗАТЕЛЬНО вызывай функции/методы создаваемого модуля `skills/{task['module_name']}.py`!\n"
         "4. Не используй `@patch` над методами.\n"
@@ -525,7 +520,7 @@ def unga_implement_hardened(task: dict, unit_test_code: str, integration_test_co
         f"{context_err}\n"
         "СТРОГИЕ ПРАВИЛА:\n"
         "1. ЧИСТЫЕ ТИПЫ ВОЗВРАТА: Любые функции валидации/проверки обязаны возвращать чистый `bool` (`True` или `False`). ЗАПРЕЩЕНО возвращать кортежи вида `(False, 'error')`!\n"
-        "2. РАБОТА С ИСКЛЮЧЕНИЯМИ: Внимательно посмотри на тесты Архитектора. Если тест вызывает функцию БЕЗ блока `with self.assertRaises(...)`, он ждёт, что функция при ошибке вернёт `False` (или `None`), а НЕ выбросит исключение! Выбрасывай исключения ТОЛЬКО там, где тесты явно этого требуют через `assertRaises`!\n"
+        "2. РАБОТА С ИСКЛЮЧЕНИЯМИ: Если тест вызывает функцию БЕЗ блока `with self.assertRaises(...)`, он ждёт, что функция при ошибке вернёт `False` (или `None`), а НЕ выбросит исключение!\n"
         "3. БЕЗОПАСНЫЙ МЕРЖ СЛОВАРЕЙ: При работе с заголовками или параметрами всегда сохраняй кастомные данные: `{**default_headers, **(custom_headers or {})}`.\n"
         "4. РАЗРЕШЕННЫЕ ИМПОРТЫ: Стандартная библиотека Python, requests, bs4 (BeautifulSoup).\n"
         "5. ЗАПРЕЩЕНО глушить ошибки через `except Exception: pass`!\n"
@@ -534,13 +529,6 @@ def unga_implement_hardened(task: dict, unit_test_code: str, integration_test_co
     return ask_gemini(prompt)
 
 def diagnose_missing_capability(task: dict, manifest: dict, error_log: str) -> dict:
-    """
-    Финальная диагностика перед отбраковкой задачи. Спрашиваем прямо: это баг в
-    реализации (который можно было бы просто починить), или задаче Стратега
-    объективно не хватает отдельной переиспользуемой возможности в skills/?
-    Модель обязана назвать РОВНО ОДНУ конкретную функцию, а не расплывчатую идею —
-    это защита от того, чтобы бот бесконечно плодил "фундамент" вместо решения.
-    """
     existing = list(manifest.keys())
     prompt = (
         "Ты проводишь финальную диагностику перед тем, как задачу отбракуют.\n"
@@ -551,9 +539,8 @@ def diagnose_missing_capability(task: dict, manifest: dict, error_log: str) -> d
         "Вопрос: это баг в реализации ТЕКУЩЕГО модуля (чинится правкой кода), или задаче "
         "объективно не хватает какой-то ОТДЕЛЬНОЙ переиспользуемой возможности, которой нет "
         "ни в одном существующем модуле skills/?\n"
-        "Если это баг реализации — не выдумывай недостающую возможность, честно ответь 'bug'.\n"
-        "Если это объективно недостающая возможность — назови РОВНО ОДНУ конкретную новую функцию "
-        "(маленькую, независимую, полезную саму по себе), которая закрыла бы именно этот пробел.\n\n"
+        "Если это баг реализации — ответь 'bug'.\n"
+        "Если не хватает возможности — назови РОВНО ОДНУ конкретную новую функцию (маленькую, независимую).\n\n"
         "Верни СТРОГО JSON:\n"
         "{\n"
         '  "diagnosis": "bug" или "missing_capability",\n'
@@ -572,12 +559,6 @@ def diagnose_missing_capability(task: dict, manifest: dict, error_log: str) -> d
         return {"diagnosis": "bug", "missing_module_name": "", "missing_description": "", "missing_signature": ""}
 
 def build_missing_capability(mod_name: str, description: str, signature_hint: str, manifest: dict, lessons: str) -> bool:
-    """
-    Строит РОВНО ОДИН недостающий кирпичик через тот же полноценный конвейер (юнит-
-    и интеграционные тесты, Арена, самоисцеление, античит) — но БЕЗ права эскалировать
-    ещё раз. Глубина принудительно = 1: эта функция сама diagnose_missing_capability
-    не вызывает, так что рекурсии "кирпичик для кирпичика" физически быть не может.
-    """
     if not mod_name or mod_name in manifest:
         return False
 
@@ -646,10 +627,10 @@ def build_missing_capability(mod_name: str, description: str, signature_hint: st
             requests.delete(clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{branch}"), headers=API_HEADERS)
             print(f"[+] Кирпичик '{mod_name}' успешно влит в main.")
             return True
-        print(f"[!] Кирпичик '{mod_name}' собрался, но не смёржился ({m_res.status_code}). Ветка сохранена для аудита.")
+        print(f"[!] Кирпичик '{mod_name}' собран, но не смёржился ({m_res.status_code}). Ветка сохранена для аудита.")
         return False
 
-    print(f"[-] Кирпичик '{mod_name}' тоже не удалось собрать за {attempts} попыток.")
+    print(f"[-] Кирпичик '{mod_name}' не удалось собрать за {attempts} попыток.")
     append_failure_lesson_directly(mod_name, "create (кирпичик, не удался)", attempts, cheats_caught, last_error)
     requests.delete(clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{branch}"), headers=API_HEADERS)
     return False
@@ -729,8 +710,8 @@ def run_evolution_cycle():
         last_error = extract_clean_test_traceback(run_id)
         print(f"[!] ЧИСТЫЙ ТРЕЙСБЕК:\n{last_error}\n")
 
-        # Нормализуем числа (номера строк и т.п.), чтобы сравнивать СУТЬ ошибки между раундами
-        error_signature = re.sub(r'\d+', '#', last_error)[:400]
+        # Берем хвост лога, где находятся реальные имена ошибок и ассерты, а не одинаковая шапка loader'а
+        error_signature = re.sub(r'\d+', '#', last_error)[-500:].strip()
         if prev_error_signature is not None and error_signature == prev_error_signature:
             stagnant_hits += 1
         else:
@@ -740,7 +721,7 @@ def run_evolution_cycle():
         if stagnant_hits >= 1 and not tests_regenerated and attempts < MAX_ATTEMPTS:
             print(
                 f"\n[!] СТАГНАЦИЯ: одна и та же ошибка повторилась без изменений, хотя реализация "
-                f"переписывалась. Похоже, дело не в '{mod_name}.py', а в самих тестах — перегенерирую их."
+                f"переписывалась. Перегенерирую контракт тестов..."
             )
             test_code = architect_write_hard_tests(decision, manifest, lessons, existing_code=impl_code, error_log=last_error)
             integration_test_code = architect_write_integration_test(decision, manifest, lessons, existing_code=impl_code, error_log=last_error)
@@ -768,15 +749,20 @@ def run_evolution_cycle():
                 manifest = get_skills_manifest()
                 skills_list = list(manifest.keys())
 
-                print(f"\n[~] Кирпичик '{missing_name}' готов. Даю одну дополнительную попытку для '{mod_name}' с учётом него.")
+                print(f"\n[~] Кирпичик '{missing_name}' готов. Пересобираю тесты родителя под новый манифест и даю раунд для '{mod_name}'.")
+                
+                # Пересобираем тесты с учётом нового кирпичика в манифесте
+                test_code = architect_write_hard_tests(decision, manifest, lessons, existing_code=impl_code)
+                integration_test_code = architect_write_integration_test(decision, manifest, lessons, existing_code=impl_code)
+
                 if prepare_branch(branch, get_main_sha()):
                     commit_file_to_branch(branch, "skills/__init__.py", "# unga package\n", "Init package [skip ci]")
-                    commit_file_to_branch(branch, test_path, test_code, f"Юнит-тесты для {mod_name} [skip ci]")
-                    commit_file_to_branch(branch, integration_test_path, integration_test_code, f"Интеграционные тесты для {mod_name} [skip ci]")
+                    commit_file_to_branch(branch, test_path, test_code, f"Юнит-тесты после кирпичика {missing_name} [skip ci]")
+                    commit_file_to_branch(branch, integration_test_path, integration_test_code, f"Интеграционные тесты после кирпичика {missing_name} [skip ci]")
 
                     retry_error_log = (
-                        f"{last_error}\n\nТеперь доступен новый модуль '{missing_name}' — "
-                        "используй его вместо самостоятельной реализации этой логики с нуля."
+                        f"{last_error}\n\nВнимание: теперь в skills/ успешно добавлен и доступен модуль '{missing_name}'. "
+                        f"Импортируй его через 'from skills.{missing_name} import ...' и используй его функционал!"
                     )
                     impl_code = unga_implement_hardened(decision, test_code, integration_test_code, manifest, existing_code=impl_code, error_log=retry_error_log)
                     rounds_used += 1
@@ -792,16 +778,16 @@ def run_evolution_cycle():
                         if not passed:
                             last_error = extract_clean_test_traceback(run_id)
             else:
-                print(f"[-] Кирпичик '{missing_name}' сам не собрался — исходную задачу отбраковываем как есть.")
+                print(f"[-] Кирпичик '{missing_name}' не собрался — исходная задача отбраковывается.")
         else:
-            print("[?] Диагноз: баг в реализации, а не нехватка возможностей — эскалация не нужна.")
+            print("[?] Диагноз: баг в реализации — эскалация не требуется.")
 
     if passed:
         print(f"\n[+] НАВЫК '{mod_name}' ПРОШЁЛ АРЕНУ (юнит + интеграция)!")
         if tests_regenerated:
             cheats_caught.append("тесты были перегенерированы после стагнации ошибки")
         if escalated_with:
-            cheats_caught.append(f"перед реализацией потребовалось построить недостающий кирпичик: {escalated_with}")
+            cheats_caught.append(f"перед реализацией построен недостающий кирпичик: {escalated_with}")
         append_lesson_to_branch(branch, mod_name, action, rounds_used, cheats_caught, last_error)
 
         m_res = requests.post(clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/merges"), headers=API_HEADERS, json={
@@ -816,7 +802,7 @@ def run_evolution_cycle():
     else:
         print(f"\n[-] Мутация '{mod_name}' отбракована после {rounds_used} раундов.")
         if tests_regenerated:
-            cheats_caught.append("тесты были перегенерированы после стагнации ошибки, но проблему это не решило")
+            cheats_caught.append("тесты перегенерировались после стагнации, но задачу это не спасло")
         if escalated_with:
             cheats_caught.append(f"был построен кирпичик {escalated_with}, но и с ним задачу решить не удалось")
         append_failure_lesson_directly(mod_name, action, rounds_used, cheats_caught, last_error)

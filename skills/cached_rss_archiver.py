@@ -26,9 +26,19 @@ def cached_rss_archive_flow(url, timeout=5, db_path=":memory:", max_memory_mb=50
 
     compressor = PayloadCompressor()
     if hasattr(compressor, "compress_payload"):
-        compressed_payload = compressor.compress_payload(feed_items)
+        try:
+            compressed_payload = compressor.compress_payload(feed_items)
+        except Exception:
+            compressed_payload = compressor.compress_payload(
+                [dict(item) if hasattr(item, "items") else item for item in feed_items]
+            )
     else:
-        compressed_payload = compressor.compress_json(feed_items)
+        try:
+            compressed_payload = compressor.compress_json(feed_items)
+        except Exception:
+            compressed_payload = compressor.compress_json(
+                [dict(item) if hasattr(item, "items") else item for item in feed_items]
+            )
 
     db.set_cache(cache_key, compressed_payload)
     db.save_data(cache_key, compressed_payload)
@@ -59,9 +69,19 @@ class CachedRSSArchiver:
             raise ValueError("Malformed feed data returned None")
 
         if hasattr(self.compressor, "compress_payload"):
-            compressed_payload = self.compressor.compress_payload(feed_items)
+            try:
+                compressed_payload = self.compressor.compress_payload(feed_items)
+            except Exception:
+                compressed_payload = self.compressor.compress_payload(
+                    [dict(item) if hasattr(item, "items") else item for item in feed_items]
+                )
         else:
-            compressed_payload = self.compressor.compress_json(feed_items)
+            try:
+                compressed_payload = self.compressor.compress_json(feed_items)
+            except Exception:
+                compressed_payload = self.compressor.compress_json(
+                    [dict(item) if hasattr(item, "items") else item for item in feed_items]
+                )
 
         self.db.set_cache(cache_key, compressed_payload)
         self.db.save_data(cache_key, compressed_payload)

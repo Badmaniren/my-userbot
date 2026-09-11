@@ -23,7 +23,7 @@ class JsonExtractorError(Exception):
 class SmartCrawler:
     def __init__(self):
         self.headers_rotator = HeadersRotator()
-        self.rate_limiter = RateLimiter()
+        self.rate_limiter = RateLimiter(calls=5, period=1)
         self.link_extractor = link_extractor.LinkExtractor()
 
     def coordinate_expansion(self, url: str, timeout: int = 5):

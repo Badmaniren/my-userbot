@@ -2,19 +2,44 @@ import xml.etree.ElementTree as ET
 import urllib.error
 from skills import cached_ping
 
-def parse_feed(url: str, timeout: int = 5) -> list:
-    response = cached_ping.ping_and_cache(url, timeout=timeout)
+def parse_feed(url, timeout: int = 5) -> list:
+    url_for_error = "unknown_source"
+
+    if isinstance(url, str) and (url.strip().startswith('http://') or url.strip().startswith('https://')):
+        url_for_error = url
+        response = cached_ping.ping_and_cache(url, timeout=timeout)
+    else:
+        response = url
     
     if response is None:
         raise ValueError("Payload is None")
 
-    if hasattr(response, 'status_code') and response.status_code >= 400:
-        raise urllib.error.HTTPError(url, response.status_code, "Bad Status Code", {}, None)
+    status_code = 200
+    if hasattr(response, 'status_code'):
+        status_code = response.status_code
+    elif hasattr(response, 'status'):
+        status_code = response.status
+    elif isinstance(response, dict):
+        status_code = response.get('status_code', response.get('status', 200))
+
+    if isinstance(status_code, int) and status_code >= 400:
+        raise urllib.error.HTTPError(url_for_error, status_code, "Bad Status Code", {}, None)
         
-    raw_data = response.read()
+    raw_data = None
+    if hasattr(response, 'read') and callable(response.read):
+        raw_data = response.read()
+    elif isinstance(response, (str, bytes)):
+        raw_data = response
+    elif isinstance(response, dict):
+        for key in ('data', 'content', 'text', 'body', 'raw'):
+            if key in response:
+                raw_data = response[key]
+                break
+
     if raw_data is None:
         raise ValueError("Payload read returned None")
-    if not raw_data:
+
+    if not raw_data or (isinstance(raw_data, (str, bytes)) and not raw_data.strip()):
         return []
         
     try:

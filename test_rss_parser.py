@@ -137,5 +137,50 @@ class TestArchitectInquisitorRSSParser(unittest.TestCase):
         with self.assertRaises(Exception):
             rss_parser.parse_feed("http://example.com/forbidden", timeout=5)
 
+    def test_parse_raw_string(self):
+        targets = rss_parser.parse_feed(self.valid_rss)
+        self.assertIsInstance(targets, list)
+        self.assertGreaterEqual(len(targets), 2)
+        self.assertEqual(targets[0]['title'], "Target Alpha")
+
+    def test_parse_raw_bytes(self):
+        targets = rss_parser.parse_feed(self.valid_rss.encode('utf-8'))
+        self.assertIsInstance(targets, list)
+        self.assertGreaterEqual(len(targets), 2)
+        self.assertEqual(targets[0]['title'], "Target Alpha")
+
+    def test_parse_dict_with_data_key(self):
+        payload = {"status": 200, "data": self.valid_atom}
+        targets = rss_parser.parse_feed(payload)
+        self.assertIsInstance(targets, list)
+        self.assertGreaterEqual(len(targets), 1)
+        self.assertEqual(targets[0]['title'], "Atom Target One")
+
+    def test_parse_dict_with_text_key(self):
+        payload = {"status_code": 200, "text": self.valid_rss}
+        targets = rss_parser.parse_feed(payload)
+        self.assertIsInstance(targets, list)
+        self.assertGreaterEqual(len(targets), 2)
+
+    def test_parse_object_with_read(self):
+        class DummyResponse:
+            def read(self):
+                return self.valid_atom
+
+        dummy = DummyResponse()
+        dummy.valid_atom = self.valid_atom
+
+        targets = rss_parser.parse_feed(dummy)
+        self.assertIsInstance(targets, list)
+        self.assertGreaterEqual(len(targets), 1)
+        self.assertEqual(targets[0]['title'], "Atom Target One")
+
+    @patch('skills.rss_parser.cached_ping.ping_and_cache')
+    def test_url_fetch_returning_dict(self, mock_ping):
+        mock_ping.return_value = {"status": 200, "data": self.valid_rss}
+        targets = rss_parser.parse_feed("http://example.com/mock-dict")
+        self.assertIsInstance(targets, list)
+        self.assertEqual(targets[0]['title'], "Target Alpha")
+
 if __name__ == '__main__':
     unittest.main()

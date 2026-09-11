@@ -56,10 +56,16 @@ class ResilientRSSFetcher:
             headers = self.headers_rotator.rotate_headers()
             
             if hasattr(self.headers_rotator, 'validate_headers_against_target'):
+                valid = False
                 try:
                     validation_res = self.headers_rotator.validate_headers_against_target(url, headers, timeout=timeout)
                 except TypeError:
-                    validation_res = self.headers_rotator.validate_headers_against_target(url, headers)
+                    try:
+                        validation_res = self.headers_rotator.validate_headers_against_target(url, headers)
+                    except Exception:
+                        validation_res = False
+                except Exception:
+                    validation_res = False
                 
                 if isinstance(validation_res, tuple):
                     valid = bool(validation_res[0])

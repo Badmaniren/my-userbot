@@ -5,6 +5,8 @@ import base64
 import re
 import json
 import ast
+import io
+import zipfile
 import requests
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -191,87 +193,50 @@ def watch_arena_by_sha(expected_sha: str):
         time.sleep(10)
     return False, last_seen_id
 
-# 5. ХИРУРГИЧЕСКИЙ ПАРСИНГ ТРЕЙСБЕКА
-def _fetch_job_logs(job_id: int) -> str:
-    """
-    GitHub отдаёт логи джобы не напрямую, а через 302-редирект на подписанную
-    ссылку в blob-хранилище. Дополнительная сложность: сразу после того, как
-    job помечена 'completed', архив логов ещё может быть не готов пару десятков
-    секунд — тогда сама ссылка из редиректа честно отвечает 404. Поэтому ждём
-    дольше и с нарастающей паузой, а не просто дёргаем 3 раза подряд.
-    """
-    logs_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/actions/jobs/{job_id}/logs")
-    delays = [10, 15, 20, 25, 30]  # суммарно ~100 сек ожидания архивации логов
-
-    for attempt, delay in enumerate(delays, start=1):
-        try:
-            step1 = requests.get(logs_url, headers=API_HEADERS, timeout=15, allow_redirects=False)
-
-            if step1.status_code in (401, 403):
-                print(f"[!] Логи: доступ к самому GitHub API запрещён (HTTP {step1.status_code}) — вот это уже реально похоже на нехватку прав токена, дальше ждать бессмысленно.")
-                return ""
-
-            if step1.status_code in (301, 302, 303, 307, 308):
-                blob_url = step1.headers.get("Location")
-                if blob_url:
-                    # финальная ссылка уже содержит подписанный токен доступа —
-                    # заголовки авторизации GitHub здесь не нужны и могут мешать
-                    step2 = requests.get(blob_url, timeout=15)
-                    if step2.status_code == 200 and step2.text.strip():
-                        return step2.text
-                    print(f"[!] Логи: редирект есть, но тело не отдалось (HTTP {step2.status_code}), попытка {attempt}/{len(delays)}")
-            elif step1.status_code == 200 and step1.text.strip():
-                return step1.text
-            else:
-                print(f"[!] Логи: неожиданный статус {step1.status_code} на попытке {attempt}/{len(delays)}")
-        except Exception as e:
-            print(f"[!] Логи: сетевая ошибка на попытке {attempt}/{len(delays)}: {e}")
-
-        time.sleep(delay)
-
-    return ""
-
+# 5. ХИРУРГИЧЕСКИЙ ПАРСИНГ ТРЕЙСБЕКА ЧЕРЕЗ АРХИВ РАНА
 def extract_clean_test_traceback(run_id: int) -> str:
     if not run_id:
         return "Не удалось определить run_id шага тестирования."
 
-    jobs_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/actions/runs/{run_id}/jobs")
-    r = requests.get(jobs_url, headers=API_HEADERS, timeout=10)
-    if r.status_code != 200:
-        return f"Не удалось получить список jobs (HTTP {r.status_code})."
-    jobs = r.json().get("jobs", [])
-    failed = next((j for j in jobs if j.get("conclusion") == "failure"), None)
-    if not failed:
-        return "Проваленный job не найден."
+    logs_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/actions/runs/{run_id}/logs")
+    try:
+        r = requests.get(logs_url, headers=API_HEADERS, timeout=30)
+        if r.status_code != 200:
+            return f"Не удалось скачать архив логов рана (HTTP {r.status_code})."
 
-    log_text = _fetch_job_logs(failed["id"])
-    if not log_text:
-        return (
-            f"Тело логов недоступно (job_id={failed['id']}) даже после долгих повторных попыток. "
-            "Судя по тому, что редирект на архив логов проходит успешно, а не отдаётся именно тело — "
-            "это похоже на задержку публикации логов у GitHub, а не на нехватку прав токена. "
-            "Ручного вмешательства это не требует: этот раунд просто останется без чистого трейсбека."
-        )
+        with zipfile.ZipFile(io.BytesIO(r.content)) as z:
+            target_name = next(
+                (name for name in z.namelist() if "Запуск гладиаторских тестов" in name or "unittest" in name.lower()),
+                None
+            )
+            if not target_name:
+                txt_files = [n for n in z.namelist() if n.endswith(".txt")]
+                if not txt_files:
+                    return "Архив логов пуст."
+                target_name = max(txt_files, key=lambda n: z.getinfo(n).file_size)
 
-    lines = log_text.splitlines()
-    error_buffer = []
-    capture = False
+            log_text = z.read(target_name).decode("utf-8", errors="ignore")
 
-    for line in lines:
-        cleaned = re.sub(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\s*', '', line).strip()
-        if any(marker in cleaned for marker in ["FAIL:", "ERROR:", "Traceback (most recent call last):", "SyntaxError:", "ImportError:"]):
-            capture = True
-        if capture:
-            if not cleaned.startswith("[command]") and "node-20" not in cleaned.lower():
-                error_buffer.append(cleaned)
-            if len(error_buffer) >= 40:
-                break
-            if cleaned.startswith("FAILED ("):
-                break
+        lines = log_text.splitlines()
+        error_buffer = []
+        capture = False
 
-    if error_buffer:
-        return "\n".join(error_buffer)
-    return "Тесты провалены, но блок ошибки не идентифицирован."
+        for line in lines:
+            cleaned = re.sub(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\s*', '', line).strip()
+            if any(marker in cleaned for marker in ["FAIL:", "ERROR:", "Traceback (most recent call last):", "SyntaxError:", "ImportError:", "ModuleNotFoundError:"]):
+                capture = True
+            if capture:
+                if not cleaned.startswith("[command]") and "node-20" not in cleaned.lower():
+                    error_buffer.append(cleaned)
+                if len(error_buffer) >= 40:
+                    break
+                if cleaned.startswith("FAILED ("):
+                    break
+
+        return "\n".join(error_buffer) if error_buffer else "Лог получен, но блок ошибки не идентифицирован."
+
+    except Exception as e:
+        return f"Сбой при извлечении трейсбека: {e}"
 
 # 6. ГЛУБОКИЙ АНТИЧИТ
 def inspect_code_for_cheating(code: str, existing_skills: list, target_module: str) -> str:
@@ -336,7 +301,6 @@ def get_skills_manifest() -> dict:
     return manifest
 
 def get_lessons_context() -> str:
-    """Читает накопленные уроки из main, чтобы подать их в промпты Архитектора/Унги."""
     content = get_file_content("main", LESSONS_PATH)
     if not content:
         return "Пока нет накопленных уроков — это будет первая запись."
@@ -362,22 +326,11 @@ def _merge_lessons_text(existing: str, entry: str) -> str:
     return updated
 
 def append_lesson_to_branch(branch: str, mod_name: str, action: str, rounds: int, cheats_caught: list, last_error: str = "") -> None:
-    """
-    Дописывает урок в LESSONS.md ПРЯМО В ВЕТКЕ МУТАЦИИ, чтобы он влился в main
-    вместе с уже протестированным кодом — это не нарушает правило
-    'бот никогда не пушит в main напрямую', т.к. коммит едет тем же путём слияния.
-    """
     existing = get_file_content(branch, LESSONS_PATH) or get_file_content("main", LESSONS_PATH) or LESSONS_HEADER
     entry = _build_lesson_entry(mod_name, action, rounds, cheats_caught, last_error, "успешно прошёл интеграционные тесты и влит в main")
     commit_file_to_branch(branch, LESSONS_PATH, _merge_lessons_text(existing, entry), f"Урок: {mod_name}")
 
 def append_failure_lesson_directly(mod_name: str, action: str, rounds: int, cheats_caught: list, last_error: str = "") -> None:
-    """
-    Провальная ветка с кодом удаляется целиком — но урок из неё стоит запомнить.
-    LESSONS.md не исполняется как код, поэтому для НЕГО заводим отдельную короткую
-    ветку и мержим сразу, не дожидаясь Arena: риска для main это не несёт, т.к.
-    ни один .py-файл тут не меняется — только заметка для будущих промптов.
-    """
     base_sha = get_main_sha()
     if not base_sha:
         print("[!] Не удалось сохранить урок о провале: main sha недоступен.")
@@ -458,12 +411,6 @@ def architect_write_hard_tests(task: dict, manifest: dict, lessons: str, existin
     return ask_gemini(prompt)
 
 def architect_write_integration_test(task: dict, manifest: dict, lessons: str, existing_code: str = "") -> str:
-    """
-    Ключевое отличие от юнит-теста: тут запрещено мокать другие модули skills/.
-    Юнит-тесты с моками не ловят рассинхрон контрактов между модулями (например,
-    один модуль возвращает dict, а другой ожидает объект с атрибутами status_code) —
-    именно это интеграционный тест обязан поймать, реально соединяя модули друг с другом.
-    """
     context_code = f"КОД ДО РЕФАКТОРИНГА:\n{existing_code}\n" if existing_code else ""
     dep_names = [m for m in manifest.keys() if m != task["module_name"]]
     prompt = (

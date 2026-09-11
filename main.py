@@ -206,7 +206,7 @@ def extract_clean_test_traceback(run_id: int) -> str:
 
         with zipfile.ZipFile(io.BytesIO(r.content)) as z:
             target_name = next(
-                (name for name in z.namelist() if "Запуск гладиаторских тестов" in name or "unittest" in name.lower()),
+                (name for name in z.namelist() if "run tests" in name.lower() or "unittest" in name.lower()),
                 None
             )
             if not target_name:
@@ -228,7 +228,7 @@ def extract_clean_test_traceback(run_id: int) -> str:
             if capture:
                 if not cleaned.startswith("[command]") and "node-20" not in cleaned.lower():
                     error_buffer.append(cleaned)
-                if len(error_buffer) >= 40:
+                if len(error_buffer) >= 45:
                     break
                 if cleaned.startswith("FAILED ("):
                     break
@@ -398,15 +398,14 @@ def architect_write_hard_tests(task: dict, manifest: dict, lessons: str, existin
         f"{context_code}\n"
         f"СИГНАТУРЫ ДЛЯ ИМПОРТА:\n{json.dumps(manifest, indent=2, ensure_ascii=False)}\n\n"
         f"УРОКИ ИЗ ПРОШЛЫХ ОШИБОК:\n{lessons}\n\n"
-        "СТРОГИЕ ПРАВИЛА ВАЛИДНОСТИ ТЕСТОВ:\n"
-        "1. Минимум 50% тестов моделируют сбои (битые данные, 404/500, таймауты, пустые типы).\n"
-        "2. БЕЗ РЕАЛЬНОЙ СЕТИ. Используй unittest.mock!\n"
-        "3. МОКИ И СЕТЕВЫЕ ОШИБКИ:\n"
-        "   - Если мокаешь успешный ответ: задавай числовой статус (`mock.status_code = 200`, `mock.status = 200`).\n"
-        "   - ЗАПРЕЩЕНО менять атрибуты у реальных исключений (например, `err.status = 404` вызовет AttributeError: property has no setter)!\n"
-        "   - Для симуляции HTTPError создавай валидный инстанс: `urllib.error.HTTPError('url', 404, 'Not Found', {}, None)` или используй чистый `MagicMock(code=404, status=404)`!\n"
-        "4. Это ЮНИТ-тест одного модуля — мокай ВСЕ его внешние зависимости из skills/, включая другие навыки.\n"
-        "5. Верни ТОЛЬКО валидный Python-код файла тестов без markdown."
+        "СТРОГИЕ ПРАВИЛА ВАЛИДНОСТИ ТЕСТОВ (ЗА НАРУШЕНИЕ — СМЕРТЬ):\n"
+        "1. БЕЗ СЛОМАННЫХ ДЕКОРАТОРОВ. Запрещено вешать `@patch` над методами теста! "
+        "Используй исключительно контекстный менеджер внутри метода: `with patch(...) as mock_obj:`!\n"
+        "2. МОКИ ДОЛЖНЫ ВОЗВРАЩАТЬ РЕАЛЬНЫЕ ТИПЫ ДАННЫХ:\n"
+        "   - Если мокаешь ответ функции/запроса: `mock_res = MagicMock(); mock_res.status = 200; mock_res.status_code = 200; mock_res.text = '...'; mock_func.return_value = mock_res`\n"
+        "   - Никогда не оставляй поля статусов неинициализированными, иначе в коде будет `Invalid status: <MagicMock>`!\n"
+        "3. Минимум 50% тестов моделируют сбои (битые данные, 404/500, таймауты, пустые типы).\n"
+        "4. Верни ТОЛЬКО валидный Python-код файла тестов без markdown."
     )
     return ask_gemini(prompt)
 
@@ -414,31 +413,17 @@ def architect_write_integration_test(task: dict, manifest: dict, lessons: str, e
     context_code = f"КОД ДО РЕФАКТОРИНГА:\n{existing_code}\n" if existing_code else ""
     dep_names = [m for m in manifest.keys() if m != task["module_name"]]
     prompt = (
-        "Ты — Архитектор-Инквизитор. Твоя вторая задача — ИНТЕГРАЦИОННЫЙ тест (без моков между навыками).\n"
-        "Обычные юнит-тесты с моками НЕ ловят рассинхрон контрактов между модулями: "
-        "один модуль может возвращать dict, а сосед ожидать объект с атрибутами (или наоборот) — "
-        "юнит-тест 'зелёный', а реальный вызов падает с AttributeError/TypeError.\n\n"
+        "Ты — Архитектор-Инквизитор. Твоя задача — ИНТЕГРАЦИОННЫЙ тест (без моков между навыками).\n"
         f"Модуль: skills/{task['module_name']}.py\n"
         f"Описание: {task['description']}\n"
         f"{context_code}\n"
-        f"ДРУГИЕ СУЩЕСТВУЮЩИЕ МОДУЛИ (импортируй их РЕАЛЬНО, без mock): {dep_names}\n\n"
+        f"РЕАЛЬНЫЕ МОДУЛИ (импортируй их точные имена из манифеста): {dep_names}\n\n"
         f"УРОКИ ИЗ ПРОШЛЫХ ОШИБОК СТЫКОВКИ:\n{lessons}\n\n"
         "ПРАВИЛА ИНТЕГРАЦИОННОГО ТЕСТА:\n"
-        "1. Импортируй РЕАЛЬНЫЕ функции/классы зависимых модулей из skills/ — БЕЗ unittest.mock для них.\n"
-        "   Мокать можно только то, что находится вне репозитория (например, время через time.sleep,\n"
-        "   но не другие skills/*.py).\n"
-        "2. ЗАПРЕЩЕНА реальная сеть (интернет) — тест должен быть детерминированным и работать в CI.\n"
-        "   Если проверяемый модуль или его зависимость делает HTTP-запрос — подними локальный\n"
-        "   http.server.HTTPServer в отдельном daemon-потоке в setUp() на '127.0.0.1' со свободным\n"
-        "   портом (port=0, потом server.server_address[1]), отдай тестовый контент через обработчик,\n"
-        "   и направь код на 'http://127.0.0.1:{port}/...'. В tearDown() обязательно вызови shutdown().\n"
-        "3. Цель теста — проверить именно СТЫКОВКУ: что реально возвращает зависимость (тип, ключи\n"
-        "   словаря или атрибуты объекта) и что реально ожидает проверяемый модуль. Если модуль А\n"
-        "   вызывает модуль Б и читает status_code через getattr(), а Б возвращает dict — тест должен\n"
-        "   это упасть-показать, а не пройти благодаря мокам.\n"
-        "4. Если модулей-зависимостей нет (dep_names пуст) — просто честно протестируй сам модуль\n"
-        "   через реальные вызовы (без моков вообще), не выдумывай несуществующие зависимости.\n"
-        "5. Верни ТОЛЬКО валидный Python-код файла тестов без markdown, без объяснений."
+        "1. Импортируй РЕАЛЬНЫЕ функции/классы зависимых модулей из skills/ — БЕЗ mock для них.\n"
+        "2. Запрещено использовать `@patch` как декоратор на методах тестов. Используй `with patch(...):` только для внешних библиотек.\n"
+        "3. Если модулей-зависимостей нет — честно протестируй модуль через реальные вызовы.\n"
+        "4. Верни ТОЛЬКО валидный Python-код файла тестов без markdown."
     )
     return ask_gemini(prompt)
 
@@ -446,8 +431,8 @@ def unga_implement_hardened(task: dict, unit_test_code: str, integration_test_co
     context_err = f"ОШИБКА АРЕНЫ С ПРОШЛОГО РАУНДА:\n{error_log}\n" if error_log else ""
     context_base = f"БАЗОВЫЙ КОД:\n{existing_code}\n" if existing_code else ""
     combined_tests = (
-        f"ЮНИТ-ТЕСТЫ (моки допустимы):\n{unit_test_code}\n\n"
-        f"ИНТЕГРАЦИОННЫЕ ТЕСТЫ (реальные вызовы соседних модулей, без моков между skills):\n{integration_test_code}\n"
+        f"ЮНИТ-ТЕСТЫ:\n{unit_test_code}\n\n"
+        f"ИНТЕГРАЦИОННЫЕ ТЕСТЫ:\n{integration_test_code}\n"
     )
     prompt = (
         "Ты — Унга, кодер. Архитектор — закон. Подчинись ОБОИМ наборам его тестов.\n"
@@ -456,15 +441,12 @@ def unga_implement_hardened(task: dict, unit_test_code: str, integration_test_co
         f"{context_base}\n"
         f"ТЕСТЫ АРХИТЕКТОРА:\n{combined_tests}\n\n"
         f"{context_err}\n"
-        "ПРАВИЛА:\n"
-        "1. ЗАПРЕЩЕНО создавать заглушки с именами модулей из skills/! Делай честный импорт!\n"
-        f"   Доступные модули: {list(manifest.keys())}\n"
-        "2. Если тест требует `assertRaises`, НЕ глуши ошибку через try-except, выбрасывай её наружу!\n"
-        "3. Интеграционный тест проверяет РЕАЛЬНУЮ форму данных, которую отдают соседние модули —\n"
-        "   если он ждёт dict с ключом 'status', не используй getattr(obj, 'status_code'), читай\n"
-        "   через .get('status') или ['status']. Согласуй свой код с тем, что модули РЕАЛЬНО возвращают,\n"
-        "   а не с тем, что 'логично было бы' по имени функции.\n"
-        "4. Верни ТОЛЬКО чистый Python-код файла модуля без markdown."
+        "СТРОГИЕ ПРАВИЛА:\n"
+        "1. ТОЧНЫЕ ИМПОРТЫ: Загляни в манифест существующих навыков! Импортируй ТОЛЬКО те имена функций/классов, которые там реально объявлены:\n"
+        f"{json.dumps(manifest, indent=2, ensure_ascii=False)}\n"
+        "   Запрещено выдумывать имена функций в других модулях (например `from skills.x import x`), если в манифесте другое имя!\n"
+        "2. Если мок статуса в тестах возвращает объект, приводи статус к числу безопасно: `int(getattr(res, 'status', 200) or 200)` или делай fallback на 200.\n"
+        "3. Верни ТОЛЬКО чистый Python-код файла модуля без markdown."
     )
     return ask_gemini(prompt)
 

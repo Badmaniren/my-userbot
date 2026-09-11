@@ -364,7 +364,7 @@ def dream_action(manifest: dict, lessons: str) -> dict:
         "ВЫБЕРИ ДЕЙСТВИЕ:\n"
         "1. 'create': Новый модуль (RSS-парсер, замерщик памяти, парсер JSON, экстрактор данных).\n"
         "2. 'refactor': Устранение слабостей существующего модуля.\n\n"
-        "ТРЕБОВАНИЯ: Стандартная библиотека Python или requests.\n"
+        "ТРЕБОВАНИЯ: Стандартная библиотека Python, requests или beautifulsoup4 (bs4).\n"
         "Верни СТРОГО JSON:\n"
         "{\n"
         '  "action": "create" или "refactor",\n'
@@ -375,13 +375,16 @@ def dream_action(manifest: dict, lessons: str) -> dict:
     )
     raw = ask_gemini(prompt, json_mode=True)
     try:
-        data = json.loads(raw)
+        json_match = re.search(r'\{.*\}', raw, re.DOTALL)
+        clean_raw = json_match.group(0) if json_match else raw
+        data = json.loads(clean_raw)
         mod = re.sub(r'[^a-zA-Z0-9_]', '', data.get("module_name", "").lower())
         if not mod:
             raise ValueError("Empty module name")
         data["module_name"] = mod
         return data
-    except Exception:
+    except Exception as e:
+        print(f"[!] Ошибка парсинга решения Стратега: {e}, fallback")
         return {
             "action": "create",
             "module_name": f"extractor_tool_{int(time.time())}",
@@ -398,14 +401,16 @@ def architect_write_hard_tests(task: dict, manifest: dict, lessons: str, existin
         f"{context_code}\n"
         f"СИГНАТУРЫ ДЛЯ ИМПОРТА:\n{json.dumps(manifest, indent=2, ensure_ascii=False)}\n\n"
         f"УРОКИ ИЗ ПРОШЛЫХ ОШИБОК:\n{lessons}\n\n"
-        "СТРОГИЕ ПРАВИЛА ВАЛИДНОСТИ ТЕСТОВ (ЗА НАРУШЕНИЕ — СМЕРТЬ):\n"
-        "1. БЕЗ СЛОМАННЫХ ДЕКОРАТОРОВ. Запрещено вешать `@patch` над методами теста! "
-        "Используй исключительно контекстный менеджер внутри метода: `with patch(...) as mock_obj:`!\n"
-        "2. МОКИ ДОЛЖНЫ ВОЗВРАЩАТЬ РЕАЛЬНЫЕ ТИПЫ ДАННЫХ:\n"
-        "   - Если мокаешь ответ функции/запроса: `mock_res = MagicMock(); mock_res.status = 200; mock_res.status_code = 200; mock_res.text = '...'; mock_func.return_value = mock_res`\n"
-        "   - Никогда не оставляй поля статусов неинициализированными, иначе в коде будет `Invalid status: <MagicMock>`!\n"
-        "3. Минимум 50% тестов моделируют сбои (битые данные, 404/500, таймауты, пустые типы).\n"
-        "4. Верни ТОЛЬКО валидный Python-код файла тестов без markdown."
+        "СТРОГИЕ ПРАВИЛА ВАЛИДНОСТИ ТЕСТОВ:\n"
+        "1. РАЗРЕШЕННЫЕ БИБЛИОТЕКИ: Стандартная библиотека Python, unittest, unittest.mock, requests, bs4 (BeautifulSoup).\n"
+        "2. БЕЗ СЛОМАННЫХ ДЕКОРАТОРОВ: Запрещено вешать `@patch` над методами теста! Используй только `with patch(...) as mock:` внутри метода!\n"
+        "3. ВНИМАНИЕ К ТИПАМ ВОЗВРАТА (TRUTHINESS ЛОВУШКА):\n"
+        "   - Если функция возвращает кортеж `(bool, str)`, ЗАПРЕЩЕНО писать `self.assertFalse(func())`! "
+        "В Python `bool((False, 'error'))` ВСЕГДА равен True! Проверяй нулевой элемент: `self.assertFalse(func()[0])`.\n"
+        "   - Если ожидается булево значение — тестируй только чистый `bool`.\n"
+        "4. МОКИ ДОЛЖНЫ ВОЗВРАЩАТЬ РЕАЛЬНЫЕ ТИПЫ: `mock_res.status_code = 200`, `mock_res.text = '...'`.\n"
+        "5. Минимум 50% тестов моделируют сбои (битые данные, 404/500, таймауты, пустые типы).\n"
+        "6. Верни ТОЛЬКО валидный Python-код файла тестов без markdown."
     )
     return ask_gemini(prompt)
 
@@ -419,14 +424,11 @@ def architect_write_integration_test(task: dict, manifest: dict, lessons: str, e
         f"ПОЛНЫЙ МАНИФЕСТ РЕАЛЬНЫХ МОДУЛЕЙ И ИХ СИГНАТУР:\n{json.dumps(manifest, indent=2, ensure_ascii=False)}\n\n"
         f"УРОКИ ИЗ ПРОШЛЫХ ОШИБОК СТЫКОВКИ:\n{lessons}\n\n"
         "СТРОЖАЙШИЕ ПРАВИЛА:\n"
-        "1. ИМПОРТ ТОЛЬКО СУЩЕСТВУЮЩЕГО: Если импортируешь что-то из `skills.*`, бери ТОЛЬКО те имена классов и функций, "
-        "которые ДОСЛОВНО присутствуют в манифесте выше! Запрещено выдумывать классы вроде 'HTTPPing', если в манифесте функция 'http_ping'.\n"
-        "2. БЕЗ ПРИТЯГИВАНИЯ ЗА УШИ: Связывай тестируемый модуль с соседними модулями ТОЛЬКО если это логично по архитектуре "
-        "(например: crawler зависит от fetcher, fetcher зависит от rate_limiter). "
-        "Если модуль является чистой утилитой (url_cleaner, clean_text, json_extractor) и ему НЕ нужны соседи — "
-        "НЕ ИМПОРТИРУЙ соседние модули вообще! Напиши честный сквозной (end-to-end) интеграционный тест работы самого модуля.\n"
-        "3. Запрещено использовать `@patch` как декоратор. Используй `with patch(...):` только для внешних библиотек.\n"
-        "4. Верни ТОЛЬКО валидный Python-код файла тестов без markdown."
+        "1. РАЗРЕШЕННЫЕ БИБЛИОТЕКИ: Стандартная библиотека Python, requests, bs4 (BeautifulSoup).\n"
+        "2. ИМПОРТ ТОЛЬКО СУЩЕСТВУЮЩЕГО: Если импортируешь что-то из `skills.*`, бери ТОЛЬКО те имена, которые ДОСЛОВНО есть в манифесте!\n"
+        "3. РЕАЛЬНАЯ ПРОВЕРКА: В тестах ОБЯЗАТЕЛЬНО вызывай функции/методы создаваемого модуля `skills/{task['module_name']}.py`, а не просто стандартную библиотеку!\n"
+        "4. Не используй `@patch` над методами.\n"
+        "5. Верни ТОЛЬКО валидный Python-код файла тестов без markdown."
     )
     return ask_gemini(prompt)
 
@@ -445,11 +447,12 @@ def unga_implement_hardened(task: dict, unit_test_code: str, integration_test_co
         f"ТЕСТЫ АРХИТЕКТОРА:\n{combined_tests}\n\n"
         f"{context_err}\n"
         "СТРОГИЕ ПРАВИЛА:\n"
-        "1. ТОЧНЫЕ ИМПОРТЫ: Загляни в манифест существующих навыков! Импортируй ТОЛЬКО те имена функций/классов, которые там реально объявлены:\n"
-        f"{json.dumps(manifest, indent=2, ensure_ascii=False)}\n"
-        "   Запрещено выдумывать имена функций в других модулях (например `from skills.x import x`), если в манифесте другое имя!\n"
-        "2. Внимательно смотри на ожидаемые значения assertEqual в трейсбеках: следи за слэшами на концах путей, регистром букв и порядком параметров.\n"
-        "3. Верни ТОЛЬКО чистый Python-код файла модуля без markdown."
+        "1. СМОТРИ НА ОЖИДАЕМЫЙ ТИП ВОЗВРАТА:\n"
+        "   - Если тест падает с `AssertionError: (False, ...) is not false` — тест вызвал `self.assertFalse(...)` прямо на результате! "
+        "НЕ ВОЗВРАЩАЙ кортеж `(False, 'reason')`! Функция обязана возвращать чистый `False` (тип bool) или бросать исключение!\n"
+        "2. РАЗРЕШЕННЫЕ ИМПОРТЫ: Стандартная библиотека Python, requests, bs4 (BeautifulSoup).\n"
+        "3. ЗАПРЕЩЕНО глушить ошибки через `except Exception: pass`!\n"
+        "4. Верни ТОЛЬКО чистый Python-код файла модуля без markdown."
     )
     return ask_gemini(prompt)
 

@@ -13,7 +13,10 @@ class CompressedRSSCache:
 
     def __init__(self, cache_dir: str = "rss_cache", default_ttl: int = 300, compression_level: int = 6):
         self.file_cache = FileCache(cache_dir=cache_dir, default_ttl=default_ttl)
-        self.compressor = PayloadCompressor(compression_level=compression_level)
+        try:
+            self.compressor = PayloadCompressor(compression_level=compression_level)
+        except TypeError:
+            self.compressor = PayloadCompressor()
 
     def set_feed(self, url: str, payload: str, ttl: int = None) -> None:
         if not url or not isinstance(url, str):

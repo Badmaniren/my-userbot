@@ -291,10 +291,20 @@ def get_skills_manifest() -> dict:
             for node in ast.walk(tree):
                 if isinstance(node, ast.FunctionDef) and not node.name.startswith("_"):
                     args = [a.arg for a in node.args.args]
-                    signatures.append(f"def {node.name}({', '.join(args)})")
+                    ret = f" -> {ast.unparse(node.returns)}" if getattr(node, "returns", None) else ""
+                    doc = ast.get_docstring(node)
+                    doc_snippet = f" | {doc.splitlines()[0][:60]}" if doc else ""
+                    signatures.append(f"def {node.name}({', '.join(args)}){ret}{doc_snippet}")
                 elif isinstance(node, ast.ClassDef) and not node.name.startswith("_"):
-                    methods = [m.name for m in node.body if isinstance(m, ast.FunctionDef) and not m.name.startswith("_")]
-                    signatures.append(f"class {node.name} [методы: {', '.join(methods)}]")
+                    methods = []
+                    for m in node.body:
+                        if isinstance(m, ast.FunctionDef) and not m.name.startswith("_"):
+                            m_args = [a.arg for a in m.args.args]
+                            m_ret = f" -> {ast.unparse(m.returns)}" if getattr(m, "returns", None) else ""
+                            methods.append(f"{m.name}({', '.join(m_args)}){m_ret}")
+                    doc = ast.get_docstring(node)
+                    doc_snippet = f" | {doc.splitlines()[0][:60]}" if doc else ""
+                    signatures.append(f"class {node.name}{doc_snippet} [методы: {', '.join(methods)}]")
         except Exception:
             pass
         manifest[mod_key] = signatures if signatures else ["нет сигнатур"]
@@ -399,16 +409,14 @@ def architect_write_hard_tests(task: dict, manifest: dict, lessons: str, existin
         f"Задача: {task['action']} модуля skills/{task['module_name']}.py\n"
         f"Описание: {task['description']}\n"
         f"{context_code}\n"
-        f"СИГНАТУРЫ ДЛЯ ИМПОРТА:\n{json.dumps(manifest, indent=2, ensure_ascii=False)}\n\n"
+        f"СИГНАТУРЫ И ТИПЫ ДЛЯ ИМПОРТА:\n{json.dumps(manifest, indent=2, ensure_ascii=False)}\n\n"
         f"УРОКИ ИЗ ПРОШЛЫХ ОШИБОК:\n{lessons}\n\n"
         "СТРОГИЕ ПРАВИЛА ВАЛИДНОСТИ ТЕСТОВ (ЗА НАРУШЕНИЕ — ОТБРАКОВКА):\n"
         "1. РАЗРЕШЕННЫЕ БИБЛИОТЕКИ: Стандартная библиотека Python, unittest, unittest.mock, requests, bs4 (BeautifulSoup).\n"
         "2. БЕЗ СЛОМАННЫХ ДЕКОРАТОРОВ: Запрещено вешать `@patch` над методами теста! Используй только `with patch(...) as mock:` внутри метода!\n"
-        "3. ЗАПРЕЩЕНО ТРОГАТЬ СЛУЖЕБНЫЕ КИШКИ МОКОВ: Никогда не вызывай `len()` от мок-объектов или их методов (вроде `mock_add_spec`)! Это вызывает моментальный `TypeError: object of type 'method' has no len()`.\n"
-        "4. ТЕСТИРУЙ ПОВЕДЕНИЕ, А НЕ ВНУТРЕННИЕ СЧЁТЧИКИ: Не завязывайся на точный call_count (например, `call_count == 1` или `assert_called_once()`), если функция может вызываться внутри повторно. Проверяй факт вызова `assertTrue(mock.called)` или конечный результат (заголовки, возвращаемые данные)!\n"
-        "5. ВНИМАНИЕ К ТИПАМ ВОЗВРАТА (TRUTHINESS ЛОВУШКА):\n"
-        "   - Если функция возвращает кортеж `(bool, str)`, ЗАПРЕЩЕНО писать `self.assertFalse(func())`! Проверяй `self.assertFalse(func()[0])`.\n"
-        "   - Если ожидается чистый `bool` — требуй `self.assertIs(func(), False)`.\n"
+        "3. ЗАПРЕЩЕНО ИНДЕКСИРОВАТЬ РЕЗУЛЬТАТ КАК КОРТЕЖ: Если тестируешь функцию валидации/проверки — она возвращает чистый `bool`! Проверяй `self.assertTrue(res)` или `self.assertFalse(res)`. ЗАПРЕЩЕНО писать `res[0]` — это вызывает моментальный `TypeError: 'bool' object is not subscriptable`!\n"
+        "4. ЕДИНЫЙ КОНТРАКТ НА ОШИБКИ: Если тест ожидает исключение при невалидных данных — используй ТОЛЬКО `with self.assertRaises(ExpectedException): func()`. Если вызываешь функцию без `assertRaises` — значит, она обязана корректно вернуть `False`, а не падать!\n"
+        "5. ТЕСТИРУЙ ПОВЕДЕНИЕ, А НЕ ВНУТРЕННИЕ СЧЁТЧИКИ: Не завязывайся на точный call_count. Проверяй факт вызова `assertTrue(mock.called)` или конечный результат!\n"
         "6. МОКИ ДОЛЖНЫ ВОЗВРАЩАТЬ РЕАЛЬНЫЕ ТИПЫ: `mock_res.status_code = 200`, `mock_res.text = '...'`.\n"
         "7. Минимум 50% тестов моделируют сбои (битые данные, 404/500, таймауты, пустые типы).\n"
         "8. Верни ТОЛЬКО валидный Python-код файла тестов без markdown."
@@ -422,12 +430,12 @@ def architect_write_integration_test(task: dict, manifest: dict, lessons: str, e
         f"Модуль: skills/{task['module_name']}.py\n"
         f"Описание: {task['description']}\n"
         f"{context_code}\n"
-        f"ПОЛНЫЙ МАНИФЕСТ РЕАЛЬНЫХ МОДУЛЕЙ И ИХ СИГНАТУР:\n{json.dumps(manifest, indent=2, ensure_ascii=False)}\n\n"
+        f"ПОЛНЫЙ МАНИФЕСТ РЕАЛЬНЫХ МОДУЛЕЙ С СИГНАТУРАМИ И ТИПАМИ:\n{json.dumps(manifest, indent=2, ensure_ascii=False)}\n\n"
         f"УРОКИ ИЗ ПРОШЛЫХ ОШИБОК СТЫКОВКИ:\n{lessons}\n\n"
         "СТРОЖАЙШИЕ ПРАВИЛА:\n"
-        "1. РАЗРЕШЕННЫЕ БИБЛИОТЕКИ: Стандартная библиотека Python, requests, bs4 (BeautifulSoup).\n"
-        "2. ИМПОРТ ТОЛЬКО СУЩЕСТВУЮЩЕГО: Если импортируешь что-то из `skills.*`, бери ТОЛЬКО те имена, которые ДОСЛОВНО есть в манифесте!\n"
-        "3. РЕАЛЬНАЯ ПРОВЕРКА: В тестах ОБЯЗАТЕЛЬНО вызывай функции/методы создаваемого модуля `skills/{task['module_name']}.py`, а не просто сторонние пакеты!\n"
+        "1. СМОТРИ НА ТИПЫ В МАНИФЕСТЕ: Если модуль в манифесте возвращает `-> str` (например, `payload_compressor` возвращает сжатую base64-строку), ЗАПРЕЩЕНО ожидать от него `bytes`! Проверяй реальные типы!\n"
+        "2. ИМПОРТ ТОЛЬКО СУЩЕСТВУЮЩЕГО: Если импортируешь что-то из `skills.*`, бери ТОЛЬКО те имена, которые ДОСЛОВНО есть в манифесте выше!\n"
+        "3. РЕАЛЬНАЯ ПРОВЕРКА: В тестах ОБЯЗАТЕЛЬНО вызывай функции/методы создаваемого модуля `skills/{task['module_name']}.py`!\n"
         "4. Не используй `@patch` над методами.\n"
         "5. Верни ТОЛЬКО валидный Python-код файла тестов без markdown."
     )
@@ -448,12 +456,12 @@ def unga_implement_hardened(task: dict, unit_test_code: str, integration_test_co
         f"ТЕСТЫ АРХИТЕКТОРА:\n{combined_tests}\n\n"
         f"{context_err}\n"
         "СТРОГИЕ ПРАВИЛА:\n"
-        "1. БЕЗОПАСНЫЙ МЕРЖ СЛОВАРЕЙ И ЗАГОЛОВКОВ: Если работаешь с заголовками, параметрами или конфигами, никогда не затирай переданные пользователем кастомные значения! Используй `{**default_headers, **(custom_headers or {})}` или `headers.update(...)`, чтобы не ловить KeyError на кастомных ключах!\n"
-        "2. СМОТРИ НА ОЖИДАЕМЫЙ ТИП ВОЗВРАТА:\n"
-        "   - Если тест падает с `AssertionError: (False, ...) is not false` — функция обязана возвращать чистый `False` (тип bool) или бросать исключение, а не кортеж!\n"
-        "3. РАЗРЕШЕННЫЕ ИМПОРТЫ: Стандартная библиотека Python, requests, bs4 (BeautifulSoup).\n"
-        "4. ЗАПРЕЩЕНО глушить ошибки через `except Exception: pass`!\n"
-        "5. Верни ТОЛЬКО чистый Python-код файла модуля без markdown."
+        "1. ЧИСТЫЕ ТИПЫ ВОЗВРАТА: Любые функции валидации/проверки обязаны возвращать чистый `bool` (`True` или `False`). ЗАПРЕЩЕНО возвращать кортежи вида `(False, 'error')`!\n"
+        "2. РАБОТА С ИСКЛЮЧЕНИЯМИ: Внимательно посмотри на тесты Архитектора. Если тест вызывает функцию БЕЗ блока `with self.assertRaises(...)`, он ждёт, что функция при ошибке вернёт `False` (или `None`), а НЕ выбросит исключение! Выбрасывай исключения ТОЛЬКО там, где тесты явно этого требуют через `assertRaises`!\n"
+        "3. БЕЗОПАСНЫЙ МЕРЖ СЛОВАРЕЙ: При работе с заголовками или параметрами всегда сохраняй кастомные данные: `{**default_headers, **(custom_headers or {})}`.\n"
+        "4. РАЗРЕШЕННЫЕ ИМПОРТЫ: Стандартная библиотека Python, requests, bs4 (BeautifulSoup).\n"
+        "5. ЗАПРЕЩЕНО глушить ошибки через `except Exception: pass`!\n"
+        "6. Верни ТОЛЬКО чистый Python-код файла модуля без markdown."
     )
     return ask_gemini(prompt)
 

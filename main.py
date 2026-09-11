@@ -195,16 +195,21 @@ def watch_arena_by_sha(expected_sha: str):
 def _fetch_job_logs(job_id: int) -> str:
     """
     GitHub отдаёт логи джобы не напрямую, а через 302-редирект на подписанную
-    ссылку в blob-хранилище. requests обычно следует за редиректом сам, но:
-    1) сразу после завершения job логи иногда ещё не готовы (гонка);
-    2) на кросс-доменном редиректе лишние заголовки (Authorization) могут мешать.
-    Поэтому редирект обрабатываем вручную и делаем несколько попыток с паузой.
+    ссылку в blob-хранилище. Дополнительная сложность: сразу после того, как
+    job помечена 'completed', архив логов ещё может быть не готов пару десятков
+    секунд — тогда сама ссылка из редиректа честно отвечает 404. Поэтому ждём
+    дольше и с нарастающей паузой, а не просто дёргаем 3 раза подряд.
     """
     logs_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/actions/jobs/{job_id}/logs")
+    delays = [10, 15, 20, 25, 30]  # суммарно ~100 сек ожидания архивации логов
 
-    for attempt in range(1, 4):
+    for attempt, delay in enumerate(delays, start=1):
         try:
             step1 = requests.get(logs_url, headers=API_HEADERS, timeout=15, allow_redirects=False)
+
+            if step1.status_code in (401, 403):
+                print(f"[!] Логи: доступ к самому GitHub API запрещён (HTTP {step1.status_code}) — вот это уже реально похоже на нехватку прав токена, дальше ждать бессмысленно.")
+                return ""
 
             if step1.status_code in (301, 302, 303, 307, 308):
                 blob_url = step1.headers.get("Location")
@@ -214,15 +219,15 @@ def _fetch_job_logs(job_id: int) -> str:
                     step2 = requests.get(blob_url, timeout=15)
                     if step2.status_code == 200 and step2.text.strip():
                         return step2.text
-                    print(f"[!] Логи: редирект есть, но тело не отдалось (HTTP {step2.status_code}), попытка {attempt}/3")
+                    print(f"[!] Логи: редирект есть, но тело не отдалось (HTTP {step2.status_code}), попытка {attempt}/{len(delays)}")
             elif step1.status_code == 200 and step1.text.strip():
                 return step1.text
             else:
-                print(f"[!] Логи: неожиданный статус {step1.status_code} на попытке {attempt}/3")
+                print(f"[!] Логи: неожиданный статус {step1.status_code} на попытке {attempt}/{len(delays)}")
         except Exception as e:
-            print(f"[!] Логи: сетевая ошибка на попытке {attempt}/3: {e}")
+            print(f"[!] Логи: сетевая ошибка на попытке {attempt}/{len(delays)}: {e}")
 
-        time.sleep(5)
+        time.sleep(delay)
 
     return ""
 
@@ -242,9 +247,10 @@ def extract_clean_test_traceback(run_id: int) -> str:
     log_text = _fetch_job_logs(failed["id"])
     if not log_text:
         return (
-            f"Тело логов недоступно после 3 попыток (job_id={failed['id']}). "
-            "Если это происходит систематически, а не разово — вероятно, у токена "
-            "GITHUB_TOKEN не хватает прав на чтение Actions, это стоит проверить вручную."
+            f"Тело логов недоступно (job_id={failed['id']}) даже после долгих повторных попыток. "
+            "Судя по тому, что редирект на архив логов проходит успешно, а не отдаётся именно тело — "
+            "это похоже на задержку публикации логов у GitHub, а не на нехватку прав токена. "
+            "Ручного вмешательства это не требует: этот раунд просто останется без чистого трейсбека."
         )
 
     lines = log_text.splitlines()

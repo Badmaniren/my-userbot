@@ -56,7 +56,17 @@ class ResilientRSSFetcher:
             headers = self.headers_rotator.rotate_headers()
             
             if hasattr(self.headers_rotator, 'validate_headers_against_target'):
-                if not self.headers_rotator.validate_headers_against_target(url, headers):
+                try:
+                    validation_res = self.headers_rotator.validate_headers_against_target(url, headers, timeout=timeout)
+                except TypeError:
+                    validation_res = self.headers_rotator.validate_headers_against_target(url, headers)
+                
+                if isinstance(validation_res, tuple):
+                    valid = bool(validation_res[0])
+                else:
+                    valid = bool(validation_res)
+
+                if not valid:
                     raise ResilientFetcherError("Валидация заголовков против цели не прошла")
 
             result = self.archiver.archive_feed(url, timeout, force_refresh=force_refresh)

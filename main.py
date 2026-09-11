@@ -192,6 +192,40 @@ def watch_arena_by_sha(expected_sha: str):
     return False, last_seen_id
 
 # 5. ХИРУРГИЧЕСКИЙ ПАРСИНГ ТРЕЙСБЕКА
+def _fetch_job_logs(job_id: int) -> str:
+    """
+    GitHub отдаёт логи джобы не напрямую, а через 302-редирект на подписанную
+    ссылку в blob-хранилище. requests обычно следует за редиректом сам, но:
+    1) сразу после завершения job логи иногда ещё не готовы (гонка);
+    2) на кросс-доменном редиректе лишние заголовки (Authorization) могут мешать.
+    Поэтому редирект обрабатываем вручную и делаем несколько попыток с паузой.
+    """
+    logs_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/actions/jobs/{job_id}/logs")
+
+    for attempt in range(1, 4):
+        try:
+            step1 = requests.get(logs_url, headers=API_HEADERS, timeout=15, allow_redirects=False)
+
+            if step1.status_code in (301, 302, 303, 307, 308):
+                blob_url = step1.headers.get("Location")
+                if blob_url:
+                    # финальная ссылка уже содержит подписанный токен доступа —
+                    # заголовки авторизации GitHub здесь не нужны и могут мешать
+                    step2 = requests.get(blob_url, timeout=15)
+                    if step2.status_code == 200 and step2.text.strip():
+                        return step2.text
+                    print(f"[!] Логи: редирект есть, но тело не отдалось (HTTP {step2.status_code}), попытка {attempt}/3")
+            elif step1.status_code == 200 and step1.text.strip():
+                return step1.text
+            else:
+                print(f"[!] Логи: неожиданный статус {step1.status_code} на попытке {attempt}/3")
+        except Exception as e:
+            print(f"[!] Логи: сетевая ошибка на попытке {attempt}/3: {e}")
+
+        time.sleep(5)
+
+    return ""
+
 def extract_clean_test_traceback(run_id: int) -> str:
     if not run_id:
         return "Не удалось определить run_id шага тестирования."
@@ -199,17 +233,21 @@ def extract_clean_test_traceback(run_id: int) -> str:
     jobs_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/actions/runs/{run_id}/jobs")
     r = requests.get(jobs_url, headers=API_HEADERS, timeout=10)
     if r.status_code != 200:
-        return "Не удалось получить список jobs."
+        return f"Не удалось получить список jobs (HTTP {r.status_code})."
     jobs = r.json().get("jobs", [])
     failed = next((j for j in jobs if j.get("conclusion") == "failure"), None)
     if not failed:
         return "Проваленный job не найден."
 
-    log_res = requests.get(clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/actions/jobs/{failed['id']}/logs"), headers=API_HEADERS, timeout=15)
-    if log_res.status_code != 200:
-        return "Тело логов недоступно."
+    log_text = _fetch_job_logs(failed["id"])
+    if not log_text:
+        return (
+            f"Тело логов недоступно после 3 попыток (job_id={failed['id']}). "
+            "Если это происходит систематически, а не разово — вероятно, у токена "
+            "GITHUB_TOKEN не хватает прав на чтение Actions, это стоит проверить вручную."
+        )
 
-    lines = log_res.text.splitlines()
+    lines = log_text.splitlines()
     error_buffer = []
     capture = False
 
@@ -300,6 +338,23 @@ def get_lessons_context() -> str:
         return "...(старые записи обрезаны)...\n" + content[-MAX_LESSONS_CHARS_IN_PROMPT:]
     return content
 
+def _build_lesson_entry(mod_name: str, action: str, rounds: int, cheats_caught: list, last_error: str, status_line: str) -> str:
+    entry_lines = [f"\n## {mod_name} ({action}) — раундов: {rounds}"]
+    if cheats_caught:
+        entry_lines.append(f"- Античит поймал: {'; '.join(cheats_caught)}")
+    if last_error:
+        snippet = next((l for l in reversed(last_error.strip().splitlines()) if l.strip()), "")
+        if snippet:
+            entry_lines.append(f"- Последняя ошибка перед фиксом: {snippet[:300]}")
+    entry_lines.append(f"- Статус: {status_line}")
+    return "\n".join(entry_lines)
+
+def _merge_lessons_text(existing: str, entry: str) -> str:
+    updated = existing.rstrip() + "\n" + entry + "\n"
+    if len(updated) > MAX_LESSONS_FILE_CHARS:
+        updated = LESSONS_HEADER + "\n...(старые уроки обрезаны для экономии контекста)...\n" + updated[-MAX_LESSONS_FILE_CHARS:]
+    return updated
+
 def append_lesson_to_branch(branch: str, mod_name: str, action: str, rounds: int, cheats_caught: list, last_error: str = "") -> None:
     """
     Дописывает урок в LESSONS.md ПРЯМО В ВЕТКЕ МУТАЦИИ, чтобы он влился в main
@@ -307,21 +362,39 @@ def append_lesson_to_branch(branch: str, mod_name: str, action: str, rounds: int
     'бот никогда не пушит в main напрямую', т.к. коммит едет тем же путём слияния.
     """
     existing = get_file_content(branch, LESSONS_PATH) or get_file_content("main", LESSONS_PATH) or LESSONS_HEADER
+    entry = _build_lesson_entry(mod_name, action, rounds, cheats_caught, last_error, "успешно прошёл интеграционные тесты и влит в main")
+    commit_file_to_branch(branch, LESSONS_PATH, _merge_lessons_text(existing, entry), f"Урок: {mod_name}")
 
-    entry_lines = [f"\n## {mod_name} ({action}) — раундов до успеха: {rounds}"]
-    if cheats_caught:
-        entry_lines.append(f"- Античит поймал: {'; '.join(cheats_caught)}")
-    if last_error:
-        snippet = next((l for l in reversed(last_error.strip().splitlines()) if l.strip()), "")
-        if snippet:
-            entry_lines.append(f"- Последняя ошибка перед фиксом: {snippet[:300]}")
-    entry_lines.append("- Статус: успешно прошёл интеграционные тесты и влит в main")
+def append_failure_lesson_directly(mod_name: str, action: str, rounds: int, cheats_caught: list, last_error: str = "") -> None:
+    """
+    Провальная ветка с кодом удаляется целиком — но урок из неё стоит запомнить.
+    LESSONS.md не исполняется как код, поэтому для НЕГО заводим отдельную короткую
+    ветку и мержим сразу, не дожидаясь Arena: риска для main это не несёт, т.к.
+    ни один .py-файл тут не меняется — только заметка для будущих промптов.
+    """
+    base_sha = get_main_sha()
+    if not base_sha:
+        print("[!] Не удалось сохранить урок о провале: main sha недоступен.")
+        return
 
-    updated = existing.rstrip() + "\n" + "\n".join(entry_lines) + "\n"
-    if len(updated) > MAX_LESSONS_FILE_CHARS:
-        updated = LESSONS_HEADER + "\n...(старые уроки обрезаны для экономии контекста)...\n" + updated[-MAX_LESSONS_FILE_CHARS:]
+    note_branch = f"unga-lesson-{mod_name}-{int(time.time())}"
+    if not prepare_branch(note_branch, base_sha):
+        print("[!] Не удалось сохранить урок о провале: ветка не создана.")
+        return
 
-    commit_file_to_branch(branch, LESSONS_PATH, updated, f"Урок: {mod_name}")
+    existing = get_file_content("main", LESSONS_PATH) or LESSONS_HEADER
+    entry = _build_lesson_entry(mod_name, action, rounds, cheats_caught, last_error, "ПРОВАЛЕН после всех попыток, ветка с кодом удалена")
+    commit_file_to_branch(note_branch, LESSONS_PATH, _merge_lessons_text(existing, entry), f"Урок (провал): {mod_name}")
+
+    m_res = requests.post(clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/merges"), headers=API_HEADERS, json={
+        "base": "main", "head": note_branch, "commit_message": f"Урок из провала: {mod_name}"
+    }, timeout=10)
+
+    if m_res.status_code in [200, 201, 204]:
+        requests.delete(clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{note_branch}"), headers=API_HEADERS)
+        print(f"[*] Урок о провале '{mod_name}' сохранён в {LESSONS_PATH}.")
+    else:
+        print(f"[!] Не удалось влить урок о провале ({m_res.status_code}). Ветка {note_branch} оставлена для аудита.")
 
 # 8. ТРИАДА
 def dream_action(manifest: dict, lessons: str) -> dict:
@@ -527,7 +600,7 @@ def run_evolution_cycle():
             print(f"[!] Ошибка слияния ({m_res.status_code}): {m_res.text}. Ветка сохранена для аудита!")
     else:
         print(f"\n[-] Мутация '{mod_name}' отбракована после {attempts} раундов.")
-        print(f"[*] Урок не сохранён в main (правило: без прямых пушей), но виден в логах выше.")
+        append_failure_lesson_directly(mod_name, action, attempts, cheats_caught, last_error)
         requests.delete(clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{branch}"), headers=API_HEADERS)
 
 def life_cycle():

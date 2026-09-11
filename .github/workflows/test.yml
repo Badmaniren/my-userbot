@@ -10,18 +10,18 @@ jobs:
   arena-run:
     runs-on: ubuntu-latest
     steps:
-      - name: Загрузка репозитория
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Подготовка Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Установка зависимостей
+      - name: Install dependencies
         run: |
           pip install requests
 
-      - name: Запуск гладиаторских тестов
+      - name: Run tests
         run: |
           python -m unittest discover -s . -p "test_*.py"

@@ -3,8 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-окена GITHUB_TOKEN не хватает прав на чтение Actions, это стоит проверить вручную.
-- Статус: ПРОВАЛЕН после всех попыток, ветка с кодом удалена
+пыток, ветка с кодом удалена
 
 ## smart_crawler (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: Тело логов недоступно после 3 попыток (job_id=103295522310). Если это происходит систематически, а не разово — вероятно, у токена GITHUB_TOKEN не хватает прав на чтение Actions, это стоит проверить вручную.
@@ -294,3 +293,6 @@
 ## smart_secure_compressed_rss_crawler_v3 (compose) — раундов: 5
 - Последняя ошибка перед фиксом: FAIL: test_memory_profiler_integration (test_smart_secure_compressed_rss_crawler_v3.TestSmartSecureCompressedRSSCrawlerV3.test_memory_profiler_integration)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## smart_secure_compressed_sitemap_crawler_v2 (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

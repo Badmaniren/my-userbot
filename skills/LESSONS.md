@@ -173,3 +173,7 @@
 ## secure_clean_compressed_rss_archiver (compose) — раундов: 5
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН после всех попыток
+
+## resilient_clean_compressed_rss_archiver (compose) — раундов: 5
+- Последняя ошибка перед фиксом: skills.resilient_clean_compressed_rss_archiver.ResilientCleanCompressedRSSArchiverError: Ошибка декомпрессии данных: Payload decompression failed: Input must be a string
+- Статус: ПРОВАЛЕН после всех попыток

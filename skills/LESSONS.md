@@ -189,3 +189,7 @@
 ## smart_crawler (compose) — раундов: 5
 - Последняя ошибка перед фиксом: Ran 271 tests in 4.872s
 - Статус: ПРОВАЛЕН после всех попыток
+
+## smart_secure_rss_crawler (compose) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
+- Статус: успешно прошёл тесты и влит в main

@@ -26,6 +26,7 @@ if not GITHUB_TOKEN or not GITHUB_REPO or not API_KEYS:
     sys.exit(1)
 
 MANUAL_TASK_QUEUE = []
+HANDLED_JULES_COMMENTS = set()
 
 # 2. СЕРВЕР ЖИЗНИ ДЛЯ RENDER
 class DummyHandler(BaseHTTPRequestHandler):
@@ -495,50 +496,48 @@ def reactivate_stuck_jules_issues() -> int:
 def run_jules_babysitter():
     """
     Фоновый демон. Читает комменты в открытых Jules-задачах.
-    Если видит, что Jules обосрался (оставил коммент с просьбой перевесить лейбл),
-    молча сносит лейбл и вешает заново.
+    Реагирует на каждый сбой строго один раз, предотвращая цикл перезапусков.
     """
     print("[+] Демон-нянька для Jules запущен.")
     while True:
-        time.sleep(180) # Раз в 3 минуты, чтобы не задрачивать API GitHub'а лимитами
+        time.sleep(180)
         url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues")
         try:
             res = requests.get(url, headers=API_HEADERS, params={"state": "open", "per_page": 50}, timeout=10)
             if res.status_code != 200:
                 continue
-            
+
             issues = [i for i in res.json() if i.get("title", "").startswith("Jules Task:")]
-            
+
             for issue in issues:
                 num = issue.get("number")
                 if not num:
                     continue
-                
-                # Смотрим комменты к задаче
+
                 c_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues/{num}/comments")
                 c_res = requests.get(c_url, headers=API_HEADERS, timeout=10)
-                
+
                 if c_res.status_code == 200:
                     comments = c_res.json()
                     if not comments:
                         continue
-                    
+
                     last_comment = comments[-1]
+                    c_id = last_comment.get("id")
                     body = last_comment.get("body", "").lower()
-                    
-                    # Если Jules сам написал, что сдох
-                    if "jules has failed" in body or "try again later by removing and re-adding" in body:
-                        print(f"[*] Jules обосрался в issue #{num}. Выдаю пинка (авто-реактивация)...")
-                        
-                        # Удаляем лейбл
+
+                    if c_id not in HANDLED_JULES_COMMENTS and (
+                        "jules has failed" in body or "try again later by removing and re-adding" in body
+                    ):
+                        print(f"[*] Jules споткнулся в Issue #{num} (коммент #{c_id}). Перезапуск задачи...")
+                        HANDLED_JULES_COMMENTS.add(c_id)
+
                         del_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues/{num}/labels/jules")
                         requests.delete(del_url, headers=API_HEADERS, timeout=10)
-                        
-                        time.sleep(2) # Даем гитхабу прожевать
-                        
-                        # Вешаем заново
+
+                        time.sleep(2)
                         add_jules_label(num)
-                        
+
         except Exception as e:
             print(f"[!] Ошибка няньки Jules: {e}")
 
@@ -827,7 +826,7 @@ def architect_write_integration_test(task: dict, manifest: dict, lessons: str, e
 
 def unga_implement_hardened(task: dict, unit_test_code: str, integration_test_code: str, manifest: dict, existing_code: str = "", error_log: str = "") -> str:
     context_err = f"ОШИБКА С ПРОШЛОГО РАУНДА:\n{error_log}\n" if error_log else ""
-    context_base = f"БАЗОВЫЙ КОД:\n{existing_code}\n" if existing_code else ""
+    context_base = f"БАЗОВЙ КОД:\n{existing_code}\n" if existing_code else ""
     prompt = (
         "Ты — Унга, кодер. Подчинись ОБОИМ наборам тестов Архитектора.\n"
         f"Модуль: skills/{task['module_name']}.py\n"
@@ -1057,8 +1056,6 @@ def life_cycle():
         time.sleep(900)
 
 if __name__ == "__main__":
-    # Запускаем няньку в отдельном потоке
     threading.Thread(target=run_jules_babysitter, daemon=True).start()
-    # Запускаем основной цикл жизни
     threading.Thread(target=life_cycle, daemon=True).start()
     threading.Event().wait()

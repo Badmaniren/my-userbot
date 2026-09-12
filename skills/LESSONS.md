@@ -157,3 +157,7 @@
 
 ## compressed_db_storage (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## clean_compressed_db_storage (compose) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: успешно прошёл тесты и влит в main

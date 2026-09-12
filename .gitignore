@@ -1,0 +1,6 @@
+__pycache__/
+skills/__pycache__/
+*.pyc
+cache/
+.pytest_cache/
+*.db

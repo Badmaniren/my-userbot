@@ -47,6 +47,12 @@ threading.Thread(target=run_dummy_server, daemon=True).start()
 
 # 3. БЕЗОПАСНЫЙ TELEGRAM ДЕМОН (HTML)
 def send_tg(text: str, buttons: list = None, keyboard: bool = False):
+    """
+    buttons: список РЯДОВ inline-кнопок; каждый ряд — список dict вида
+    {"text": "...", "callback_data": "..."} или {"text": "...", "url": "..."}.
+    keyboard=True: показать/обновить постоянное меню-клавиатуру внизу экрана
+    (взаимоисключимо с inline-кнопками в одном сообщении — это разные виды разметки).
+    """
     if not TG_TOKEN or not TG_ADMIN_ID:
         return
     url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
@@ -148,6 +154,7 @@ def run_telegram_listener():
                     msg = update.get("message", {})
                     chat_id = str(msg.get("chat", {}).get("id", ""))
                     text = msg.get("text", "").strip()
+                    # кнопки постоянного меню приходят как обычный текст с эмодзи — снимаем эмодзи-обёртку
                     text = re.sub(r'^[📊🔁⚙️❓]\s*', '', text)
 
                     if chat_id != TG_ADMIN_ID:
@@ -191,7 +198,7 @@ threading.Thread(target=run_telegram_listener, daemon=True).start()
 
 # 4. СЕТЬ И КЛИЕНТ GEMINI
 def clean_url(url: str) -> str:
-    return re.sub(r'\[.*?\]\(\vert{}\)', '', url).strip()
+    return re.sub(r'\[.*?\]\(|\)', '', url).strip()
 
 API_HOST = "generativelanguage.googleapis.com"
 API_BASE = "https://" + API_HOST + "/v1beta/"
@@ -388,6 +395,11 @@ def extract_clean_test_traceback(run_id: int) -> str:
         return f"Сбой при извлечении трейсбека: {e}"
 
 def fix_jules_issue_labels() -> int:
+    """
+    Разовая починка: у issue-эскалаций, созданных ДО того, как метка 'jules' стала
+    проставляться автоматически, метки нет — и Jules их никогда не подхватит сам.
+    Дорасставляет метку на все такие уже существующие открытые issues.
+    """
     ensure_jules_label_exists()
     url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues?state=open&per_page=100")
     fixed = 0
@@ -414,6 +426,12 @@ def fix_jules_issue_labels() -> int:
     return fixed
 
 def ensure_jules_label_exists() -> None:
+    """
+    Jules подхватывает задачу из issue ТОЛЬКО если на нём стоит метка 'jules'.
+    Метка должна существовать в репозитории заранее, иначе GitHub отклонит
+    попытку присвоить её при создании issue. Создаём один раз, тихо игнорируя
+    ошибку 'уже существует' (422), но громко печатая любую другую.
+    """
     url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/labels")
     try:
         res = requests.post(url, headers=API_HEADERS, json={
@@ -422,7 +440,7 @@ def ensure_jules_label_exists() -> None:
             "description": "Автоматически подхватывается Jules для исправления"
         }, timeout=10)
         if res.status_code not in [200, 201, 422]:
-            print(f"[!] Не удалось создать лейбл jules (HTTP {res.status_code})")
+            print(f"[!] Не удалось создать лейбл jules в репозитории (HTTP {res.status_code}): {res.text[:300]}")
     except Exception as e:
         print(f"[!] Ошибка запроса создания лейбла jules: {e}")
 
@@ -440,12 +458,17 @@ def escalate_to_github_issue(mod_name: str, task_desc: str, last_error: str, bra
         f"> 2. Исправь код модуля `skills/{mod_name}.py` и тесты в `test_{mod_name}.py` / `test_{mod_name}_integration.py`.\n"
         f"> 3. Добейся успешного прохождения `python -m unittest` и открой Pull Request в `main`."
     )
+    # Лейбл НЕ ставим прямо здесь: если он придёт вместе с созданием issue, GitHub
+    # шлёт только событие "issue opened" — Jules реагирует именно на отдельное
+    # событие "лейбл добавлен". Поэтому сначала создаём issue без лейбла...
     payload = {"title": f"Jules Task: исправить сбой модуля {mod_name}", "body": body}
     try:
         res = requests.post(issue_url, headers=API_HEADERS, json=payload, timeout=10)
         if res.status_code in [200, 201]:
             issue_data = res.json()
             issue_number = issue_data.get("number")
+            # ...а лейбл добавляем отдельным запросом сразу после — это гарантированно
+            # своё собственное событие "labeled", на которое и подписан Jules.
             if issue_number:
                 add_jules_label(issue_number)
             return issue_data.get("html_url", "")
@@ -460,20 +483,30 @@ def add_jules_label(issue_number: int) -> bool:
         res = requests.post(url, headers=API_HEADERS, json={"labels": ["jules"]}, timeout=10)
         if res.status_code in [200, 201]:
             return True
-        print(f"[!] Не удалось поставить лейбл jules на #{issue_number}")
+        print(f"[!] Не удалось поставить лейбл jules на #{issue_number} (HTTP {res.status_code}): {res.text[:300]}")
         return False
     except Exception as e:
         print(f"[!] Ошибка добавления лейбла jules на #{issue_number}: {e}")
         return False
 
 def reactivate_stuck_jules_issues() -> int:
+    """
+    "Толкает" зависшие Jules-задачи. Ищем по ЗАГОЛОВКУ ("Jules Task:"), а не по
+    фильтру "issues с лейблом jules" — если постановка лейбла при создании сама
+    когда-то не удалась (см. add_jules_label), у issue лейбла нет вообще, и поиск
+    по лейблу такие issues никогда не найдёт. Для уже помеченных — снимаем и
+    ставим заново (гарантированно свежее событие 'labeled'); для непомеченных —
+    просто ставим впервые.
+    """
     url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues")
     try:
         res = requests.get(url, headers=API_HEADERS, params={"state": "open", "per_page": 100}, timeout=10)
         if res.status_code != 200:
+            print(f"[!] Реактивация: не удалось получить список issues (HTTP {res.status_code})")
             return 0
         issues = [i for i in res.json() if i.get("title", "").startswith("Jules Task:")]
-    except Exception:
+    except Exception as e:
+        print(f"[!] Реактивация: ошибка запроса списка issues: {e}")
         return 0
 
     reactivated = 0
@@ -491,56 +524,6 @@ def reactivate_stuck_jules_issues() -> int:
         if add_jules_label(number):
             reactivated += 1
     return reactivated
-
-def run_jules_babysitter():
-    """
-    Фоновый демон. Читает комменты в открытых Jules-задачах.
-    Если видит, что Jules обосрался (оставил коммент с просьбой перевесить лейбл),
-    молча сносит лейбл и вешает заново.
-    """
-    print("[+] Демон-нянька для Jules запущен.")
-    while True:
-        time.sleep(180) # Раз в 3 минуты, чтобы не задрачивать API GitHub'а лимитами
-        url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues")
-        try:
-            res = requests.get(url, headers=API_HEADERS, params={"state": "open", "per_page": 50}, timeout=10)
-            if res.status_code != 200:
-                continue
-            
-            issues = [i for i in res.json() if i.get("title", "").startswith("Jules Task:")]
-            
-            for issue in issues:
-                num = issue.get("number")
-                if not num:
-                    continue
-                
-                # Смотрим комменты к задаче
-                c_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues/{num}/comments")
-                c_res = requests.get(c_url, headers=API_HEADERS, timeout=10)
-                
-                if c_res.status_code == 200:
-                    comments = c_res.json()
-                    if not comments:
-                        continue
-                    
-                    last_comment = comments[-1]
-                    body = last_comment.get("body", "").lower()
-                    
-                    # Если Jules сам написал, что сдох
-                    if "jules has failed" in body or "try again later by removing and re-adding" in body:
-                        print(f"[*] Jules обосрался в issue #{num}. Выдаю пинка (авто-реактивация)...")
-                        
-                        # Удаляем лейбл
-                        del_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues/{num}/labels/jules")
-                        requests.delete(del_url, headers=API_HEADERS, timeout=10)
-                        
-                        time.sleep(2) # Даем гитхабу прожевать
-                        
-                        # Вешаем заново
-                        add_jules_label(num)
-                        
-        except Exception as e:
-            print(f"[!] Ошибка няньки Jules: {e}")
 
 # 6. АНТИЧИТ
 def inspect_code_for_cheating(code: str, existing_skills: list, target_module: str) -> str:
@@ -866,6 +849,13 @@ def write_epic_smoke_test(epic_title: str, epic_body: str, manifest: dict) -> st
     return ask_gemini(prompt)
 
 def run_epic_smoke_test(epic_title: str, manifest: dict) -> None:
+    """
+    После завершения эпика — не верим только локальным мокам, реально пробуем
+    способность в деле. Специально НЕ попадает в постоянный CI: коммитится на
+    одноразовую ветку с именем файла вне обычного шаблона test_*.py — то есть даже
+    если что-то пойдёт не так с очисткой, обычный набор регрессионных тестов
+    никогда не подхватит этот файл и не станет зависеть от реальной сети.
+    """
     epic_body = get_epic_context()
     print(f"\n[~] ПРАКТИЧЕСКАЯ ПРОВЕРКА ЭПИКА: '{epic_title}'")
     send_tg(f"🧪 Эпик <b>{html.escape(epic_title)}</b> завершён — проверяю на практике, в реальном мире...")
@@ -875,7 +865,7 @@ def run_epic_smoke_test(epic_title: str, manifest: dict) -> None:
         print("[-] Практическая проверка: не удалось подготовить ветку.")
         return
 
-    smoke_path = "test_epic_smoke.py"
+    smoke_path = "test_epic_smoke.py"  # эта ветка никогда не мержится в main, так что совпадение с обычным шаблоном discovery безопасно
     last_error = ""
     passed = False
     run_id = None
@@ -910,6 +900,7 @@ def run_epic_smoke_test(epic_title: str, manifest: dict) -> None:
             "🚨 Передано Jules.",
             buttons=tg_issue_button(issue_url)
         )
+        # ветка НЕ удаляется — она нужна Jules'у для работы
 
 def run_evolution_cycle():
     print("\n==========================================")
@@ -1027,6 +1018,7 @@ def run_evolution_cycle():
     else:
         append_failure_lesson_directly(mod_name, action, rounds_used, cheats_caught, last_error)
 
+        # ЭСКАЛАЦИЯ: Создаем Issue на GitHub для Jules и оставляем ветку живой
         issue_url = escalate_to_github_issue(mod_name, decision.get('description', ''), last_error, branch)
 
         err_snippet = last_error.splitlines()[-5:] if last_error else ["Неизвестная ошибка"]
@@ -1057,8 +1049,5 @@ def life_cycle():
         time.sleep(900)
 
 if __name__ == "__main__":
-    # Запускаем няньку в отдельном потоке
-    threading.Thread(target=run_jules_babysitter, daemon=True).start()
-    # Запускаем основной цикл жизни
     threading.Thread(target=life_cycle, daemon=True).start()
     threading.Event().wait()

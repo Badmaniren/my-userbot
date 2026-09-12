@@ -83,4 +83,4 @@ def resilient_secure_clean_compressed_sitemap_crawler_flow(
         period=period,
         raise_on_limit=raise_on_limit
     )
-    return crawler.crawl(url, timeout=timeout)
+    return crawler.crawl(url, timeout)

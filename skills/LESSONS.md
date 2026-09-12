@@ -150,3 +150,7 @@
 ## clean_url_crawler (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: успешно прошёл тесты и влит в main
+
+## clean_compressed_rss_archiver (compose) — раундов: 5
+- Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/unittest/mock.py", line 1446, in __enter__
+- Статус: ПРОВАЛЕН после всех попыток

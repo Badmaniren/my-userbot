@@ -34,6 +34,8 @@ class CleanCompressedDBStorage:
             self.storage.save_compressed_data(cleaned_url, cleaned_text)
         except UrlCleanerError as e:
             raise CleanCompressedDBStorageError(str(e))
+        except CleanCompressedDBStorageError:
+            raise
         except Exception as e:
             raise CleanCompressedDBStorageError(str(e))
 
@@ -43,6 +45,8 @@ class CleanCompressedDBStorage:
             return self.storage.get_compressed_data(cleaned_url)
         except UrlCleanerError as e:
             raise CleanCompressedDBStorageError(str(e))
+        except CleanCompressedDBStorageError:
+            raise
         except Exception as e:
             raise CleanCompressedDBStorageError(str(e))
 
@@ -53,6 +57,8 @@ class CleanCompressedDBStorage:
             self.storage.set_compressed_cache(cleaned_url, cleaned_text, ttl)
         except UrlCleanerError as e:
             raise CleanCompressedDBStorageError(str(e))
+        except CleanCompressedDBStorageError:
+            raise
         except Exception as e:
             raise CleanCompressedDBStorageError(str(e))
 
@@ -62,29 +68,39 @@ class CleanCompressedDBStorage:
             return self.storage.get_compressed_cache(cleaned_url)
         except UrlCleanerError as e:
             raise CleanCompressedDBStorageError(str(e))
+        except CleanCompressedDBStorageError:
+            raise
         except Exception as e:
             raise CleanCompressedDBStorageError(str(e))
 
     def save_cleaned_and_compressed_data(self, cleaned_url: str, payload: dict) -> None:
         try:
             self.storage.save_compressed_data(cleaned_url, payload)
+        except CleanCompressedDBStorageError:
+            raise
         except Exception as e:
             raise CleanCompressedDBStorageError(str(e))
 
     def get_cleaned_and_compressed_data(self, cleaned_url: str):
         try:
             return self.storage.get_compressed_data(cleaned_url)
+        except CleanCompressedDBStorageError:
+            raise
         except Exception as e:
             raise CleanCompressedDBStorageError(str(e))
 
     def set_cleaned_compressed_cache(self, cleaned_url: str, payload: dict, ttl: int) -> None:
         try:
             self.storage.set_compressed_cache(cleaned_url, payload, ttl)
+        except CleanCompressedDBStorageError:
+            raise
         except Exception as e:
             raise CleanCompressedDBStorageError(str(e))
 
     def get_cleaned_compressed_cache(self, cleaned_url: str):
         try:
             return self.storage.get_compressed_cache(cleaned_url)
+        except CleanCompressedDBStorageError:
+            raise
         except Exception as e:
             raise CleanCompressedDBStorageError(str(e))

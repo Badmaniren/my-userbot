@@ -56,8 +56,11 @@ class ResilientSecureSmartCrawlerHubV8Enterprise(ResilientSecureSmartCrawlerHubV
 
     def validate_target_headers(self, url: str, timeout: int = 5) -> bool:
         """Валидация заголовков целевого URL через HEAD запрос."""
-        response = requests.head(url, timeout=timeout)
-        return bool(response.status_code == 200)
+        try:
+            response = requests.head(url, timeout=timeout)
+            return bool(response.status_code == 200)
+        except Exception:
+            return False
 
     def coordinate_expansion_safe(self, url: str, timeout: int = 5) -> bool:
         """Безопасный запуск координации расширения с перехватом исключений."""
@@ -69,7 +72,7 @@ class ResilientSecureSmartCrawlerHubV8Enterprise(ResilientSecureSmartCrawlerHubV
 
     def export_analytics_report(self, target: str, report_data: Dict[str, Any]) -> None:
         """Экспорт аналитического отчета."""
-        self._reports[target] = report_data
+        self._reports = {**self._reports, target: report_data}
         self.exporter.export_analytics_report(target, report_data)
 
     def get_exported_report(self, target: str) -> Optional[Any]:

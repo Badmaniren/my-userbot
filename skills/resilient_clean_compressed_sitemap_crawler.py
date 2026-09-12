@@ -13,12 +13,25 @@ class ResilientCleanCompressedSitemapCrawlerError(Exception):
 class ResilientCleanCompressedSitemapCrawler:
     def __init__(self, db_path=":memory:", calls=5, period=1.0, raise_on_limit=True):
         self.db_path = db_path
-        self.rate_limiter = RateLimiter(
-            db_path=db_path,
-            calls=calls,
-            period=period,
-            raise_on_limit=raise_on_limit
-        )
+        try:
+            self.rate_limiter = RateLimiter(
+                db_path=db_path,
+                calls=calls,
+                period=period,
+                raise_on_limit=raise_on_limit
+            )
+        except TypeError:
+            try:
+                self.rate_limiter = RateLimiter(
+                    calls=calls,
+                    period=period,
+                    raise_on_limit=raise_on_limit
+                )
+            except TypeError:
+                self.rate_limiter = RateLimiter(
+                    calls=calls,
+                    period=period
+                )
         self.parser = CleanCompressedSitemapParserV3()
         self._parser_helper = ResilientCleanCompressedSitemapParser()
 
@@ -50,7 +63,9 @@ class ResilientCleanCompressedSitemapCrawler:
             if isinstance(result, tuple):
                 return bool(result[0])
             return bool(result)
-        except Exception:
+        except Exception as e:
+            if isinstance(e, ResilientCleanCompressedSitemapCrawlerError):
+                raise e
             return False
 
 

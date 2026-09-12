@@ -33,11 +33,8 @@ class ResilientSecureGlobalMeshDistributedSynchronizerV13:
         self._reports = {}
 
     def validate_target_headers(self, target: str, timeout: int) -> bool:
-        try:
-            response = requests.head(target, timeout=timeout)
-            return response.status_code == 200
-        except Exception:
-            return False
+        response = requests.head(target, timeout=timeout)
+        return response.status_code == 200
 
     def coordinate_expansion(self, target: str, timeout: int) -> bool:
         response = requests.get(target, timeout=timeout)

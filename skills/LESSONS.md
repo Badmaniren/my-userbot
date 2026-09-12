@@ -259,3 +259,7 @@
 ## resilient_clean_compressed_sitemap_crawler (compose) — раундов: 2
 - Последняя ошибка перед фиксом: ^^^^^^^^^^^^
 - Статус: успешно прошёл тесты и влит в main
+
+## resilient_clean_compressed_sitemap_crawler_v2 (compose) — раундов: 5
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН после всех попыток

@@ -1,7 +1,9 @@
 # Уроки Унги
 
-Это файл, который бот пишет и читает сам. Здесь фиксируются реальные баги стыковки
-между модулями (не то, что ловят юнит-тесты с моками, а то, что ловят интеграционные
+Это файл, который бот пишет и читает сам.
+
+...(старые уроки обрезаны)...
+еграционные
 тесты) — чтобы Архитектор и Унга не наступали на те же грабли в следующих циклах.
 
 ## resource_monitor (create) — раундов: 4
@@ -278,3 +280,7 @@
 
 ## resilient_clean_url_crawler (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## resilient_secure_clean_url_crawler (compose) — раундов: 5
+- Последняя ошибка перед фиксом: AssertionError: Crawler raised unexpected custom error: Failed to process URL https://Example.com/Path?utm_source=test&param=1: 404 Client Error: Not Found for url: https://example.com/Path?utm_source=test&param=1
+- Статус: ПРОВАЛЕН после всех попыток

@@ -1,78 +1,85 @@
 from skills.resilient_secure_smart_crawler_hub_v6 import ResilientSecureSmartCrawlerHubV6
-from skills.resilient_secure_smart_crawler_hub_analytics_exporter import ResilientSecureSmartCrawlerHubAnalyticsExporter
 
 
 class ResilientSecureSmartCrawlerHubV7OrchestratorError(Exception):
-    """Custom exception for ResilientSecureSmartCrawlerHubV7Orchestrator errors."""
+    """Custom exception for ResilientSecureSmartCrawlerHubV7 orchestrator error."""
     pass
 
 
-class ResilientSecureSmartCrawlerHubV7Orchestrator:
-    """
-    Absolute orchestrator for crawler hub v7 based on composition of v6 hub 
-    and analytics exporter, with secure compressed storage.
-    """
+class ResilientSecureSmartCrawlerHubV7Error(Exception):
+    """Custom exception for ResilientSecureSmartCrawlerHubV7 error."""
+    pass
 
-    def __init__(self, db_path=":memory:", max_memory_mb=100, calls=10, period=1.0, raise_on_limit=True):
-        self.db_path = db_path
-        self.max_memory_mb = max_memory_mb
-        self.calls = calls
-        self.period = period
-        self.raise_on_limit = raise_on_limit
 
-        self.hub_v6 = ResilientSecureSmartCrawlerHubV6(
+class ResilientSecureSmartCrawlerHubV7(ResilientSecureSmartCrawlerHubV6):
+    """Resilient Secure Smart Crawler Hub V7 inheriting from V6."""
+
+    def __init__(
+        self,
+        db_path=":memory:",
+        max_memory_mb=128,
+        calls=10,
+        period=1.0,
+        raise_on_limit=True
+    ):
+        super().__init__(
             db_path=db_path,
             max_memory_mb=max_memory_mb,
             calls=calls,
             period=period,
             raise_on_limit=raise_on_limit
         )
-        self.analytics_exporter = ResilientSecureSmartCrawlerHubAnalyticsExporter(
-            db_path=db_path
+
+    def validate_target_headers(self, url: str, timeout: int = 5) -> bool:
+        try:
+            return super().validate_target_headers(url, timeout)
+        except Exception as e:
+            if isinstance(e, ResilientSecureSmartCrawlerHubV7Error):
+                raise
+            if self.raise_on_limit:
+                raise ResilientSecureSmartCrawlerHubV7Error(f"Header validation failed: {e}") from e
+            return False
+
+    def coordinate_expansion_safe(self, url: str, timeout: int = 5) -> bool:
+        try:
+            return super().coordinate_expansion_safe(url, timeout)
+        except Exception as e:
+            if isinstance(e, ResilientSecureSmartCrawlerHubV7Error):
+                raise
+            if self.raise_on_limit:
+                raise ResilientSecureSmartCrawlerHubV7Error(f"Safe expansion failed: {e}") from e
+            return False
+
+    def coordinate_expansion(self, url: str, timeout: int = 5):
+        try:
+            return super().coordinate_expansion(url, timeout)
+        except Exception as e:
+            if isinstance(e, ResilientSecureSmartCrawlerHubV7Error):
+                raise
+            raise ResilientSecureSmartCrawlerHubV7Error(f"Expansion failed: {e}") from e
+
+    def process_stream(self, url: str, timeout: int = 5):
+        try:
+            return super().process_stream(url, timeout)
+        except Exception as e:
+            if isinstance(e, ResilientSecureSmartCrawlerHubV7Error):
+                raise
+            if self.raise_on_limit:
+                raise ResilientSecureSmartCrawlerHubV7Error(f"Process stream failed: {e}") from e
+            return False
+
+
+def start_new(url, timeout=5, db_path=":memory:", max_memory_mb=128, calls=10, period=1.0, raise_on_limit=True):
+    try:
+        hub = ResilientSecureSmartCrawlerHubV7(
+            db_path=db_path,
+            max_memory_mb=max_memory_mb,
+            calls=calls,
+            period=period,
+            raise_on_limit=raise_on_limit
         )
-
-    def validate_target_headers(self, url: str, timeout: int) -> bool:
-        try:
-            return bool(self.hub_v6.validate_target_headers(url, timeout))
-        except Exception as e:
-            if self.raise_on_limit or isinstance(e, ResilientSecureSmartCrawlerHubV7OrchestratorError):
-                raise ResilientSecureSmartCrawlerHubV7OrchestratorError(str(e)) from e
+        return hub.process_stream(url, timeout)
+    except Exception as e:
+        if isinstance(e, ResilientSecureSmartCrawlerHubV7OrchestratorError):
             raise
-
-    def coordinate_expansion_safe(self, url: str, timeout: int) -> bool:
-        try:
-            return bool(self.hub_v6.coordinate_expansion_safe(url, timeout))
-        except Exception as e:
-            if self.raise_on_limit or isinstance(e, ResilientSecureSmartCrawlerHubV7OrchestratorError):
-                raise ResilientSecureSmartCrawlerHubV7OrchestratorError(str(e)) from e
-            raise
-
-    def coordinate_expansion(self, url: str, timeout: int):
-        try:
-            return self.hub_v6.coordinate_expansion(url, timeout)
-        except Exception as e:
-            raise ResilientSecureSmartCrawlerHubV7OrchestratorError(str(e)) from e
-
-    def process_stream(self, url: str, timeout: int):
-        try:
-            return self.hub_v6.process_stream(url, timeout)
-        except Exception as e:
-            if self.raise_on_limit or isinstance(e, ResilientSecureSmartCrawlerHubV7OrchestratorError):
-                raise ResilientSecureSmartCrawlerHubV7OrchestratorError(str(e)) from e
-            raise
-
-    def export_analytics_report(self, target: str, report_data: dict):
-        try:
-            return self.analytics_exporter.export_analytics_report(target, report_data)
-        except Exception as e:
-            if self.raise_on_limit or isinstance(e, ResilientSecureSmartCrawlerHubV7OrchestratorError):
-                raise ResilientSecureSmartCrawlerHubV7OrchestratorError(str(e)) from e
-            raise
-
-    def get_exported_report(self, target: str):
-        try:
-            return self.analytics_exporter.get_exported_report(target)
-        except Exception as e:
-            if self.raise_on_limit or isinstance(e, ResilientSecureSmartCrawlerHubV7OrchestratorError):
-                raise ResilientSecureSmartCrawlerHubV7OrchestratorError(str(e)) from e
-            raise
+        raise ResilientSecureSmartCrawlerHubV7OrchestratorError(str(e)) from e

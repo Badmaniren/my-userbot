@@ -240,3 +240,7 @@
 ## clean_compressed_sitemap_parser (compose) — раундов: 5
 - Последняя ошибка перед фиксом: FAILED (failures=1, skipped=1)
 - Статус: ПРОВАЛЕН после всех попыток
+
+## resilient_sitemap_crawler (compose) — раундов: 5
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
+- Статус: ПРОВАЛЕН после всех попыток

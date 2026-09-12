@@ -1,94 +1,80 @@
 import unittest
 from unittest.mock import patch, MagicMock
 import io
-
 from skills.resilient_secure_clean_compressed_rss_archiver import (
-    SecureCleanCompressedRSSArchiver,
-    secure_clean_compressed_rss_archive_flow,
-    SecureCleanCompressedRSSArchiverError
+    ResilientSecureCleanCompressedRSSArchiver,
+    SecureCleanCompressedRSSArchiverError,
+    secure_clean_compressed_rss_archive_flow
 )
 
 
 class TestResilientSecureCleanCompressedRSSArchiver(unittest.TestCase):
 
-    def setUp(self):
-        self.db_path = ":memory:"
-        self.url = "https://example.com/rss"
-        self.timeout = 5
-        self.max_memory_mb = 128
-        self.calls = 10
-        self.period = 60
-        self.raise_on_limit = True
+    def test_archive_feed_success(self):
+        with patch('skills.resilient_secure_clean_compressed_rss_archiver.ResilientRSSFetcher') as mock_fetcher_cls, \
+             patch('skills.resilient_secure_clean_compressed_rss_archiver.BaseArchiver') as mock_base_cls:
+            
+            mock_fetcher = mock_fetcher_cls.return_value
+            mock_fetcher.fetch.return_value = "<rss><channel><title>Test</title></channel></rss>"
+            
+            mock_base = mock_base_cls.return_value
+            mock_base.archive_feed.return_value = True
 
-    def test_init_and_attributes(self):
-        archiver = SecureCleanCompressedRSSArchiver(
-            db_path=self.db_path,
-            max_memory_mb=self.max_memory_mb,
-            calls=self.calls,
-            period=self.period,
-            raise_on_limit=self.raise_on_limit
-        )
-        self.assertIsNotNone(archiver)
+            archiver = ResilientSecureCleanCompressedRSSArchiver()
+            result = archiver.archive_feed("http://example.com/rss")
+            self.assertTrue(result)
 
-    @patch('skills.resilient_secure_clean_compressed_rss_archiver.ResilientRSSFetcher')
-    @patch('skills.resilient_secure_clean_compressed_rss_archiver.SecureCleanCompressedRSSArchiver')
-    def test_archive_feed_success(self, mock_secure_archiver_cls, mock_resilient_fetcher_cls):
-        mock_instance = MagicMock()
-        mock_instance.archive_feed.return_value = True
-        mock_secure_archiver_cls.return_value = mock_instance
+    def test_archive_feed_fetch_none(self):
+        with patch('skills.resilient_secure_clean_compressed_rss_archiver.ResilientRSSFetcher') as mock_fetcher_cls, \
+             patch('skills.resilient_secure_clean_compressed_rss_archiver.BaseArchiver') as mock_base_cls:
+            
+            mock_fetcher = mock_fetcher_cls.return_value
+            mock_fetcher.fetch.return_value = None
 
-        archiver = SecureCleanCompressedRSSArchiver(
-            db_path=self.db_path,
-            max_memory_mb=self.max_memory_mb,
-            calls=self.calls,
-            period=self.period,
-            raise_on_limit=self.raise_on_limit
-        )
-        
-        with patch('skills.resilient_secure_clean_compressed_rss_archiver.resilient_rss_fetcher') as mock_fetcher:
-            result = archiver.archive_feed(self.url, self.timeout, force_refresh=False)
-            self.assertIsNotNone(result)
+            archiver = ResilientSecureCleanCompressedRSSArchiver()
+            result = archiver.archive_feed("http://example.com/rss")
+            self.assertFalse(result)
+
+    def test_archive_feed_exception_raise_on_limit(self):
+        with patch('skills.resilient_secure_clean_compressed_rss_archiver.ResilientRSSFetcher') as mock_fetcher_cls:
+            mock_fetcher = mock_fetcher_cls.return_value
+            mock_fetcher.fetch.side_effect = Exception("Fetch error")
+
+            archiver = ResilientSecureCleanCompressedRSSArchiver(raise_on_limit=True)
+            with self.assertRaises(SecureCleanCompressedRSSArchiverError):
+                archiver.archive_feed("http://example.com/rss")
+
+    def test_archive_feed_exception_no_raise(self):
+        with patch('skills.resilient_secure_clean_compressed_rss_archiver.ResilientRSSFetcher') as mock_fetcher_cls:
+            mock_fetcher = mock_fetcher_cls.return_value
+            mock_fetcher.fetch.side_effect = Exception("Fetch error")
+
+            archiver = ResilientSecureCleanCompressedRSSArchiver(raise_on_limit=False)
+            result = archiver.archive_feed("http://example.com/rss")
+            self.assertFalse(result)
 
     def test_get_archived_feed(self):
-        archiver = SecureCleanCompressedRSSArchiver(
-            db_path=self.db_path,
-            max_memory_mb=self.max_memory_mb,
-            calls=self.calls,
-            period=self.period,
-            raise_on_limit=self.raise_on_limit
-        )
-        
-        with patch('skills.resilient_secure_clean_compressed_rss_archiver.SecureCleanCompressedRSSArchiver.get_archived_feed') as mock_get:
-            mock_get.return_value = "<rss>data</rss>"
-            feed = archiver.get_archived_feed(self.url)
-            self.assertEqual(feed, "<rss>data</rss>")
+        with patch('skills.resilient_secure_clean_compressed_rss_archiver.BaseArchiver') as mock_base_cls:
+            mock_base = mock_base_cls.return_value
+            mock_base.get_archived_feed.return_value = "cached_data"
+
+            archiver = ResilientSecureCleanCompressedRSSArchiver()
+            data = archiver.get_archived_feed("http://example.com/rss")
+            self.assertEqual(data, "cached_data")
 
     def test_secure_clean_compressed_rss_archive_flow(self):
-        with patch('skills.resilient_secure_clean_compressed_rss_archiver.secure_clean_compressed_rss_archive_flow') as mock_flow:
-            mock_flow.return_value = True
-            res = secure_clean_compressed_rss_archive_flow(
-                self.url, self.timeout, self.db_path, self.max_memory_mb, 
-                force_refresh=True, calls=self.calls, period=self.period, raise_on_limit=self.raise_on_limit
-            )
-            self.assertTrue(res)
+        with patch('skills.resilient_secure_clean_compressed_rss_archiver.ResilientRSSFetcher') as mock_fetcher_cls, \
+             patch('skills.resilient_secure_clean_compressed_rss_archiver.BaseArchiver') as mock_base_cls:
+            
+            mock_fetcher = mock_fetcher_cls.return_value
+            mock_fetcher.fetch.return_value = "<rss><channel></channel></rss>"
+            
+            mock_base = mock_base_cls.return_value
+            mock_base.archive_feed.return_value = True
 
-    def test_archiver_error_handling(self):
-        archiver = SecureCleanCompressedRSSArchiver(
-            db_path=self.db_path,
-            max_memory_mb=self.max_memory_mb,
-            calls=self.calls,
-            period=self.period,
-            raise_on_limit=self.raise_on_limit
-        )
-        
-        with patch.object(archiver, 'archive_feed', side_effect=SecureCleanCompressedRSSArchiverError("Archiving failed")):
-            with self.assertRaises(SecureCleanCompressedRSSArchiverError):
-                archiver.archive_feed(self.url, self.timeout, force_refresh=True)
-
-    def test_stream_bytes_io_mock(self):
-        stream = io.BytesIO(b'<rss><channel><title>Test Feed</title></channel></rss>')
-        self.assertIsNotNone(stream.read())
+            result = secure_clean_compressed_rss_archive_flow("http://example.com/rss")
+            self.assertTrue(result)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

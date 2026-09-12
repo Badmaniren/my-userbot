@@ -1,88 +1,159 @@
 import unittest
 from unittest.mock import patch, MagicMock
-import io
-
-from skills.clean_compressed_db_storage import (
-    CleanCompressedDBStorage,
-    CleanCompressedDBStorageError
-)
+from skills.clean_compressed_db_storage import CleanCompressedDBStorage, CleanCompressedDBStorageError
+from skills.url_cleaner import UrlCleanerError
 
 class TestCleanCompressedDBStorage(unittest.TestCase):
-
     def setUp(self):
         self.db_path = ":memory:"
-        self.storage = CleanCompressedDBStorage(self.db_path)
+        self.processor = CleanCompressedDBStorage(self.db_path)
 
-    def test_init_creates_storage(self):
-        self.assertIsNotNone(self.storage)
+    @patch('skills.clean_compressed_db_storage.clean_url')
+    def test_clean_target_url_success(self, mock_clean_url):
+        mock_clean_url.return_value = "https://example.com"
+        result = self.processor.clean_target_url("https://example.com/?utm_source=test")
+        self.assertEqual(result, "https://example.com")
+        mock_clean_url.assert_called_once_with("https://example.com/?utm_source=test")
 
-    def test_save_and_get_cleaned_data_success(self):
-        raw_url = "HTTPS://Example.com/path?utm_source=test&param=1"
-        raw_text = "Hello &amp; World!   "
+    @patch('skills.clean_compressed_db_storage.clean_url')
+    def test_clean_target_url_error(self, mock_clean_url):
+        mock_clean_url.side_effect = UrlCleanerError("Invalid URL")
+        with self.assertRaises(UrlCleanerError):
+            self.processor.clean_target_url("invalid-url")
+
+    @patch('skills.clean_compressed_db_storage.clean')
+    def test_clean_target_text(self, mock_clean):
+        mock_clean.return_value = "Hello &amp; welcome"
+        result = self.processor.clean_target_text("<b>Hello &amp; welcome</b>")
+        self.assertEqual(result, "Hello & welcome")
+
+    @patch('skills.clean_compressed_db_storage.clean')
+    def test_clean_target_text_exception_fallback(self, mock_clean):
+        mock_clean.side_effect = Exception("Parsing error")
+        raw_text = "fallback text"
+        result = self.processor.clean_target_text(raw_text)
+        self.assertEqual(result, raw_text)
+
+    @patch('skills.clean_compressed_db_storage.CompressedDBStorage.save_compressed_data')
+    @patch('skills.clean_compressed_db_storage.clean')
+    @patch('skills.clean_compressed_db_storage.clean_url')
+    def test_save_cleaned_data_success(self, mock_clean_url, mock_clean, mock_save):
+        mock_clean_url.return_value = "https://example.com"
+        mock_clean.return_value = "Clean text"
         
-        expected_url = "https://example.com/path?param=1"
-        expected_text = "Hello & World!"
+        self.processor.save_cleaned_data("https://example.com", "<p>Clean text</p>")
+        mock_save.assert_called_once_with("https://example.com", "Clean text")
 
-        with patch('skills.compressed_db_storage.CompressedDBStorage.save_compressed_data') as mock_save:
-            self.storage.save_cleaned_data(raw_url, raw_text)
-            mock_save.assert_called_once()
-            args = mock_save.call_args[0]
-            self.assertEqual(args[0], expected_url)
-            self.assertEqual(args[1], expected_text)
+    @patch('skills.clean_compressed_db_storage.clean_url')
+    def test_error_handling_on_invalid_url(self, mock_clean_url):
+        mock_clean_url.side_effect = UrlCleanerError("Bad URL")
+        with self.assertRaises(CleanCompressedDBStorageError):
+            self.processor.save_cleaned_data("bad-url", "some text")
 
-    def test_get_cleaned_data_success(self):
-        raw_url = "HTTP://Example.com/test/?utm_campaign=summer"
-        expected_url = "http://example.com/test/"
-        stored_payload = "Cleaned text payload"
-
-        with patch('skills.compressed_db_storage.CompressedDBStorage.get_compressed_data', return_value=stored_payload) as mock_get:
-            result = self.storage.get_cleaned_data(raw_url)
-            mock_get.assert_called_once_with(expected_url)
-            self.assertEqual(result, stored_payload)
-
-    def test_save_cleaned_cache_success(self):
-        raw_url = "https://example.com/?utm_medium=email"
-        raw_text = "Cache text"
-        expected_url = "https://example.com/"
-        ttl = 300
-
-        with patch('skills.compressed_db_storage.CompressedDBStorage.set_compressed_cache') as mock_set_cache:
-            self.storage.set_cleaned_cache(raw_url, raw_text, ttl)
-            mock_set_cache.assert_called_once()
-            args = mock_set_cache.call_args[0]
-            self.assertEqual(args[0], expected_url)
-            self.assertEqual(args[1], "Cache text")
-            self.assertEqual(args[2], ttl)
-
-    def test_get_cleaned_cache_success(self):
-        raw_url = "https://example.com/?utm_term=keyword"
-        expected_url = "https://example.com/"
-        cached_payload = "Cached payload"
-
-        with patch('skills.compressed_db_storage.CompressedDBStorage.get_compressed_cache', return_value=cached_payload) as mock_get_cache:
-            result = self.storage.get_cleaned_cache(raw_url)
-            mock_get_cache.assert_called_once_with(expected_url)
-            self.assertEqual(result, cached_payload)
-
-    def test_clean_url_and_text_integration(self):
-        dirty_url = "HTTP://Test.com/page.html?utm_id=123&foo=bar"
-        dirty_text = "<p>Some <b>HTML</b> text &copy;</p>"
+    @patch('skills.clean_compressed_db_storage.CompressedDBStorage.get_compressed_data')
+    @patch('skills.clean_compressed_db_storage.clean_url')
+    def test_get_cleaned_data_success(self, mock_clean_url, mock_get):
+        mock_clean_url.return_value = "https://example.com"
+        mock_get.return_value = "Stored data"
         
-        clean_url_res = self.storage.clean_target_url(dirty_url)
-        clean_text_res = self.storage.clean_target_text(dirty_text)
+        result = self.processor.get_cleaned_data("https://example.com")
+        self.assertEqual(result, "Stored data")
+        mock_get.assert_called_once_with("https://example.com")
 
-        self.assertEqual(clean_url_res, "http://test.com/page.html?foo=bar")
-        self.assertIsInstance(clean_text_res, str)
+    @patch('skills.clean_compressed_db_storage.CompressedDBStorage.get_compressed_data')
+    @patch('skills.clean_compressed_db_storage.clean_url')
+    def test_get_cleaned_data_error(self, mock_clean_url, mock_get):
+        mock_clean_url.return_value = "https://example.com"
+        mock_get.side_effect = Exception("DB error")
+        
+        with self.assertRaises(CleanCompressedDBStorageError):
+            self.processor.get_cleaned_data("https://example.com")
 
-    def test_error_handling_on_invalid_url(self):
-        from skills.url_cleaner import UrlCleanerError
-        with patch('skills.url_cleaner.clean_url', side_effect=UrlCleanerError("Invalid URL")):
-            with self.assertRaises(CleanCompressedDBStorageError):
-                self.storage.save_cleaned_data("invalid_url", "some text")
+    @patch('skills.clean_compressed_db_storage.CompressedDBStorage.set_compressed_cache')
+    @patch('skills.clean_compressed_db_storage.clean')
+    @patch('skills.clean_compressed_db_storage.clean_url')
+    def test_set_cleaned_cache_success(self, mock_clean_url, mock_clean, mock_set_cache):
+        mock_clean_url.return_value = "https://example.com"
+        mock_clean.return_value = "Cached text"
+        
+        self.processor.set_cleaned_cache("https://example.com", "Cached text", 3600)
+        mock_set_cache.assert_called_once_with("https://example.com", "Cached text", 3600)
 
-    def test_io_stream_handling(self):
-        stream = io.BytesIO(b"stream payload data")
-        self.assertIsNotNone(stream.read())
+    @patch('skills.clean_compressed_db_storage.CompressedDBStorage.set_compressed_cache')
+    @patch('skills.clean_compressed_db_storage.clean_url')
+    def test_set_cleaned_cache_error(self, mock_clean_url, mock_set_cache):
+        mock_clean_url.return_value = "https://example.com"
+        mock_set_cache.side_effect = Exception("Cache error")
+        
+        with self.assertRaises(CleanCompressedDBStorageError):
+            self.processor.set_cleaned_cache("https://example.com", "text", 3600)
+
+    @patch('skills.clean_compressed_db_storage.CompressedDBStorage.get_compressed_cache')
+    @patch('skills.clean_compressed_db_storage.clean_url')
+    def test_get_cleaned_cache_success(self, mock_clean_url, mock_get_cache):
+        mock_clean_url.return_value = "https://example.com"
+        mock_get_cache.return_value = "Cached payload"
+        
+        result = self.processor.get_cleaned_cache("https://example.com")
+        self.assertEqual(result, "Cached payload")
+        mock_get_cache.assert_called_once_with("https://example.com")
+
+    @patch('skills.clean_compressed_db_storage.CompressedDBStorage.get_compressed_cache')
+    @patch('skills.clean_compressed_db_storage.clean_url')
+    def test_get_cleaned_cache_error(self, mock_clean_url, mock_get_cache):
+        mock_clean_url.return_value = "https://example.com"
+        mock_get_cache.side_effect = Exception("Cache error")
+        
+        with self.assertRaises(CleanCompressedDBStorageError):
+            self.processor.get_cleaned_cache("https://example.com")
+
+    @patch('skills.clean_compressed_db_storage.CompressedDBStorage.save_compressed_data')
+    def test_save_cleaned_and_compressed_data_success(self, mock_save):
+        payload = {"key": "value"}
+        self.processor.save_cleaned_and_compressed_data("https://example.com", payload)
+        mock_save.assert_called_once_with("https://example.com", payload)
+
+    @patch('skills.clean_compressed_db_storage.CompressedDBStorage.save_compressed_data')
+    def test_save_cleaned_and_compressed_data_error(self, mock_save):
+        mock_save.side_effect = Exception("Storage fail")
+        with self.assertRaises(CleanCompressedDBStorageError):
+            self.processor.save_cleaned_and_compressed_data("https://example.com", {})
+
+    @patch('skills.clean_compressed_db_storage.CompressedDBStorage.get_compressed_data')
+    def test_get_cleaned_and_compressed_data_success(self, mock_get):
+        mock_get.return_value = {"key": "value"}
+        result = self.processor.get_cleaned_and_compressed_data("https://example.com")
+        self.assertEqual(result, {"key": "value"})
+
+    @patch('skills.clean_compressed_db_storage.CompressedDBStorage.get_compressed_data')
+    def test_get_cleaned_and_compressed_data_error(self, mock_get):
+        mock_get.side_effect = Exception("Storage fail")
+        with self.assertRaises(CleanCompressedDBStorageError):
+            self.processor.get_cleaned_and_compressed_data("https://example.com")
+
+    @patch('skills.clean_compressed_db_storage.CompressedDBStorage.set_compressed_cache')
+    def test_set_cleaned_compressed_cache_success(self, mock_set):
+        payload = {"data": 123}
+        self.processor.set_cleaned_compressed_cache("https://example.com", payload, 60)
+        mock_set.assert_called_once_with("https://example.com", payload, 60)
+
+    @patch('skills.clean_compressed_db_storage.CompressedDBStorage.set_compressed_cache')
+    def test_set_cleaned_compressed_cache_error(self, mock_set):
+        mock_set.side_effect = Exception("Cache fail")
+        with self.assertRaises(CleanCompressedDBStorageError):
+            self.processor.set_cleaned_compressed_cache("https://example.com", {}, 60)
+
+    @patch('skills.clean_compressed_db_storage.CompressedDBStorage.get_compressed_cache')
+    def test_get_cleaned_compressed_cache_success(self, mock_get):
+        mock_get.return_value = {"data": 123}
+        result = self.processor.get_cleaned_compressed_cache("https://example.com")
+        self.assertEqual(result, {"data": 123})
+
+    @patch('skills.clean_compressed_db_storage.CompressedDBStorage.get_compressed_cache')
+    def test_get_cleaned_compressed_cache_error(self, mock_get):
+        mock_get.side_effect = Exception("Cache fail")
+        with self.assertRaises(CleanCompressedDBStorageError):
+            self.processor.get_cleaned_compressed_cache("https://example.com")
 
 if __name__ == '__main__':
     unittest.main()

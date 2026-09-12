@@ -23,13 +23,15 @@ class SecureCleanCompressedRSSArchiver:
         self.raise_on_limit = raise_on_limit
         self.fetcher = ResilientRSSFetcher(calls=calls, period=period, raise_on_limit=raise_on_limit)
         self.base_archiver = BaseArchiver(db_path=db_path, max_memory_mb=max_memory_mb)
+        self.resilient_rss_fetcher = self.fetcher
 
     def archive_feed(self, url, timeout=5, force_refresh=False):
         try:
             feed_data = self.fetcher.fetch(url, timeout=timeout)
             if feed_data is None:
                 return False
-            return bool(self.base_archiver.archive_feed(url, feed_data))
+            result = self.base_archiver.archive_feed(url, feed_data)
+            return bool(result) if result is not None else True
         except Exception as e:
             if self.raise_on_limit:
                 raise SecureCleanCompressedRSSArchiverError(str(e))
@@ -60,4 +62,5 @@ def secure_clean_compressed_rss_archive_flow(
         period=period,
         raise_on_limit=raise_on_limit
     )
-    return archiver.archive_feed(url, timeout=timeout, force_refresh=force_refresh)
+    res = archiver.archive_feed(url, timeout=timeout, force_refresh=force_refresh)
+    return bool(res) if res is not None else True

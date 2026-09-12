@@ -193,3 +193,6 @@
 ## smart_secure_rss_crawler (compose) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: успешно прошёл тесты и влит в main
+
+## smart_secure_compressed_rss_crawler (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

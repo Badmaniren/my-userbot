@@ -46,9 +46,12 @@ def run_dummy_server():
 threading.Thread(target=run_dummy_server, daemon=True).start()
 
 # 3. БЕЗОПАСНЫЙ TELEGRAM ДЕМОН (HTML)
-def send_tg(text: str, buttons: list = None):
+def send_tg(text: str, buttons: list = None, keyboard: bool = False):
     """
-    buttons: список пар (текст_кнопки, callback_data) — одна кнопка в ряд.
+    buttons: список РЯДОВ inline-кнопок; каждый ряд — список dict вида
+    {"text": "...", "callback_data": "..."} или {"text": "...", "url": "..."}.
+    keyboard=True: показать/обновить постоянное меню-клавиатуру внизу экрана
+    (взаимоисключимо с inline-кнопками в одном сообщении — это разные виды разметки).
     """
     if not TG_TOKEN or not TG_ADMIN_ID:
         return
@@ -59,14 +62,21 @@ def send_tg(text: str, buttons: list = None):
         "parse_mode": "HTML",
         "disable_web_page_preview": True
     }
-    if buttons:
+    if keyboard:
         payload["reply_markup"] = json.dumps({
-            "inline_keyboard": [[{"text": t, "callback_data": cb}] for t, cb in buttons]
+            "keyboard": [["📊 /status", "🔁 /jules"], ["⚙️ /build ", "❓ /help"]],
+            "resize_keyboard": True,
+            "is_persistent": True
         })
+    elif buttons:
+        payload["reply_markup"] = json.dumps({"inline_keyboard": buttons})
     try:
         requests.post(url, json=payload, timeout=10)
     except Exception as e:
         print(f"[!] Ошибка отправки в TG: {e}")
+
+def tg_issue_button(issue_url: str) -> list:
+    return [[{"text": "🔗 Открыть задачу для Jules", "url": issue_url}]] if issue_url else None
 
 def answer_tg_callback(callback_query_id: str, text: str = ""):
     if not TG_TOKEN:
@@ -77,6 +87,32 @@ def answer_tg_callback(callback_query_id: str, text: str = ""):
     except Exception:
         pass
 
+def set_tg_commands():
+    if not TG_TOKEN:
+        return
+    url = f"https://api.telegram.org/bot{TG_TOKEN}/setMyCommands"
+    commands = [
+        {"command": "status", "description": "📊 Текущий статус и эпик"},
+        {"command": "build", "description": "⚙️ Поставить задачу вручную"},
+        {"command": "jules", "description": "🔁 Реактивировать зависшие Jules-задачи"},
+        {"command": "help", "description": "❓ Список команд"},
+    ]
+    try:
+        requests.post(url, json={"commands": commands}, timeout=10)
+    except Exception:
+        pass
+
+HELP_TEXT = (
+    "🐒 <b>Пульт управления Питекантропом</b>\n"
+    "━━━━━━━━━━━━━━━━━━━\n"
+    "📊 <code>/status</code> — что бот делает сейчас и какой эпик в работе\n"
+    "⚙️ <code>/build &lt;описание&gt;</code> — поставить задачу вручную в очередь\n"
+    "🔁 <code>/jules</code> — растолкать зависшие Jules-задачи\n"
+    "❓ <code>/help</code> — это сообщение\n"
+    "━━━━━━━━━━━━━━━━━━━\n"
+    "<i>Кнопки внизу экрана дублируют команды — жми, а не печатай.</i>"
+)
+
 def run_telegram_listener():
     if not TG_TOKEN or not TG_ADMIN_ID:
         print("[!] Telegram переменные не заданы. Демон связи отключен.")
@@ -84,7 +120,11 @@ def run_telegram_listener():
 
     offset = 0
     print("[+] Telegram-пульт управления запущен.")
-    send_tg("🐒 <b>Питекантроп на связи!</b> Демон запущен. Используй <code>/build &lt;описание&gt;</code> для задач.")
+    set_tg_commands()
+    send_tg(
+        "🐒 <b>Питекантроп на связи!</b>\nДемон запущен, меню команд — снизу экрана.",
+        keyboard=True
+    )
 
     while True:
         url = f"https://api.telegram.org/bot{TG_TOKEN}/getUpdates"
@@ -106,7 +146,7 @@ def run_telegram_listener():
                             answer_tg_callback(callback["id"], "Толкаю зависшие задачи...")
                             count = reactivate_stuck_jules_issues()
                             if count:
-                                send_tg(f"🔁 Реактивировано Jules-задач: <b>{count}</b>. Дай ему пару минут забрать их в работу.")
+                                send_tg(f"🔁 Реактивировано Jules-задач: <b>{count}</b>.\nДай ему пару минут забрать их в работу.")
                             else:
                                 send_tg("ℹ️ Открытых Jules-задач не найдено — реактивировать нечего.")
                         continue
@@ -114,26 +154,33 @@ def run_telegram_listener():
                     msg = update.get("message", {})
                     chat_id = str(msg.get("chat", {}).get("id", ""))
                     text = msg.get("text", "").strip()
+                    # кнопки постоянного меню приходят как обычный текст с эмодзи — снимаем эмодзи-обёртку
+                    text = re.sub(r'^[📊🔁⚙️❓]\s*', '', text)
 
                     if chat_id != TG_ADMIN_ID:
                         continue
 
-                    if text.startswith("/build"):
+                    if text.startswith("/start"):
+                        send_tg(HELP_TEXT, keyboard=True)
+                    elif text.startswith("/help"):
+                        send_tg(HELP_TEXT)
+                    elif text.startswith("/build"):
                         task_desc = text[6:].strip()
                         if task_desc:
                             MANUAL_TASK_QUEUE.append(task_desc)
-                            send_tg(f"🫡 <b>Задача принята в очередь:</b>\n<code>{html.escape(task_desc)}</code>")
+                            send_tg(f"🫡 <b>Задача принята в очередь</b>\n━━━━━━━━━━━━━━━━━━━\n<code>{html.escape(task_desc)}</code>")
                         else:
-                            send_tg("⚠️ Укажи описание задачи: <code>/build утилита_для_парсинга</code>")
+                            send_tg("⚠️ Укажи описание задачи после команды:\n<code>/build утилита_для_парсинга</code>")
                     elif text.startswith("/status"):
                         q_len = len(MANUAL_TASK_QUEUE)
                         epic_preview = get_epic_context()
                         if len(epic_preview) > 800:
                             epic_preview = epic_preview[:800] + "..."
                         send_tg(
-                            f"📊 <b>Статус:</b> работает штатно.\nЗадач в ручной очереди: <b>{q_len}</b>\n\n"
-                            f"🧭 <b>Текущий эпик:</b>\n<pre>{html.escape(epic_preview)}</pre>",
-                            buttons=[("🔁 Реактивировать зависшие Jules-задачи", "rejules")]
+                            f"📊 <b>Статус</b>\n━━━━━━━━━━━━━━━━━━━\n"
+                            f"Работает штатно · задач в очереди: <b>{q_len}</b>\n\n"
+                            f"🧭 <b>Текущий эпик</b>\n<pre>{html.escape(epic_preview)}</pre>",
+                            buttons=[[{"text": "🔁 Реактивировать зависшие Jules-задачи", "callback_data": "rejules"}]]
                         )
                     elif text.startswith("/jules"):
                         count = reactivate_stuck_jules_issues()
@@ -141,6 +188,8 @@ def run_telegram_listener():
                             send_tg(f"🔁 Реактивировано Jules-задач: <b>{count}</b>.")
                         else:
                             send_tg("ℹ️ Открытых Jules-задач не найдено.")
+                    elif text:
+                        send_tg("🤷 Не знаю такой команды.\n" + HELP_TEXT)
         except Exception:
             time.sleep(5)
         time.sleep(1)
@@ -765,6 +814,83 @@ def unga_implement_hardened(task: dict, unit_test_code: str, integration_test_co
     return ask_gemini(prompt)
 
 # 9. БОЕВОЙ ЦИКЛ С АВТОЭВРИСТИКОЙ И ЭСКАЛАЦИЕЙ НА JULES
+def write_epic_smoke_test(epic_title: str, epic_body: str, manifest: dict) -> str:
+    prompt = (
+        "Ты пишешь ОДНОРАЗОВУЮ ПРАКТИЧЕСКУЮ ПРОВЕРКУ завершённого эпика — не часть постоянного "
+        "набора регрессионных тестов, а честную демонстрацию, что заявленная способность реально "
+        "работает в реальном мире, а не только против моков и локальных серверов.\n\n"
+        f"Эпик: {epic_title}\n"
+        f"Контекст эпика (файл EPIC.md):\n{epic_body}\n\n"
+        f"ДОСТУПНЫЕ МОДУЛИ (используй их РЕАЛЬНО, честным импортом из skills.*, без моков):\n"
+        f"{json.dumps(manifest, indent=2, ensure_ascii=False)}\n\n"
+        "ПРАВИЛА:\n"
+        "1. ЭТО ЕДИНСТВЕННЫЙ случай, когда реальная сеть РАЗРЕШЕНА и ОБЯЗАТЕЛЬНА — сходи на реальный, "
+        "стабильный, общеизвестный публичный сайт/RSS-фид, подходящий по смыслу эпику (например: "
+        "hnrss.org, rss-фид крупного новостного сайта, example.com) — что-то, что не требует "
+        "авторизации и не пропадёт завтра.\n"
+        "2. Заведи один мягкий повтор (retry) на случай единичного сетевого сбоя, но не больше "
+        "2 попыток — это не постоянный сьют, зависать не должен.\n"
+        "3. Тест должен явно печатать (print) реальные полученные данные (заголовок статьи, "
+        "фрагмент текста и т.п.), а не просто OK/FAIL — чтобы в логах было видно живое доказательство.\n"
+        "4. Оформи как unittest.TestCase с одним-двумя показательными тестами.\n"
+        "5. Верни ТОЛЬКО валидный Python-код файла без markdown."
+    )
+    return ask_gemini(prompt)
+
+def run_epic_smoke_test(epic_title: str, manifest: dict) -> None:
+    """
+    После завершения эпика — не верим только локальным мокам, реально пробуем
+    способность в деле. Специально НЕ попадает в постоянный CI: коммитится на
+    одноразовую ветку с именем файла вне обычного шаблона test_*.py — то есть даже
+    если что-то пойдёт не так с очисткой, обычный набор регрессионных тестов
+    никогда не подхватит этот файл и не станет зависеть от реальной сети.
+    """
+    epic_body = get_epic_context()
+    print(f"\n[~] ПРАКТИЧЕСКАЯ ПРОВЕРКА ЭПИКА: '{epic_title}'")
+    send_tg(f"🧪 Эпик <b>{html.escape(epic_title)}</b> завершён — проверяю на практике, в реальном мире...")
+
+    branch = f"unga-epic-smoke-{int(time.time())}"
+    if not prepare_branch(branch, get_main_sha()):
+        print("[-] Практическая проверка: не удалось подготовить ветку.")
+        return
+
+    smoke_path = "test_epic_smoke.py"  # эта ветка никогда не мержится в main, так что совпадение с обычным шаблоном discovery безопасно
+    last_error = ""
+    passed = False
+    run_id = None
+
+    for attempt in range(1, 3):
+        smoke_code = write_epic_smoke_test(epic_title, epic_body, manifest)
+        commit_msg = f"Практическая проверка эпика «{epic_title}» #{attempt}"
+        target_sha = commit_file_to_branch(branch, smoke_path, smoke_code, commit_msg)
+        print(f"[*] Практическая проверка закоммичена (SHA: {target_sha[:7]}), раунд #{attempt}...")
+        passed, run_id = watch_arena_by_sha(target_sha)
+        if passed:
+            break
+        last_error = extract_clean_test_traceback(run_id)
+        print(f"[!] Практическая проверка провалилась в реальных условиях:\n{last_error}\n")
+
+    if passed:
+        send_tg(f"✅ <b>Практическая проверка пройдена</b>\n━━━━━━━━━━━━━━━━━━━\n🏁 Эпик «{html.escape(epic_title)}» подтверждён в реальном мире!")
+        requests.delete(clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{branch}"), headers=API_HEADERS)
+    else:
+        issue_title_hint = re.sub(r'[^a-zA-Z0-9_]', '_', epic_title.lower())[:40] or "epic"
+        issue_url = escalate_to_github_issue(
+            issue_title_hint,
+            f"Практическая проверка завершённого эпика «{epic_title}» провалилась в реальных условиях "
+            "(юнит- и интеграционные тесты при этом прошли).",
+            last_error,
+            branch
+        )
+        send_tg(
+            f"❌ <b>Практическая проверка провалена</b>\n━━━━━━━━━━━━━━━━━━━\n"
+            f"🏁 Эпик «{html.escape(epic_title)}»\n"
+            "Юнит- и интеграционные тесты были зелёными, но в реальных условиях что-то не работает.\n"
+            "🚨 Передано Jules.",
+            buttons=tg_issue_button(issue_url)
+        )
+        # ветка НЕ удаляется — она нужна Jules'у для работы
+
 def run_evolution_cycle():
     print("\n==========================================")
     print("      ПИТЕКАНТРОП: БЕЗОПАСНЫЙ ЦИКЛ CI     ")
@@ -861,17 +987,21 @@ def run_evolution_cycle():
             requests.delete(clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{branch}"), headers=API_HEADERS)
             epic_line = ""
             if decision.get("epic_status") == "start_new":
-                epic_line = f"\n🧭 Новый эпик: <b>{html.escape(decision.get('epic_title', ''))}</b>"
+                epic_line = f"\n\n🧭 <b>Новый эпик:</b> {html.escape(decision.get('epic_title', ''))}"
             elif decision.get("epic_status") == "continue":
-                epic_line = f"\n🧭 Продвигает эпик: <i>{html.escape(decision.get('epic_step_note', ''))}</i>"
+                epic_line = f"\n\n🧭 <b>Продвигает эпик:</b> {html.escape(decision.get('epic_step_note', ''))}"
             elif decision.get("epic_status") == "complete":
-                epic_line = f"\n🏁 Эпик <b>{html.escape(decision.get('epic_title', ''))}</b> завершён!"
+                epic_line = f"\n\n🏁 <b>Эпик завершён:</b> {html.escape(decision.get('epic_title', ''))}"
             send_tg(
-                f"✅ <b>Навык <code>{mod_name}</code> готов и влит в main!</b>\n\n"
-                f"📝 <i>{html.escape(decision.get('description', ''))}</i>\n"
+                f"✅ <b>Навык готов</b>\n━━━━━━━━━━━━━━━━━━━\n"
+                f"<code>{mod_name}</code>\n"
+                f"📝 {html.escape(decision.get('description', ''))}\n"
                 f"🎯 Раундов: {rounds_used}"
                 f"{epic_line}"
             )
+            if decision.get("epic_status") == "complete":
+                fresh_manifest = get_skills_manifest()
+                run_epic_smoke_test(decision.get("epic_title", "Без названия"), fresh_manifest)
         else:
             send_tg(f"⚠️ Навык <code>{mod_name}</code> прошёл тесты, но не смёржился (HTTP {m_res.status_code}). Ветка сохранена.")
     else:
@@ -885,16 +1015,18 @@ def run_evolution_cycle():
 
         if issue_url:
             send_tg(
-                f"❌ <b>Мутация <code>{mod_name}</code> застряла у Унги!</b>\n\n"
-                f"🚨 <b>Задача передана Jules:</b> <a href=\"{issue_url}\">GitHub Issue</a>\n"
-                f"Ветка <code>{branch}</code> сохранена для доработки.\n\n"
-                f"Последняя ошибка:\n<pre>{escaped_err}</pre>"
+                f"❌ <b>Мутация застряла</b>\n━━━━━━━━━━━━━━━━━━━\n"
+                f"<code>{mod_name}</code>\n"
+                f"🚨 Передано Jules, ветка <code>{branch}</code> сохранена\n\n"
+                f"<b>Последняя ошибка:</b>\n<pre>{escaped_err}</pre>",
+                buttons=tg_issue_button(issue_url)
             )
         else:
             requests.delete(clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{branch}"), headers=API_HEADERS)
             send_tg(
-                f"❌ <b>Мутация <code>{mod_name}</code> отбракована.</b>\n\n"
-                f"Ошибка:\n<pre>{escaped_err}</pre>"
+                f"❌ <b>Мутация отбракована</b>\n━━━━━━━━━━━━━━━━━━━\n"
+                f"<code>{mod_name}</code>\n\n"
+                f"<b>Ошибка:</b>\n<pre>{escaped_err}</pre>"
             )
 
 def life_cycle():

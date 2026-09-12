@@ -154,3 +154,6 @@
 ## clean_compressed_rss_archiver (compose) — раундов: 5
 - Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/unittest/mock.py", line 1446, in __enter__
 - Статус: ПРОВАЛЕН после всех попыток
+
+## compressed_db_storage (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

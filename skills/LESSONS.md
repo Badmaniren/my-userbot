@@ -270,3 +270,8 @@
 ## resilient_secure_clean_compressed_rss_archiver (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main
+
+## resilient_secure_clean_compressed_sitemap_parser (compose) — раундов: 5
+- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
+- Последняя ошибка перед фиксом: Exception: Connection error
+- Статус: ПРОВАЛЕН после всех попыток

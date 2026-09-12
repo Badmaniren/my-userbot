@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ступно после 3 попыток (job_id=103264683388). Если это происходит систематически, а не разово — вероятно, у токена GITHUB_TOKEN не хватает прав на чтение Actions, это стоит проверить вручную.
-- Статус: ПРОВАЛЕН после всех попыток, ветка с кодом удалена
-
-## resource_monitor (create) — раундов: 4
-- Последняя ошибка перед фиксом: Тело логов недоступно после 3 попыток (job_id=103271749126). Если это происходит систематически, а не разово — вероятно, у токена GITHUB_TOKEN не хватает прав на чтение Actions, это стоит проверить вручную.
+пыток (job_id=103271749126). Если это происходит систематически, а не разово — вероятно, у токена GITHUB_TOKEN не хватает прав на чтение Actions, это стоит проверить вручную.
 - Статус: ПРОВАЛЕН после всех попыток, ветка с кодом удалена
 
 ## smart_crawler (refactor) — раундов: 4
@@ -290,3 +286,7 @@
 
 ## resilient_secure_clean_compressed_sitemap_parser_v2 (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## resilient_secure_clean_compressed_sitemap_crawler_v2 (compose) — раундов: 5
+- Последняя ошибка перед фиксом: skills.resilient_secure_clean_compressed_sitemap_crawler.ResilientSecureCleanCompressedSitemapCrawlerError: CleanCompressedDBStorage.set_cleaned_compressed_cache() missing 1 required positional argument: 'ttl'
+- Статус: ПРОВАЛЕН после всех попыток

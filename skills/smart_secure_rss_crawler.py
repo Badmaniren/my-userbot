@@ -37,7 +37,6 @@ class SmartSecureRSSCrawler:
     def archive_feed(self, url, timeout=10, force_refresh=False):
         try:
             self.rate_limiter.acquire()
-            # Исправлено: убрана передача 'headers', так как LinkExtractor.extract не поддерживает этот аргумент
             self.crawler.coordinate_expansion(url)
             result = self.archiver.archive_feed(url, timeout=timeout, force_refresh=force_refresh)
             return bool(result)
@@ -51,7 +50,6 @@ class SmartSecureRSSCrawler:
             raise SmartSecureRSSCrawlerError(str(e))
 
     def get_archived_feed(self, url):
-        # Возвращаем результат напрямую, чтобы тесты могли корректно его проверить
         return self.archiver.get_archived_feed(url)
 
     def coordinate_expansion(self, url):

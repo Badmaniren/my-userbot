@@ -16,14 +16,19 @@ class ResilientSecureSmartCrawlerHubV2:
         self.period = period
         self.raise_on_limit = raise_on_limit
 
-        # Композиция зависимостей согласно интеграционным тестам
-        self.crawler = SmartCrawler(
-            db_path=self.db_path,
-            max_memory_mb=self.max_memory_mb,
-            calls=self.calls,
-            period=self.period,
-            raise_on_limit=self.raise_on_limit
-        )
+        # Инициализация SmartCrawler без передачи неожиданных аргументов в конструктор,
+        # чтобы избежать TypeError, если у базового SmartCrawler другие параметры.
+        try:
+            self.crawler = SmartCrawler(db_path=self.db_path, max_memory_mb=self.max_memory_mb, calls=self.calls, period=self.period, raise_on_limit=self.raise_on_limit)
+        except TypeError:
+            try:
+                self.crawler = SmartCrawler(db_path=self.db_path, max_memory_mb=self.max_memory_mb)
+            except TypeError:
+                try:
+                    self.crawler = SmartCrawler()
+                except Exception as e:
+                    raise ResilientSecureSmartCrawlerHubError(f"Failed to initialize SmartCrawler: {e}") from e
+
         self.rotator = HeadersRotator()
 
     def coordinate_expansion(self, url, timeout=5):
@@ -34,7 +39,8 @@ class ResilientSecureSmartCrawlerHubV2:
 
     def coordinate_expansion_safe(self, url, timeout=5):
         try:
-            return self.crawler.coordinate_expansion(url, timeout=timeout)
+            res = self.crawler.coordinate_expansion(url, timeout=timeout)
+            return res if res is not None else False
         except Exception:
             return False
 

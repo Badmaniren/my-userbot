@@ -94,7 +94,13 @@ def run_telegram_listener():
                             send_tg("⚠️ Укажи описание задачи: <code>/build утилита_для_парсинга</code>")
                     elif text.startswith("/status"):
                         q_len = len(MANUAL_TASK_QUEUE)
-                        send_tg(f"📊 <b>Статус:</b> работает штатно.\nЗадач в ручной очереди: <b>{q_len}</b>")
+                        epic_preview = get_epic_context()
+                        if len(epic_preview) > 800:
+                            epic_preview = epic_preview[:800] + "..."
+                        send_tg(
+                            f"📊 <b>Статус:</b> работает штатно.\nЗадач в ручной очереди: <b>{q_len}</b>\n\n"
+                            f"🧭 <b>Текущий эпик:</b>\n<pre>{html.escape(epic_preview)}</pre>"
+                        )
         except Exception:
             time.sleep(5)
         time.sleep(1)
@@ -103,7 +109,7 @@ threading.Thread(target=run_telegram_listener, daemon=True).start()
 
 # 4. СЕТЬ И КЛИЕНТ GEMINI
 def clean_url(url: str) -> str:
-    return re.sub(r'\[.*?\]\(\vert{}\)', '', url).strip()
+    return re.sub(r'\[.*?\]\(|\)', '', url).strip()
 
 API_HOST = "generativelanguage.googleapis.com"
 API_BASE = "https://" + API_HOST + "/v1beta/"
@@ -359,6 +365,36 @@ LESSONS_HEADER = "# Уроки Унги\n\nЭто файл, который бо�
 MAX_LESSONS_CHARS_IN_PROMPT = 4000
 MAX_LESSONS_FILE_CHARS = 16000
 
+EPIC_PATH = "skills/EPIC.md"
+EPIC_HEADER = "# Текущий эпик Унги\n\nЭто многошаговая цель бота, которая живёт дольше одного цикла — тут видно, к чему бот идёт, а не только что он только что сделал.\n\nНет активного эпика — можно предложить новый.\n"
+
+def get_epic_context() -> str:
+    content = get_file_content("main", EPIC_PATH)
+    return content if content else "Нет активного эпика — можно предложить новый."
+
+def update_epic_file(branch: str, decision: dict) -> None:
+    status = decision.get("epic_status", "none")
+    if status not in ("start_new", "continue", "complete"):
+        return
+
+    title = (decision.get("epic_title") or "Без названия").strip()
+    step_note = (decision.get("epic_step_note") or "").strip()
+    mod_name = decision.get("module_name", "?")
+
+    if status == "start_new":
+        content = f"# Текущий эпик Унги\n\n## {title}\n\n- {mod_name}"
+        content += f": {step_note}\n" if step_note else ": первый шаг эпика\n"
+    else:
+        existing = get_file_content(branch, EPIC_PATH) or get_file_content("main", EPIC_PATH) or EPIC_HEADER
+        line = f"- {mod_name}: {step_note}" if step_note else f"- {mod_name}: шаг эпика выполнен"
+        if status == "complete":
+            line += "  ✅ ЭПИК ЗАВЕРШЁН"
+        content = existing.rstrip() + "\n" + line + "\n"
+        if status == "complete":
+            content += "\nНет активного эпика — можно предложить новый.\n"
+
+    commit_file_to_branch(branch, EPIC_PATH, content, f"Эпик «{title}»: {status}")
+
 def get_skills_manifest() -> dict:
     url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents/skills?ref=main")
     r = requests.get(url, headers=API_HEADERS, timeout=10)
@@ -452,7 +488,7 @@ def append_failure_lesson_directly(mod_name: str, action: str, rounds: int, chea
         requests.delete(clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{note_branch}"), headers=API_HEADERS)
 
 # 8. ПЛАНИРОВАНИЕ И ГЕНЕРАЦИЯ
-def dream_action(manifest: dict, lessons: str, manual_prompt: str = "") -> dict:
+def dream_action(manifest: dict, lessons: str, epic: str, manual_prompt: str = "") -> dict:
     if manual_prompt:
         prompt = (
             f"Пользователь дал прямое ТЗ: '{manual_prompt}'\n"
@@ -464,7 +500,10 @@ def dream_action(manifest: dict, lessons: str, manual_prompt: str = "") -> dict:
             '  "module_name": "латинское_имя_без_py",\n'
             '  "description": "суть модуля",\n'
             '  "class_or_func": "сигнатуры функций/классов",\n'
-            '  "composed_of": []\n'
+            '  "composed_of": [],\n'
+            '  "epic_status": "none",\n'
+            '  "epic_title": "",\n'
+            '  "epic_step_note": ""\n'
             "}"
         )
     else:
@@ -475,10 +514,19 @@ def dream_action(manifest: dict, lessons: str, manual_prompt: str = "") -> dict:
             "Заполни 'composed_of' списком их имён.\n"
         ) if can_compose else ""
         prompt = (
-            "Ты — Стратег-Паразит. Цель: экспансия и выживаемость.\n"
+            "Ты — Стратег-Паразит. Цель — не просто плодить модули, а РЕАЛЬНО развиваться: выстраивать "
+            "многошаговые направления, где каждая задача продвигает что-то большее, чем она сама.\n\n"
             f"УЖЕ СОЗДАННЫЕ МОДУЛИ:\n{json.dumps(manifest, indent=2, ensure_ascii=False)}\n\n"
             f"УРОКИ:\n{lessons}\n\n"
-            "ДЕЙСТВИЯ:\n1. 'create': Новый модуль.\n2. 'refactor': Улучшение модуля.\n"
+            f"ТЕКУЩИЙ ЭПИК (многошаговая цель дольше одного цикла):\n{epic}\n\n"
+            "ПРАВИЛО ПРО ЭПИК:\n"
+            "- Если эпик активен — ОБЯЗАН выбрать действие, которое реально его продвигает, а не постороннюю "
+            "задачу. Заполни 'epic_status': 'continue', или 'complete', если этим шагом эпик закрыт целиком.\n"
+            "- Если эпика нет или он только что завершён — можешь предложить НОВЫЙ: короткое, амбициозное, "
+            "реалистичное направление на 3-6 будущих циклов (например: 'Система мониторинга: RSS → чистка "
+            "текста → кэш → дайджест в Telegram'). Заполни 'epic_status': 'start_new' и 'epic_title'.\n"
+            "- Если явно нечего предложить в качестве эпика — 'epic_status': 'none'.\n\n"
+            "ДЕЙСТВИЯ ДЛЯ ТЕКУЩЕГО ШАГА:\n1. 'create'\n2. 'refactor'\n"
             f"{compose_hint}\n"
             "ТРЕБОВАНИЯ: Python 3.11, requests, beautifulsoup4 (bs4).\n"
             "Верни СТРОГО JSON:\n"
@@ -487,7 +535,10 @@ def dream_action(manifest: dict, lessons: str, manual_prompt: str = "") -> dict:
             '  "module_name": "латинское_имя_без_py",\n'
             '  "description": "суть модуля",\n'
             '  "class_or_func": "сигнатуры функций/классов",\n'
-            '  "composed_of": ["модуль1", "модуль2"]\n'
+            '  "composed_of": ["модуль1", "модуль2"],\n'
+            '  "epic_status": "start_new" | "continue" | "complete" | "none",\n'
+            '  "epic_title": "название эпика (пусто, если epic_status=none)",\n'
+            '  "epic_step_note": "как именно эта задача продвигает эпик"\n'
             "}"
         )
 
@@ -510,6 +561,8 @@ def dream_action(manifest: dict, lessons: str, manual_prompt: str = "") -> dict:
             composed_of = []
 
         data["composed_of"] = composed_of
+        if data.get("epic_status") not in ("start_new", "continue", "complete", "none"):
+            data["epic_status"] = "none"
         return data
     except Exception as e:
         print(f"[!] Ошибка парсинга Стратега: {e}, fallback")
@@ -518,7 +571,10 @@ def dream_action(manifest: dict, lessons: str, manual_prompt: str = "") -> dict:
             "module_name": f"extractor_tool_{int(time.time())}",
             "description": "Модуль извлечения метаданных из разметки",
             "class_or_func": "parse_meta(html: str) -> dict",
-            "composed_of": []
+            "composed_of": [],
+            "epic_status": "none",
+            "epic_title": "",
+            "epic_step_note": ""
         }
 
 def _compose_context(task: dict) -> str:
@@ -583,13 +639,14 @@ def run_evolution_cycle():
     manifest = get_skills_manifest()
     skills_list = list(manifest.keys())
     lessons = get_lessons_context()
+    epic = get_epic_context()
 
     manual_task = MANUAL_TASK_QUEUE.pop(0) if MANUAL_TASK_QUEUE else ""
     if manual_task:
         print(f"[!] ВЗЯТА РУЧНАЯ ЗАДАЧА ИЗ TELEGRAM: {manual_task}")
         send_tg(f"⚙️ <b>Питекантроп начал сборку:</b>\n<i>{html.escape(manual_task)}</i>")
 
-    decision = dream_action(manifest, lessons, manual_prompt=manual_task)
+    decision = dream_action(manifest, lessons, epic, manual_prompt=manual_task)
     mod_name = decision["module_name"]
     action = decision.get("action", "create")
     print(f"[+] Действие: {action.upper()} для '{mod_name}' — {decision.get('description')}")
@@ -615,6 +672,7 @@ def run_evolution_cycle():
     impl_code = unga_implement_hardened(decision, test_code, integration_test_code, manifest, existing_code=current_code)
 
     attempts = 1
+    rounds_used = 0
     passed = False
     run_id = None
     cheats_caught = []
@@ -625,6 +683,7 @@ def run_evolution_cycle():
     MAX_ATTEMPTS = 4
 
     while attempts <= MAX_ATTEMPTS:
+        rounds_used = attempts
         cheat_err = inspect_code_for_cheating(impl_code, skills_list, mod_name)
         if cheat_err:
             cheats_caught.append(cheat_err[:200])
@@ -648,7 +707,9 @@ def run_evolution_cycle():
 
         if stagnant_hits >= 1 and not tests_regenerated and attempts < MAX_ATTEMPTS:
             test_code = architect_write_hard_tests(decision, manifest, lessons, existing_code=impl_code, error_log=last_error)
-            commit_file_to_branch(branch, test_path, test_code, f"Перегенерация тестов [skip ci]")
+            integration_test_code = architect_write_integration_test(decision, manifest, lessons, existing_code=impl_code)
+            commit_file_to_branch(branch, test_path, test_code, "Перегенерация юнит-тестов [skip ci]")
+            commit_file_to_branch(branch, integration_test_path, integration_test_code, "Перегенерация интеграционных тестов [skip ci]")
             tests_regenerated = True
             stagnant_hits = 0
 
@@ -656,22 +717,31 @@ def run_evolution_cycle():
         attempts += 1
 
     if passed:
-        append_lesson_to_branch(branch, mod_name, action, attempts, cheats_caught, last_error)
+        append_lesson_to_branch(branch, mod_name, action, rounds_used, cheats_caught, last_error)
+        update_epic_file(branch, decision)
         m_res = requests.post(clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/merges"), headers=API_HEADERS, json={
             "base": "main", "head": branch, "commit_message": f"ЭВОЛЮЦИЯ: Вливание skills/{mod_name}.py"
         }, timeout=10)
 
         if m_res.status_code in [200, 201, 204]:
             requests.delete(clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{branch}"), headers=API_HEADERS)
+            epic_line = ""
+            if decision.get("epic_status") == "start_new":
+                epic_line = f"\n🧭 Новый эпик: <b>{html.escape(decision.get('epic_title', ''))}</b>"
+            elif decision.get("epic_status") == "continue":
+                epic_line = f"\n🧭 Продвигает эпик: <i>{html.escape(decision.get('epic_step_note', ''))}</i>"
+            elif decision.get("epic_status") == "complete":
+                epic_line = f"\n🏁 Эпик <b>{html.escape(decision.get('epic_title', ''))}</b> завершён!"
             send_tg(
                 f"✅ <b>Навык <code>{mod_name}</code> готов и влит в main!</b>\n\n"
                 f"📝 <i>{html.escape(decision.get('description', ''))}</i>\n"
-                f"🎯 Раундов: {attempts}"
+                f"🎯 Раундов: {rounds_used}"
+                f"{epic_line}"
             )
         else:
             send_tg(f"⚠️ Навык <code>{mod_name}</code> прошёл тесты, но не смёржился (HTTP {m_res.status_code}). Ветка сохранена.")
     else:
-        append_failure_lesson_directly(mod_name, action, attempts, cheats_caught, last_error)
+        append_failure_lesson_directly(mod_name, action, rounds_used, cheats_caught, last_error)
 
         # ЭСКАЛАЦИЯ: Создаем Issue на GitHub для Jules и оставляем ветку живой
         issue_url = escalate_to_github_issue(mod_name, decision.get('description', ''), last_error, branch)

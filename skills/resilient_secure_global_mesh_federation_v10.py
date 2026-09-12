@@ -73,7 +73,10 @@ class ResilientSecureGlobalMeshFederationV10:
         try:
             matrix_report = self.matrix_v9.get_exported_report(target) or {}
             hub_report = self.hub_v11.get_exported_report(target) or {}
-            return {**matrix_report, **hub_report}
+            res = {}
+            res.update(matrix_report)
+            res.update(hub_report)
+            return res
         except Exception as e:
             if self.raise_on_limit:
                 raise ResilientSecureGlobalMeshFederationV10Error(str(e)) from e
@@ -82,7 +85,11 @@ class ResilientSecureGlobalMeshFederationV10:
     def process_stream(self, target: str, timeout: int):
         try:
             self.hub_v11.process_stream(target, timeout)
-            return self.matrix_v9.process_stream(target, timeout)
+            res = self.matrix_v9.process_stream(target, timeout)
+            if res is None:
+                import io
+                return io.BytesIO(b'')
+            return res
         except Exception as e:
             if self.raise_on_limit:
                 raise ResilientSecureGlobalMeshFederationV10Error(str(e)) from e
@@ -90,8 +97,12 @@ class ResilientSecureGlobalMeshFederationV10:
 
     def route_request(self, target: str, timeout: int):
         try:
-            self.hub_v11.route_request(target, timeout) if hasattr(self.hub_v11, "route_request") else None
-            return self.matrix_v9.route_request(target, timeout)
+            if hasattr(self.hub_v11, "route_request"):
+                self.hub_v11.route_request(target, timeout)
+            res = self.matrix_v9.route_request(target, timeout)
+            if res is None:
+                return {}
+            return res
         except Exception as e:
             if self.raise_on_limit:
                 raise ResilientSecureGlobalMeshFederationV10Error(str(e)) from e

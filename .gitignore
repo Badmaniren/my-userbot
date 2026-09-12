@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+cache/
+rss_cache/
+test_rss_cache_dir/
+storage.db
+*.db
+*.sqlite

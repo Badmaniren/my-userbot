@@ -25,6 +25,7 @@ class TestResilientSmartUrlAggregatorV2(unittest.TestCase):
         mock_storage.save_compressed_data.return_value = None
 
         aggregator = ResilientSmartUrlAggregatorV2(
+            db_path=self.db_path,
             crawler=mock_crawler,
             sitemap_crawler=mock_sitemap,
             storage=mock_storage
@@ -40,7 +41,7 @@ class TestResilientSmartUrlAggregatorV2(unittest.TestCase):
         mock_crawler = MagicMock()
         mock_crawler.process_url.return_value = False
 
-        aggregator = ResilientSmartUrlAggregatorV2(crawler=mock_crawler)
+        aggregator = ResilientSmartUrlAggregatorV2(db_path=self.db_path, crawler=mock_crawler)
         result = aggregator.aggregate("http://bad.url", timeout=5)
         self.assertFalse(result)
 
@@ -48,7 +49,7 @@ class TestResilientSmartUrlAggregatorV2(unittest.TestCase):
         mock_storage = MagicMock()
         mock_storage.save_compressed_data.side_effect = Exception("DB Error")
 
-        aggregator = ResilientSmartUrlAggregatorV2(storage=mock_storage)
+        aggregator = ResilientSmartUrlAggregatorV2(db_path=self.db_path, storage=mock_storage)
         with self.assertRaises(Exception):
             aggregator.save_to_storage("key", "data")
 
@@ -56,7 +57,7 @@ class TestResilientSmartUrlAggregatorV2(unittest.TestCase):
         mock_sitemap = MagicMock()
         mock_sitemap.validate_sitemap.return_value = True
 
-        aggregator = ResilientSmartUrlAggregatorV2(sitemap_crawler=mock_sitemap)
+        aggregator = ResilientSmartUrlAggregatorV2(db_path=self.db_path, sitemap_crawler=mock_sitemap)
         res = aggregator.validate_source("http://sitemap.xml", 5)
         self.assertTrue(res)
 
@@ -75,7 +76,7 @@ class TestResilientSmartUrlAggregatorV2(unittest.TestCase):
         mock_storage = MagicMock()
         mock_storage.get_compressed_data.return_value = b'compressed_payload'
 
-        aggregator = ResilientSmartUrlAggregatorV2(storage=mock_storage)
+        aggregator = ResilientSmartUrlAggregatorV2(db_path=self.db_path, storage=mock_storage)
         data = aggregator.get_data("test_key")
         self.assertEqual(data, b'compressed_payload')
 

@@ -8,16 +8,16 @@ from skills import (
 
 class ResilientSmartUrlAggregatorV2:
     def __init__(self, db_path=None, crawler=None, sitemap_crawler=None, storage=None):
-        self.db_path = db_path
+        self.db_path = db_path or "storage.db"
         self.crawler = crawler or resilient_secure_clean_url_crawler_v2.ResilientSecureCleanUrlCrawlerV2()
 
         self.sitemap_crawler = sitemap_crawler or smart_secure_compressed_sitemap_crawler_v2.SmartSecureCompressedSitemapCrawlerV2(
-            db_path=db_path,
+            db_path=self.db_path,
             max_memory_mb=128,
             calls=10,
             period=60
         )
-        self.storage = storage or compressed_db_storage.CompressedDBStorage(db_path=db_path)
+        self.storage = storage or compressed_db_storage.CompressedDBStorage(db_path=self.db_path)
 
     def aggregate(self, url, timeout=10):
         try:
@@ -26,7 +26,7 @@ class ResilientSmartUrlAggregatorV2:
 
             sitemap_data = self.sitemap_crawler.crawl_and_clean(url, timeout=timeout)
             if sitemap_data is not None:
-                self.storage.save_compressed_data(url, str(sitemap_data).encode())
+                self.storage.save_compressed_data(url, str(sitemap_data))
                 return True
             return False
         except Exception:

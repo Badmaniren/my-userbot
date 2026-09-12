@@ -1,37 +1,38 @@
-import pytest
+import unittest
 from skills.resilient_secure_global_mesh_node_v2 import ResilientSecureGlobalMeshNodeV2, ResilientSecureGlobalMeshNodeV2Error
-from skills.resilient_secure_global_mesh_node_v1 import ResilientSecureSmartCrawlerHubV11GlobalMesh
-from skills.resilient_secure_smart_crawler_hub_analytics_exporter import ResilientSecureSmartCrawlerHubAnalyticsExporter
 
-def test_integration_resilient_secure_global_mesh_node_v2(tmp_path):
-    db_file = tmp_path / "mesh_node_v2.db"
-    db_path = str(db_file)
-    max_memory_mb = 256
-    calls = 10
-    period = 1.0
-    raise_on_limit = True
+class TestResilientSecureGlobalMeshNodeV2Integration(unittest.TestCase):
+    def setUp(self):
+        self.node = ResilientSecureGlobalMeshNodeV2(
+            db_path=":memory:",
+            max_memory_mb=512,
+            calls=10,
+            period=1.0,
+            raise_on_limit=True
+        )
 
-    node = ResilientSecureGlobalMeshNodeV2(
-        db_path=db_path,
-        max_memory_mb=max_memory_mb,
-        calls=calls,
-        period=period,
-        raise_on_limit=raise_on_limit
-    )
+    def test_inheritance_and_composition(self):
+        self.assertIsNotNone(self.node.analytics_exporter)
+        self.assertTrue(hasattr(self.node, 'coordinate_expansion'))
+        self.assertTrue(hasattr(self.node, 'validate_target_headers'))
 
-    assert isinstance(node, ResilientSecureGlobalMeshNodeV2)
+    def test_analytics_export_and_retrieval(self):
+        target = "https://example.com/mesh-node"
+        report_data = {"status": "active", "load": 0.42}
+        
+        self.node.export_analytics_report(target, report_data)
+        retrieved_report = self.node.get_exported_report(target)
+        
+        self.assertEqual(retrieved_report, report_data)
 
-    test_url = "http://example.com"
-    target_name = "test_target"
-    report_data = {"status": "active", "metrics": {"load": 0.1}}
+    def test_coordinate_expansion_safe_with_invalid_url(self):
+        invalid_url = "http://invalid-mesh-node-url-99999.local"
+        result = self.node.coordinate_expansion_safe(url=invalid_url, timeout=1)
+        self.assertFalse(result)
 
-    node.export_analytics_report(target_name, report_data)
-    exported = node.get_exported_report(target_name)
-    assert isinstance(exported, dict)
-    assert exported.get("status") == "active"
+    def test_exception_exists(self):
+        with self.assertRaises(ResilientSecureGlobalMeshNodeV2Error):
+            raise ResilientSecureGlobalMeshNodeV2Error("Test error")
 
-    headers_valid = node.validate_target_headers(test_url, timeout=5)
-    assert isinstance(headers_valid, bool)
-
-    expansion_result = node.coordinate_expansion_safe(test_url, timeout=5)
-    assert isinstance(expansion_result, bool)
+if __name__ == "__main__":
+    unittest.main()

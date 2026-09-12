@@ -205,3 +205,7 @@
 - Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: FAILED (failures=3)
 - Статус: ПРОВАЛЕН после всех попыток
+
+## smart_secure_clean_compressed_rss_crawler_v2 (compose) — раундов: 5
+- Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/unittest/mock.py", line 939, in assert_called_with
+- Статус: ПРОВАЛЕН после всех попыток

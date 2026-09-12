@@ -266,3 +266,7 @@
 
 ## resilient_clean_compressed_sitemap_parser_v2 (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## resilient_secure_clean_compressed_rss_archiver (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main

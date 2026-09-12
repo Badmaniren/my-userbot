@@ -225,3 +225,6 @@
 ## resilient_smart_secure_rss_crawler (compose) — раундов: 5
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН после всех попыток
+
+## sitemap_parser (create) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

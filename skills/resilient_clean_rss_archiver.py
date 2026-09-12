@@ -12,7 +12,10 @@ class ResilientCleanRSSArchiver:
         self.db_path = db_path
         self.max_memory_mb = max_memory_mb
         self.fetcher = ResilientRSSFetcher(calls=calls, period=period, raise_on_limit=raise_on_limit)
-        self.storage = CleanCompressedDBStorage(db_path=db_path, max_memory_mb=max_memory_mb)
+        try:
+            self.storage = CleanCompressedDBStorage(db_path=db_path, max_memory_mb=max_memory_mb)
+        except TypeError:
+            self.storage = CleanCompressedDBStorage(db_path=db_path)
 
     def archive_feed(self, url: str, timeout: int = 10, force_refresh: bool = False) -> bool:
         try:

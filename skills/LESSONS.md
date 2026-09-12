@@ -255,3 +255,7 @@
 
 ## resilient_clean_compressed_sitemap_parser (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## resilient_clean_compressed_sitemap_crawler (compose) — раундов: 2
+- Последняя ошибка перед фиксом: ^^^^^^^^^^^^
+- Статус: успешно прошёл тесты и влит в main

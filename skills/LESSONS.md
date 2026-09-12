@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-aner (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
-- Статус: ПРОВАЛЕН после всех попыток, ветка с кодом удалена
-
-## query_string_parser (create) — раундов: 1
+er (create) — раундов: 1
 - Статус: успешно прошёл интеграционные тесты и влит в main
 
 ## extractor_tool_1789152588 (create) — раундов: 4
@@ -326,4 +322,8 @@ aner (create) — раундов: 4
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## resilient_secure_smart_crawler_hub_v7_orchestrator (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## resilient_secure_smart_crawler_hub_v8_enterprise (compose) — раундов: 2
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main

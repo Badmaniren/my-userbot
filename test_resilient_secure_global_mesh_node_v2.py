@@ -1,8 +1,9 @@
 import unittest
 from unittest.mock import patch, MagicMock
 import io
+import requests
 
-from skills.resilient_secure_ global_mesh_node_v2 import (
+from skills.resilient_secure_global_mesh_node_v2 import (
     ResilientSecureGlobalMeshNodeV2,
     ResilientSecureGlobalMeshNodeV2Error
 )
@@ -10,79 +11,103 @@ from skills.resilient_secure_ global_mesh_node_v2 import (
 class TestResilientSecureGlobalMeshNodeV2(unittest.TestCase):
 
     def setUp(self):
-        self.db_path = ":memory:"
-        self.max_memory_mb = 512
-        self.calls = 10
-        self.period = 1.0
-        self.raise_on_limit = True
         self.node = ResilientSecureGlobalMeshNodeV2(
-            db_path=self.db_path,
-            max_memory_mb=self.max_memory_mb,
-            calls=self.calls,
-            period=self.period,
-            raise_on_limit=self.raise_on_limit
+            db_path=":memory:",
+            max_memory_mb=512,
+            calls=10,
+            period=1.0,
+            raise_on_limit=True
         )
 
-    def test_initialization(self):
+    def test_init_inheritance_and_attributes(self):
         self.assertIsInstance(self.node, ResilientSecureGlobalMeshNodeV2)
+        self.assertIsNotNone(self.node.analytics_exporter)
+        self.assertIsInstance(self.node._exported_reports, dict)
 
-    def test_validate_target_headers_success(self):
-        with patch('requests.head') as mock_head:
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_head.return_value = mock_response
+    @patch('requests.head')
+    def test_validate_target_headers_success(self, mock_head):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_head.return_value = mock_response
 
-            result = self.node.validate_target_headers("https://example.com", 5)
-            self.assertTrue(result)
+        url = "http://example.com"
+        result = self.node.validate_target_headers(url, timeout=5)
+        self.assertTrue(result)
+        mock_head.assert_called_once_with(url, timeout=5)
 
-    def test_validate_target_headers_failure(self):
-        with patch('requests.head') as mock_head:
-            mock_head.side_effect = Exception("Connection error")
+    @patch('requests.head')
+    def test_validate_target_headers_failure(self, mock_head):
+        mock_response = MagicMock()
+        mock_response.status_code = 404
+        mock_head.return_value = mock_response
 
-            result = self.node.validate_target_headers("https://example.com", 5)
-            self.assertFalse(result)
+        url = "http://example.com/404"
+        result = self.node.validate_target_headers(url, timeout=5)
+        self.assertFalse(result)
 
-    def test_coordinate_expansion_success(self):
-        with patch('requests.get') as mock_get:
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.raw = io.BytesIO(b'{"status": "ok"}')
-            mock_get.return_value = mock_response
+    @patch('requests.get')
+    def test_coordinate_expansion_success(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_get.return_value = mock_response
 
-            result = self.node.coordinate_expansion("https://example.com/mesh", 5)
-            self.assertTrue(result)
+        url = "http://example.com/expand"
+        result = self.node.coordinate_expansion(url, timeout=5)
+        self.assertTrue(result)
+        mock_get.assert_called_once_with(url, timeout=5, stream=True)
 
-    def test_coordinate_expansion_safe(self):
-        with patch('requests.get') as mock_get:
-            mock_get.side_effect = Exception("Mesh failure")
+    @patch('requests.get')
+    def test_coordinate_expansion_failure(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.status_code = 500
+        mock_get.return_value = mock_response
 
-            result = self.node.coordinate_expansion_safe("https://example.com/mesh", 5)
-            self.assertFalse(result)
+        url = "http://example.com/error"
+        result = self.node.coordinate_expansion(url, timeout=5)
+        self.assertFalse(result)
 
-    def test_export_and_get_analytics_report(self):
-        target = "https://example.com/node"
-        report_data = {"mesh_sync": True, "latency_ms": 12}
+    @patch('requests.get')
+    def test_coordinate_expansion_safe_success(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_get.return_value = mock_response
+
+        url = "http://example.com/safe"
+        result = self.node.coordinate_expansion_safe(url, timeout=5)
+        self.assertTrue(result)
+
+    @patch('requests.get')
+    def test_coordinate_expansion_safe_catches_exception(self, mock_get):
+        mock_get.side_effect = requests.exceptions.ConnectionError("Connection failed")
+
+        url = "http://example.com/unreachable"
+        result = self.node.coordinate_expansion_safe(url, timeout=5)
+        self.assertFalse(result)
+
+    def test_export_and_get_exported_report(self):
+        target = "http://target.com"
+        report_data = {"status": "active", "nodes": 3}
 
         self.node.export_analytics_report(target, report_data)
-        exported = self.node.get_exported_report(target)
+        
+        retrieved_report = self.node.get_exported_report(target)
+        self.assertEqual(retrieved_report, report_data)
 
-        self.assertEqual(exported, report_data)
+    @patch('requests.get')
+    def test_process_stream(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.iter_content.return_value = [b'chunk1', b'chunk2', b'chunk3']
+        mock_get.return_value = mock_response
 
-    def test_process_stream(self):
-        with patch('requests.get') as mock_get:
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.iter_content.return_value = [b'stream_chunk']
-            mock_get.return_value = mock_response
+        url = "http://example.com/stream"
+        try:
+            self.node.process_stream(url, timeout=5)
+        except Exception as e:
+            self.fail(f"process_stream raised unexpected exception: {e}")
 
-            try:
-                self.node.process_stream("https://example.com/stream", 5)
-            except Exception as e:
-                self.fail(f"process_stream raised unexpected exception: {e}")
-
-    def test_error_handling_exception(self):
-        with self.assertRaises(ResilientSecureGlobalMeshNodeV2Error):
-            raise ResilientSecureGlobalMeshNodeV2Error("Critical Mesh Error")
+        mock_get.assert_called_once_with(url, timeout=5, stream=True)
+        mock_response.iter_content.assert_called_once_with(chunk_size=8192)
 
 if __name__ == '__main__':
     unittest.main()

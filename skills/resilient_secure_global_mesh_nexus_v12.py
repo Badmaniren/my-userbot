@@ -64,7 +64,9 @@ class ResilientSecureGlobalMeshNexusV12:
             gw_res = bool(self.gateway.coordinate_expansion_safe(target, timeout))
             hub_res = bool(self.hub.coordinate_expansion_safe(target, timeout))
             return gw_res and hub_res
-        except Exception:
+        except Exception as e:
+            if self.raise_on_limit:
+                raise ResilientSecureGlobalMeshNexusV12Error(str(e)) from e
             return False
 
     def export_analytics_report(self, target: str, report_data: dict) -> None:
@@ -77,9 +79,11 @@ class ResilientSecureGlobalMeshNexusV12:
         return self.gateway.get_exported_report(target)
 
     def process_stream(self, target: str, timeout: int = 5):
-        """Обработка потока данных."""
+        """Обработка потока данных через компоненты шлюза и хаба."""
         try:
-            return self.gateway.process_stream(target, timeout)
+            res = self.gateway.process_stream(target, timeout)
+            self.hub.process_stream(target, timeout)
+            return res
         except Exception as e:
             raise ResilientSecureGlobalMeshNexusV12Error(str(e)) from e
 

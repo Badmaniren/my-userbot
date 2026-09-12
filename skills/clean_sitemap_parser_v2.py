@@ -13,7 +13,6 @@ class CleanSitemapParser:
     def parse(self, url, timeout=5):
         try:
             raw_urls = self._parser.parse(url, timeout=timeout)
-            # Применяем clean_url к каждому элементу, чтобы нормализовать регистр и удалить UTM
             return [clean_url(u) for u in raw_urls]
         except requests.RequestException as e:
             raise CleanSitemapParserError(f"Network error: {e}")
@@ -23,7 +22,8 @@ class CleanSitemapParser:
     def validate_sitemap(self, url, timeout=5):
         try:
             result = self._parser.validate_sitemap(url, timeout=timeout)
-            # Гарантируем возврат чистого bool, даже если парсер возвращает кортеж или иное
+            if isinstance(result, tuple):
+                return bool(result[0])
             return bool(result)
         except Exception:
             return False

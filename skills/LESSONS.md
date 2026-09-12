@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-archiver (compose) — раундов: 4
-- Античит поймал: тесты перегенерировались после стагнации, но задачу это не спасло
-- Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/unittest/mock.py", line 1378, in patched
+lcache/Python/3.11.16/x64/lib/python3.11/unittest/mock.py", line 1378, in patched
 - Статус: ПРОВАЛЕН после всех попыток, ветка с кодом удалена
 
 ## cached_rss_archiver (compose) — раундов: 4
@@ -328,4 +326,8 @@ archiver (compose) — раундов: 4
 - Статус: успешно прошёл тесты и влит в main
 
 ## resilient_secure_global_mesh_autonomous_matrix_v9 (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## resilient_secure_global_mesh_federation_v10 (compose) — раундов: 2
+- Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main

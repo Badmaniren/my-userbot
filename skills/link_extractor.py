@@ -14,7 +14,7 @@ class _HTMLLinkParser(HTMLParser):
                     self.links.append(value)
 
 class LinkExtractor:
-    def extract(self, html_content: str) -> list:
+    def extract(self, html_content: str, headers: dict = None, timeout: int = 5, **kwargs) -> list:
         if html_content is None:
             raise TypeError("html_content cannot be None")
         parser = _HTMLLinkParser()

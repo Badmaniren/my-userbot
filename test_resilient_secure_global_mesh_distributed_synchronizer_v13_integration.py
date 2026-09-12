@@ -1,60 +1,37 @@
-import pytest
-from skills.resilient_secure_global_mesh_distributed_synchronizer_v13 import ResilientSecureGlobalMeshDistributedSynchronizerV13
-from skills.resilient_secure_global_mesh_nexus_v12 import ResilientSecureGlobalMeshNexusV12
-from skills.resilient_secure_global_mesh_federation_v10 import ResilientSecureGlobalMeshFederationV10
+import unittest
+from skills.resilient_secure_global_mesh_distributed_synchronizer_v13 import (
+    ResilientSecureGlobalMeshDistributedSynchronizerV13,
+    ResilientSecureGlobalMeshDistributedSynchronizerV13Error
+)
 
-def test_integration_distributed_synchronizer_v13():
-    db_path = ":memory:"
-    max_memory_mb = 256
-    calls = 10
-    period = 1.0
-    raise_on_limit = True
+class TestResilientSecureGlobalMeshDistributedSynchronizerV13Integration(unittest.TestCase):
+    def setUp(self):
+        self.synchronizer = ResilientSecureGlobalMeshDistributedSynchronizerV13(
+            db_path=":memory:",
+            max_memory_mb=128,
+            calls=10,
+            period=1.0,
+            raise_on_limit=True
+        )
 
-    synchronizer = ResilientSecureGlobalMeshDistributedSynchronizerV13(
-        db_path=db_path,
-        max_memory_mb=max_memory_mb,
-        calls=calls,
-        period=period,
-        raise_on_limit=raise_on_limit
-    )
+    def test_initialization_and_composition(self):
+        self.assertIsNotNone(self.synchronizer.nexus)
+        self.assertIsNotNone(self.synchronizer.federation)
 
-    assert isinstance(synchronizer, ResilientSecureGlobalMeshDistributedSynchronizerV13)
-    
-    target = "https://example.com"
-    timeout = 5.0
+    def test_export_and_get_exported_report(self):
+        target = "http://example.com/mesh"
+        report_data = {"status": "synchronized", "nodes": 5}
+        
+        self.synchronizer.export_analytics_report(target, report_data)
+        exported = self.synchronizer.get_exported_report(target)
+        
+        self.assertEqual(exported.get("status"), "synchronized")
+        self.assertEqual(exported.get("nodes"), 5)
 
-    try:
-        is_valid = synchronizer.validate_target_headers(target, timeout)
-        assert isinstance(is_valid, bool)
-    except Exception:
-        pass
+    def test_coordinate_expansion_safe_invalid_target(self):
+        target = "http://invalid-mesh-target-nonexistent-domain.local"
+        result = self.synchronizer.coordinate_expansion_safe(target, timeout=1)
+        self.assertFalse(result)
 
-    try:
-        expanded = synchronizer.coordinate_expansion(target, timeout)
-        assert isinstance(expanded, bool)
-    except Exception:
-        pass
-
-    try:
-        expanded_safe = synchronizer.coordinate_expansion_safe(target, timeout)
-        assert isinstance(expanded_safe, bool)
-    except Exception:
-        pass
-
-    report_data = {"status": "synchronized", "nodes": 3}
-    try:
-        synchronizer.export_analytics_report(target, report_data)
-        report = synchronizer.get_exported_report(target)
-        assert isinstance(report, dict)
-    except Exception:
-        pass
-
-    try:
-        synchronizer.process_stream(target, timeout)
-    except Exception:
-        pass
-
-    try:
-        synchronizer.route_request(target, timeout)
-    except Exception:
-        pass
+if __name__ == "__main__":
+    unittest.main()

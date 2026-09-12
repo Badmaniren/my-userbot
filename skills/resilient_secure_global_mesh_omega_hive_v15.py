@@ -48,39 +48,35 @@ class ResilientSecureGlobalMeshOmegaHiveV15(
         """Валидация заголовков целевого узла."""
         try:
             response = requests.head(target, timeout=timeout)
-            return response.status_code == 200
-        except Exception:
+            return bool(response.status_code == 200)
+        except (requests.RequestException, Exception):
             return False
 
     def coordinate_expansion(self, target: str, timeout: int = 5) -> bool:
         """Координация расширения роя."""
-        try:
-            response = requests.get(target, timeout=timeout)
-            return response.status_code == 200
-        except Exception as e:
-            raise e
+        response = requests.get(target, timeout=timeout)
+        return bool(response.status_code == 200)
 
     def coordinate_expansion_safe(self, target: str, timeout: int = 5) -> bool:
         """Безопасная координация расширения роя."""
         try:
             response = requests.get(target, timeout=timeout)
-            return response.status_code == 200
-        except Exception:
+            return bool(response.status_code == 200)
+        except (requests.RequestException, Exception):
             return False
 
     def export_analytics_report(self, target: str, report_data: dict) -> None:
         """Экспорт аналитического отчета."""
-        self.reports[target] = dict(report_data)
+        self.reports[target] = {**report_data}
 
     def get_exported_report(self, target: str) -> dict:
         """Получение экспортированного отчета."""
-        return self.reports.get(target, {})
+        return dict(self.reports.get(target, {}))
 
     def process_stream(self, target: str, timeout: int = 5) -> None:
         """Обработка потоковых данных от узла."""
         response = requests.get(target, stream=True, timeout=timeout)
         if hasattr(response, 'raw') and response.raw:
-            # Чтение потока для совместимости с тестами
             _ = response.raw.read()
 
     def route_request(self, target: str, timeout: int = 5):

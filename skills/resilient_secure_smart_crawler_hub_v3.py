@@ -31,7 +31,10 @@ class ResilientSecureSmartCrawlerHubV3(ResilientSecureSmartCrawlerHubV2):
         self.memory_profiler = MemoryProfiler()
 
     def _check_memory(self):
-        memory_profiler.assert_memory_limit(self.max_memory_mb, self.raise_on_limit)
+        try:
+            memory_profiler.assert_memory_limit(self.max_memory_mb, self.raise_on_limit)
+        except TypeError:
+            memory_profiler.assert_memory_limit(self.max_memory_mb)
 
     def coordinate_expansion(self, url, timeout):
         self._check_memory()

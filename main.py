@@ -46,13 +46,7 @@ def run_dummy_server():
 threading.Thread(target=run_dummy_server, daemon=True).start()
 
 # 3. БЕЗОПАСНЫЙ TELEGRAM ДЕМОН (HTML)
-def send_tg(text: str, buttons: list = None, keyboard: bool = False):
-    """
-    buttons: список РЯДОВ inline-кнопок; каждый ряд — список dict вида
-    {"text": "...", "callback_data": "..."} или {"text": "...", "url": "..."}.
-    keyboard=True: показать/обновить постоянное меню-клавиатуру внизу экрана
-    (взаимоисключимо с inline-кнопками в одном сообщении — это разные виды разметки).
-    """
+def send_tg(text: str):
     if not TG_TOKEN or not TG_ADMIN_ID:
         return
     url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
@@ -62,56 +56,10 @@ def send_tg(text: str, buttons: list = None, keyboard: bool = False):
         "parse_mode": "HTML",
         "disable_web_page_preview": True
     }
-    if keyboard:
-        payload["reply_markup"] = json.dumps({
-            "keyboard": [["📊 /status", "🔁 /jules"], ["⚙️ /build ", "❓ /help"]],
-            "resize_keyboard": True,
-            "is_persistent": True
-        })
-    elif buttons:
-        payload["reply_markup"] = json.dumps({"inline_keyboard": buttons})
     try:
         requests.post(url, json=payload, timeout=10)
     except Exception as e:
         print(f"[!] Ошибка отправки в TG: {e}")
-
-def tg_issue_button(issue_url: str) -> list:
-    return [[{"text": "🔗 Открыть задачу для Jules", "url": issue_url}]] if issue_url else None
-
-def answer_tg_callback(callback_query_id: str, text: str = ""):
-    if not TG_TOKEN:
-        return
-    url = f"https://api.telegram.org/bot{TG_TOKEN}/answerCallbackQuery"
-    try:
-        requests.post(url, json={"callback_query_id": callback_query_id, "text": text[:200]}, timeout=10)
-    except Exception:
-        pass
-
-def set_tg_commands():
-    if not TG_TOKEN:
-        return
-    url = f"https://api.telegram.org/bot{TG_TOKEN}/setMyCommands"
-    commands = [
-        {"command": "status", "description": "📊 Текущий статус и эпик"},
-        {"command": "build", "description": "⚙️ Поставить задачу вручную"},
-        {"command": "jules", "description": "🔁 Реактивировать зависшие Jules-задачи"},
-        {"command": "help", "description": "❓ Список команд"},
-    ]
-    try:
-        requests.post(url, json={"commands": commands}, timeout=10)
-    except Exception:
-        pass
-
-HELP_TEXT = (
-    "🐒 <b>Пульт управления Питекантропом</b>\n"
-    "━━━━━━━━━━━━━━━━━━━\n"
-    "📊 <code>/status</code> — что бот делает сейчас и какой эпик в работе\n"
-    "⚙️ <code>/build &lt;описание&gt;</code> — поставить задачу вручную в очередь\n"
-    "🔁 <code>/jules</code> — растолкать зависшие Jules-задачи\n"
-    "❓ <code>/help</code> — это сообщение\n"
-    "━━━━━━━━━━━━━━━━━━━\n"
-    "<i>Кнопки внизу экрана дублируют команды — жми, а не печатай.</i>"
-)
 
 def run_telegram_listener():
     if not TG_TOKEN or not TG_ADMIN_ID:
@@ -120,11 +68,7 @@ def run_telegram_listener():
 
     offset = 0
     print("[+] Telegram-пульт управления запущен.")
-    set_tg_commands()
-    send_tg(
-        "🐒 <b>Питекантроп на связи!</b>\nДемон запущен, меню команд — снизу экрана.",
-        keyboard=True
-    )
+    send_tg("🐒 <b>Питекантроп на связи!</b> Демон запущен. Используй <code>/build &lt;описание&gt;</code> для задач.")
 
     while True:
         url = f"https://api.telegram.org/bot{TG_TOKEN}/getUpdates"
@@ -134,62 +78,29 @@ def run_telegram_listener():
                 data = r.json()
                 for update in data.get("result", []):
                     offset = update["update_id"] + 1
-
-                    callback = update.get("callback_query")
-                    if callback:
-                        cb_chat_id = str(callback.get("message", {}).get("chat", {}).get("id", ""))
-                        cb_data = callback.get("data", "")
-                        if cb_chat_id != TG_ADMIN_ID:
-                            answer_tg_callback(callback["id"])
-                            continue
-                        if cb_data == "rejules":
-                            answer_tg_callback(callback["id"], "Толкаю зависшие задачи...")
-                            count = reactivate_stuck_jules_issues()
-                            if count:
-                                send_tg(f"🔁 Реактивировано Jules-задач: <b>{count}</b>.\nДай ему пару минут забрать их в работу.")
-                            else:
-                                send_tg("ℹ️ Открытых Jules-задач не найдено — реактивировать нечего.")
-                        continue
-
                     msg = update.get("message", {})
                     chat_id = str(msg.get("chat", {}).get("id", ""))
                     text = msg.get("text", "").strip()
-                    # кнопки постоянного меню приходят как обычный текст с эмодзи — снимаем эмодзи-обёртку
-                    text = re.sub(r'^[📊🔁⚙️❓]\s*', '', text)
 
                     if chat_id != TG_ADMIN_ID:
                         continue
 
-                    if text.startswith("/start"):
-                        send_tg(HELP_TEXT, keyboard=True)
-                    elif text.startswith("/help"):
-                        send_tg(HELP_TEXT)
-                    elif text.startswith("/build"):
+                    if text.startswith("/build"):
                         task_desc = text[6:].strip()
                         if task_desc:
                             MANUAL_TASK_QUEUE.append(task_desc)
-                            send_tg(f"🫡 <b>Задача принята в очередь</b>\n━━━━━━━━━━━━━━━━━━━\n<code>{html.escape(task_desc)}</code>")
+                            send_tg(f"🫡 <b>Задача принята в очередь:</b>\n<code>{html.escape(task_desc)}</code>")
                         else:
-                            send_tg("⚠️ Укажи описание задачи после команды:\n<code>/build утилита_для_парсинга</code>")
+                            send_tg("⚠️ Укажи описание задачи: <code>/build утилита_для_парсинга</code>")
                     elif text.startswith("/status"):
                         q_len = len(MANUAL_TASK_QUEUE)
                         epic_preview = get_epic_context()
                         if len(epic_preview) > 800:
                             epic_preview = epic_preview[:800] + "..."
                         send_tg(
-                            f"📊 <b>Статус</b>\n━━━━━━━━━━━━━━━━━━━\n"
-                            f"Работает штатно · задач в очереди: <b>{q_len}</b>\n\n"
-                            f"🧭 <b>Текущий эпик</b>\n<pre>{html.escape(epic_preview)}</pre>",
-                            buttons=[[{"text": "🔁 Реактивировать зависшие Jules-задачи", "callback_data": "rejules"}]]
+                            f"📊 <b>Статус:</b> работает штатно.\nЗадач в ручной очереди: <b>{q_len}</b>\n\n"
+                            f"🧭 <b>Текущий эпик:</b>\n<pre>{html.escape(epic_preview)}</pre>"
                         )
-                    elif text.startswith("/jules"):
-                        count = reactivate_stuck_jules_issues()
-                        if count:
-                            send_tg(f"🔁 Реактивировано Jules-задач: <b>{count}</b>.")
-                        else:
-                            send_tg("ℹ️ Открытых Jules-задач не найдено.")
-                    elif text:
-                        send_tg("🤷 Не знаю такой команды.\n" + HELP_TEXT)
         except Exception:
             time.sleep(5)
         time.sleep(1)
@@ -394,58 +305,7 @@ def extract_clean_test_traceback(run_id: int) -> str:
     except Exception as e:
         return f"Сбой при извлечении трейсбека: {e}"
 
-def fix_jules_issue_labels() -> int:
-    """
-    Разовая починка: у issue-эскалаций, созданных ДО того, как метка 'jules' стала
-    проставляться автоматически, метки нет — и Jules их никогда не подхватит сам.
-    Дорасставляет метку на все такие уже существующие открытые issues.
-    """
-    ensure_jules_label_exists()
-    url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues?state=open&per_page=100")
-    fixed = 0
-    try:
-        r = requests.get(url, headers=API_HEADERS, timeout=10)
-        if r.status_code == 200:
-            for issue in r.json():
-                if "pull_request" in issue:
-                    continue
-                if not issue.get("title", "").startswith("Jules Task:"):
-                    continue
-                labels = [l["name"] for l in issue.get("labels", [])]
-                if "jules" in labels:
-                    continue
-                num = issue["number"]
-                res = requests.post(
-                    clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues/{num}/labels"),
-                    headers=API_HEADERS, json={"labels": ["jules"]}, timeout=10
-                )
-                if res.status_code in (200, 201):
-                    fixed += 1
-    except Exception as e:
-        print(f"[!] Ошибка починки меток: {e}")
-    return fixed
-
-def ensure_jules_label_exists() -> None:
-    """
-    Jules подхватывает задачу из issue ТОЛЬКО если на нём стоит метка 'jules'.
-    Метка должна существовать в репозитории заранее, иначе GitHub отклонит
-    попытку присвоить её при создании issue. Создаём один раз, тихо игнорируя
-    ошибку 'уже существует' (422), но громко печатая любую другую.
-    """
-    url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/labels")
-    try:
-        res = requests.post(url, headers=API_HEADERS, json={
-            "name": "jules",
-            "color": "6f42c1",
-            "description": "Автоматически подхватывается Jules для исправления"
-        }, timeout=10)
-        if res.status_code not in [200, 201, 422]:
-            print(f"[!] Не удалось создать лейбл jules в репозитории (HTTP {res.status_code}): {res.text[:300]}")
-    except Exception as e:
-        print(f"[!] Ошибка запроса создания лейбла jules: {e}")
-
 def escalate_to_github_issue(mod_name: str, task_desc: str, last_error: str, branch: str) -> str:
-    ensure_jules_label_exists()
     issue_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues")
     body = (
         f"### Автоматическая эскалация сбоя от Питекантропа\n\n"
@@ -458,72 +318,18 @@ def escalate_to_github_issue(mod_name: str, task_desc: str, last_error: str, bra
         f"> 2. Исправь код модуля `skills/{mod_name}.py` и тесты в `test_{mod_name}.py` / `test_{mod_name}_integration.py`.\n"
         f"> 3. Добейся успешного прохождения `python -m unittest` и открой Pull Request в `main`."
     )
-    # Лейбл НЕ ставим прямо здесь: если он придёт вместе с созданием issue, GitHub
-    # шлёт только событие "issue opened" — Jules реагирует именно на отдельное
-    # событие "лейбл добавлен". Поэтому сначала создаём issue без лейбла...
-    payload = {"title": f"Jules Task: исправить сбой модуля {mod_name}", "body": body}
+    payload = {
+        "title": f"Jules Task: исправить сбой модуля {mod_name}",
+        "body": body
+    }
     try:
         res = requests.post(issue_url, headers=API_HEADERS, json=payload, timeout=10)
         if res.status_code in [200, 201]:
-            issue_data = res.json()
-            issue_number = issue_data.get("number")
-            # ...а лейбл добавляем отдельным запросом сразу после — это гарантированно
-            # своё собственное событие "labeled", на которое и подписан Jules.
-            if issue_number:
-                add_jules_label(issue_number)
-            return issue_data.get("html_url", "")
+            return res.json().get("html_url", "")
         print(f"[!] Ошибка создания Issue (HTTP {res.status_code}): {res.text}")
     except Exception as e:
         print(f"[!] Ошибка запроса создания Issue: {e}")
     return ""
-
-def add_jules_label(issue_number: int) -> bool:
-    url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues/{issue_number}/labels")
-    try:
-        res = requests.post(url, headers=API_HEADERS, json={"labels": ["jules"]}, timeout=10)
-        if res.status_code in [200, 201]:
-            return True
-        print(f"[!] Не удалось поставить лейбл jules на #{issue_number} (HTTP {res.status_code}): {res.text[:300]}")
-        return False
-    except Exception as e:
-        print(f"[!] Ошибка добавления лейбла jules на #{issue_number}: {e}")
-        return False
-
-def reactivate_stuck_jules_issues() -> int:
-    """
-    "Толкает" зависшие Jules-задачи. Ищем по ЗАГОЛОВКУ ("Jules Task:"), а не по
-    фильтру "issues с лейблом jules" — если постановка лейбла при создании сама
-    когда-то не удалась (см. add_jules_label), у issue лейбла нет вообще, и поиск
-    по лейблу такие issues никогда не найдёт. Для уже помеченных — снимаем и
-    ставим заново (гарантированно свежее событие 'labeled'); для непомеченных —
-    просто ставим впервые.
-    """
-    url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues")
-    try:
-        res = requests.get(url, headers=API_HEADERS, params={"state": "open", "per_page": 100}, timeout=10)
-        if res.status_code != 200:
-            print(f"[!] Реактивация: не удалось получить список issues (HTTP {res.status_code})")
-            return 0
-        issues = [i for i in res.json() if i.get("title", "").startswith("Jules Task:")]
-    except Exception as e:
-        print(f"[!] Реактивация: ошибка запроса списка issues: {e}")
-        return 0
-
-    reactivated = 0
-    for issue in issues:
-        number = issue.get("number")
-        if not number:
-            continue
-        has_label = any(l.get("name") == "jules" for l in issue.get("labels", []))
-        if has_label:
-            del_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues/{number}/labels/jules")
-            try:
-                requests.delete(del_url, headers=API_HEADERS, timeout=10)
-            except Exception:
-                pass
-        if add_jules_label(number):
-            reactivated += 1
-    return reactivated
 
 # 6. АНТИЧИТ
 def inspect_code_for_cheating(code: str, existing_skills: list, target_module: str) -> str:
@@ -825,83 +631,6 @@ def unga_implement_hardened(task: dict, unit_test_code: str, integration_test_co
     return ask_gemini(prompt)
 
 # 9. БОЕВОЙ ЦИКЛ С АВТОЭВРИСТИКОЙ И ЭСКАЛАЦИЕЙ НА JULES
-def write_epic_smoke_test(epic_title: str, epic_body: str, manifest: dict) -> str:
-    prompt = (
-        "Ты пишешь ОДНОРАЗОВУЮ ПРАКТИЧЕСКУЮ ПРОВЕРКУ завершённого эпика — не часть постоянного "
-        "набора регрессионных тестов, а честную демонстрацию, что заявленная способность реально "
-        "работает в реальном мире, а не только против моков и локальных серверов.\n\n"
-        f"Эпик: {epic_title}\n"
-        f"Контекст эпика (файл EPIC.md):\n{epic_body}\n\n"
-        f"ДОСТУПНЫЕ МОДУЛИ (используй их РЕАЛЬНО, честным импортом из skills.*, без моков):\n"
-        f"{json.dumps(manifest, indent=2, ensure_ascii=False)}\n\n"
-        "ПРАВИЛА:\n"
-        "1. ЭТО ЕДИНСТВЕННЫЙ случай, когда реальная сеть РАЗРЕШЕНА и ОБЯЗАТЕЛЬНА — сходи на реальный, "
-        "стабильный, общеизвестный публичный сайт/RSS-фид, подходящий по смыслу эпику (например: "
-        "hnrss.org, rss-фид крупного новостного сайта, example.com) — что-то, что не требует "
-        "авторизации и не пропадёт завтра.\n"
-        "2. Заведи один мягкий повтор (retry) на случай единичного сетевого сбоя, но не больше "
-        "2 попыток — это не постоянный сьют, зависать не должен.\n"
-        "3. Тест должен явно печатать (print) реальные полученные данные (заголовок статьи, "
-        "фрагмент текста и т.п.), а не просто OK/FAIL — чтобы в логах было видно живое доказательство.\n"
-        "4. Оформи как unittest.TestCase с одним-двумя показательными тестами.\n"
-        "5. Верни ТОЛЬКО валидный Python-код файла без markdown."
-    )
-    return ask_gemini(prompt)
-
-def run_epic_smoke_test(epic_title: str, manifest: dict) -> None:
-    """
-    После завершения эпика — не верим только локальным мокам, реально пробуем
-    способность в деле. Специально НЕ попадает в постоянный CI: коммитится на
-    одноразовую ветку с именем файла вне обычного шаблона test_*.py — то есть даже
-    если что-то пойдёт не так с очисткой, обычный набор регрессионных тестов
-    никогда не подхватит этот файл и не станет зависеть от реальной сети.
-    """
-    epic_body = get_epic_context()
-    print(f"\n[~] ПРАКТИЧЕСКАЯ ПРОВЕРКА ЭПИКА: '{epic_title}'")
-    send_tg(f"🧪 Эпик <b>{html.escape(epic_title)}</b> завершён — проверяю на практике, в реальном мире...")
-
-    branch = f"unga-epic-smoke-{int(time.time())}"
-    if not prepare_branch(branch, get_main_sha()):
-        print("[-] Практическая проверка: не удалось подготовить ветку.")
-        return
-
-    smoke_path = "test_epic_smoke.py"  # эта ветка никогда не мержится в main, так что совпадение с обычным шаблоном discovery безопасно
-    last_error = ""
-    passed = False
-    run_id = None
-
-    for attempt in range(1, 3):
-        smoke_code = write_epic_smoke_test(epic_title, epic_body, manifest)
-        commit_msg = f"Практическая проверка эпика «{epic_title}» #{attempt}"
-        target_sha = commit_file_to_branch(branch, smoke_path, smoke_code, commit_msg)
-        print(f"[*] Практическая проверка закоммичена (SHA: {target_sha[:7]}), раунд #{attempt}...")
-        passed, run_id = watch_arena_by_sha(target_sha)
-        if passed:
-            break
-        last_error = extract_clean_test_traceback(run_id)
-        print(f"[!] Практическая проверка провалилась в реальных условиях:\n{last_error}\n")
-
-    if passed:
-        send_tg(f"✅ <b>Практическая проверка пройдена</b>\n━━━━━━━━━━━━━━━━━━━\n🏁 Эпик «{html.escape(epic_title)}» подтверждён в реальном мире!")
-        requests.delete(clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{branch}"), headers=API_HEADERS)
-    else:
-        issue_title_hint = re.sub(r'[^a-zA-Z0-9_]', '_', epic_title.lower())[:40] or "epic"
-        issue_url = escalate_to_github_issue(
-            issue_title_hint,
-            f"Практическая проверка завершённого эпика «{epic_title}» провалилась в реальных условиях "
-            "(юнит- и интеграционные тесты при этом прошли).",
-            last_error,
-            branch
-        )
-        send_tg(
-            f"❌ <b>Практическая проверка провалена</b>\n━━━━━━━━━━━━━━━━━━━\n"
-            f"🏁 Эпик «{html.escape(epic_title)}»\n"
-            "Юнит- и интеграционные тесты были зелёными, но в реальных условиях что-то не работает.\n"
-            "🚨 Передано Jules.",
-            buttons=tg_issue_button(issue_url)
-        )
-        # ветка НЕ удаляется — она нужна Jules'у для работы
-
 def run_evolution_cycle():
     print("\n==========================================")
     print("      ПИТЕКАНТРОП: БЕЗОПАСНЫЙ ЦИКЛ CI     ")
@@ -998,21 +727,17 @@ def run_evolution_cycle():
             requests.delete(clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{branch}"), headers=API_HEADERS)
             epic_line = ""
             if decision.get("epic_status") == "start_new":
-                epic_line = f"\n\n🧭 <b>Новый эпик:</b> {html.escape(decision.get('epic_title', ''))}"
+                epic_line = f"\n🧭 Новый эпик: <b>{html.escape(decision.get('epic_title', ''))}</b>"
             elif decision.get("epic_status") == "continue":
-                epic_line = f"\n\n🧭 <b>Продвигает эпик:</b> {html.escape(decision.get('epic_step_note', ''))}"
+                epic_line = f"\n🧭 Продвигает эпик: <i>{html.escape(decision.get('epic_step_note', ''))}</i>"
             elif decision.get("epic_status") == "complete":
-                epic_line = f"\n\n🏁 <b>Эпик завершён:</b> {html.escape(decision.get('epic_title', ''))}"
+                epic_line = f"\n🏁 Эпик <b>{html.escape(decision.get('epic_title', ''))}</b> завершён!"
             send_tg(
-                f"✅ <b>Навык готов</b>\n━━━━━━━━━━━━━━━━━━━\n"
-                f"<code>{mod_name}</code>\n"
-                f"📝 {html.escape(decision.get('description', ''))}\n"
+                f"✅ <b>Навык <code>{mod_name}</code> готов и влит в main!</b>\n\n"
+                f"📝 <i>{html.escape(decision.get('description', ''))}</i>\n"
                 f"🎯 Раундов: {rounds_used}"
                 f"{epic_line}"
             )
-            if decision.get("epic_status") == "complete":
-                fresh_manifest = get_skills_manifest()
-                run_epic_smoke_test(decision.get("epic_title", "Без названия"), fresh_manifest)
         else:
             send_tg(f"⚠️ Навык <code>{mod_name}</code> прошёл тесты, но не смёржился (HTTP {m_res.status_code}). Ветка сохранена.")
     else:
@@ -1026,18 +751,16 @@ def run_evolution_cycle():
 
         if issue_url:
             send_tg(
-                f"❌ <b>Мутация застряла</b>\n━━━━━━━━━━━━━━━━━━━\n"
-                f"<code>{mod_name}</code>\n"
-                f"🚨 Передано Jules, ветка <code>{branch}</code> сохранена\n\n"
-                f"<b>Последняя ошибка:</b>\n<pre>{escaped_err}</pre>",
-                buttons=tg_issue_button(issue_url)
+                f"❌ <b>Мутация <code>{mod_name}</code> застряла у Унги!</b>\n\n"
+                f"🚨 <b>Задача передана Jules:</b> <a href=\"{issue_url}\">GitHub Issue</a>\n"
+                f"Ветка <code>{branch}</code> сохранена для доработки.\n\n"
+                f"Последняя ошибка:\n<pre>{escaped_err}</pre>"
             )
         else:
             requests.delete(clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{branch}"), headers=API_HEADERS)
             send_tg(
-                f"❌ <b>Мутация отбракована</b>\n━━━━━━━━━━━━━━━━━━━\n"
-                f"<code>{mod_name}</code>\n\n"
-                f"<b>Ошибка:</b>\n<pre>{escaped_err}</pre>"
+                f"❌ <b>Мутация <code>{mod_name}</code> отбракована.</b>\n\n"
+                f"Ошибка:\n<pre>{escaped_err}</pre>"
             )
 
 def life_cycle():

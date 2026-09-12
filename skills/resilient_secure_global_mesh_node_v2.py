@@ -33,7 +33,15 @@ class ResilientSecureGlobalMeshNodeV2(ResilientSecureSmartCrawlerHubV11GlobalMes
             return False
 
     def export_analytics_report(self, target: str, report_data: dict) -> None:
-        self.analytics_exporter.export(target, report_data)
+        if hasattr(self.analytics_exporter, 'export'):
+            self.analytics_exporter.export(target, report_data)
+        elif hasattr(self.analytics_exporter, 'save_report'):
+            self.analytics_exporter.save_report(target, report_data)
+        elif hasattr(self.analytics_exporter, 'add_report'):
+            self.analytics_exporter.add_report(target, report_data)
+        else:
+            if hasattr(self.analytics_exporter, 'reports'):
+                self.analytics_exporter.reports[target] = report_data
         self._exported_reports.update({target: report_data})
 
     def get_exported_report(self, target: str) -> dict:

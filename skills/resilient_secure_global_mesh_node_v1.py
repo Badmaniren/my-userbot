@@ -71,8 +71,13 @@ class ResilientSecureSmartCrawlerHubV11GlobalMesh:
         try:
             response = requests.get(url, stream=True, timeout=timeout)
             if response.status_code == 200:
-                for _ in response.raw.stream(1024):
-                    pass
+                raw_obj = response.raw
+                if hasattr(raw_obj, "stream"):
+                    for _ in raw_obj.stream(1024):
+                        pass
+                else:
+                    for _ in iter(lambda: raw_obj.read(1024), b""):
+                        pass
             else:
                 raise ResilientSecureSmartCrawlerHubV11GlobalMeshError("Stream error: status code != 200")
         except Exception as e:

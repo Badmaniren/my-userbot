@@ -46,7 +46,10 @@ def run_dummy_server():
 threading.Thread(target=run_dummy_server, daemon=True).start()
 
 # 3. БЕЗОПАСНЫЙ TELEGRAM ДЕМОН (HTML)
-def send_tg(text: str):
+def send_tg(text: str, buttons: list = None):
+    """
+    buttons: список пар (текст_кнопки, callback_data) — одна кнопка в ряд.
+    """
     if not TG_TOKEN or not TG_ADMIN_ID:
         return
     url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
@@ -56,10 +59,23 @@ def send_tg(text: str):
         "parse_mode": "HTML",
         "disable_web_page_preview": True
     }
+    if buttons:
+        payload["reply_markup"] = json.dumps({
+            "inline_keyboard": [[{"text": t, "callback_data": cb}] for t, cb in buttons]
+        })
     try:
         requests.post(url, json=payload, timeout=10)
     except Exception as e:
         print(f"[!] Ошибка отправки в TG: {e}")
+
+def answer_tg_callback(callback_query_id: str, text: str = ""):
+    if not TG_TOKEN:
+        return
+    url = f"https://api.telegram.org/bot{TG_TOKEN}/answerCallbackQuery"
+    try:
+        requests.post(url, json={"callback_query_id": callback_query_id, "text": text[:200]}, timeout=10)
+    except Exception:
+        pass
 
 def run_telegram_listener():
     if not TG_TOKEN or not TG_ADMIN_ID:
@@ -78,6 +94,23 @@ def run_telegram_listener():
                 data = r.json()
                 for update in data.get("result", []):
                     offset = update["update_id"] + 1
+
+                    callback = update.get("callback_query")
+                    if callback:
+                        cb_chat_id = str(callback.get("message", {}).get("chat", {}).get("id", ""))
+                        cb_data = callback.get("data", "")
+                        if cb_chat_id != TG_ADMIN_ID:
+                            answer_tg_callback(callback["id"])
+                            continue
+                        if cb_data == "rejules":
+                            answer_tg_callback(callback["id"], "Толкаю зависшие задачи...")
+                            count = reactivate_stuck_jules_issues()
+                            if count:
+                                send_tg(f"🔁 Реактивировано Jules-задач: <b>{count}</b>. Дай ему пару минут забрать их в работу.")
+                            else:
+                                send_tg("ℹ️ Открытых Jules-задач не найдено — реактивировать нечего.")
+                        continue
+
                     msg = update.get("message", {})
                     chat_id = str(msg.get("chat", {}).get("id", ""))
                     text = msg.get("text", "").strip()
@@ -99,8 +132,15 @@ def run_telegram_listener():
                             epic_preview = epic_preview[:800] + "..."
                         send_tg(
                             f"📊 <b>Статус:</b> работает штатно.\nЗадач в ручной очереди: <b>{q_len}</b>\n\n"
-                            f"🧭 <b>Текущий эпик:</b>\n<pre>{html.escape(epic_preview)}</pre>"
+                            f"🧭 <b>Текущий эпик:</b>\n<pre>{html.escape(epic_preview)}</pre>",
+                            buttons=[("🔁 Реактивировать зависшие Jules-задачи", "rejules")]
                         )
+                    elif text.startswith("/jules"):
+                        count = reactivate_stuck_jules_issues()
+                        if count:
+                            send_tg(f"🔁 Реактивировано Jules-задач: <b>{count}</b>.")
+                        else:
+                            send_tg("ℹ️ Открытых Jules-задач не найдено.")
         except Exception:
             time.sleep(5)
         time.sleep(1)
@@ -305,7 +345,56 @@ def extract_clean_test_traceback(run_id: int) -> str:
     except Exception as e:
         return f"Сбой при извлечении трейсбека: {e}"
 
+def fix_jules_issue_labels() -> int:
+    """
+    Разовая починка: у issue-эскалаций, созданных ДО того, как метка 'jules' стала
+    проставляться автоматически, метки нет — и Jules их никогда не подхватит сам.
+    Дорасставляет метку на все такие уже существующие открытые issues.
+    """
+    ensure_jules_label_exists()
+    url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues?state=open&per_page=100")
+    fixed = 0
+    try:
+        r = requests.get(url, headers=API_HEADERS, timeout=10)
+        if r.status_code == 200:
+            for issue in r.json():
+                if "pull_request" in issue:
+                    continue
+                if not issue.get("title", "").startswith("Jules Task:"):
+                    continue
+                labels = [l["name"] for l in issue.get("labels", [])]
+                if "jules" in labels:
+                    continue
+                num = issue["number"]
+                res = requests.post(
+                    clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues/{num}/labels"),
+                    headers=API_HEADERS, json={"labels": ["jules"]}, timeout=10
+                )
+                if res.status_code in (200, 201):
+                    fixed += 1
+    except Exception as e:
+        print(f"[!] Ошибка починки меток: {e}")
+    return fixed
+
+def ensure_jules_label_exists() -> None:
+    """
+    Jules подхватывает задачу из issue ТОЛЬКО если на нём стоит метка 'jules'.
+    Метка должна существовать в репозитории заранее, иначе GitHub отклонит
+    попытку присвоить её при создании issue. Создаём один раз, тихо игнорируя
+    ошибку 'уже существует'.
+    """
+    url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/labels")
+    try:
+        requests.post(url, headers=API_HEADERS, json={
+            "name": "jules",
+            "color": "6f42c1",
+            "description": "Автоматически подхватывается Jules для исправления"
+        }, timeout=10)
+    except Exception:
+        pass
+
 def escalate_to_github_issue(mod_name: str, task_desc: str, last_error: str, branch: str) -> str:
+    ensure_jules_label_exists()
     issue_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues")
     body = (
         f"### Автоматическая эскалация сбоя от Питекантропа\n\n"
@@ -318,18 +407,63 @@ def escalate_to_github_issue(mod_name: str, task_desc: str, last_error: str, bra
         f"> 2. Исправь код модуля `skills/{mod_name}.py` и тесты в `test_{mod_name}.py` / `test_{mod_name}_integration.py`.\n"
         f"> 3. Добейся успешного прохождения `python -m unittest` и открой Pull Request в `main`."
     )
-    payload = {
-        "title": f"Jules Task: исправить сбой модуля {mod_name}",
-        "body": body
-    }
+    # Лейбл НЕ ставим прямо здесь: если он придёт вместе с созданием issue, GitHub
+    # шлёт только событие "issue opened" — Jules реагирует именно на отдельное
+    # событие "лейбл добавлен". Поэтому сначала создаём issue без лейбла...
+    payload = {"title": f"Jules Task: исправить сбой модуля {mod_name}", "body": body}
     try:
         res = requests.post(issue_url, headers=API_HEADERS, json=payload, timeout=10)
         if res.status_code in [200, 201]:
-            return res.json().get("html_url", "")
+            issue_data = res.json()
+            issue_number = issue_data.get("number")
+            # ...а лейбл добавляем отдельным запросом сразу после — это гарантированно
+            # своё собственное событие "labeled", на которое и подписан Jules.
+            if issue_number:
+                add_jules_label(issue_number)
+            return issue_data.get("html_url", "")
         print(f"[!] Ошибка создания Issue (HTTP {res.status_code}): {res.text}")
     except Exception as e:
         print(f"[!] Ошибка запроса создания Issue: {e}")
     return ""
+
+def add_jules_label(issue_number: int) -> bool:
+    url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues/{issue_number}/labels")
+    try:
+        res = requests.post(url, headers=API_HEADERS, json={"labels": ["jules"]}, timeout=10)
+        return res.status_code in [200, 201]
+    except Exception as e:
+        print(f"[!] Ошибка добавления лейбла jules на #{issue_number}: {e}")
+        return False
+
+def reactivate_stuck_jules_issues() -> int:
+    """
+    "Толкает" зависшие Jules-issues: снимает и заново ставит лейбл 'jules' на
+    каждом открытом issue с этим лейблом. Просто повторно ставить уже стоящий
+    лейбл GitHub не всегда воспринимает как новое событие — снятие+постановка
+    гарантированно шлёт свежее событие 'labeled'.
+    """
+    url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues")
+    try:
+        res = requests.get(url, headers=API_HEADERS, params={"labels": "jules", "state": "open", "per_page": 50}, timeout=10)
+        if res.status_code != 200:
+            return 0
+        issues = res.json()
+    except Exception:
+        return 0
+
+    reactivated = 0
+    for issue in issues:
+        number = issue.get("number")
+        if not number:
+            continue
+        del_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues/{number}/labels/jules")
+        try:
+            requests.delete(del_url, headers=API_HEADERS, timeout=10)
+        except Exception:
+            pass
+        if add_jules_label(number):
+            reactivated += 1
+    return reactivated
 
 # 6. АНТИЧИТ
 def inspect_code_for_cheating(code: str, existing_skills: list, target_module: str) -> str:

@@ -3,8 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-lcache/Python/3.11.16/x64/lib/python3.11/unittest/mock.py", line 1378, in patched
-- Статус: ПРОВАЛЕН после всех попыток, ветка с кодом удалена
+опыток, ветка с кодом удалена
 
 ## cached_rss_archiver (compose) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.; АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
@@ -330,4 +329,7 @@ lcache/Python/3.11.16/x64/lib/python3.11/unittest/mock.py", line 1378, in patche
 
 ## resilient_secure_global_mesh_federation_v10 (compose) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## resilient_secure_global_mesh_gateway_v11 (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

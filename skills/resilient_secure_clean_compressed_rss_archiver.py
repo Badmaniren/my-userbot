@@ -30,7 +30,7 @@ class SecureCleanCompressedRSSArchiver:
             feed_data = self.fetcher.fetch(url, timeout=timeout)
             if feed_data is None:
                 return False
-            result = self.base_archiver.archive_feed(url, feed_data)
+            result = self.base_archiver.archive_feed(url, timeout=timeout, force_refresh=force_refresh)
             return bool(result) if result is not None else True
         except Exception as e:
             if self.raise_on_limit:

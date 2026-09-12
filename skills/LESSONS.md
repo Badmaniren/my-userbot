@@ -217,3 +217,7 @@
 ## resilient_smart_secure_rss_crawler (compose) — раундов: 5
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН после всех попыток
+
+## resilient_smart_crawler (compose) — раундов: 5
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН после всех попыток

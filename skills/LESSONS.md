@@ -232,3 +232,7 @@
 ## clean_sitemap_parser (compose) — раундов: 5
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН после всех попыток
+
+## clean_sitemap_parser_v2 (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: успешно прошёл тесты и влит в main

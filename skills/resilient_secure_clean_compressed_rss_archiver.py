@@ -64,3 +64,25 @@ def secure_clean_compressed_rss_archive_flow(
     )
     res = archiver.archive_feed(url, timeout=timeout, force_refresh=force_refresh)
     return bool(res) if res is not None else True
+
+
+def resilient_secure_clean_compressed_rss_archive_flow(
+    url,
+    timeout=5,
+    db_path=":memory:",
+    max_memory_mb=128,
+    force_refresh=False,
+    calls=10,
+    period=60,
+    raise_on_limit=True
+):
+    return secure_clean_compressed_rss_archive_flow(
+        url=url,
+        timeout=timeout,
+        db_path=db_path,
+        max_memory_mb=max_memory_mb,
+        force_refresh=force_refresh,
+        calls=calls,
+        period=period,
+        raise_on_limit=raise_on_limit
+    )

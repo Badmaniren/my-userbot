@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+skills/__pycache__/
+cache/
+rss_cache/
+test_rss_cache_dir/
+storage.db
+*.db
+.pytest_cache/

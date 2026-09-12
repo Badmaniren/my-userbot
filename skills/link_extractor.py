@@ -24,7 +24,10 @@ class LinkExtractor:
     def validate_link(self, url: str, timeout: int = 5) -> bool:
         try:
             response = check_endpoint(url, timeout)
-            status = getattr(response, 'status_code', getattr(response, 'status', None))
+            if isinstance(response, dict):
+                status = response.get('status_code', response.get('status'))
+            else:
+                status = getattr(response, 'status_code', getattr(response, 'status', None))
             if status == 200:
                 return True
             return False
@@ -34,7 +37,10 @@ class LinkExtractor:
     def process_with_cache(self, url: str, timeout: int = 5) -> bool:
         try:
             response = ping_and_cache(url, timeout)
-            status = getattr(response, 'status_code', getattr(response, 'status', None))
+            if isinstance(response, dict):
+                status = response.get('status_code', response.get('status'))
+            else:
+                status = getattr(response, 'status_code', getattr(response, 'status', None))
             if status == 200:
                 return True
             return False

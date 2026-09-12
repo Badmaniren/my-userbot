@@ -39,3 +39,9 @@ class CompressedDBStorage:
 
     def get_data(self, key: str):
         return self.get_compressed_data(key)
+
+    def save(self, key: str, payload) -> None:
+        self.save_compressed_data(key, payload)
+
+    def load(self, key: str):
+        return self.get_compressed_data(key)

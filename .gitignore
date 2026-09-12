@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.db
+cache/
+rss_cache/
+test_rss_cache_dir/

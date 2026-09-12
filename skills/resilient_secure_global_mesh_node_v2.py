@@ -17,12 +17,9 @@ class ResilientSecureGlobalMeshNodeV2(ResilientSecureSmartCrawlerHubV11GlobalMes
         self._exported_reports = {}
 
     def validate_target_headers(self, url: str, timeout: int = 5) -> bool:
-        try:
-            import requests
-            response = requests.head(url, timeout=timeout)
-            return response.status_code == 200
-        except Exception:
-            return False
+        import requests
+        response = requests.head(url, timeout=timeout)
+        return response.status_code == 200
 
     def coordinate_expansion(self, url: str, timeout: int = 5) -> bool:
         import requests
@@ -32,12 +29,12 @@ class ResilientSecureGlobalMeshNodeV2(ResilientSecureSmartCrawlerHubV11GlobalMes
     def coordinate_expansion_safe(self, url: str, timeout: int = 5) -> bool:
         try:
             return self.coordinate_expansion(url, timeout=timeout)
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, ConnectionError, TimeoutError, OSError):
             return False
 
     def export_analytics_report(self, target: str, report_data: dict) -> None:
         self.analytics_exporter.export(target, report_data)
-        self._exported_reports[target] = report_data
+        self._exported_reports.update({target: report_data})
 
     def get_exported_report(self, target: str) -> dict:
         if target in self._exported_reports:

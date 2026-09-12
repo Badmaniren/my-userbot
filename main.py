@@ -7,6 +7,7 @@ import json
 import ast
 import io
 import zipfile
+import html
 import requests
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -24,7 +25,6 @@ if not GITHUB_TOKEN or not GITHUB_REPO or not API_KEYS:
     print("[FATAL] Отсутствуют критические переменные окружения (GITHUB_TOKEN, GITHUB_REPO, GEMINI_API_KEY)!")
     sys.exit(1)
 
-# Очередь ручных задач из Telegram
 MANUAL_TASK_QUEUE = []
 
 # 2. СЕРВЕР ЖИЗНИ ДЛЯ RENDER
@@ -45,7 +45,7 @@ def run_dummy_server():
 
 threading.Thread(target=run_dummy_server, daemon=True).start()
 
-# 3. TELEGRAM НОТИФИКАЦИИ И ПРИЁМ КОМАНД
+# 3. БЕЗОПАСНЫЙ TELEGRAM ДЕМОН (HTML)
 def send_tg(text: str):
     if not TG_TOKEN or not TG_ADMIN_ID:
         return
@@ -53,7 +53,8 @@ def send_tg(text: str):
     payload = {
         "chat_id": TG_ADMIN_ID,
         "text": text[:4000],
-        "parse_mode": "Markdown"
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True
     }
     try:
         requests.post(url, json=payload, timeout=10)
@@ -67,7 +68,7 @@ def run_telegram_listener():
 
     offset = 0
     print("[+] Telegram-пульт управления запущен.")
-    send_tg("🐒 *Питекантроп на связи!* Демон запущен. Используй `/build <описание утилиты>`, чтобы дать задачу.")
+    send_tg("🐒 <b>Питекантроп на связи!</b> Демон запущен. Используй <code>/build &lt;описание&gt;</code> для задач.")
 
     while True:
         url = f"https://api.telegram.org/bot{TG_TOKEN}/getUpdates"
@@ -88,12 +89,12 @@ def run_telegram_listener():
                         task_desc = text[6:].strip()
                         if task_desc:
                             MANUAL_TASK_QUEUE.append(task_desc)
-                            send_tg(f"🫡 *Задача принята в очередь:*\n_{task_desc}_")
+                            send_tg(f"🫡 <b>Задача принята в очередь:</b>\n<code>{html.escape(task_desc)}</code>")
                         else:
-                            send_tg("⚠️ Укажи описание задачи: `/build утилита_для_парсинга`")
+                            send_tg("⚠️ Укажи описание задачи: <code>/build утилита_для_парсинга</code>")
                     elif text.startswith("/status"):
                         q_len = len(MANUAL_TASK_QUEUE)
-                        send_tg(f"📊 *Статус:* работает штатно.\nЗадач в ручной очереди: {q_len}")
+                        send_tg(f"📊 <b>Статус:</b> работает штатно.\nЗадач в ручной очереди: <b>{q_len}</b>")
         except Exception:
             time.sleep(5)
         time.sleep(1)
@@ -102,7 +103,7 @@ threading.Thread(target=run_telegram_listener, daemon=True).start()
 
 # 4. СЕТЬ И КЛИЕНТ GEMINI
 def clean_url(url: str) -> str:
-    return re.sub(r'\[.*?\]\(|\)', '', url).strip()
+    return re.sub(r'\[.*?\]\(\vert{}\)', '', url).strip()
 
 API_HOST = "generativelanguage.googleapis.com"
 API_BASE = "https://" + API_HOST + "/v1beta/"
@@ -193,7 +194,7 @@ def ask_gemini(prompt: str, json_mode: bool = False) -> str:
                 time.sleep(2)
     return ""
 
-# 5. GITHUB ОПЕРАЦИИ
+# 5. GITHUB ОПЕРАЦИИ И ЭСКАЛАЦИЯ ДЛЯ JULES
 def get_main_sha() -> str:
     url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/ref/heads/main")
     r = requests.get(url, headers=API_HEADERS, timeout=10)
@@ -298,6 +299,32 @@ def extract_clean_test_traceback(run_id: int) -> str:
     except Exception as e:
         return f"Сбой при извлечении трейсбека: {e}"
 
+def escalate_to_github_issue(mod_name: str, task_desc: str, last_error: str, branch: str) -> str:
+    issue_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues")
+    body = (
+        f"### Автоматическая эскалация сбоя от Питекантропа\n\n"
+        f"- **Модуль:** `skills/{mod_name}.py`\n"
+        f"- **Рабочая ветка:** `{branch}`\n"
+        f"- **Исходная цель:** {task_desc}\n\n"
+        f"#### Трейсбек последней ошибки из GitHub Actions:\n```text\n{last_error}\n```\n\n"
+        f"> **Инструкция для Jules:**\n"
+        f"> 1. Переключись в ветку `{branch}`.\n"
+        f"> 2. Исправь код модуля `skills/{mod_name}.py` и тесты в `test_{mod_name}.py` / `test_{mod_name}_integration.py`.\n"
+        f"> 3. Добейся успешного прохождения `python -m unittest` и открой Pull Request в `main`."
+    )
+    payload = {
+        "title": f"Jules Task: исправить сбой модуля {mod_name}",
+        "body": body
+    }
+    try:
+        res = requests.post(issue_url, headers=API_HEADERS, json=payload, timeout=10)
+        if res.status_code in [200, 201]:
+            return res.json().get("html_url", "")
+        print(f"[!] Ошибка создания Issue (HTTP {res.status_code}): {res.text}")
+    except Exception as e:
+        print(f"[!] Ошибка запроса создания Issue: {e}")
+    return ""
+
 # 6. АНТИЧИТ
 def inspect_code_for_cheating(code: str, existing_skills: list, target_module: str) -> str:
     try:
@@ -326,7 +353,7 @@ def inspect_code_for_cheating(code: str, existing_skills: list, target_module: s
                 )
     return ""
 
-# 7. МАНИФЕСТ И LESSONS
+# 7. МАНИФЕСТ И ПАМЯТЬ
 LESSONS_PATH = "skills/LESSONS.md"
 LESSONS_HEADER = "# Уроки Унги\n\nЭто файл, который бот пишет и читает сам.\n"
 MAX_LESSONS_CHARS_IN_PROMPT = 4000
@@ -414,11 +441,11 @@ def append_failure_lesson_directly(mod_name: str, action: str, rounds: int, chea
         return
 
     existing = get_file_content("main", LESSONS_PATH) or LESSONS_HEADER
-    entry = _build_lesson_entry(mod_name, action, rounds, cheats_caught, last_error, "ПРОВАЛЕН после всех попыток")
-    commit_file_to_branch(note_branch, LESSONS_PATH, _merge_lessons_text(existing, entry), f"Урок (провал): {mod_name}")
+    entry = _build_lesson_entry(mod_name, action, rounds, cheats_caught, last_error, "ПРОВАЛЕН Унгой, передан на эскалацию")
+    commit_file_to_branch(note_branch, LESSONS_PATH, _merge_lessons_text(existing, entry), f"Урок (сбой): {mod_name}")
 
     m_res = requests.post(clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/merges"), headers=API_HEADERS, json={
-        "base": "main", "head": note_branch, "commit_message": f"Урок из провала: {mod_name}"
+        "base": "main", "head": note_branch, "commit_message": f"Урок из сбоя: {mod_name}"
     }, timeout=10)
 
     if m_res.status_code in [200, 201, 204]:
@@ -481,7 +508,7 @@ def dream_action(manifest: dict, lessons: str, manual_prompt: str = "") -> dict:
             composed_of = []
         elif data.get("action") != "compose":
             composed_of = []
-            
+
         data["composed_of"] = composed_of
         return data
     except Exception as e:
@@ -542,12 +569,12 @@ def unga_implement_hardened(task: dict, unit_test_code: str, integration_test_co
         f"ЮНИТ-ТЕСТЫ:\n{unit_test_code}\n\n"
         f"ИНТЕГРАЦИОННЫЕ ТЕСТЫ:\n{integration_test_code}\n\n"
         f"{context_err}\n"
-        "ПРАВИЛА: Валидация возвращает чистый bool (не кортеж). Исключения бросай только если в тестах есть assertRaises. "
+        "ПРАВИЛА: Валидация возвращает чистый bool. Исключения бросай только если в тестах есть assertRaises. "
         "Мерж словарей через update или {**a, **b}. Без 'except Exception: pass'. Верни только чистый Python-код."
     )
     return ask_gemini(prompt)
 
-# 9. БОЕВОЙ ЦИКЛ С УВЕДОМЛЕНИЯМИ
+# 9. БОЕВОЙ ЦИКЛ С АВТОЭВРИСТИКОЙ И ЭСКАЛАЦИЕЙ НА JULES
 def run_evolution_cycle():
     print("\n==========================================")
     print("      ПИТЕКАНТРОП: БЕЗОПАСНЫЙ ЦИКЛ CI     ")
@@ -560,7 +587,7 @@ def run_evolution_cycle():
     manual_task = MANUAL_TASK_QUEUE.pop(0) if MANUAL_TASK_QUEUE else ""
     if manual_task:
         print(f"[!] ВЗЯТА РУЧНАЯ ЗАДАЧА ИЗ TELEGRAM: {manual_task}")
-        send_tg(f"⚙️ *Питекантроп начал работу над задачей:*\n_{manual_task}_")
+        send_tg(f"⚙️ <b>Питекантроп начал сборку:</b>\n<i>{html.escape(manual_task)}</i>")
 
     decision = dream_action(manifest, lessons, manual_prompt=manual_task)
     mod_name = decision["module_name"]
@@ -636,14 +663,35 @@ def run_evolution_cycle():
 
         if m_res.status_code in [200, 201, 204]:
             requests.delete(clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{branch}"), headers=API_HEADERS)
-            send_tg(f"✅ *Навык `{mod_name}` готов и влит в main!*\n\n📝 _{decision.get('description')}_\n🎯 Раундов: {attempts}")
+            send_tg(
+                f"✅ <b>Навык <code>{mod_name}</code> готов и влит в main!</b>\n\n"
+                f"📝 <i>{html.escape(decision.get('description', ''))}</i>\n"
+                f"🎯 Раундов: {attempts}"
+            )
         else:
-            send_tg(f"⚠️ Навык `{mod_name}` прошёл тесты, но не смёржился (HTTP {m_res.status_code}). Ветка сохранена.")
+            send_tg(f"⚠️ Навык <code>{mod_name}</code> прошёл тесты, но не смёржился (HTTP {m_res.status_code}). Ветка сохранена.")
     else:
         append_failure_lesson_directly(mod_name, action, attempts, cheats_caught, last_error)
-        requests.delete(clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{branch}"), headers=API_HEADERS)
-        err_snippet = last_error.splitlines()[-4:] if last_error else ["Неизвестная ошибка"]
-        send_tg(f"❌ *Мутация `{mod_name}` отбракована.*\n\nОшибка:\n```\n{chr(10).join(err_snippet)}\n```")
+
+        # ЭСКАЛАЦИЯ: Создаем Issue на GitHub для Jules и оставляем ветку живой
+        issue_url = escalate_to_github_issue(mod_name, decision.get('description', ''), last_error, branch)
+
+        err_snippet = last_error.splitlines()[-5:] if last_error else ["Неизвестная ошибка"]
+        escaped_err = html.escape("\n".join(err_snippet))
+
+        if issue_url:
+            send_tg(
+                f"❌ <b>Мутация <code>{mod_name}</code> застряла у Унги!</b>\n\n"
+                f"🚨 <b>Задача передана Jules:</b> <a href=\"{issue_url}\">GitHub Issue</a>\n"
+                f"Ветка <code>{branch}</code> сохранена для доработки.\n\n"
+                f"Последняя ошибка:\n<pre>{escaped_err}</pre>"
+            )
+        else:
+            requests.delete(clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{branch}"), headers=API_HEADERS)
+            send_tg(
+                f"❌ <b>Мутация <code>{mod_name}</code> отбракована.</b>\n\n"
+                f"Ошибка:\n<pre>{escaped_err}</pre>"
+            )
 
 def life_cycle():
     while True:

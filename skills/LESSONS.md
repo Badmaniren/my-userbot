@@ -181,3 +181,7 @@
 ## secure_clean_compressed_rss_archiver (compose) — раундов: 5
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН после всех попыток
+
+## secure_clean_compressed_rss_archiver (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: успешно прошёл тесты и влит в main

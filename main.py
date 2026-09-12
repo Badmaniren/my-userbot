@@ -430,17 +430,19 @@ def ensure_jules_label_exists() -> None:
     Jules подхватывает задачу из issue ТОЛЬКО если на нём стоит метка 'jules'.
     Метка должна существовать в репозитории заранее, иначе GitHub отклонит
     попытку присвоить её при создании issue. Создаём один раз, тихо игнорируя
-    ошибку 'уже существует'.
+    ошибку 'уже существует' (422), но громко печатая любую другую.
     """
     url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/labels")
     try:
-        requests.post(url, headers=API_HEADERS, json={
+        res = requests.post(url, headers=API_HEADERS, json={
             "name": "jules",
             "color": "6f42c1",
             "description": "Автоматически подхватывается Jules для исправления"
         }, timeout=10)
-    except Exception:
-        pass
+        if res.status_code not in [200, 201, 422]:
+            print(f"[!] Не удалось создать лейбл jules в репозитории (HTTP {res.status_code}): {res.text[:300]}")
+    except Exception as e:
+        print(f"[!] Ошибка запроса создания лейбла jules: {e}")
 
 def escalate_to_github_issue(mod_name: str, task_desc: str, last_error: str, branch: str) -> str:
     ensure_jules_label_exists()
@@ -479,25 +481,32 @@ def add_jules_label(issue_number: int) -> bool:
     url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues/{issue_number}/labels")
     try:
         res = requests.post(url, headers=API_HEADERS, json={"labels": ["jules"]}, timeout=10)
-        return res.status_code in [200, 201]
+        if res.status_code in [200, 201]:
+            return True
+        print(f"[!] Не удалось поставить лейбл jules на #{issue_number} (HTTP {res.status_code}): {res.text[:300]}")
+        return False
     except Exception as e:
         print(f"[!] Ошибка добавления лейбла jules на #{issue_number}: {e}")
         return False
 
 def reactivate_stuck_jules_issues() -> int:
     """
-    "Толкает" зависшие Jules-issues: снимает и заново ставит лейбл 'jules' на
-    каждом открытом issue с этим лейблом. Просто повторно ставить уже стоящий
-    лейбл GitHub не всегда воспринимает как новое событие — снятие+постановка
-    гарантированно шлёт свежее событие 'labeled'.
+    "Толкает" зависшие Jules-задачи. Ищем по ЗАГОЛОВКУ ("Jules Task:"), а не по
+    фильтру "issues с лейблом jules" — если постановка лейбла при создании сама
+    когда-то не удалась (см. add_jules_label), у issue лейбла нет вообще, и поиск
+    по лейблу такие issues никогда не найдёт. Для уже помеченных — снимаем и
+    ставим заново (гарантированно свежее событие 'labeled'); для непомеченных —
+    просто ставим впервые.
     """
     url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues")
     try:
-        res = requests.get(url, headers=API_HEADERS, params={"labels": "jules", "state": "open", "per_page": 50}, timeout=10)
+        res = requests.get(url, headers=API_HEADERS, params={"state": "open", "per_page": 100}, timeout=10)
         if res.status_code != 200:
+            print(f"[!] Реактивация: не удалось получить список issues (HTTP {res.status_code})")
             return 0
-        issues = res.json()
-    except Exception:
+        issues = [i for i in res.json() if i.get("title", "").startswith("Jules Task:")]
+    except Exception as e:
+        print(f"[!] Реактивация: ошибка запроса списка issues: {e}")
         return 0
 
     reactivated = 0
@@ -505,11 +514,13 @@ def reactivate_stuck_jules_issues() -> int:
         number = issue.get("number")
         if not number:
             continue
-        del_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues/{number}/labels/jules")
-        try:
-            requests.delete(del_url, headers=API_HEADERS, timeout=10)
-        except Exception:
-            pass
+        has_label = any(l.get("name") == "jules" for l in issue.get("labels", []))
+        if has_label:
+            del_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues/{number}/labels/jules")
+            try:
+                requests.delete(del_url, headers=API_HEADERS, timeout=10)
+            except Exception:
+                pass
         if add_jules_label(number):
             reactivated += 1
     return reactivated

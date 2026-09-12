@@ -165,3 +165,7 @@
 ## resilient_clean_rss_archiver (compose) — раундов: 2
 - Последняя ошибка перед фиксом: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 - Статус: успешно прошёл тесты и влит в main
+
+## resilient_clean_compressed_rss_archiver (compose) — раундов: 5
+- Последняя ошибка перед фиксом: self.storage = CompressedDBStorage(db_path)
+- Статус: ПРОВАЛЕН после всех попыток

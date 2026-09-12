@@ -248,3 +248,7 @@
 ## clean_compressed_sitemap_parser_v2 (compose) — раундов: 5
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН после всех попыток
+
+## clean_compressed_sitemap_parser_v3 (compose) — раундов: 2
+- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
+- Статус: успешно прошёл тесты и влит в main

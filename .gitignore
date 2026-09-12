@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+skills/__pycache__/
+*.db
+cache/

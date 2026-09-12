@@ -33,12 +33,16 @@ class ResilientSecureSmartCrawlerHubAnalyticsExporter:
         try:
             cleaned_url = self.storage.clean_target_url(url)
             self.storage.save_cleaned_and_compressed_data(cleaned_url, raw_payload)
+        except ResilientSecureSmartCrawlerHubAnalyticsExporterError:
+            raise
         except Exception as e:
-            raise ResilientSecureSmartCrawlerHubAnalyticsExporterError(f"Export failed: {e}")
+            raise ResilientSecureSmartCrawlerHubAnalyticsExporterError(f"Export failed: {e}") from e
 
     def get_exported_report(self, url: str):
         try:
             cleaned_url = self.storage.clean_target_url(url)
             return self.storage.get_cleaned_and_compressed_data(cleaned_url)
+        except ResilientSecureSmartCrawlerHubAnalyticsExporterError:
+            raise
         except Exception as e:
-            raise ResilientSecureSmartCrawlerHubAnalyticsExporterError(f"Retrieval failed: {e}")
+            raise ResilientSecureSmartCrawlerHubAnalyticsExporterError(f"Retrieval failed: {e}") from e

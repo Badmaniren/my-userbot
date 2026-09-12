@@ -86,6 +86,15 @@ class TestResilientSecureSmartCrawlerHubAnalyticsExporter(unittest.TestCase):
             mock_clean_url.assert_called_once_with(url)
             mock_get.assert_called_once_with(cleaned_url)
 
+    def test_process_stream(self):
+        url = "https://example.com/stream"
+        timeout = 5
+        expected_result = ["item1", "item2"]
+        with patch('skills.resilient_secure_smart_crawler_hub_analytics_v2.ResilientSecureSmartCrawlerHubAnalyticsV2.process_stream', return_value=expected_result) as mock_stream:
+            res = self.exporter.process_stream(url, timeout)
+            self.assertEqual(res, expected_result)
+            mock_stream.assert_called_once_with(url, timeout)
+
     def test_export_analytics_report_exception_handling(self):
         url = "https://example.com/report"
         raw_payload = "bad data"
@@ -93,6 +102,13 @@ class TestResilientSecureSmartCrawlerHubAnalyticsExporter(unittest.TestCase):
         with patch('skills.clean_compressed_db_storage.CleanCompressedDBStorage.clean_target_url', side_effect=Exception("Storage error")):
             with self.assertRaises(ResilientSecureSmartCrawlerHubAnalyticsExporterError):
                 self.exporter.export_analytics_report(url, raw_payload)
+
+    def test_get_exported_report_exception_handling(self):
+        url = "https://example.com/report"
+
+        with patch('skills.clean_compressed_db_storage.CleanCompressedDBStorage.clean_target_url', side_effect=Exception("Retrieval error")):
+            with self.assertRaises(ResilientSecureSmartCrawlerHubAnalyticsExporterError):
+                self.exporter.get_exported_report(url)
 
 
 if __name__ == '__main__':

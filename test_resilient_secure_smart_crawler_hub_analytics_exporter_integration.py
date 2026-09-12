@@ -53,5 +53,10 @@ class TestResilientSecureSmartCrawlerHubAnalyticsExporterIntegration(unittest.Te
         stream_data = self.exporter.process_stream(self.url, self.timeout)
         self.assertIsNotNone(stream_data)
 
+        raw_payload = "analytics summary report data"
+        self.exporter.export_analytics_report(self.url, raw_payload)
+        retrieved_payload = self.exporter.get_exported_report(self.url)
+        self.assertEqual(retrieved_payload, raw_payload)
+
 if __name__ == "__main__":
     unittest.main()

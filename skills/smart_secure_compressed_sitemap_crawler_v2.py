@@ -1,3 +1,5 @@
+from skills import memory_profiler
+from skills.memory_profiler import MemoryLimitExceeded
 from skills.smart_secure_compressed_sitemap_crawler import SmartSecureCompressedSitemapCrawler
 from skills.resilient_secure_clean_compressed_sitemap_crawler import ResilientSecureCleanCompressedSitemapCrawler
 
@@ -17,26 +19,46 @@ class SmartSecureCompressedSitemapCrawlerV2(SmartSecureCompressedSitemapCrawler,
 
     def validate_sitemap(self, url, timeout):
         try:
+            memory_profiler.assert_memory_limit(self.max_memory_mb)
             return ResilientSecureCleanCompressedSitemapCrawler.validate_sitemap(self, url, timeout)
+        except MemoryLimitExceeded:
+            raise
         except Exception as e:
+            if "Memory" in type(e).__name__:
+                raise
             raise SmartSecureCompressedSitemapCrawlerV2Error(f"Validation failed: {e}")
 
     def crawl(self, url, timeout):
         try:
+            memory_profiler.assert_memory_limit(self.max_memory_mb)
             return ResilientSecureCleanCompressedSitemapCrawler.crawl(self, url, timeout)
+        except MemoryLimitExceeded:
+            raise
         except Exception as e:
+            if "Memory" in type(e).__name__:
+                raise
             raise SmartSecureCompressedSitemapCrawlerV2Error(f"Crawl failed: {e}")
 
     def crawl_and_clean(self, url, timeout):
         try:
+            memory_profiler.assert_memory_limit(self.max_memory_mb)
             return SmartSecureCompressedSitemapCrawler.crawl_and_clean(self, url, timeout)
+        except MemoryLimitExceeded:
+            raise
         except Exception as e:
+            if "Memory" in type(e).__name__:
+                raise
             raise SmartSecureCompressedSitemapCrawlerV2Error(f"Crawl and clean failed: {e}")
 
     def coordinate_expansion(self, url, timeout):
         try:
+            memory_profiler.assert_memory_limit(self.max_memory_mb)
             return SmartSecureCompressedSitemapCrawler.coordinate_expansion(self, url, timeout)
+        except MemoryLimitExceeded:
+            raise
         except Exception as e:
+            if "Memory" in type(e).__name__:
+                raise
             raise SmartSecureCompressedSitemapCrawlerV2Error(f"Expansion failed: {e}")
 
 def smart_secure_compressed_sitemap_crawler_v2_flow(url, timeout, db_path, max_memory_mb, calls, period, raise_on_limit):

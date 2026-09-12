@@ -22,6 +22,7 @@ class SmartSecureCompressedSitemapCrawler(ResilientSecureCleanCompressedSitemapC
             super().__init__(db_path=db_path, max_memory_mb=max_memory_mb, calls=calls, period=period, raise_on_limit=raise_on_limit)
         except TypeError:
             ResilientSecureCleanCompressedSitemapCrawler.__init__(self)
+        SmartCrawler.__init__(self)
 
     def validate_sitemap(self, url, timeout=5):
         try:

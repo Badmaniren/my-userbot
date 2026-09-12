@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ред фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН после всех попыток, ветка с кодом удалена
-
-## url_validator (create) — раундов: 4
-- Последняя ошибка перед фиксом: result = validate_url(None)
+result = validate_url(None)
 - Статус: ПРОВАЛЕН после всех попыток, ветка с кодом удалена
 
 ## retry_handler (create) — раундов: 4
@@ -322,4 +318,8 @@
 - Статус: успешно прошёл тесты и влит в main
 
 ## resilient_secure_smart_crawler_hub_v11_global_mesh (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## resilient_secure_global_mesh_node_v1 (start_new) — раундов: 2
+- Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main

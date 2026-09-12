@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+cache/
+*.log
+.pytest_cache/
+*.db
+*.sqlite

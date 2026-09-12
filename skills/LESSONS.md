@@ -143,3 +143,6 @@
 - Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: The above exception was the direct cause of the following exception:
 - Статус: ПРОВАЛЕН после всех попыток
+
+## url_cleaner (create) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

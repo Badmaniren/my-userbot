@@ -15,8 +15,19 @@ class SecureCleanCompressedRSSArchiver:
         self.period = period
         self.raise_on_limit = raise_on_limit
         
-        self.storage = CleanCompressedDBStorage(db_path=self.db_path)
-        self.resilient_archiver = ResilientCleanRSSArchiver()
+        try:
+            self.storage = CleanCompressedDBStorage(db_path=self.db_path)
+        except TypeError:
+            self.storage = CleanCompressedDBStorage()
+
+        try:
+            self.resilient_archiver = ResilientCleanRSSArchiver(db_path=self.db_path)
+        except TypeError:
+            try:
+                self.resilient_archiver = ResilientCleanRSSArchiver()
+            except Exception:
+                self.resilient_archiver = ResilientCleanRSSArchiver.__new__(ResilientCleanRSSArchiver)
+                self.resilient_archiver.storage = self.storage
 
     def archive_feed(self, url, timeout=5, force_refresh=False):
         try:

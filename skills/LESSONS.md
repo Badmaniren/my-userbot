@@ -3,12 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-4
-- Последняя ошибка перед фиксом: Архив логов пуст.
-- Статус: ПРОВАЛЕН после всех попыток, ветка с кодом удалена
-
-## robots_txt_checker (create) — раундов: 4
-- Последняя ошибка перед фиксом: return func(*newargs, **newkeywargs)
+перед фиксом: return func(*newargs, **newkeywargs)
 - Статус: ПРОВАЛЕН после всех попыток, ветка с кодом удалена
 
 ## url_cleaner (create) — раундов: 4
@@ -328,3 +323,7 @@
 
 ## resilient_secure_smart_crawler_hub_analytics_exporter (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## resilient_secure_smart_crawler_hub_v7_orchestrator (start_new) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

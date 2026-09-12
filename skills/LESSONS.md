@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-result = validate_url(None)
-- Статус: ПРОВАЛЕН после всех попыток, ветка с кодом удалена
-
-## retry_handler (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
+: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН после всех попыток, ветка с кодом удалена
 
 ## http_session_manager (create) — раундов: 4
@@ -322,4 +318,8 @@ result = validate_url(None)
 
 ## resilient_secure_global_mesh_node_v1 (start_new) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## resilient_secure_global_mesh_node_v2 (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: успешно прошёл тесты и влит в main

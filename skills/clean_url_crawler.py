@@ -14,18 +14,16 @@ class CleanUrlCrawler:
         return cleaned_links
 
     def validate_crawled_link(self, url: str, timeout: int = 5) -> bool:
-        try:
-            res = self.link_extractor.validate_link(url, timeout=timeout)
-            return bool(res[0] if isinstance(res, tuple) else res)
-        except Exception:
-            return False
+        res = self.link_extractor.validate_link(url, timeout=timeout)
+        if isinstance(res, tuple):
+            return bool(res[0])
+        return bool(res)
 
     def process_url(self, url: str, timeout: int = 3) -> bool:
-        try:
-            res = self.link_extractor.process_with_cache(url, timeout=timeout)
-            return bool(res[0] if isinstance(res, tuple) else res)
-        except Exception:
-            return False
+        res = self.link_extractor.process_with_cache(url, timeout=timeout)
+        if isinstance(res, tuple):
+            return bool(res[0])
+        return bool(res)
 
 
 def clean_url_crawler_flow(raw_html: str, base_url: str, timeout: int = 5) -> list:

@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-wler (compose) — раундов: 3
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
-- Статус: успешно прошёл тесты и влит в main
-
-## smart_secure_compressed_rss_crawler (compose) — раундов: 1
+(compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## smart_secure_clean_compressed_rss_crawler (compose) — раундов: 5
@@ -337,4 +333,8 @@ wler (compose) — раундов: 3
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## resilient_secure_global_mesh_omega_transcendence_v32 (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## resilient_secure_global_mesh_omega_singularity_v33 (compose) — раундов: 2
+- Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main

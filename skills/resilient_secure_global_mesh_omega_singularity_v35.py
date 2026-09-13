@@ -1,8 +1,12 @@
 import requests
 from skills.resilient_secure_global_mesh_omega_singularity_v33 import ResilientSecureGlobalMeshOmegaSingularityV33
+from skills.resilient_secure_global_mesh_omega_transcendence_v32 import ResilientSecureGlobalMeshOmegaTranscendenceV32
 
 
-class ResilientSecureGlobalMeshOmegaSingularityV35(ResilientSecureGlobalMeshOmegaSingularityV33):
+class ResilientSecureGlobalMeshOmegaSingularityV35(
+    ResilientSecureGlobalMeshOmegaSingularityV33,
+    ResilientSecureGlobalMeshOmegaTranscendenceV32
+):
     def __init__(self, db_path=":memory:", max_memory_mb=512, calls=10, period=1.0, raise_on_limit=False):
         super().__init__(
             db_path=db_path,

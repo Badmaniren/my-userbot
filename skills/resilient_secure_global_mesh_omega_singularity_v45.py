@@ -23,9 +23,16 @@ class ResilientSecureGlobalMeshOmegaSingularityV45:
     def validate_target_headers(self, target: str, timeout: int) -> bool:
         try:
             response = requests.head(target, timeout=timeout)
+            if response.status_code in (405, 501):
+                with requests.get(target, timeout=timeout, stream=True) as get_response:
+                    return get_response.status_code == 200
             return response.status_code == 200
         except Exception:
-            return False
+            try:
+                with requests.get(target, timeout=timeout, stream=True) as get_response:
+                    return get_response.status_code == 200
+            except Exception:
+                return False
 
     def coordinate_expansion(self, target: str, timeout: int) -> bool:
         response = requests.get(target, timeout=timeout)

@@ -42,11 +42,27 @@ class TestResilientSecureGlobalMeshOmegaSingularityV45(unittest.TestCase):
             self.assertTrue(result)
 
     def test_validate_target_headers_failure(self):
-        with patch('requests.head') as mock_head:
+        with patch('requests.head') as mock_head, patch('requests.get') as mock_get:
             mock_head.side_effect = Exception("Connection error")
+            mock_get.side_effect = Exception("Connection error")
 
             result = self.mesh.validate_target_headers(self.target, self.timeout)
             self.assertFalse(result)
+
+    def test_validate_target_headers_405_fallback(self):
+        with patch('requests.head') as mock_head, patch('requests.get') as mock_get:
+            mock_head_resp = MagicMock()
+            mock_head_resp.status_code = 405
+            mock_head.return_value = mock_head_resp
+
+            mock_get_resp = MagicMock()
+            mock_get_resp.status_code = 200
+            mock_get_resp.__enter__.return_value = mock_get_resp
+            mock_get.return_value = mock_get_resp
+
+            result = self.mesh.validate_target_headers(self.target, self.timeout)
+            self.assertTrue(result)
+            mock_get.assert_called_once_with(self.target, timeout=self.timeout, stream=True)
 
     def test_coordinate_expansion(self):
         with patch('requests.get') as mock_get:

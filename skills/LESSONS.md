@@ -3,8 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- clean_compressed_rss_archiver (compose) — раундов: 5
-- Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/unittest/mock.py", line 1446, in __enter__
+n/3.11.16/x64/lib/python3.11/unittest/mock.py", line 1446, in __enter__
 - Статус: ПРОВАЛЕН после всех попыток
 
 ## compressed_db_storage (compose) — раундов: 1
@@ -340,3 +339,6 @@
 ## resilient_secure_global_mesh_omega_eternity_v22 (compose) — раундов: 4
 - Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/unittest/loader.py", line 419, in _find_test_path
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## resilient_secure_global_mesh_omega_genesis_v23 (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

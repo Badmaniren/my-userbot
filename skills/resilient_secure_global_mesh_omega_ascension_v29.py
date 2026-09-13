@@ -60,7 +60,20 @@ class ResilientSecureGlobalMeshOmegaAscensionV29:
 
     def process_stream(self, target: str, timeout: int) -> None:
         response = requests.get(target, timeout=timeout, stream=True)
-        for _ in response.raw.stream(1024):
+        raw = response.raw
+        if hasattr(raw, "stream"):
+            stream_gen = raw.stream(1024)
+        elif hasattr(raw, "read"):
+            def read_gen(chunk_size):
+                while True:
+                    chunk = raw.read(chunk_size)
+                    if not chunk:
+                        break
+                    yield chunk
+            stream_gen = read_gen(1024)
+        else:
+            stream_gen = []
+        for _ in stream_gen:
             pass
 
     def export_analytics_report(self, target: str, report_data: dict) -> None:

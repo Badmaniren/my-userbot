@@ -18,7 +18,6 @@ class ResilientSecureGlobalMeshOmegaTranscendenceV20(
     ResilientSecureGlobalMeshInterfaceV17
 ):
     def __init__(self, db_path=":memory:", max_memory_mb=512, calls=10, period=1.0, raise_on_limit=True):
-        # Инициализируем базовые классы через множественное наследование (композиция)
         super().__init__(
             db_path=db_path,
             max_memory_mb=max_memory_mb,
@@ -32,7 +31,7 @@ class ResilientSecureGlobalMeshOmegaTranscendenceV20(
         try:
             response = requests.head(target, timeout=timeout)
             return response.status_code == 200
-        except Exception:
+        except (requests.RequestException, OSError):
             return False
 
     def coordinate_expansion(self, target: str, timeout: int) -> bool:
@@ -43,7 +42,7 @@ class ResilientSecureGlobalMeshOmegaTranscendenceV20(
         try:
             response = requests.get(target, timeout=timeout)
             return response.status_code == 200
-        except Exception:
+        except (requests.RequestException, OSError):
             return False
 
     def route_request(self, target: str, timeout: int) -> str:
@@ -56,8 +55,8 @@ class ResilientSecureGlobalMeshOmegaTranscendenceV20(
             pass
 
     def export_analytics_report(self, target: str, report_data: dict) -> None:
-        # Мерж словарей через update / {**a, **b} согласно правилам Архитектора
         self._reports[target] = {**report_data}
 
     def get_exported_report(self, target: str) -> dict:
-        return self._reports.get(target, {})
+        report = self._reports.get(target, {})
+        return {**report}

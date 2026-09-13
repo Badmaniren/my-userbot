@@ -3,12 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-) — раундов: 3
-- Последняя ошибка перед фиксом: FAILED (failures=1)
-- Статус: успешно прошёл тесты и влит в main
-
-## resilient_secure_clean_compressed_sitemap_parser_v2 (compose) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
+Статус: успешно прошёл тесты и влит в main
 
 ## resilient_secure_clean_compressed_sitemap_crawler_v2 (compose) — раундов: 5
 - Последняя ошибка перед фиксом: skills.resilient_secure_clean_compressed_sitemap_crawler.ResilientSecureCleanCompressedSitemapCrawlerError: CleanCompressedDBStorage.set_cleaned_compressed_cache() missing 1 required positional argument: 'ttl'
@@ -314,6 +309,10 @@
 ## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: Не удалось скачать архив логов рана (HTTP 404).
 - Статус: успешно прошёл тесты и влит в main
+
+## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

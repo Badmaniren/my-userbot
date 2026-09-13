@@ -28,36 +28,44 @@ class ResilientSecureGlobalMeshOmegaSingularityV26(
         try:
             response = requests.head(target, timeout=timeout)
             return response.status_code == 200
-        except (requests.RequestException, ValueError, TypeError):
+        except Exception:
             return False
 
     def coordinate_expansion(self, target: str, timeout: float) -> bool:
-        response = requests.get(target, timeout=timeout)
-        return response.status_code == 200
+        try:
+            response = requests.get(target, timeout=timeout)
+            return response.status_code == 200
+        except Exception:
+            return False
 
     def coordinate_expansion_safe(self, target: str, timeout: float) -> bool:
         try:
             response = requests.get(target, timeout=timeout)
             return response.status_code == 200
-        except (requests.RequestException, ValueError, TypeError):
+        except Exception:
             return False
 
     def route_request(self, target: str, timeout: float) -> str:
-        response = requests.get(target, timeout=timeout)
-        if hasattr(response, "text") and response.text:
-            return response.text
-        return "Singularity payload"
+        try:
+            response = requests.get(target, timeout=timeout)
+            if hasattr(response, "text") and response.text:
+                return response.text
+            return "Singularity payload"
+        except Exception:
+            return "Singularity payload"
 
     def process_stream(self, target: str, timeout: float) -> None:
-        response = requests.get(target, timeout=timeout, stream=True)
-        if hasattr(response, "raw") and response.raw:
-            for _ in response.raw:
-                pass
+        try:
+            response = requests.get(target, timeout=timeout, stream=True)
+            if hasattr(response, "raw") and response.raw:
+                for _ in response.raw:
+                    pass
+        except Exception:
+            return None
         return None
 
     def export_analytics_report(self, target: str, report_data: dict) -> None:
-        merged_report = {}
-        merged_report.update(report_data)
+        merged_report = {**report_data}
         self._analytics_storage[target] = merged_report
 
     def get_exported_report(self, target: str) -> dict:

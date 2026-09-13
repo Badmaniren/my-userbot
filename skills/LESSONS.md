@@ -3,7 +3,11 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- фиксом: FAIL: test_memory_profiler_integration (test_smart_secure_compressed_rss_crawler_v3.TestSmartSecureCompressedRSSCrawlerV3.test_memory_profiler_integration)
+--------------------------------------------------------
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## smart_secure_compressed_rss_crawler_v3 (compose) — раундов: 5
+- Последняя ошибка перед фиксом: FAIL: test_memory_profiler_integration (test_smart_secure_compressed_rss_crawler_v3.TestSmartSecureCompressedRSSCrawlerV3.test_memory_profiler_integration)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## smart_secure_compressed_sitemap_crawler_v2 (compose) — раундов: 1
@@ -294,10 +298,6 @@
 ## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: Не удалось скачать архив логов рана (HTTP 404).
 - Статус: успешно прошёл тесты и влит в main
-
-## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

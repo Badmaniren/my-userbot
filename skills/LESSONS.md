@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-nt_clean_compressed_sitemap_crawler (compose) — раундов: 2
-- Последняя ошибка перед фиксом: ^^^^^^^^^^^^
-- Статус: успешно прошёл тесты и влит в main
-
-## resilient_clean_compressed_sitemap_crawler_v2 (compose) — раундов: 5
+) — раундов: 5
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН после всех попыток
 
@@ -331,5 +327,9 @@ nt_clean_compressed_sitemap_crawler (compose) — раундов: 2
 - Статус: успешно прошёл тесты и влит в main
 
 ## resilient_secure_global_mesh_omega_transcendence_v46 (compose) — раундов: 4
+- Последняя ошибка перед фиксом: Не удалось скачать архив логов рана (HTTP 404).
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## resilient_secure_global_mesh_omega_transcendence_v47 (compose) — раундов: 4
 - Последняя ошибка перед фиксом: Не удалось скачать архив логов рана (HTTP 404).
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

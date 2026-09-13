@@ -23,10 +23,16 @@ class ResilientSecureGlobalMeshOmegaSingularityV40:
         return self.v39_node.process_stream(target, timeout)
 
     def export_analytics_report(self, target, report_data):
+        # Обеспечиваем запись в оба узла для кросс-версионной совместимости
         self.v39_node.export_analytics_report(target, report_data)
+        self.v32_node.export_analytics_report(target, report_data)
 
     def get_exported_report(self, target):
-        return self.v32_node.get_exported_report(target)
+        # Приоритет v40 (v32 как основной источник данных отчетов)
+        report = self.v32_node.get_exported_report(target)
+        if report is None:
+            report = self.v39_node.get_exported_report(target)
+        return report
 
     def coordinate_expansion(self, target, timeout):
         return bool(self.v39_node.coordinate_expansion(target, timeout))

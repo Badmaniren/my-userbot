@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ean_compressed_rss_archiver (compose) — раундов: 5
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
-- Статус: ПРОВАЛЕН после всех попыток
+ ПРОВАЛЕН после всех попыток
 
 ## secure_clean_compressed_rss_archiver (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
@@ -339,4 +337,7 @@ ean_compressed_rss_archiver (compose) — раундов: 5
 
 ## resilient_secure_global_mesh_omega_ascension_v29 (compose) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## resilient_secure_global_mesh_omega_singularity_v30 (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

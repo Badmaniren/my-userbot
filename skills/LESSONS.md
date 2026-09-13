@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-mple.com/Path?utm_source=test&param=1: 404 Client Error: Not Found for url: https://example.com/Path?utm_source=test&param=1
-- Статус: ПРОВАЛЕН после всех попыток
-
-## resilient_secure_clean_url_crawler_v2 (compose) — раундов: 3
+crawler_v2 (compose) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (failures=2)
 - Статус: успешно прошёл тесты и влит в main
 
@@ -321,6 +318,10 @@ mple.com/Path?utm_source=test&param=1: 404 Client Error: Not Found for url: http
 ## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: Не удалось скачать архив логов рана (HTTP 404).
 - Статус: успешно прошёл тесты и влит в main
+
+## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

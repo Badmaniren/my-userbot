@@ -227,6 +227,7 @@ threading.Thread(target=run_telegram_listener, daemon=True).start()
 
 # 4. СЕТЬ И КЛИЕНТ GEMINI
 def clean_url(url: str) -> str:
+    # ИСПРАВЛЕНА РЕГУЛЯРКА (убран мусор \vert{})
     return re.sub(r'\[.*?\]\(|\)', '', url).strip()
 
 API_HOST = "generativelanguage.googleapis.com"
@@ -473,8 +474,8 @@ def escalate_to_github_issue(mod_name: str, task_desc: str, last_error: str, bra
         f"#### Трейсбек последней ошибки из GitHub Actions:\n```text\n{last_error}\n```\n\n"
         f"> **Инструкция для Jules:**\n"
         f"> 1. Переключись в ветку `{branch}`.\n"
-        f"> 2. Исправь код модуля `skills/{mod_name}.py` и тесты в `test_{mod_name}.py` / `test_{mod_name}_integration.py`.\n"
-        f"> 3. Добейся успешного прохождения `python -m unittest` и открой Pull Request в `main`.\n"
+        f"> 2. Исправь код модуля `skills/{mod_name}.py` и тесты в папке `tests/` (`tests/test_{mod_name}.py` / `tests/test_{mod_name}_integration.py`).\n"
+        f"> 3. Добейся успешного прохождения `python -m unittest discover -s tests` и открой Pull Request в `main`.\n"
         f"> 4. **НЕ трогай `main.py`, `skills/EPIC.md` и `skills/LESSONS.md`** — это общие файлы, "
         f"в них постоянно пишет автономный цикл, и правки здесь почти гарантированно приведут "
         f"к конфликту при мерже. Если для фикса реально нужны изменения в `main.py` — опиши это "
@@ -581,14 +582,6 @@ def run_jules_babysitter():
             print(f"[!] Ошибка няньки Jules: {e}")
 
 def refresh_stuck_prs() -> tuple:
-    """
-    Долгоживущие PR (особенно от Jules, который может провозиться часы) неизбежно
-    отстают от main, который обновляется каждые ~15 минут — из-за этого они
-    "протухают" и получают конфликты на часто изменяемых файлах (EPIC.md,
-    LESSONS.md). GitHub умеет сам подтягивать main в ветку PR через update-branch —
-    делаем это каждый цикл, чтобы отставание не успевало превратиться в конфликт.
-    Возвращает (сколько обновлено, список ссылок на PR с уже реальным конфликтом).
-    """
     list_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/pulls")
     try:
         res = requests.get(list_url, headers=API_HEADERS, params={"state": "open", "per_page": 50}, timeout=10)
@@ -625,11 +618,6 @@ def refresh_stuck_prs() -> tuple:
     return refreshed, dirty_urls
 
 def cleanup_orphan_branches() -> int:
-    """
-    Ветки unga-*, у которых нет ни одного открытого PR — по сути мусор от давно
-    завершённых или прерванных циклов. Чистим только те, что старше суток, чтобы
-    не задеть то, что ещё реально в работе.
-    """
     branches_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/branches")
     prs_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/pulls")
     try:
@@ -682,12 +670,6 @@ def _normalize_skill_name(name: str) -> str:
     return n
 
 def find_duplicate_skill_clusters() -> dict:
-    """
-    Группирует модули skills/*.py по "ядру" имени после снятия шумовых префиксов
-    (resilient_, secure_, clean_, compressed_, smart_, global_, mesh_), которые
-    накопились из-за того, что 'refactor' по ошибке плодил новый файл с более
-    длинным именем вместо правки существующего.
-    """
     url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents/skills?ref=main")
     try:
         r = requests.get(url, headers=API_HEADERS, timeout=15)
@@ -721,24 +703,10 @@ def get_all_skill_sources() -> dict:
     return sources
 
 def find_skill_dependents(target: str, sources: dict) -> list:
-    """
-    Ищет, кто РЕАЛЬНО делает `from skills.{target} import ...` или
-    `import skills.{target}` — 'compose' создаёт именно такие честные зависимости
-    между модулями, и удалять target нельзя, если на него кто-то живой ссылается,
-    даже если по имени target выглядит как 'дубль' более длинного модуля.
-    """
     pattern = re.compile(rf'(from\s+skills\.{re.escape(target)}\s+import|import\s+skills\.{re.escape(target)}\b)')
     return [name for name, code in sources.items() if name != target and pattern.search(code)]
 
 def build_cleanup_plan() -> tuple:
-    """
-    Для каждого кластера дублей оставляет файл с самым свежим последним
-    коммитом, остальные — кандидаты на удаление. Но перед этим проверяет РЕАЛЬНЫЕ
-    import-зависимости по всему репозиторию: если какой-то ВЫЖИВАЮЩИЙ модуль
-    (включая 'победителя' любого кластера) реально импортирует кандидата на
-    удаление — он защищён, даже если по имени выглядит как дубль-неудачник.
-    Ничего не удаляет сама — только считает и возвращает отчёт + список.
-    """
     clusters = find_duplicate_skill_clusters()
     if not clusters:
         return "🧹 Дублей не найдено — репозиторий чист.", []
@@ -772,10 +740,6 @@ def build_cleanup_plan() -> tuple:
         safe_losers, protected_lines = [], []
         for fname in losers:
             base = fname[:-3]
-            # если модуль импортируется кем-то, кто сам не обречён на удаление —
-            # он защищён, даже если по имени выглядит как дубль-неудачник.
-            # Если два обречённых дубля зависят друг от друга — это не повод
-            # их спасать, они всё равно оба уходят.
             dependents = [d for d in find_skill_dependents(base, sources) if d not in tentative_losers]
             if dependents:
                 protected_lines.append(f"    ⛔ {fname} НЕ трогаю — от него зависит: {', '.join(dependents)}")
@@ -799,7 +763,7 @@ def execute_cleanup_plan(files_to_delete: list) -> int:
     deleted = 0
     for fname in files_to_delete:
         base = fname[:-3] if fname.endswith(".py") else fname
-        for path in (f"skills/{fname}", f"test_{base}.py", f"test_{base}_integration.py"):
+        for path in (f"skills/{fname}", f"tests/test_{base}.py", f"tests/test_{base}_integration.py"):
             info_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents/{path}?ref=main")
             try:
                 info = requests.get(info_url, headers=API_HEADERS, timeout=10)
@@ -885,13 +849,6 @@ def update_epic_file(branch: str, decision: dict) -> None:
 _MANIFEST_CACHE = {"data": {}, "fingerprint": None}
 
 def get_skills_manifest(force_refresh: bool = False) -> dict:
-    """
-    Раньше манифест пересобирался с нуля КАЖДЫЙ раз, когда был нужен — список
-    каталога plus отдельный сетевой запрос НА КАЖДЫЙ файл skills/ (а их уже
-    полсотни+). При этом skills/ реально меняется только раз за успешный цикл.
-    Кэшируем по "отпечатку" каталога (sha всех файлов) — если он не менялся,
-    просто отдаём то, что уже посчитано.
-    """
     dir_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents/skills?ref=main")
     try:
         dir_res = requests.get(dir_url, headers=API_HEADERS, timeout=10)
@@ -949,15 +906,6 @@ def get_skills_manifest(force_refresh: bool = False) -> dict:
 MAX_MANIFEST_PROMPT_CHARS = 6000
 
 def manifest_for_prompt(manifest: dict, always_full: list = None) -> str:
-    """
-    То, что реально уходит в промпт Gemini. Полные сигнатуры ВСЕХ навыков в
-    каждом промпте — это ровно то, из-за чего рост числа навыков напрямую жрёт
-    бесплатные токены. Если манифест умещается целиком — отдаём как есть. Если
-    нет — ужимаем менее важные модули до одной сигнатуры, а если и это много —
-    до простого списка имён. always_full (обычно — зависимости текущего compose)
-    НИКОГДА не обрезаются: именно неполная сигнатура зависимости и была причиной
-    бага с RateLimiter() без аргументов — экономить на этом нельзя.
-    """
     always_full = set(always_full or [])
     full = json.dumps(manifest, indent=2, ensure_ascii=False)
     if len(full) <= MAX_MANIFEST_PROMPT_CHARS:
@@ -1035,14 +983,6 @@ def _core_tokens(name: str) -> set:
     return {t for t in tokens if t and t not in FILLER_TOKENS}
 
 def find_near_duplicate(module_name: str, manifest: dict) -> str:
-    """
-    Стратег имеет склонность не углубляться, а плодить клонов: вместо того чтобы
-    доработать существующий модуль, он лепит новое имя с ещё одним прилагательным
-    ('resilient_secure_smart_crawler_v9' -> 'resilient_secure_smart_crawler_v10').
-    Сравниваем СУТЬ имени (без прилагательных-паразитов и номеров версий) с уже
-    существующими модулями — если пересечение почти полное, это не новый модуль,
-    а клон, который надо не создавать, а рефакторить.
-    """
     new_core = _core_tokens(module_name)
     if not new_core:
         return ""
@@ -1125,11 +1065,6 @@ def dream_action(manifest: dict, lessons: str, epic: str, manual_prompt: str = "
             raise ValueError("Empty module name")
         data["module_name"] = mod
 
-        # ЗАЩИТА ОТ ИНФЛЯЦИИ ИМЁН: если предложенное имя — это существующий модуль
-        # с добавленным спереди/сзади словом (resilient_, secure_, clean_ и т.п.),
-        # это не новая концепция, а Стратег пытается "улучшить" старый модуль под
-        # новым именем. Перенаправляем на честный рефакторинг оригинала вместо
-        # порождения ещё одного дубликата с более длинным именем.
         if mod not in manifest:
             duplicate = ""
             for existing in manifest:
@@ -1137,10 +1072,6 @@ def dream_action(manifest: dict, lessons: str, epic: str, manual_prompt: str = "
                     duplicate = existing
                     break
             if not duplicate:
-                # Подстрочная проверка выше ловит только 'старое_имя' + доп. слово.
-                # 'mesh_node_v1' и 'mesh_coordinator_v4' друг в друге не содержатся,
-                # но по сути — те же самые прилагательные-паразиты вокруг одной идеи.
-                # Сравниваем СУТЬ (без 'resilient/secure/smart/...' и номеров версий).
                 duplicate = find_near_duplicate(mod, manifest)
             if duplicate:
                 print(f"[!] Инфляция имён: '{mod}' — вариация '{duplicate}'. Рефакторю оригинал вместо дубликата.")
@@ -1148,8 +1079,6 @@ def dream_action(manifest: dict, lessons: str, epic: str, manual_prompt: str = "
                 data["module_name"] = mod
                 data["action"] = "refactor"
 
-        # 'refactor' обязан целиться в РЕАЛЬНО существующий модуль — иначе это
-        # просто create под чужим ярлыком.
         if data.get("action") == "refactor" and mod not in manifest:
             data["action"] = "create"
 
@@ -1265,7 +1194,8 @@ def run_epic_smoke_test(epic_title: str, manifest: dict) -> None:
         print("[-] Практическая проверка: не удалось подготовить ветку.")
         return
 
-    smoke_path = "test_epic_smoke.py"
+    # ЗДЕСЬ ТОЖЕ ПУТЬ TESTS/
+    smoke_path = "tests/test_epic_smoke.py"
     last_error = ""
     passed = False
     run_id = None
@@ -1306,7 +1236,7 @@ def delete_repo_file(path: str, message: str, branch: str = "main") -> bool:
     try:
         info = requests.get(file_url, headers=API_HEADERS, timeout=10)
         if info.status_code != 200:
-            return True  # файла и так уже нет — считаем успехом
+            return True
         sha = info.json().get("sha")
         res = requests.delete(
             clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents/{path}"),
@@ -1319,24 +1249,10 @@ def delete_repo_file(path: str, message: str, branch: str = "main") -> bool:
         return False
 
 def find_poisoning_import_error(error_text: str) -> str:
-    """
-    `unittest discover` иногда не изолирует один сломанный на импорте тестовый
-    файл, а роняет ВЕСЬ прогон целиком. Раз такой файл в принципе не может
-    импортироваться — ни одна проверка внутри него никогда не выполняется, и он
-    провален абсолютно для ЛЮБОГО коммита в репозитории, не только для текущей
-    задачи. Это и отличает 'отравление всего main' от обычного бага в новом коде.
-    """
     m = re.search(r"Failed to import test module:\s*(\S+)", error_text or "")
     return m.group(1).strip() if m else ""
 
 def check_main_health() -> tuple:
-    """
-    main триггерит CI на каждый пуш (в том числе от нашего же мержа). Если
-    ПОСЛЕДНИЙ прогон на main сам красный — любая новая мутация форкнётся от
-    этого же сломанного состояния (prepare_branch берёт sha именно от main) и
-    провалится ровно там же, что бы Унга ни делала — отсюда 'застряли и не
-    можем создать ничего нового', даже когда сама новая задача ни при чём.
-    """
     url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/actions/runs")
     try:
         r = requests.get(url, headers=API_HEADERS, params={"branch": "main", "per_page": 1}, timeout=10)
@@ -1351,12 +1267,6 @@ def check_main_health() -> tuple:
         return True, "", None
 
 def heal_main_if_poisoned() -> bool:
-    """
-    Возвращает True, если main был сломан и (по возможности) вылечен. Лечим
-    ТОЛЬКО узкий безопасный случай — тест, не способный даже импортироваться:
-    удаление такого файла не может ничего сломать, он и так был мёртвым грузом.
-    Любую другую поломку main не трогаем и просто громко сигналим.
-    """
     healthy, error_text, run_id = check_main_health()
     if healthy:
         return False
@@ -1367,10 +1277,8 @@ def heal_main_if_poisoned() -> bool:
         if delete_repo_file(path, f"Карантин: {path} не импортируется и блокирует ВСЕ мутации [skip ci]"):
             print(f"[!] main был отравлен нерабочим тестом {path} — удалён в карантин.")
             send_tg(
-                f"🧟 <b>main был отравлен</b>\n━━━━━━━━━━━━━━━━━━━\n"
-                f"Файл <code>{path}</code> не мог даже импортироваться — из-за этого ЛЮБАЯ "
-                "мутация проваливалась на ровном месте, сколько бы Унга ни пыталась чинить "
-                "СВОЙ код. Удалил его в карантин, main снова здоров."
+                f"🧟 <b>Уборка мусора</b>\n━━━━━━━━━━━━━━━━━━━\n"
+                f"Файл <code>{path}</code> не мог импортироваться и ломал CI. Удалил его. Идём дальше."
             )
             return True
 
@@ -1378,8 +1286,23 @@ def heal_main_if_poisoned() -> bool:
     send_tg(
         "🧟 <b>main сломан, авточинка не справилась</b>\n━━━━━━━━━━━━━━━━━━━\n"
         f"<pre>{html.escape(error_text[:500])}</pre>\n"
-        "Пока это не поправить руками (или через Jules), новые мутации будут проваливаться на этом же месте."
+        "Пока это не поправить руками (или через Jules), новые мутации будут проваливаться."
     )
+    return False
+
+def is_jules_working_on(mod_name: str) -> bool:
+    """Проверяет, нет ли уже открытой задачи Jules на этот модуль."""
+    url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues")
+    try:
+        res = requests.get(url, headers=API_HEADERS, params={"state": "open", "per_page": 100}, timeout=10)
+        if res.status_code == 200:
+            for issue in res.json():
+                if "pull_request" in issue:
+                    continue
+                if issue.get("title", "").startswith(f"Jules Task: исправить сбой модуля {mod_name}"):
+                    return True
+    except Exception:
+        pass
     return False
 
 def run_evolution_cycle():
@@ -1419,6 +1342,13 @@ def run_evolution_cycle():
     action = decision.get("action", "create")
     print(f"[+] Действие: {action.upper()} для '{mod_name}' — {decision.get('description')}")
 
+    # ЗАМОК ОТ ДУРАКА: Проверяем, не ковыряет ли Jules этот же модуль прямо сейчас.
+    if is_jules_working_on(mod_name):
+        msg = f"⏳ Модуль <code>{mod_name}</code> сейчас в реанимации у Jules. Пропускаю цикл, чтобы не затереть его ветку."
+        print(f"[*] {msg}")
+        send_tg(msg)
+        return
+
     current_code = get_file_content("main", f"skills/{mod_name}.py") or ""
 
     test_code = architect_write_hard_tests(decision, manifest, lessons, existing_code=current_code)
@@ -1429,11 +1359,13 @@ def run_evolution_cycle():
         print("[-] Ошибка подготовки ветки.")
         return
 
-    test_path = f"test_{mod_name}.py"
-    integration_test_path = f"test_{mod_name}_integration.py"
+    # ТЕСТЫ ТЕПЕРЬ СТРОГО В tests/
+    test_path = f"tests/test_{mod_name}.py"
+    integration_test_path = f"tests/test_{mod_name}_integration.py"
     skill_path = f"skills/{mod_name}.py"
 
     commit_file_to_branch(branch, "skills/__init__.py", "# unga package\n", "Init package [skip ci]")
+    commit_file_to_branch(branch, "tests/__init__.py", "# unga tests package\n", "Init tests [skip ci]")
     commit_file_to_branch(branch, test_path, test_code, f"Юнит-тесты для {mod_name} [skip ci]")
     commit_file_to_branch(branch, integration_test_path, integration_test_code, f"Интеграционные тесты для {mod_name} [skip ci]")
 
@@ -1472,8 +1404,8 @@ def run_evolution_cycle():
         if poison_module and poison_module not in own_test_names:
             print(f"[!] Отравляющий файл {poison_module}.py не имеет отношения к '{mod_name}' — карантин вместо правки своего кода.")
             if delete_repo_file(f"{poison_module}.py", f"Карантин: {poison_module}.py блокировал задачу {mod_name} [skip ci]", branch=branch):
-                send_tg(f"🧟 Посторонний сломанный тест <code>{poison_module}.py</code> мешал <code>{mod_name}</code> — убрал в карантин, повторяю раунд без штрафа.")
-                continue  # тот же impl_code, тот же attempts — просто перезапускаем раунд на чистой ветке
+                send_tg(f"🧟 Посторонний сломанный тест <code>{poison_module}.py</code> мешал <code>{mod_name}</code> — убрал в карантин, повторяю раунд.")
+                continue 
 
         error_signature = re.sub(r'\d+', '#', last_error)[-500:].strip()
         if prev_error_signature is not None and error_signature == prev_error_signature:

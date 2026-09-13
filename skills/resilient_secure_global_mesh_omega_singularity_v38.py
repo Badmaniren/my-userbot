@@ -4,6 +4,7 @@ from skills.resilient_secure_global_mesh_omega_singularity_v36 import (
 from skills.resilient_secure_global_mesh_omega_transcendence_v32 import (
     ResilientSecureGlobalMeshOmegaTranscendenceV32,
 )
+import requests
 
 
 class ResilientSecureGlobalMeshOmegaSingularityV38(
@@ -21,12 +22,13 @@ class ResilientSecureGlobalMeshOmegaSingularityV38(
         self._reports = {}
 
     def validate_target_headers(self, target, timeout):
-        import requests
-        response = requests.head(target, timeout=timeout)
-        return response.status_code == 200
+        try:
+            response = requests.head(target, timeout=timeout)
+            return response.status_code == 200
+        except (requests.RequestException, Exception):
+            return False
 
     def coordinate_expansion(self, target, timeout):
-        import requests
         response = requests.get(target, timeout=timeout)
         return response.status_code == 200
 
@@ -37,7 +39,6 @@ class ResilientSecureGlobalMeshOmegaSingularityV38(
             return False
 
     def route_request(self, target, timeout):
-        import requests
         try:
             response = requests.get(target, timeout=timeout)
             return response.text
@@ -45,14 +46,16 @@ class ResilientSecureGlobalMeshOmegaSingularityV38(
             return ""
 
     def process_stream(self, target, timeout):
-        import requests
         response = requests.get(target, timeout=timeout, stream=True)
         for _ in response.raw:
             pass
 
     def export_analytics_report(self, target, report_data):
         existing = self._reports.get(target, {})
-        self._reports[target] = {**existing, **report_data}
+        new_report = {}
+        new_report.update(existing)
+        new_report.update(report_data)
+        self._reports[target] = new_report
 
     def get_exported_report(self, target):
         return self._reports.get(target, {})

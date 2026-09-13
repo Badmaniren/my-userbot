@@ -8,7 +8,9 @@ class CleanCompressedSitemapParserError(Exception):
 
 
 class CleanCompressedSitemapParserV3:
-    def __init__(self, db_path=":memory:"):
+    def __init__(self, db_path=":memory:", max_memory_mb=128):
+        self.db_path = db_path
+        self.max_memory_mb = max_memory_mb
         self.sitemap_parser = CleanSitemapParserV2()
         self.storage = CleanCompressedDBStorage(db_path=db_path)
 
@@ -38,6 +40,9 @@ class CleanCompressedSitemapParserV3:
             pass
 
         return links
+
+    def parse_sitemap(self, url: str, timeout: int = 10):
+        return self.parse(url, timeout=timeout)
 
     def parse_and_clean(self, url: str, timeout: int = 10):
         try:

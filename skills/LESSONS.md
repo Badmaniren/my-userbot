@@ -3,12 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-raise.
-- Последняя ошибка перед фиксом: FAILED (failures=3)
-- Статус: ПРОВАЛЕН после всех попыток
-
-## smart_secure_clean_compressed_rss_crawler_v2 (compose) — раундов: 5
-- Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/unittest/mock.py", line 939, in assert_called_with
+няя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/unittest/mock.py", line 939, in assert_called_with
 - Статус: ПРОВАЛЕН после всех попыток
 
 ## resilient_smart_crawler (compose) — раундов: 5
@@ -341,3 +336,7 @@ raise.
 
 ## resilient_secure_global_mesh_omega_singularity_v36 (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## resilient_secure_global_mesh_omega_singularity_v37 (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

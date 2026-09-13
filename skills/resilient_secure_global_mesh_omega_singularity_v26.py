@@ -28,35 +28,29 @@ class ResilientSecureGlobalMeshOmegaSingularityV26(
         try:
             response = requests.head(target, timeout=timeout)
             return response.status_code == 200
-        except Exception:
+        except (requests.RequestException, ValueError, TypeError):
             return False
 
     def coordinate_expansion(self, target: str, timeout: float) -> bool:
-        try:
-            response = requests.get(target, timeout=timeout)
-            return response.status_code == 200
-        except Exception:
-            return False
+        response = requests.get(target, timeout=timeout)
+        return response.status_code == 200
 
     def coordinate_expansion_safe(self, target: str, timeout: float) -> bool:
         try:
             response = requests.get(target, timeout=timeout)
             return response.status_code == 200
-        except Exception:
+        except (requests.RequestException, ValueError, TypeError):
             return False
 
     def route_request(self, target: str, timeout: float) -> str:
-        try:
-            response = requests.get(target, timeout=timeout)
-            if hasattr(response, "text") and response.text:
-                return response.text
-            return "Singularity payload"
-        except Exception:
-            return "Singularity payload"
+        response = requests.get(target, timeout=timeout)
+        if hasattr(response, "text") and response.text:
+            return response.text
+        return "Singularity payload"
 
     def process_stream(self, target: str, timeout: float) -> None:
         response = requests.get(target, timeout=timeout, stream=True)
-        if hasattr(response, "raw"):
+        if hasattr(response, "raw") and response.raw:
             for _ in response.raw:
                 pass
         return None

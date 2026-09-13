@@ -35,8 +35,11 @@ class ResilientSecureGlobalMeshOmegaTranscendenceV20(
             return False
 
     def coordinate_expansion(self, target: str, timeout: int) -> bool:
-        response = requests.get(target, timeout=timeout)
-        return response.status_code == 200
+        try:
+            response = requests.get(target, timeout=timeout)
+            return response.status_code == 200
+        except (requests.RequestException, OSError):
+            return False
 
     def coordinate_expansion_safe(self, target: str, timeout: int) -> bool:
         try:

@@ -3,7 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-нтичит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
+аружу через raise.
 - Последняя ошибка перед фиксом: The above exception was the direct cause of the following exception:
 - Статус: ПРОВАЛЕН после всех попыток
 
@@ -340,4 +340,7 @@
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## resilient_secure_global_mesh_omega_singularity_v19 (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## resilient_secure_global_mesh_omega_transcendence_v20 (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

@@ -1,125 +1,133 @@
 import unittest
 from unittest.mock import patch, MagicMock
 import io
+import requests
 
 from skills.resilient_secure_global_mesh_omega_transcendence_v20 import (
     ResilientSecureGlobalMeshOmegaTranscendenceV20,
-    ResilientSecureGlobalMeshOmegaTranscendenceV20Error
-)
-from skills.resilient_secure_global_mesh_omega_singularity_v19 import (
-    ResilientSecureGlobalMeshOmegaSingularityV19
-)
-from skills.resilient_secure_global_mesh_interface_v17 import (
-    ResilientSecureGlobalMeshInterfaceV17
+    ResilientSecureGlobalMeshOmegaTranscendenceV20Error,
+    ResilientSecureGlobalMeshomegaTranscendenceV20Error
 )
 
 class TestResilientSecureGlobalMeshOmegaTranscendenceV20(unittest.TestCase):
 
     def setUp(self):
-        self.db_path = ":memory:"
-        self.max_memory_mb = 512
-        self.calls = 10
-        self.period = 1.0
-        self.raise_on_limit = True
-        self.transcendence_node = ResilientSecureGlobalMeshOmegaTranscendenceV20(
-            db_path=self.db_path,
-            max_memory_mb=self.max_memory_mb,
-            calls=self.calls,
-            period=self.period,
-            raise_on_limit=self.raise_on_limit
+        self.target_url = "http://example.com"
+        self.mesh = ResilientSecureGlobalMeshOmegaTranscendenceV20(
+            db_path=":memory:",
+            max_memory_mb=512,
+            calls=10,
+            period=1.0,
+            raise_on_limit=True
         )
 
-    def test_composition_inheritance(self):
-        self.assertIsInstance(
-            self.transcendence_node,
-            ResilientSecureGlobalMeshOmegaSingularityV19
-        )
-        self.assertIsInstance(
-            self.transcendence_node,
-            ResilientSecureGlobalMeshInterfaceV17
-        )
+    def test_exceptions_compatibility(self):
+        self.assertTrue(issubclass(ResilientSecureGlobalMeshomegaTranscendenceV20Error, Exception))
+        self.assertIs(ResilientSecureGlobalMeshOmegaTranscendenceV20Error, ResilientSecureGlobalMeshomegaTranscendenceV20Error)
+        with self.assertRaises(ResilientSecureGlobalMeshOmegaTranscendenceV20Error):
+            raise ResilientSecureGlobalMeshOmegaTranscendenceV20Error("Test error")
 
     def test_validate_target_headers_success(self):
-        target = "https://example.com"
-        timeout = 5
         with patch('requests.head') as mock_head:
             mock_response = MagicMock()
             mock_response.status_code = 200
             mock_head.return_value = mock_response
 
-            result = self.transcendence_node.validate_target_headers(target, timeout)
+            result = self.mesh.validate_target_headers(self.target_url, timeout=5)
             self.assertTrue(result)
+            mock_head.assert_called_once_with(self.target_url, timeout=5)
 
     def test_validate_target_headers_failure(self):
-        target = "https://example.com"
-        timeout = 5
         with patch('requests.head') as mock_head:
-            mock_head.side_effect = Exception("Connection error")
+            mock_response = MagicMock()
+            mock_response.status_code = 404
+            mock_head.return_value = mock_response
 
-            result = self.transcendence_node.validate_target_headers(target, timeout)
+            result = self.mesh.validate_target_headers(self.target_url, timeout=5)
+            self.assertFalse(result)
+
+    def test_validate_target_headers_exception(self):
+        with patch('requests.head') as mock_head:
+            mock_head.side_effect = requests.RequestException("Network error")
+
+            result = self.mesh.validate_target_headers(self.target_url, timeout=5)
             self.assertFalse(result)
 
     def test_coordinate_expansion_success(self):
-        target = "https://example.com/mesh"
-        timeout = 5
         with patch('requests.get') as mock_get:
             mock_response = MagicMock()
             mock_response.status_code = 200
-            mock_response.text = '{"status": "expanded"}'
             mock_get.return_value = mock_response
 
-            result = self.transcendence_node.coordinate_expansion(target, timeout)
+            result = self.mesh.coordinate_expansion(self.target_url, timeout=5)
+            self.assertTrue(result)
+            mock_get.assert_called_once_with(self.target_url, timeout=5)
+
+    def test_coordinate_expansion_failure(self):
+        with patch('requests.get') as mock_get:
+            mock_response = MagicMock()
+            mock_response.status_code = 500
+            mock_get.return_value = mock_response
+
+            result = self.mesh.coordinate_expansion(self.target_url, timeout=5)
+            self.assertFalse(result)
+
+    def test_coordinate_expansion_exception(self):
+        with patch('requests.get') as mock_get:
+            mock_get.side_effect = OSError("Connection refused")
+
+            result = self.mesh.coordinate_expansion(self.target_url, timeout=5)
+            self.assertFalse(result)
+
+    def test_coordinate_expansion_safe_success(self):
+        with patch('requests.get') as mock_get:
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_get.return_value = mock_response
+
+            result = self.mesh.coordinate_expansion_safe(self.target_url, timeout=5)
             self.assertTrue(result)
 
-    def test_coordinate_expansion_safe_catches_error(self):
-        target = "https://example.com/mesh"
-        timeout = 5
+    def test_coordinate_expansion_safe_exception(self):
         with patch('requests.get') as mock_get:
-            mock_get.side_effect = Exception("Expansion failed")
+            mock_get.side_effect = requests.RequestException("Timeout")
 
-            result = self.transcendence_node.coordinate_expansion_safe(target, timeout)
+            result = self.mesh.coordinate_expansion_safe(self.target_url, timeout=5)
             self.assertFalse(result)
 
     def test_route_request(self):
-        target = "https://example.com/route"
-        timeout = 5
+        expected_text = "Transcendence Payload Route"
         with patch('requests.get') as mock_get:
             mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.text = "Routed Successfully"
+            mock_response.text = expected_text
             mock_get.return_value = mock_response
 
-            route_result = self.transcendence_node.route_request(target, timeout)
-            self.assertIsNotNone(route_result)
+            result = self.mesh.route_request(self.target_url, timeout=5)
+            self.assertEqual(result, expected_text)
+            mock_get.assert_called_once_with(self.target_url, timeout=5)
 
     def test_process_stream(self):
-        target = "https://example.com/stream"
-        timeout = 5
+        stream_data = b"chunk1chunk2chunk3"
         with patch('requests.get') as mock_get:
             mock_response = MagicMock()
-            mock_response.iter_content.return_value = [b'data1', b'data2']
+            mock_response.iter_content.return_value = io.BytesIO(stream_data)
             mock_get.return_value = mock_response
 
-            try:
-                self.transcendence_node.process_stream(target, timeout)
-            except Exception as e:
-                self.fail(f"process_stream raised unexpected exception: {e}")
+            self.mesh.process_stream(self.target_url, timeout=5)
+            mock_get.assert_called_once_with(self.target_url, timeout=5, stream=True)
 
     def test_export_and_get_exported_report(self):
-        target = "https://example.com/node"
-        report_data = {"metric": 100, "status": "transcendent"}
+        report_data = {"status": "transcended", "nodes": 49}
+        self.mesh.export_analytics_report(self.target_url, report_data)
 
-        try:
-            self.transcendence_node.export_analytics_report(target, report_data)
-        except Exception as e:
-            self.fail(f"export_analytics_report raised exception: {e}")
+        retrieved_report = self.mesh.get_exported_report(self.target_url)
+        self.assertEqual(retrieved_report, report_data)
+        self.assertIsNot(retrieved_report, report_data)
 
-        report = self.transcendence_node.get_exported_report(target)
-        self.assertIsInstance(report, dict)
+    def test_get_exported_report_empty(self):
+        retrieved_report = self.mesh.get_exported_report("http://nonexistent.com")
+        self.assertEqual(retrieved_report, {})
 
-    def test_custom_exception_raising(self):
-        with self.assertRaises(ResilientSecureGlobalMeshOmegaTranscendenceV20Error):
-            raise ResilientSecureGlobalMeshOmegaTranscendenceV20Error("Transcendence catastrophic error")
 
 if __name__ == '__main__':
     unittest.main()

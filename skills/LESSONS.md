@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-с: ПРОВАЛЕН после всех попыток
-
-## resilient_clean_compressed_rss_archiver (compose) — раундов: 5
-- Последняя ошибка перед фиксом: skills.resilient_clean_compressed_rss_archiver.ResilientCleanCompressedRSSArchiverError: Ошибка декомпрессии данных: Payload decompression failed: Input must be a string
+ResilientCleanCompressedRSSArchiverError: Ошибка декомпрессии данных: Payload decompression failed: Input must be a string
 - Статус: ПРОВАЛЕН после всех попыток
 
 ## secure_clean_compressed_rss_archiver (compose) — раундов: 5
@@ -337,4 +334,8 @@
 
 ## resilient_secure_global_mesh_omega_infinity_v27 (compose) — раундов: 4
 - Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/unittest/loader.py", line 419, in _find_test_path
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## resilient_secure_global_mesh_omega_transcendence_v28 (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

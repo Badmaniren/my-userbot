@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-спешно прошёл тесты и влит в main
-
-## clean_compressed_db_storage (compose) — раундов: 3
-- Последняя ошибка перед фиксом: FAILED (failures=1)
+ FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main
 
 ## resilient_clean_rss_archiver (compose) — раундов: 2
@@ -342,3 +339,6 @@
 ## resilient_secure_global_mesh_omega_nexus_v24 (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## resilient_secure_global_mesh_omega_ascension_v25 (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

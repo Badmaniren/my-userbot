@@ -3,7 +3,13 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-с: ПРОВАЛЕН после всех попыток
+se) — раундов: 5
+- Последняя ошибка перед фиксом: self.storage = CompressedDBStorage(db_path)
+- Статус: ПРОВАЛЕН после всех попыток
+
+## secure_clean_compressed_rss_archiver (compose) — раундов: 5
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
+- Статус: ПРОВАЛЕН после всех попыток
 
 ## resilient_clean_compressed_rss_archiver (compose) — раундов: 5
 - Последняя ошибка перед фиксом: skills.resilient_clean_compressed_rss_archiver.ResilientCleanCompressedRSSArchiverError: Ошибка декомпрессии данных: Payload decompression failed: Input must be a string
@@ -334,7 +340,3 @@
 - Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: успешно прошёл тесты и влит в main
-
-## resilient_secure_global_mesh_omega_infinity_v27 (compose) — раундов: 4
-- Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/unittest/loader.py", line 419, in _find_test_path
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

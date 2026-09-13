@@ -49,7 +49,22 @@ class ResilientSecureGlobalMeshSyntheticIntelligenceV16(ResilientSecureGlobalMes
         response = self.session.get(target, timeout=timeout, stream=True)
         if response.status_code != 200:
             raise ResilientSecureGlobalMeshSyntheticIntelligenceV16Error(f"Stream failed with status {response.status_code}")
-        for _ in response.raw.iter_chunked(1024):
+        
+        raw_obj = response.raw
+        if hasattr(raw_obj, 'iter_chunked'):
+            chunks = raw_obj.iter_chunked(1024)
+        elif hasattr(raw_obj, 'read'):
+            def chunk_generator():
+                while True:
+                    chunk = raw_obj.read(1024)
+                    if not chunk:
+                        break
+                    yield chunk
+            chunks = chunk_generator()
+        else:
+            chunks = [response.content]
+
+        for _ in chunks:
             pass
 
     def route_request(self, target: str, timeout: int):

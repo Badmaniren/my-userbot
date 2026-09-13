@@ -3,9 +3,6 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-compose) — раундов: 5
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
-- Статус: ПРОВАЛЕН после всех попыток
 
 ## resilient_smart_secure_rss_crawler (compose) — раундов: 5
 - Последняя ошибка перед фиксом: FAILED (errors=1)
@@ -340,4 +337,7 @@ compose) — раундов: 5
 
 ## resilient_secure_global_mesh_omega_singularity_v38 (compose) — раундов: 4
 - Последняя ошибка перед фиксом: return self._execute_mock_call(*args, **kwargs)
+- Статус: успешно прошёл тесты и влит в main
+
+## resilient_secure_global_mesh_omega_singularity_v39 (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

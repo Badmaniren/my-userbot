@@ -882,15 +882,34 @@ def update_epic_file(branch: str, decision: dict) -> None:
 
     commit_file_to_branch(branch, EPIC_PATH, content, f"Эпик «{title}»: {status}")
 
-def get_skills_manifest() -> dict:
-    url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents/skills?ref=main")
-    r = requests.get(url, headers=API_HEADERS, timeout=10)
-    if r.status_code != 200:
-        return {}
+_MANIFEST_CACHE = {"data": {}, "fingerprint": None}
+
+def get_skills_manifest(force_refresh: bool = False) -> dict:
+    """
+    Раньше манифест пересобирался с нуля КАЖДЫЙ раз, когда был нужен — список
+    каталога plus отдельный сетевой запрос НА КАЖДЫЙ файл skills/ (а их уже
+    полсотни+). При этом skills/ реально меняется только раз за успешный цикл.
+    Кэшируем по "отпечатку" каталога (sha всех файлов) — если он не менялся,
+    просто отдаём то, что уже посчитано.
+    """
+    dir_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents/skills?ref=main")
+    try:
+        dir_res = requests.get(dir_url, headers=API_HEADERS, timeout=10)
+        if dir_res.status_code != 200:
+            return _MANIFEST_CACHE["data"]
+        listing = dir_res.json()
+    except Exception:
+        return _MANIFEST_CACHE["data"]
+
+    py_files = [f for f in listing if f["name"].endswith(".py") and f["name"] != "__init__.py"]
+    fingerprint = "|".join(sorted(f"{f['name']}:{f.get('sha', '')}" for f in py_files))
+
+    if not force_refresh and fingerprint == _MANIFEST_CACHE["fingerprint"] and _MANIFEST_CACHE["data"]:
+        return _MANIFEST_CACHE["data"]
 
     manifest = {}
-    files = [f["name"] for f in r.json() if f["name"].endswith(".py") and f["name"] != "__init__.py"]
-    for f_name in files:
+    for f_info in py_files:
+        f_name = f_info["name"]
         mod_key = f_name[:-3]
         code = get_file_content("main", f"skills/{f_name}")
         if not code:
@@ -922,7 +941,35 @@ def get_skills_manifest() -> dict:
         except Exception:
             pass
         manifest[mod_key] = signatures if signatures else ["нет сигнатур"]
+
+    _MANIFEST_CACHE["data"] = manifest
+    _MANIFEST_CACHE["fingerprint"] = fingerprint
     return manifest
+
+MAX_MANIFEST_PROMPT_CHARS = 6000
+
+def manifest_for_prompt(manifest: dict, always_full: list = None) -> str:
+    """
+    То, что реально уходит в промпт Gemini. Полные сигнатуры ВСЕХ навыков в
+    каждом промпте — это ровно то, из-за чего рост числа навыков напрямую жрёт
+    бесплатные токены. Если манифест умещается целиком — отдаём как есть. Если
+    нет — ужимаем менее важные модули до одной сигнатуры, а если и это много —
+    до простого списка имён. always_full (обычно — зависимости текущего compose)
+    НИКОГДА не обрезаются: именно неполная сигнатура зависимости и была причиной
+    бага с RateLimiter() без аргументов — экономить на этом нельзя.
+    """
+    always_full = set(always_full or [])
+    full = json.dumps(manifest, indent=2, ensure_ascii=False)
+    if len(full) <= MAX_MANIFEST_PROMPT_CHARS:
+        return full
+
+    compact = {k: (v if k in always_full else (v[:1] if v else [])) for k, v in manifest.items()}
+    compact_json = json.dumps(compact, indent=2, ensure_ascii=False)
+    if len(compact_json) <= MAX_MANIFEST_PROMPT_CHARS:
+        return compact_json
+
+    names_only = {k: (v if k in always_full else "...") for k, v in manifest.items()}
+    return json.dumps(names_only, ensure_ascii=False)
 
 def get_lessons_context() -> str:
     content = get_file_content("main", LESSONS_PATH)
@@ -1013,7 +1060,7 @@ def dream_action(manifest: dict, lessons: str, epic: str, manual_prompt: str = "
     if manual_prompt:
         prompt = (
             f"Пользователь дал прямое ТЗ: '{manual_prompt}'\n"
-            f"МАНИФЕСТ СУЩЕСТВУЮЩИХ МОДУЛЕЙ:\n{json.dumps(manifest, indent=2, ensure_ascii=False)}\n\n"
+            f"МАНИФЕСТ СУЩЕСТВУЮЩИХ МОДУЛЕЙ:\n{manifest_for_prompt(manifest)}\n\n"
             "Сформируй спецификацию нового модуля под эту задачу.\n"
             "Верни СТРОГО JSON:\n"
             "{\n"
@@ -1037,7 +1084,7 @@ def dream_action(manifest: dict, lessons: str, epic: str, manual_prompt: str = "
         prompt = (
             "Ты — Стратег-Паразит. Цель — не просто плодить модули, а РЕАЛЬНО развиваться: выстраивать "
             "многошаговые направления, где каждая задача продвигает что-то большее, чем она сама.\n\n"
-            f"УЖЕ СОЗДАННЫЕ МОДУЛИ:\n{json.dumps(manifest, indent=2, ensure_ascii=False)}\n\n"
+            f"УЖЕ СОЗДАННЫЕ МОДУЛИ:\n{manifest_for_prompt(manifest)}\n\n"
             f"УРОКИ:\n{lessons}\n\n"
             f"ТЕКУЩИЙ ЭПИК (многошаговая цель дольше одного цикла):\n{epic}\n\n"
             "ПРАВИЛО ПРО ЭПИК:\n"
@@ -1145,7 +1192,7 @@ def architect_write_hard_tests(task: dict, manifest: dict, lessons: str, existin
         f"Задача: {task['action']} модуля skills/{task['module_name']}.py\n"
         f"Описание: {task['description']}\n"
         f"{context_code}{_compose_context(task)}{context_stagnation}\n"
-        f"СИГНАТУРЫ И ТИПЫ:\n{json.dumps(manifest, indent=2, ensure_ascii=False)}\n\n"
+        f"СИГНАТУРЫ И ТИПЫ:\n{manifest_for_prompt(manifest, always_full=task.get('composed_of'))}\n\n"
         "СТРОГИЕ ПРАВИЛА:\n"
         "1. Библиотеки: standard lib, unittest, unittest.mock, requests, bs4.\n"
         "2. Запрещено вешать `@patch` над методами! Только `with patch(...) as mock:` внутри метода!\n"
@@ -1163,7 +1210,7 @@ def architect_write_integration_test(task: dict, manifest: dict, lessons: str, e
         f"Модуль: skills/{task['module_name']}.py\n"
         f"Описание: {task['description']}\n"
         f"{context_code}{_compose_context(task)}\n"
-        f"СИГНАТУРЫ:\n{json.dumps(manifest, indent=2, ensure_ascii=False)}\n\n"
+        f"СИГНАТУРЫ:\n{manifest_for_prompt(manifest, always_full=task.get('composed_of'))}\n\n"
         "ПРАВИЛА: Смотри на возвращаемые типы (str, bool). Импортируй ТОЛЬКО существующие имена. Вызывай создаваемый модуль. Без markdown."
     )
     return ask_gemini(prompt)
@@ -1193,7 +1240,7 @@ def write_epic_smoke_test(epic_title: str, epic_body: str, manifest: dict) -> st
         f"Эпик: {epic_title}\n"
         f"Контекст эпика (файл EPIC.md):\n{epic_body}\n\n"
         f"ДОСТУПНЫЕ МОДУЛИ (используй их РЕАЛЬНО, честным импортом из skills.*, без моков):\n"
-        f"{json.dumps(manifest, indent=2, ensure_ascii=False)}\n\n"
+        f"{manifest_for_prompt(manifest)}\n\n"
         "ПРАВИЛА:\n"
         "1. ЭТО ЕДИНСТВЕННЫЙ случай, когда реальная сеть РАЗРЕШЕНА и ОБЯЗАТЕЛЬНА — сходи на реальный, "
         "стабильный, общеизвестный публичный сайт/RSS-фид, подходящий по смыслу эпику (например: "
@@ -1254,10 +1301,95 @@ def run_epic_smoke_test(epic_title: str, manifest: dict) -> None:
             buttons=tg_issue_button(issue_url)
         )
 
+def delete_repo_file(path: str, message: str, branch: str = "main") -> bool:
+    file_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents/{path}?ref={branch}")
+    try:
+        info = requests.get(file_url, headers=API_HEADERS, timeout=10)
+        if info.status_code != 200:
+            return True  # файла и так уже нет — считаем успехом
+        sha = info.json().get("sha")
+        res = requests.delete(
+            clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents/{path}"),
+            headers=API_HEADERS,
+            json={"message": message, "sha": sha, "branch": branch},
+            timeout=10
+        )
+        return res.status_code in [200, 204]
+    except Exception:
+        return False
+
+def find_poisoning_import_error(error_text: str) -> str:
+    """
+    `unittest discover` иногда не изолирует один сломанный на импорте тестовый
+    файл, а роняет ВЕСЬ прогон целиком. Раз такой файл в принципе не может
+    импортироваться — ни одна проверка внутри него никогда не выполняется, и он
+    провален абсолютно для ЛЮБОГО коммита в репозитории, не только для текущей
+    задачи. Это и отличает 'отравление всего main' от обычного бага в новом коде.
+    """
+    m = re.search(r"Failed to import test module:\s*(\S+)", error_text or "")
+    return m.group(1).strip() if m else ""
+
+def check_main_health() -> tuple:
+    """
+    main триггерит CI на каждый пуш (в том числе от нашего же мержа). Если
+    ПОСЛЕДНИЙ прогон на main сам красный — любая новая мутация форкнётся от
+    этого же сломанного состояния (prepare_branch берёт sha именно от main) и
+    провалится ровно там же, что бы Унга ни делала — отсюда 'застряли и не
+    можем создать ничего нового', даже когда сама новая задача ни при чём.
+    """
+    url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/actions/runs")
+    try:
+        r = requests.get(url, headers=API_HEADERS, params={"branch": "main", "per_page": 1}, timeout=10)
+        if r.status_code != 200:
+            return True, "", None
+        runs = r.json().get("workflow_runs", [])
+        if not runs or runs[0].get("status") != "completed" or runs[0].get("conclusion") == "success":
+            return True, "", None
+        run_id = runs[0].get("id")
+        return False, extract_clean_test_traceback(run_id), run_id
+    except Exception:
+        return True, "", None
+
+def heal_main_if_poisoned() -> bool:
+    """
+    Возвращает True, если main был сломан и (по возможности) вылечен. Лечим
+    ТОЛЬКО узкий безопасный случай — тест, не способный даже импортироваться:
+    удаление такого файла не может ничего сломать, он и так был мёртвым грузом.
+    Любую другую поломку main не трогаем и просто громко сигналим.
+    """
+    healthy, error_text, run_id = check_main_health()
+    if healthy:
+        return False
+
+    broken_module = find_poisoning_import_error(error_text)
+    if broken_module:
+        path = f"{broken_module}.py"
+        if delete_repo_file(path, f"Карантин: {path} не импортируется и блокирует ВСЕ мутации [skip ci]"):
+            print(f"[!] main был отравлен нерабочим тестом {path} — удалён в карантин.")
+            send_tg(
+                f"🧟 <b>main был отравлен</b>\n━━━━━━━━━━━━━━━━━━━\n"
+                f"Файл <code>{path}</code> не мог даже импортироваться — из-за этого ЛЮБАЯ "
+                "мутация проваливалась на ровном месте, сколько бы Унга ни пыталась чинить "
+                "СВОЙ код. Удалил его в карантин, main снова здоров."
+            )
+            return True
+
+    print(f"[!] main сломан, но не тем паттерном, который я умею чинить сам:\n{error_text[:500]}")
+    send_tg(
+        "🧟 <b>main сломан, авточинка не справилась</b>\n━━━━━━━━━━━━━━━━━━━\n"
+        f"<pre>{html.escape(error_text[:500])}</pre>\n"
+        "Пока это не поправить руками (или через Jules), новые мутации будут проваливаться на этом же месте."
+    )
+    return False
+
 def run_evolution_cycle():
     print("\n==========================================")
     print("      ПИТЕКАНТРОП: БЕЗОПАСНЫЙ ЦИКЛ CI     ")
     print("==========================================")
+
+    print("[~] Проверка здоровья main...")
+    if heal_main_if_poisoned():
+        print("[*] main вылечен в этом же проходе — продолжаю цикл на свежей базе.")
 
     print("[~] Профилактика: обновляю отстающие PR от main, чищу мусорные ветки...")
     refreshed, dirty_urls = refresh_stuck_prs()
@@ -1334,6 +1466,15 @@ def run_evolution_cycle():
             break
 
         last_error = extract_clean_test_traceback(run_id)
+
+        poison_module = find_poisoning_import_error(last_error)
+        own_test_names = {test_path[:-3], integration_test_path[:-3]}
+        if poison_module and poison_module not in own_test_names:
+            print(f"[!] Отравляющий файл {poison_module}.py не имеет отношения к '{mod_name}' — карантин вместо правки своего кода.")
+            if delete_repo_file(f"{poison_module}.py", f"Карантин: {poison_module}.py блокировал задачу {mod_name} [skip ci]", branch=branch):
+                send_tg(f"🧟 Посторонний сломанный тест <code>{poison_module}.py</code> мешал <code>{mod_name}</code> — убрал в карантин, повторяю раунд без штрафа.")
+                continue  # тот же impl_code, тот же attempts — просто перезапускаем раунд на чистой ветке
+
         error_signature = re.sub(r'\d+', '#', last_error)[-500:].strip()
         if prev_error_signature is not None and error_signature == prev_error_signature:
             stagnant_hits += 1

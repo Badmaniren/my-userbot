@@ -3,7 +3,12 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- ошибка перед фиксом: FAILED (failures=1)
+e) — раундов: 5
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН после всех попыток
+
+## resilient_smart_secure_rss_crawler (compose) — раундов: 5
+- Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН после всех попыток
 
 ## sitemap_parser (create) — раундов: 1
@@ -335,7 +340,3 @@
 ## resilient_secure_global_mesh_omega_singularity_v40 (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: успешно прошёл тесты и влит в main
-
-## resilient_secure_global_mesh_omega_singularity_v41 (compose) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

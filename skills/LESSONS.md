@@ -3,8 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-аружу через raise.
-- Последняя ошибка перед фиксом: The above exception was the direct cause of the following exception:
+
 - Статус: ПРОВАЛЕН после всех попыток
 
 ## url_cleaner (create) — раундов: 1
@@ -343,4 +342,7 @@
 - Статус: успешно прошёл тесты и влит в main
 
 ## resilient_secure_global_mesh_omega_transcendence_v20 (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## resilient_secure_global_mesh_omega_infinity_v21 (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

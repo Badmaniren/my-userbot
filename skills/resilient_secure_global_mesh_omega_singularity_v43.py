@@ -16,8 +16,11 @@ class ResilientSecureGlobalMeshOmegaSingularityV43(ResilientSecureGlobalMeshOmeg
         self.reports = {}
 
     def validate_target_headers(self, url: str, timeout: float) -> bool:
-        response = requests.head(url, timeout=timeout)
-        return response.status_code == 200
+        try:
+            response = requests.head(url, timeout=timeout)
+            return response.status_code == 200
+        except Exception:
+            return False
 
     def coordinate_expansion(self, url: str, timeout: float) -> bool:
         response = requests.get(url, timeout=timeout)
@@ -43,7 +46,7 @@ class ResilientSecureGlobalMeshOmegaSingularityV43(ResilientSecureGlobalMeshOmeg
     def export_analytics_report(self, url: str, report_data: dict) -> None:
         if url not in self.reports:
             self.reports[url] = {}
-        self.reports[url].update(report_data)
+        self.reports[url] = {**self.reports[url], **report_data}
         return None
 
     def get_exported_report(self, url: str) -> dict:

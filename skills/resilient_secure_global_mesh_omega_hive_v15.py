@@ -62,7 +62,7 @@ class ResilientSecureGlobalMeshOmegaHiveV15(
         try:
             response = requests.get(target, timeout=timeout)
             return bool(response.status_code == 200)
-        except requests.RequestException:
+        except (requests.RequestException, Exception):
             return False
 
     def export_analytics_report(self, target: str, report_data: dict) -> None:

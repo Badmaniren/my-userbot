@@ -227,8 +227,7 @@ threading.Thread(target=run_telegram_listener, daemon=True).start()
 
 # 4. СЕТЬ И КЛИЕНТ GEMINI
 def clean_url(url: str) -> str:
-    # ИСПРАВЛЕНА РЕГУЛЯРКА (убран мусор \vert{})
-    return re.sub(r'\[.*?\]\(|\)', '', url).strip()
+    return re.sub(r'\[.*?\]\(\vert{}\)', '', url).strip()
 
 API_HOST = "generativelanguage.googleapis.com"
 API_BASE = "https://" + API_HOST + "/v1beta/"
@@ -534,10 +533,6 @@ def reactivate_stuck_jules_issues() -> int:
     return reactivated
 
 def run_jules_babysitter():
-    """
-    Фоновый демон. Читает комменты в открытых Jules-задачах.
-    Реагирует на каждый сбой строго один раз, предотвращая цикл перезапусков.
-    """
     print("[+] Демон-нянька для Jules запущен.")
     while True:
         time.sleep(180)
@@ -1194,7 +1189,6 @@ def run_epic_smoke_test(epic_title: str, manifest: dict) -> None:
         print("[-] Практическая проверка: не удалось подготовить ветку.")
         return
 
-    # ЗДЕСЬ ТОЖЕ ПУТЬ TESTS/
     smoke_path = "tests/test_epic_smoke.py"
     last_error = ""
     passed = False
@@ -1291,16 +1285,42 @@ def heal_main_if_poisoned() -> bool:
     return False
 
 def is_jules_working_on(mod_name: str) -> bool:
-    """Проверяет, нет ли уже открытой задачи Jules на этот модуль."""
+    """
+    Проверяет, занят ли Jules модулем прямо сейчас.
+    Возвращает False, если Jules уже закончил работу (открыл PR) или сдох.
+    """
     url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues")
     try:
-        res = requests.get(url, headers=API_HEADERS, params={"state": "open", "per_page": 100}, timeout=10)
-        if res.status_code == 200:
-            for issue in res.json():
-                if "pull_request" in issue:
-                    continue
-                if issue.get("title", "").startswith(f"Jules Task: исправить сбой модуля {mod_name}"):
+        res = requests.get(url, headers=API_HEADERS, params={"state": "open", "per_page": 30}, timeout=10)
+        if res.status_code != 200:
+            return False
+
+        for issue in res.json():
+            if "pull_request" in issue:
+                continue
+            if not issue.get("title", "").startswith(f"Jules Task: исправить сбой модуля {mod_name}"):
+                continue
+
+            num = issue.get("number")
+            c_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues/{num}/comments")
+            c_res = requests.get(c_url, headers=API_HEADERS, timeout=10)
+            if c_res.status_code != 200:
+                return True
+
+            comments = c_res.json()
+            comments_text = " ".join([c.get("body", "").lower() for c in comments])
+
+            if "ready for a review" in comments_text or "a pr has been created" in comments_text:
+                return False
+
+            if "jules has failed" in comments_text:
+                return False
+
+            if "is on it" in comments_text:
+                created_at = datetime.strptime(issue["created_at"], "%Y-%m-%dT%H:%M:%SZ")
+                if (datetime.utcnow() - created_at).total_seconds() < 10800:
                     return True
+
     except Exception:
         pass
     return False
@@ -1342,7 +1362,6 @@ def run_evolution_cycle():
     action = decision.get("action", "create")
     print(f"[+] Действие: {action.upper()} для '{mod_name}' — {decision.get('description')}")
 
-    # ЗАМОК ОТ ДУРАКА: Проверяем, не ковыряет ли Jules этот же модуль прямо сейчас.
     if is_jules_working_on(mod_name):
         msg = f"⏳ Модуль <code>{mod_name}</code> сейчас в реанимации у Jules. Пропускаю цикл, чтобы не затереть его ветку."
         print(f"[*] {msg}")
@@ -1359,7 +1378,6 @@ def run_evolution_cycle():
         print("[-] Ошибка подготовки ветки.")
         return
 
-    # ТЕСТЫ ТЕПЕРЬ СТРОГО В tests/
     test_path = f"tests/test_{mod_name}.py"
     integration_test_path = f"tests/test_{mod_name}_integration.py"
     skill_path = f"skills/{mod_name}.py"

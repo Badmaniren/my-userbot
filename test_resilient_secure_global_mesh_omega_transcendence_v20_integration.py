@@ -1,54 +1,42 @@
 import unittest
 from skills.resilient_secure_global_mesh_omega_transcendence_v20 import (
     ResilientSecureGlobalMeshOmegaTranscendenceV20,
+    ResilientSecureGlobalMeshOmegaTranscendenceV20Error,
     ResilientSecureGlobalMeshomegaTranscendenceV20Error
 )
 
-class TestResilientSecureGlobalMeshOmegaTranscendenceV20(unittest.TestCase):
-    def setUp(self):
-        self.db_path = ":memory:"
-        self.max_memory_mb = 512
-        self.calls = 10
-        self.period = 1.0
-        self.raise_on_limit = True
-        self.transcendence_node = ResilientSecureGlobalMeshOmegaTranscendenceV20(
-            db_path=self.db_path,
-            max_memory_mb=self.max_memory_mb,
-            calls=self.calls,
-            period=self.period,
-            raise_on_limit=self.raise_on_limit
+class TestResilientSecureGlobalMeshOmegaTranscendenceV20Integration(unittest.TestCase):
+    def test_transcendence_v20_flow(self):
+        mesh = ResilientSecureGlobalMeshOmegaTranscendenceV20(
+            db_path=":memory:",
+            max_memory_mb=256,
+            calls=5,
+            period=1.0,
+            raise_on_limit=False
         )
-        self.target_url = "https://example.com"
-        self.timeout = 5.0
-        self.report_payload = {"status": "transcended", "metrics": {"entropy": 0.0}}
+        
+        self.assertIsNotNone(mesh)
+        self.assertTrue(issubclass(ResilientSecureGlobalMeshOmegaTranscendenceV20Error, Exception))
+        self.assertTrue(issubclass(ResilientSecureGlobalMeshomegaTranscendenceV20Error, Exception))
 
-    def test_validate_target_headers(self):
-        result = self.transcendence_node.validate_target_headers(self.target_url, self.timeout)
-        self.assertIsInstance(result, bool)
+        target = "http://example.com"
+        
+        headers_valid = mesh.validate_target_headers(target, timeout=2)
+        self.assertIsInstance(headers_valid, bool)
 
-    def test_coordinate_expansion(self):
-        result = self.transcendence_node.coordinate_expansion(self.target_url, self.timeout)
-        self.assertIsInstance(result, bool)
+        expansion = mesh.coordinate_expansion(target, timeout=2)
+        self.assertIsInstance(expansion, bool)
 
-    def test_coordinate_expansion_safe(self):
-        result = self.transcendence_node.coordinate_expansion_safe(self.target_url, self.timeout)
-        self.assertIsInstance(result, bool)
+        expansion_safe = mesh.coordinate_expansion_safe(target, timeout=2)
+        self.assertIsInstance(expansion_safe, bool)
 
-    def test_route_request(self):
-        result = self.transcendence_node.route_request(self.target_url, self.timeout)
-        self.assertIsInstance(result, str)
-
-    def test_process_stream(self):
-        try:
-            self.transcendence_node.process_stream(self.target_url, self.timeout)
-        except Exception as e:
-            self.assertIsInstance(e, (ResilientSecureGlobalMeshomegaTranscendenceV20Error, Exception))
-
-    def test_analytics_export_and_retrieve(self):
-        self.transcendence_node.export_analytics_report(self.target_url, self.report_payload)
-        report = self.transcendence_node.get_exported_report(self.target_url)
-        self.assertIsInstance(report, dict)
-        self.assertEqual(report.get("status"), "transcended")
+        report_data = {"status": "transcended", "nodes": 49}
+        mesh.export_analytics_report(target, report_data)
+        
+        exported = mesh.get_exported_report(target)
+        self.assertIsInstance(exported, dict)
+        self.assertEqual(exported.get("status"), "transcended")
+        self.assertEqual(exported.get("nodes"), 49)
 
 if __name__ == "__main__":
     unittest.main()

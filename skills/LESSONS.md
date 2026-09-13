@@ -3,7 +3,10 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-мо или пробрось наружу через raise.
+ле всех попыток
+
+## smart_secure_compressed_sitemap_crawler (compose) — раундов: 2
+- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
 - Статус: успешно прошёл тесты и влит в main
 
 ## smart_secure_compressed_rss_crawler_v2 (compose) — раундов: 5
@@ -302,10 +305,6 @@
 ## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: Не удалось скачать архив логов рана (HTTP 404).
 - Статус: успешно прошёл тесты и влит в main
-
-## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

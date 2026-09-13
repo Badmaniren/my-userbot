@@ -40,9 +40,12 @@ class ResilientSecureGlobalMeshOmegaSingularityV38(
             return False
 
     def route_request(self, target, timeout):
-        import requests
-        response = requests.get(target, timeout=timeout)
-        return response.text
+        try:
+            import requests
+            response = requests.get(target, timeout=timeout)
+            return response.text
+        except Exception:
+            return ""
 
     def process_stream(self, target, timeout):
         import requests

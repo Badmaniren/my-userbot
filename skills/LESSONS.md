@@ -3,12 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-шибка перед фиксом: FAILED (failures=1, errors=1)
-- Статус: ПРОВАЛЕН после всех попыток
-
-## clean_compressed_sitemap_parser_v2 (compose) — раундов: 5
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН после всех попыток
+тус: ПРОВАЛЕН после всех попыток
 
 ## clean_compressed_sitemap_parser_v3 (compose) — раундов: 2
 - Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
@@ -331,6 +326,10 @@
 
 ## resilient_secure_global_mesh_omega_singularity_v44 (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## resilient_secure_global_mesh_omega_singularity_v45 (compose) — раундов: 4
+- Последняя ошибка перед фиксом: Не удалось скачать архив логов рана (HTTP 404).
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## resilient_secure_global_mesh_omega_singularity_v45 (compose) — раундов: 4
 - Последняя ошибка перед фиксом: Не удалось скачать архив логов рана (HTTP 404).

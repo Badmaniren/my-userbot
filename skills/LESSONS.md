@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-n/3.11.16/x64/lib/python3.11/unittest/mock.py", line 1446, in __enter__
-- Статус: ПРОВАЛЕН после всех попыток
-
-## compressed_db_storage (compose) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
+спешно прошёл тесты и влит в main
 
 ## clean_compressed_db_storage (compose) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (failures=1)
@@ -342,3 +338,7 @@ n/3.11.16/x64/lib/python3.11/unittest/mock.py", line 1446, in __enter__
 
 ## resilient_secure_global_mesh_omega_genesis_v23 (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## resilient_secure_global_mesh_omega_nexus_v24 (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

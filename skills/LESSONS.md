@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-crawler_v2 (compose) — раундов: 3
-- Последняя ошибка перед фиксом: FAILED (failures=2)
-- Статус: успешно прошёл тесты и влит в main
-
-## resilient_secure_clean_compressed_sitemap_crawler (compose) — раундов: 3
+) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main
 
@@ -318,6 +314,10 @@ crawler_v2 (compose) — раундов: 3
 ## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: Не удалось скачать архив логов рана (HTTP 404).
 - Статус: успешно прошёл тесты и влит в main
+
+## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

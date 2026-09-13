@@ -92,6 +92,7 @@ def set_tg_commands():
         {"command": "build", "description": "⚙️ Поставить задачу вручную"},
         {"command": "jules", "description": "🔁 Реактивировать зависшие Jules-задачи"},
         {"command": "prs", "description": "🔀 Подтянуть main во все отстающие PR"},
+        {"command": "cleanup", "description": "🧹 Найти и удалить дубли навыков"},
         {"command": "help", "description": "❓ Список команд"},
     ]
     try:
@@ -106,6 +107,7 @@ HELP_TEXT = (
     "⚙️ <code>/build &lt;описание&gt;</code> — поставить задачу вручную в очередь\n"
     "🔁 <code>/jules</code> — растолкать зависшие Jules-задачи\n"
     "🔀 <code>/prs</code> — подтянуть main во все отстающие PR\n"
+    "🧹 <code>/cleanup</code> — найти дубли навыков и предложить удаление\n"
     "❓ <code>/help</code> — это сообщение\n"
     "━━━━━━━━━━━━━━━━━━━\n"
     "<i>Кнопки внизу экрана дублируют команды — жми, а не печатай.</i>"
@@ -154,6 +156,14 @@ def run_telegram_listener():
                             if dirty_urls:
                                 msg += f"\n⚠️ С настоящими конфликтами: <b>{len(dirty_urls)}</b> (нужна ручная правка)."
                             send_tg(msg)
+                        elif cb_data == "confirm_cleanup":
+                            answer_tg_callback(callback["id"], "Удаляю дубли...")
+                            if PENDING_CLEANUP_PLAN:
+                                count = execute_cleanup_plan(PENDING_CLEANUP_PLAN)
+                                send_tg(f"🗑 Удалено файлов: <b>{count}</b>.")
+                                PENDING_CLEANUP_PLAN.clear()
+                            else:
+                                send_tg("ℹ️ План очистки устарел или пуст — вызови /cleanup заново.")
                         continue
 
                     msg = update.get("message", {})
@@ -201,6 +211,12 @@ def run_telegram_listener():
                         if dirty_urls:
                             msg += f"\n⚠️ С настоящими конфликтами: <b>{len(dirty_urls)}</b> (нужна ручная правка)."
                         send_tg(msg)
+                    elif text.startswith("/cleanup"):
+                        report, plan = build_cleanup_plan()
+                        PENDING_CLEANUP_PLAN.clear()
+                        PENDING_CLEANUP_PLAN.extend(plan)
+                        buttons = [[{"text": "⚠️ Подтвердить удаление", "callback_data": "confirm_cleanup"}]] if plan else None
+                        send_tg(report, buttons=buttons)
                     elif text:
                         send_tg("🤷 Не знаю такой команды.\n" + HELP_TEXT)
         except Exception:
@@ -651,6 +667,157 @@ def cleanup_orphan_branches() -> int:
             pass
     return deleted
 
+NOISE_PREFIXES = ["resilient_", "secure_", "clean_", "compressed_", "smart_", "global_", "mesh_"]
+PENDING_CLEANUP_PLAN = []
+
+def _normalize_skill_name(name: str) -> str:
+    n = name
+    changed = True
+    while changed:
+        changed = False
+        for p in NOISE_PREFIXES:
+            if n.startswith(p):
+                n = n[len(p):]
+                changed = True
+    return n
+
+def find_duplicate_skill_clusters() -> dict:
+    """
+    Группирует модули skills/*.py по "ядру" имени после снятия шумовых префиксов
+    (resilient_, secure_, clean_, compressed_, smart_, global_, mesh_), которые
+    накопились из-за того, что 'refactor' по ошибке плодил новый файл с более
+    длинным именем вместо правки существующего.
+    """
+    url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents/skills?ref=main")
+    try:
+        r = requests.get(url, headers=API_HEADERS, timeout=15)
+        if r.status_code != 200:
+            return {}
+        files = [f["name"] for f in r.json() if f["name"].endswith(".py") and f["name"] != "__init__.py"]
+    except Exception:
+        return {}
+
+    clusters = {}
+    for fname in files:
+        core = _normalize_skill_name(fname[:-3])
+        clusters.setdefault(core, []).append(fname)
+    return {k: v for k, v in clusters.items() if len(v) > 1}
+
+def get_all_skill_sources() -> dict:
+    url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents/skills?ref=main")
+    try:
+        r = requests.get(url, headers=API_HEADERS, timeout=15)
+        if r.status_code != 200:
+            return {}
+        files = [f["name"] for f in r.json() if f["name"].endswith(".py") and f["name"] != "__init__.py"]
+    except Exception:
+        return {}
+
+    sources = {}
+    for fname in files:
+        code = get_file_content("main", f"skills/{fname}")
+        if code:
+            sources[fname[:-3]] = code
+    return sources
+
+def find_skill_dependents(target: str, sources: dict) -> list:
+    """
+    Ищет, кто РЕАЛЬНО делает `from skills.{target} import ...` или
+    `import skills.{target}` — 'compose' создаёт именно такие честные зависимости
+    между модулями, и удалять target нельзя, если на него кто-то живой ссылается,
+    даже если по имени target выглядит как 'дубль' более длинного модуля.
+    """
+    pattern = re.compile(rf'(from\s+skills\.{re.escape(target)}\s+import|import\s+skills\.{re.escape(target)}\b)')
+    return [name for name, code in sources.items() if name != target and pattern.search(code)]
+
+def build_cleanup_plan() -> tuple:
+    """
+    Для каждого кластера дублей оставляет файл с самым свежим последним
+    коммитом, остальные — кандидаты на удаление. Но перед этим проверяет РЕАЛЬНЫЕ
+    import-зависимости по всему репозиторию: если какой-то ВЫЖИВАЮЩИЙ модуль
+    (включая 'победителя' любого кластера) реально импортирует кандидата на
+    удаление — он защищён, даже если по имени выглядит как дубль-неудачник.
+    Ничего не удаляет сама — только считает и возвращает отчёт + список.
+    """
+    clusters = find_duplicate_skill_clusters()
+    if not clusters:
+        return "🧹 Дублей не найдено — репозиторий чист.", []
+
+    per_cluster = {}
+    tentative_losers = set()
+    for core, files in sorted(clusters.items()):
+        dated = []
+        for fname in files:
+            try:
+                cr = requests.get(
+                    clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/commits"),
+                    headers=API_HEADERS, params={"path": f"skills/{fname}", "per_page": 1}, timeout=10
+                )
+                commits = cr.json() if cr.status_code == 200 else []
+                date_str = commits[0]["commit"]["committer"]["date"] if commits else "1970-01-01T00:00:00Z"
+            except Exception:
+                date_str = "1970-01-01T00:00:00Z"
+            dated.append((fname, date_str))
+        dated.sort(key=lambda x: x[1], reverse=True)
+        keep = dated[0][0]
+        losers = [f for f, _ in dated[1:]]
+        per_cluster[core] = {"keep": keep, "losers": losers}
+        tentative_losers.update(f[:-3] for f in losers)
+
+    sources = get_all_skill_sources()
+    to_delete = []
+    report_lines = []
+    for core, info in per_cluster.items():
+        keep, losers = info["keep"], info["losers"]
+        safe_losers, protected_lines = [], []
+        for fname in losers:
+            base = fname[:-3]
+            # если модуль импортируется кем-то, кто сам не обречён на удаление —
+            # он защищён, даже если по имени выглядит как дубль-неудачник.
+            # Если два обречённых дубля зависят друг от друга — это не повод
+            # их спасать, они всё равно оба уходят.
+            dependents = [d for d in find_skill_dependents(base, sources) if d not in tentative_losers]
+            if dependents:
+                protected_lines.append(f"    ⛔ {fname} НЕ трогаю — от него зависит: {', '.join(dependents)}")
+            else:
+                safe_losers.append(fname)
+
+        to_delete.extend(safe_losers)
+        report_lines.append(f"• <b>{html.escape(core)}</b>: оставляю <code>{html.escape(keep)}</code>, удаляю {len(safe_losers)} из {len(losers)}")
+        report_lines.extend(protected_lines)
+
+    report = "🧹 <b>План очистки дублей</b>\n━━━━━━━━━━━━━━━━━━━\n" + "\n".join(report_lines[:30])
+    if len(report_lines) > 30:
+        report += f"\n...и ещё {len(report_lines) - 30} строк"
+    report += (
+        f"\n\nВсего файлов на удаление: <b>{len(to_delete)}</b> (плюс их тесты). "
+        "Реальные import-зависимости уже проверены и защищены — ⛔ выше показывает, что осталось нетронутым."
+    )
+    return report, to_delete
+
+def execute_cleanup_plan(files_to_delete: list) -> int:
+    deleted = 0
+    for fname in files_to_delete:
+        base = fname[:-3] if fname.endswith(".py") else fname
+        for path in (f"skills/{fname}", f"test_{base}.py", f"test_{base}_integration.py"):
+            info_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents/{path}?ref=main")
+            try:
+                info = requests.get(info_url, headers=API_HEADERS, timeout=10)
+                if info.status_code != 200:
+                    continue
+                sha = info.json().get("sha")
+                del_res = requests.delete(
+                    clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents/{path}"),
+                    headers=API_HEADERS,
+                    json={"message": f"Чистка дублей: удаляю {path} [skip ci]", "sha": sha, "branch": "main"},
+                    timeout=10
+                )
+                if del_res.status_code in [200, 201]:
+                    deleted += 1
+            except Exception:
+                pass
+    return deleted
+
 # 6. АНТИЧИТ
 def inspect_code_for_cheating(code: str, existing_skills: list, target_module: str) -> str:
     try:
@@ -808,6 +975,40 @@ def append_failure_lesson_directly(mod_name: str, action: str, rounds: int, chea
         requests.delete(clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{note_branch}"), headers=API_HEADERS)
 
 # 8. ПЛАНИРОВАНИЕ И ГЕНЕРАЦИЯ
+FILLER_TOKENS = {
+    "resilient", "secure", "smart", "clean", "compressed",
+    "robust", "hardened", "autonomous", "advanced", "enhanced", "safe",
+    "optimized", "optimised", "reliable", "improved", "final", "omega",
+    "singularity", "ultimate", "core", "pro", "v1", "v2", "v3", "v4", "v5",
+    "v6", "v7", "v8", "v9", "v10", "v11", "v12"
+}
+
+def _core_tokens(name: str) -> set:
+    tokens = re.split(r'[_\d]+', name.lower())
+    return {t for t in tokens if t and t not in FILLER_TOKENS}
+
+def find_near_duplicate(module_name: str, manifest: dict) -> str:
+    """
+    Стратег имеет склонность не углубляться, а плодить клонов: вместо того чтобы
+    доработать существующий модуль, он лепит новое имя с ещё одним прилагательным
+    ('resilient_secure_smart_crawler_v9' -> 'resilient_secure_smart_crawler_v10').
+    Сравниваем СУТЬ имени (без прилагательных-паразитов и номеров версий) с уже
+    существующими модулями — если пересечение почти полное, это не новый модуль,
+    а клон, который надо не создавать, а рефакторить.
+    """
+    new_core = _core_tokens(module_name)
+    if not new_core:
+        return ""
+    best_match, best_overlap = "", 0.0
+    for existing_name in manifest.keys():
+        existing_core = _core_tokens(existing_name)
+        if not existing_core:
+            continue
+        overlap = len(new_core & existing_core) / len(new_core | existing_core)
+        if overlap > best_overlap:
+            best_match, best_overlap = existing_name, overlap
+    return best_match if best_overlap >= 0.6 else ""
+
 def dream_action(manifest: dict, lessons: str, epic: str, manual_prompt: str = "") -> dict:
     if manual_prompt:
         prompt = (
@@ -846,7 +1047,12 @@ def dream_action(manifest: dict, lessons: str, epic: str, manual_prompt: str = "
             "реалистичное направление на 3-6 будущих циклов (например: 'Система мониторинга: RSS → чистка "
             "текста → кэш → дайджест в Telegram'). Заполни 'epic_status': 'start_new' и 'epic_title'.\n"
             "- Если явно нечего предложить в качестве эпика — 'epic_status': 'none'.\n\n"
-            "ДЕЙСТВИЯ ДЛЯ ТЕКУЩЕГО ШАГА:\n1. 'create'\n2. 'refactor'\n"
+            "ДЕЙСТВИЯ ДЛЯ ТЕКУЩЕГО ШАГА:\n"
+            "1. 'create': НОВАЯ концепция, которой реально нет в списке модулей.\n"
+            "2. 'refactor': module_name ДОЛЖЕН БУКВАЛЬНО СОВПАДАТЬ с уже существующим именем из манифеста "
+            "выше. ЗАПРЕЩЕНО придумывать 'улучшенную' версию с новым именем "
+            "(например 'secure_' + старое имя, 'resilient_' + старое имя) — это не рефакторинг, "
+            "а дубликат, раздувающий репозиторий и CI. Если хочешь улучшить X — module_name='X', не 'secure_X'.\n"
             f"{compose_hint}\n"
             "ТРЕБОВАНИЯ: Python 3.11, requests, beautifulsoup4 (bs4).\n"
             "Верни СТРОГО JSON:\n"
@@ -871,6 +1077,34 @@ def dream_action(manifest: dict, lessons: str, epic: str, manual_prompt: str = "
         if not mod:
             raise ValueError("Empty module name")
         data["module_name"] = mod
+
+        # ЗАЩИТА ОТ ИНФЛЯЦИИ ИМЁН: если предложенное имя — это существующий модуль
+        # с добавленным спереди/сзади словом (resilient_, secure_, clean_ и т.п.),
+        # это не новая концепция, а Стратег пытается "улучшить" старый модуль под
+        # новым именем. Перенаправляем на честный рефакторинг оригинала вместо
+        # порождения ещё одного дубликата с более длинным именем.
+        if mod not in manifest:
+            duplicate = ""
+            for existing in manifest:
+                if existing != mod and (existing in mod or mod in existing):
+                    duplicate = existing
+                    break
+            if not duplicate:
+                # Подстрочная проверка выше ловит только 'старое_имя' + доп. слово.
+                # 'mesh_node_v1' и 'mesh_coordinator_v4' друг в друге не содержатся,
+                # но по сути — те же самые прилагательные-паразиты вокруг одной идеи.
+                # Сравниваем СУТЬ (без 'resilient/secure/smart/...' и номеров версий).
+                duplicate = find_near_duplicate(mod, manifest)
+            if duplicate:
+                print(f"[!] Инфляция имён: '{mod}' — вариация '{duplicate}'. Рефакторю оригинал вместо дубликата.")
+                mod = duplicate
+                data["module_name"] = mod
+                data["action"] = "refactor"
+
+        # 'refactor' обязан целиться в РЕАЛЬНО существующий модуль — иначе это
+        # просто create под чужим ярлыком.
+        if data.get("action") == "refactor" and mod not in manifest:
+            data["action"] = "create"
 
         composed_of_raw = data.get("composed_of") or []
         composed_of = [c for c in composed_of_raw if isinstance(c, str) and c in manifest]

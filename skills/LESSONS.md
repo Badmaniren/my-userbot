@@ -3,13 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-уемо или пробрось наружу через raise.
-- Статус: успешно прошёл тесты и влит в main
-
-## resilient_clean_compressed_sitemap_parser (compose) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## resilient_clean_compressed_sitemap_crawler (compose) — раундов: 2
+nt_clean_compressed_sitemap_crawler (compose) — раундов: 2
 - Последняя ошибка перед фиксом: ^^^^^^^^^^^^
 - Статус: успешно прошёл тесты и влит в main
 
@@ -335,3 +329,7 @@
 ## resilient_secure_global_mesh_omega_singularity_v45 (compose) — раундов: 2
 - Последняя ошибка перед фиксом: Не удалось скачать архив логов рана (HTTP 404).
 - Статус: успешно прошёл тесты и влит в main
+
+## resilient_secure_global_mesh_omega_transcendence_v46 (compose) — раундов: 4
+- Последняя ошибка перед фиксом: Не удалось скачать архив логов рана (HTTP 404).
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

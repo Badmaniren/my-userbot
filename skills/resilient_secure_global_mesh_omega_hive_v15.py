@@ -49,7 +49,7 @@ class ResilientSecureGlobalMeshOmegaHiveV15(
         try:
             response = requests.head(target, timeout=timeout)
             return bool(response.status_code == 200)
-        except (requests.RequestException, Exception):
+        except requests.RequestException:
             return False
 
     def coordinate_expansion(self, target: str, timeout: int = 5) -> bool:
@@ -62,7 +62,7 @@ class ResilientSecureGlobalMeshOmegaHiveV15(
         try:
             response = requests.get(target, timeout=timeout)
             return bool(response.status_code == 200)
-        except (requests.RequestException, Exception):
+        except requests.RequestException:
             return False
 
     def export_analytics_report(self, target: str, report_data: dict) -> None:

@@ -1,30 +1,19 @@
 import requests
-from skills.resilient_secure_global_mesh_omega_singularity_v19 import (
-    ResilientSecureGlobalMeshOmegaSingularityV19
-)
-from skills.resilient_secure_global_mesh_interface_v17 import (
-    ResilientSecureGlobalMeshInterfaceV17
-)
 
 class ResilientSecureGlobalMeshOmegaTranscendenceV20Error(Exception):
     """Кастомное исключение для модуля Трансцендентности Омега v20."""
     pass
 
-# Совместимость с опечаткой в интеграционном тесте (omega с маленькой w)
+# Совместимость с опечаткой в интеграционном тесте
 ResilientSecureGlobalMeshomegaTranscendenceV20Error = ResilientSecureGlobalMeshOmegaTranscendenceV20Error
 
-class ResilientSecureGlobalMeshOmegaTranscendenceV20(
-    ResilientSecureGlobalMeshOmegaSingularityV19,
-    ResilientSecureGlobalMeshInterfaceV17
-):
+class ResilientSecureGlobalMeshOmegaTranscendenceV20:
     def __init__(self, db_path=":memory:", max_memory_mb=512, calls=10, period=1.0, raise_on_limit=True):
-        super().__init__(
-            db_path=db_path,
-            max_memory_mb=max_memory_mb,
-            calls=calls,
-            period=period,
-            raise_on_limit=raise_on_limit
-        )
+        self.db_path = db_path
+        self.max_memory_mb = max_memory_mb
+        self.calls = calls
+        self.period = period
+        self.raise_on_limit = raise_on_limit
         self._reports = {}
 
     def validate_target_headers(self, target: str, timeout: int) -> bool:
@@ -50,12 +39,15 @@ class ResilientSecureGlobalMeshOmegaTranscendenceV20(
 
     def route_request(self, target: str, timeout: int) -> str:
         response = requests.get(target, timeout=timeout)
+        response.raise_for_status()
         return response.text
 
     def process_stream(self, target: str, timeout: int) -> None:
-        response = requests.get(target, timeout=timeout, stream=True)
-        for _ in response.iter_content(chunk_size=1024):
-            pass
+        with requests.get(target, timeout=timeout, stream=True) as response:
+            response.raise_for_status()
+            for chunk in response.iter_content(chunk_size=1024):
+                if not chunk:
+                    break
 
     def export_analytics_report(self, target: str, report_data: dict) -> None:
         self._reports[target] = {**report_data}

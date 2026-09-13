@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch, Mock
 from skills.resilient_secure_global_mesh_omega_transcendence_v20 import (
     ResilientSecureGlobalMeshOmegaTranscendenceV20,
     ResilientSecureGlobalMeshOmegaTranscendenceV20Error,
@@ -6,37 +7,77 @@ from skills.resilient_secure_global_mesh_omega_transcendence_v20 import (
 )
 
 class TestResilientSecureGlobalMeshOmegaTranscendenceV20Integration(unittest.TestCase):
-    def test_transcendence_v20_flow(self):
-        mesh = ResilientSecureGlobalMeshOmegaTranscendenceV20(
+    def setUp(self):
+        self.mesh = ResilientSecureGlobalMeshOmegaTranscendenceV20(
             db_path=":memory:",
             max_memory_mb=256,
-            calls=5,
+            calls=10,
             period=1.0,
-            raise_on_limit=False
+            raise_on_limit=True
         )
-        
-        self.assertIsNotNone(mesh)
-        self.assertTrue(issubclass(ResilientSecureGlobalMeshOmegaTranscendenceV20Error, Exception))
+        self.target = "http://example.com"
+
+    def test_exceptions_compatibility(self):
         self.assertTrue(issubclass(ResilientSecureGlobalMeshomegaTranscendenceV20Error, Exception))
+        self.assertTrue(issubclass(ResilientSecureGlobalMeshOmegaTranscendenceV20Error, Exception))
 
-        target = "http://example.com"
-        
-        headers_valid = mesh.validate_target_headers(target, timeout=2)
-        self.assertIsInstance(headers_valid, bool)
+    @patch("skills.resilient_secure_global_mesh_omega_transcendence_v20.requests.head")
+    def test_validate_target_headers(self, mock_head):
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_head.return_value = mock_response
 
-        expansion = mesh.coordinate_expansion(target, timeout=2)
-        self.assertIsInstance(expansion, bool)
+        result = self.mesh.validate_target_headers(self.target, timeout=5)
+        self.assertIsInstance(result, bool)
+        self.assertTrue(result)
+        mock_head.assert_called_once_with(self.target, timeout=5)
 
-        expansion_safe = mesh.coordinate_expansion_safe(target, timeout=2)
-        self.assertIsInstance(expansion_safe, bool)
+    @patch("skills.resilient_secure_global_mesh_omega_transcendence_v20.requests.get")
+    def test_coordinate_expansion(self, mock_get):
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_get.return_value = mock_response
 
+        result = self.mesh.coordinate_expansion(self.target, timeout=5)
+        self.assertIsInstance(result, bool)
+        self.assertTrue(result)
+
+    @patch("skills.resilient_secure_global_mesh_omega_transcendence_v20.requests.get")
+    def test_coordinate_expansion_safe(self, mock_get):
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_get.return_value = mock_response
+
+        result = self.mesh.coordinate_expansion_safe(self.target, timeout=5)
+        self.assertIsInstance(result, bool)
+        self.assertTrue(result)
+
+    @patch("skills.resilient_secure_global_mesh_omega_transcendence_v20.requests.get")
+    def test_route_request(self, mock_get):
+        mock_response = Mock()
+        mock_response.text = "mesh routed content"
+        mock_get.return_value = mock_response
+
+        result = self.mesh.route_request(self.target, timeout=5)
+        self.assertIsInstance(result, str)
+        self.assertEqual(result, "mesh routed content")
+
+    @patch("skills.resilient_secure_global_mesh_omega_transcendence_v20.requests.get")
+    def test_process_stream(self, mock_get):
+        mock_response = Mock()
+        mock_response.iter_content.return_value = [b"chunk1", b"chunk2"]
+        mock_get.return_value = mock_response
+
+        result = self.mesh.process_stream(self.target, timeout=5)
+        self.assertIsNone(result)
+
+    def test_analytics_reporting_flow(self):
         report_data = {"status": "transcended", "nodes": 49}
-        mesh.export_analytics_report(target, report_data)
+        self.mesh.export_analytics_report(self.target, report_data)
         
-        exported = mesh.get_exported_report(target)
+        exported = self.mesh.get_exported_report(self.target)
         self.assertIsInstance(exported, dict)
-        self.assertEqual(exported.get("status"), "transcended")
-        self.assertEqual(exported.get("nodes"), 49)
+        self.assertEqual(exported, report_data)
 
 if __name__ == "__main__":
     unittest.main()

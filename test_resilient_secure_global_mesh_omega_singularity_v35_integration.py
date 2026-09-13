@@ -1,60 +1,48 @@
 import unittest
-import os
-import tempfile
 from skills.resilient_secure_global_mesh_omega_singularity_v35 import ResilientSecureGlobalMeshOmegaSingularityV35
-from skills.resilient_secure_global_mesh_omega_singularity_v33 import ResilientSecureGlobalMeshOmegaSingularityV33
-from skills.resilient_secure_global_mesh_omega_transcendence_v32 import ResilientSecureGlobalMeshOmegaTranscendence_v32
 
-class TestResilientSecureGlobalMeshOmegaSingularityV35(unittest.TestCase):
+
+class TestResilientSecureGlobalMeshOmegaSingularityV35Integration(unittest.TestCase):
     def setUp(self):
-        self.test_dir = tempfile.TemporaryDirectory()
-        self.db_path = os.path.join(self.test_dir.name, "test_mesh.db")
-        self.max_memory_mb = 128
-        self.calls = 10
-        self.period = 60
-        self.raise_on_limit = True
-        
-        self.mesh_v35 = ResilientSecureGlobalMeshOmegaSingularityV35(
-            self.db_path, self.max_memory_mb, self.calls, self.period, self.raise_on_limit
+        self.mesh = ResilientSecureGlobalMeshOmegaSingularityV35(
+            db_path=":memory:",
+            max_memory_mb=512,
+            calls=10,
+            period=1.0,
+            raise_on_limit=False
         )
-        
-        self.target_url = "https://example.com/mesh-node"
-        self.timeout = 5
+        self.test_target = "http://httpbin.org/status/200"
 
-    def tearDown(self):
-        self.test_dir.cleanup()
+    def test_validate_target_headers(self):
+        result = self.mesh.validate_target_headers(self.test_target, 5.0)
+        self.assertIsInstance(result, bool)
 
-    def test_integration_composition_flow(self):
-        # Проверка валидации заголовков через композицию
-        is_valid = self.mesh_v35.validate_target_headers(self.target_url, self.timeout)
-        self.assertIsInstance(is_valid, bool)
+    def test_coordinate_expansion(self):
+        result = self.mesh.coordinate_expansion(self.test_target, 5.0)
+        self.assertIsInstance(result, bool)
 
-        # Проверка координации расширения
-        expansion_result = self.mesh_v35.coordinate_expansion(self.target_url, self.timeout)
-        self.assertIsInstance(expansion_result, bool)
+    def test_coordinate_expansion_safe(self):
+        result = self.mesh.coordinate_expansion_safe(self.test_target, 5.0)
+        self.assertIsInstance(result, bool)
 
-        # Проверка безопасной координации
-        safe_expansion = self.mesh_v35.coordinate_expansion_safe(self.target_url, self.timeout)
-        self.assertIsInstance(safe_expansion, bool)
+    def test_route_request(self):
+        result = self.mesh.route_request(self.test_target, 5.0)
+        self.assertIsInstance(result, str)
 
-        # Проверка маршрутизации
-        route = self.mesh_v35.route_request(self.target_url, self.timeout)
-        self.assertIsInstance(route, str)
-
-    def test_analytics_export_flow(self):
-        report_data = {"status": "active", "nodes": 1, "load": 0.05}
-        self.mesh_v35.export_analytics_report(self.target_url, report_data)
-        
-        exported_report = self.mesh_v35.get_exported_report(self.target_url)
-        self.assertIsInstance(exported_report, dict)
-        self.assertEqual(exported_report.get("status"), "active")
-
-    def test_stream_processing(self):
-        # Проверка обработки потока
+    def test_process_stream(self):
         try:
-            self.mesh_v35.process_stream(self.target_url, self.timeout)
+            self.mesh.process_stream(self.test_target, 5.0)
         except Exception as e:
-            self.fail(f"process_stream raised exception unexpectedly: {e}")
+            self.fail(f"process_stream raised an exception unexpectedly: {e}")
+
+    def test_analytics_export_and_get(self):
+        report_data = {"status": "operational", "version": "v35"}
+        self.mesh.export_analytics_report(self.test_target, report_data)
+        
+        fetched_report = self.mesh.get_exported_report(self.test_target)
+        self.assertIsInstance(fetched_report, dict)
+        self.assertEqual(fetched_report.get("status"), "operational")
+
 
 if __name__ == "__main__":
     unittest.main()

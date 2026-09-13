@@ -21,12 +21,9 @@ class ResilientSecureGlobalMeshOmegaSingularityV38(
         self._reports = {}
 
     def validate_target_headers(self, target, timeout):
-        try:
-            import requests
-            response = requests.head(target, timeout=timeout)
-            return response.status_code == 200
-        except Exception:
-            return False
+        import requests
+        response = requests.head(target, timeout=timeout)
+        return response.status_code == 200
 
     def coordinate_expansion(self, target, timeout):
         import requests
@@ -36,15 +33,15 @@ class ResilientSecureGlobalMeshOmegaSingularityV38(
     def coordinate_expansion_safe(self, target, timeout):
         try:
             return self.coordinate_expansion(target, timeout)
-        except Exception:
+        except (requests.RequestException, Exception):
             return False
 
     def route_request(self, target, timeout):
+        import requests
         try:
-            import requests
             response = requests.get(target, timeout=timeout)
             return response.text
-        except Exception:
+        except (requests.RequestException, Exception):
             return ""
 
     def process_stream(self, target, timeout):

@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-sitemap_parser (compose) — раундов: 5
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН после всех попыток
-
-## clean_sitemap_parser_v2 (compose) — раундов: 4
+: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main
 
@@ -337,3 +333,7 @@ sitemap_parser (compose) — раундов: 5
 ## resilient_secure_global_mesh_omega_singularity_v42 (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## resilient_secure_global_mesh_omega_singularity_v43 (compose) — раундов: 2
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main

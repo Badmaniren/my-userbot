@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-няя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/unittest/mock.py", line 939, in assert_called_with
-- Статус: ПРОВАЛЕН после всех попыток
-
-## resilient_smart_crawler (compose) — раундов: 5
+compose) — раундов: 5
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН после всех попыток
 
@@ -340,3 +337,7 @@
 ## resilient_secure_global_mesh_omega_singularity_v37 (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## resilient_secure_global_mesh_omega_singularity_v38 (compose) — раундов: 4
+- Последняя ошибка перед фиксом: return self._execute_mock_call(*args, **kwargs)
+- Статус: успешно прошёл тесты и влит в main

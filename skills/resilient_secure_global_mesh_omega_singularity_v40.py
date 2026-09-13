@@ -20,15 +20,13 @@ class ResilientSecureGlobalMeshOmegaSingularityV40:
         return self.v32_node.route_request(target, timeout)
 
     def process_stream(self, target, timeout):
-        return self.v39_node.process_stream(target, timeout)
+        return bool(self.v39_node.process_stream(target, timeout))
 
     def export_analytics_report(self, target, report_data):
-        # Синхронизация данных в оба узла для обеспечения консистентности
         self.v39_node.export_analytics_report(target, report_data)
         self.v32_node.export_analytics_report(target, report_data)
 
     def get_exported_report(self, target):
-        # Приоритет v32 как основного источника, fallback на v39
         report = self.v32_node.get_exported_report(target)
         if report is None:
             report = self.v39_node.get_exported_report(target)

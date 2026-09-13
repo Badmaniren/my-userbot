@@ -45,7 +45,7 @@ class ResilientSecureGlobalMeshOmegaSingularityV35(
             pass
 
     def export_analytics_report(self, target: str, report_data: dict) -> None:
-        self._exported_reports[target] = dict(report_data)
+        self._exported_reports[target] = {**report_data}
 
     def get_exported_report(self, target: str) -> dict:
-        return self._exported_reports.get(target, {})
+        return dict(self._exported_reports.get(target, {}))

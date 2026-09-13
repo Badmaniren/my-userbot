@@ -10,6 +10,7 @@ import zipfile
 import html
 import requests
 import threading
+from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # 1. FAIL-FAST ПРОВЕРКА ОКРУЖЕНИЯ
@@ -90,6 +91,7 @@ def set_tg_commands():
         {"command": "status", "description": "📊 Текущий статус и эпик"},
         {"command": "build", "description": "⚙️ Поставить задачу вручную"},
         {"command": "jules", "description": "🔁 Реактивировать зависшие Jules-задачи"},
+        {"command": "prs", "description": "🔀 Подтянуть main во все отстающие PR"},
         {"command": "help", "description": "❓ Список команд"},
     ]
     try:
@@ -103,6 +105,7 @@ HELP_TEXT = (
     "📊 <code>/status</code> — что бот делает сейчас и какой эпик в работе\n"
     "⚙️ <code>/build &lt;описание&gt;</code> — поставить задачу вручную в очередь\n"
     "🔁 <code>/jules</code> — растолкать зависшие Jules-задачи\n"
+    "🔀 <code>/prs</code> — подтянуть main во все отстающие PR\n"
     "❓ <code>/help</code> — это сообщение\n"
     "━━━━━━━━━━━━━━━━━━━\n"
     "<i>Кнопки внизу экрана дублируют команды — жми, а не печатай.</i>"
@@ -144,6 +147,13 @@ def run_telegram_listener():
                                 send_tg(f"🔁 Реактивировано Jules-задач: <b>{count}</b>.\nДай ему пару минут забрать их в работу.")
                             else:
                                 send_tg("ℹ️ Открытых Jules-задач не найдено — реактивировать нечего.")
+                        elif cb_data == "refreshprs":
+                            answer_tg_callback(callback["id"], "Обновляю PR от main...")
+                            refreshed, dirty_urls = refresh_stuck_prs()
+                            msg = f"🔀 Обновлено PR: <b>{refreshed}</b>."
+                            if dirty_urls:
+                                msg += f"\n⚠️ С настоящими конфликтами: <b>{len(dirty_urls)}</b> (нужна ручная правка)."
+                            send_tg(msg)
                         continue
 
                     msg = update.get("message", {})
@@ -174,7 +184,10 @@ def run_telegram_listener():
                             f"📊 <b>Статус</b>\n━━━━━━━━━━━━━━━━━━━\n"
                             f"Работает штатно · задач в очереди: <b>{q_len}</b>\n\n"
                             f"🧭 <b>Текущий эпик</b>\n<pre>{html.escape(epic_preview)}</pre>",
-                            buttons=[[{"text": "🔁 Реактивировать зависшие Jules-задачи", "callback_data": "rejules"}]]
+                            buttons=[
+                                [{"text": "🔁 Реактивировать зависшие Jules-задачи", "callback_data": "rejules"}],
+                                [{"text": "🔀 Обновить отстающие PR от main", "callback_data": "refreshprs"}]
+                            ]
                         )
                     elif text.startswith("/jules"):
                         count = reactivate_stuck_jules_issues()
@@ -182,6 +195,12 @@ def run_telegram_listener():
                             send_tg(f"🔁 Реактивировано Jules-задач: <b>{count}</b>.")
                         else:
                             send_tg("ℹ️ Открытых Jules-задач не найдено.")
+                    elif text.startswith("/prs"):
+                        refreshed, dirty_urls = refresh_stuck_prs()
+                        msg = f"🔀 Обновлено PR: <b>{refreshed}</b>."
+                        if dirty_urls:
+                            msg += f"\n⚠️ С настоящими конфликтами: <b>{len(dirty_urls)}</b> (нужна ручная правка)."
+                        send_tg(msg)
                     elif text:
                         send_tg("🤷 Не знаю такой команды.\n" + HELP_TEXT)
         except Exception:
@@ -192,7 +211,7 @@ threading.Thread(target=run_telegram_listener, daemon=True).start()
 
 # 4. СЕТЬ И КЛИЕНТ GEMINI
 def clean_url(url: str) -> str:
-    return re.sub(r'\[.*?\]\(\vert{}\)', '', url).strip()
+    return re.sub(r'\[.*?\]\(|\)', '', url).strip()
 
 API_HOST = "generativelanguage.googleapis.com"
 API_BASE = "https://" + API_HOST + "/v1beta/"
@@ -439,7 +458,11 @@ def escalate_to_github_issue(mod_name: str, task_desc: str, last_error: str, bra
         f"> **Инструкция для Jules:**\n"
         f"> 1. Переключись в ветку `{branch}`.\n"
         f"> 2. Исправь код модуля `skills/{mod_name}.py` и тесты в `test_{mod_name}.py` / `test_{mod_name}_integration.py`.\n"
-        f"> 3. Добейся успешного прохождения `python -m unittest` и открой Pull Request в `main`."
+        f"> 3. Добейся успешного прохождения `python -m unittest` и открой Pull Request в `main`.\n"
+        f"> 4. **НЕ трогай `main.py`, `skills/EPIC.md` и `skills/LESSONS.md`** — это общие файлы, "
+        f"в них постоянно пишет автономный цикл, и правки здесь почти гарантированно приведут "
+        f"к конфликту при мерже. Если для фикса реально нужны изменения в `main.py` — опиши это "
+        f"отдельным комментарием к issue вместо прямой правки."
     )
     payload = {"title": f"Jules Task: исправить сбой модуля {mod_name}", "body": body}
     try:
@@ -540,6 +563,93 @@ def run_jules_babysitter():
 
         except Exception as e:
             print(f"[!] Ошибка няньки Jules: {e}")
+
+def refresh_stuck_prs() -> tuple:
+    """
+    Долгоживущие PR (особенно от Jules, который может провозиться часы) неизбежно
+    отстают от main, который обновляется каждые ~15 минут — из-за этого они
+    "протухают" и получают конфликты на часто изменяемых файлах (EPIC.md,
+    LESSONS.md). GitHub умеет сам подтягивать main в ветку PR через update-branch —
+    делаем это каждый цикл, чтобы отставание не успевало превратиться в конфликт.
+    Возвращает (сколько обновлено, список ссылок на PR с уже реальным конфликтом).
+    """
+    list_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/pulls")
+    try:
+        res = requests.get(list_url, headers=API_HEADERS, params={"state": "open", "per_page": 50}, timeout=10)
+        if res.status_code != 200:
+            return 0, []
+        pr_numbers = [p.get("number") for p in res.json() if p.get("number")]
+    except Exception:
+        return 0, []
+
+    refreshed = 0
+    dirty_urls = []
+    for number in pr_numbers:
+        detail_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/pulls/{number}")
+        try:
+            d = requests.get(detail_url, headers=API_HEADERS, timeout=10)
+            if d.status_code != 200:
+                continue
+            pr_data = d.json()
+            state = pr_data.get("mergeable_state")
+        except Exception:
+            continue
+
+        if state == "behind":
+            update_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/pulls/{number}/update-branch")
+            try:
+                r = requests.put(update_url, headers=API_HEADERS, timeout=10)
+                if r.status_code in [200, 202]:
+                    refreshed += 1
+            except Exception:
+                pass
+        elif state == "dirty":
+            dirty_urls.append(pr_data.get("html_url", f"#{number}"))
+
+    return refreshed, dirty_urls
+
+def cleanup_orphan_branches() -> int:
+    """
+    Ветки unga-*, у которых нет ни одного открытого PR — по сути мусор от давно
+    завершённых или прерванных циклов. Чистим только те, что старше суток, чтобы
+    не задеть то, что ещё реально в работе.
+    """
+    branches_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/branches")
+    prs_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/pulls")
+    try:
+        br_res = requests.get(branches_url, headers=API_HEADERS, params={"per_page": 100}, timeout=10)
+        pr_res = requests.get(prs_url, headers=API_HEADERS, params={"state": "open", "per_page": 100}, timeout=10)
+        if br_res.status_code != 200 or pr_res.status_code != 200:
+            return 0
+        branch_names = [b["name"] for b in br_res.json() if b["name"].startswith("unga-")]
+        branches_with_pr = {pr["head"]["ref"] for pr in pr_res.json()}
+    except Exception:
+        return 0
+
+    deleted = 0
+    for name in branch_names:
+        if name in branches_with_pr:
+            continue
+        commit_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/branches/{name}")
+        try:
+            c = requests.get(commit_url, headers=API_HEADERS, timeout=10)
+            if c.status_code != 200:
+                continue
+            commit_date_str = c.json().get("commit", {}).get("commit", {}).get("committer", {}).get("date", "")
+            commit_date = datetime.strptime(commit_date_str, "%Y-%m-%dT%H:%M:%SZ")
+            if (datetime.utcnow() - commit_date).total_seconds() < 86400:
+                continue
+        except Exception:
+            continue
+
+        del_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{name}")
+        try:
+            r = requests.delete(del_url, headers=API_HEADERS, timeout=10)
+            if r.status_code in [200, 204]:
+                deleted += 1
+        except Exception:
+            pass
+    return deleted
 
 # 6. АНТИЧИТ
 def inspect_code_for_cheating(code: str, existing_skills: list, target_module: str) -> str:
@@ -914,6 +1024,19 @@ def run_evolution_cycle():
     print("\n==========================================")
     print("      ПИТЕКАНТРОП: БЕЗОПАСНЫЙ ЦИКЛ CI     ")
     print("==========================================")
+
+    print("[~] Профилактика: обновляю отстающие PR от main, чищу мусорные ветки...")
+    refreshed, dirty_urls = refresh_stuck_prs()
+    orphans_deleted = cleanup_orphan_branches()
+    if refreshed or orphans_deleted:
+        print(f"[*] Обновлено PR: {refreshed}, удалено мусорных веток: {orphans_deleted}")
+    if dirty_urls:
+        buttons = [[{"text": f"🔗 Конфликт в PR #{u.rstrip('/').split('/')[-1]}", "url": u}] for u in dirty_urls[:5]]
+        send_tg(
+            f"⚠️ <b>Настоящие конфликты в {len(dirty_urls)} PR</b>\n━━━━━━━━━━━━━━━━━━━\n"
+            "Автоматическое обновление не спасает — нужна ручная (или Jules-) правка.",
+            buttons=buttons
+        )
 
     manifest = get_skills_manifest()
     skills_list = list(manifest.keys())

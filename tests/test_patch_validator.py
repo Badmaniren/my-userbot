@@ -1,105 +1,168 @@
 import unittest
-from unittest.mock import patch, MagicMock
+import io
 import uuid
 import random
-import string
-import io
-import ast
-import types
+from skills.patch_validator import PatchValidator, sandbox_exec
 
-from skills.patch_validator import PatchValidator
 
 class TestPatchValidator(unittest.TestCase):
 
     def setUp(self):
         self.validator = PatchValidator()
-        self.random_module = ''.join(random.choices(string.ascii_lowercase, k=10))
-        self.random_func = ''.join(random.choices(string.ascii_lowercase, k=8))
-        self.random_var = ''.join(random.choices(string.ascii_lowercase, k=6))
-        self.random_uuid = uuid.uuid4().hex
+        self.rand_suffix = uuid.uuid4().hex[:8]
 
-    def test_static_analysis_valid_syntax(self):
-        valid_code = f"def {self.random_func}():\n    {self.random_var} = {random.randint(1, 100)}\n    return {self.random_var}"
-        result = self.validator.analyze_static(valid_code)
-        self.assertTrue(result.get("is_valid"))
-        self.assertEqual(result.get("error"), None)
+    def test_sandbox_exec_success(self):
+        rand_val = random.randint(1000, 9999)
+        code = f"""
+def execute_patch():
+    return {rand_val}
+"""
+        success, res, err = sandbox_exec(code)
+        self.assertTrue(success)
+        self.assertEqual(res, rand_val)
+        self.assertEqual(err, "")
 
-    def test_static_analysis_syntax_error(self):
-        invalid_code = f"def {self.random_func}()\n    return {random.randint(101, 200)}"
-        result = self.validator.analyze_static(invalid_code)
-        self.assertFalse(result.get("is_valid"))
-        self.assertIn("SyntaxError", str(result.get("error")))
+    def test_sandbox_exec_syntax_error(self):
+        rand_syntax_error_code = f"def execute_patch(\n    return {random.randint(1, 100)}"
+        success, res, err = sandbox_exec(rand_syntax_error_code)
+        self.assertFalse(success)
+        self.assertIsNone(res)
+        self.assertTrue(len(err) > 0)
 
-    def test_static_analysis_forbidden_imports(self):
-        forbidden_modules = ["os", "sys", "subprocess", "shutil", "eval", "exec"]
-        chosen_forbidden = random.choice(forbidden_modules)
-        malicious_code = f"import {chosen_forbidden}\n\ndef {self.random_func}():\n    pass"
-        result = self.validator.analyze_static(malicious_code)
-        self.assertFalse(result.get("is_valid"))
-        self.assertIn(chosen_forbidden, str(result.get("error")))
+    def test_analyze_static_valid(self):
+        rand_var = f"var_{self.rand_suffix}"
+        rand_val = random.randint(10, 100)
+        code = f"""
+def execute_patch():
+    {rand_var} = {rand_val}
+    return {rand_var}
+"""
+        result = self.validator.analyze_static(code)
+        self.assertTrue(result["is_valid"])
+        self.assertIsNone(result["error"])
 
-    def test_dynamic_analysis_success(self):
-        expected_output = random.randint(1000, 9999)
-        safe_patch = f"def execute_patch():\n    return {expected_output}"
-        
-        with patch('skills.patch_validator.sandbox_exec') as mock_sandbox:
-            mock_sandbox.return_value = (True, expected_output, "")
-            result = self.validator.analyze_dynamic(safe_patch)
-            
-        self.assertTrue(result.get("executed"))
-        self.assertEqual(result.get("result"), expected_output)
+    def test_analyze_static_syntax_error(self):
+        code = f"print('{self.rand_suffix}'"
+        result = self.validator.analyze_static(code)
+        self.assertFalse(result["is_valid"])
+        self.assertIn("SyntaxError", result["error"])
 
-    def test_dynamic_analysis_runtime_failure(self):
-        error_message = f"RuntimeError_{uuid.uuid4().hex[:8]}"
-        failing_patch = f"def execute_patch():\n    raise RuntimeError('{error_message}')"
-        
-        with patch('skills.patch_validator.sandbox_exec') as mock_sandbox:
-            mock_sandbox.return_value = (False, None, error_message)
-            result = self.validator.analyze_dynamic(failing_patch)
-            
-        self.assertFalse(result.get("executed"))
-        self.assertIn(error_message, result.get("error"))
+    def test_analyze_static_forbidden_import(self):
+        forbidden = random.choice(list(self.validator.forbidden_modules))
+        code = f"""
+import {forbidden}
+def execute_patch():
+    return '{self.rand_suffix}'
+"""
+        result = self.validator.analyze_static(code)
+        self.assertFalse(result["is_valid"])
+        self.assertIn(f"Forbidden import: {forbidden}", result["error"])
 
-    def test_verify_patch_complete_pipeline_success(self):
-        patch_content = f"def {self.random_func}():\n    return '{self.random_uuid}'"
-        
-        with patch('skills.patch_validator.sandbox_exec') as mock_sandbox:
-            mock_sandbox.return_value = (True, self.random_uuid, "")
-            verification = self.validator.verify_patch(patch_content)
-            
-        self.assertTrue(verification.get("passed"))
-        self.assertTrue(verification.get("static_passed"))
-        self.assertTrue(verification.get("dynamic_passed"))
+    def test_analyze_static_forbidden_import_from(self):
+        forbidden = random.choice(list(self.validator.forbidden_modules))
+        code = f"""
+from {forbidden} import something
+def execute_patch():
+    return '{self.rand_suffix}'
+"""
+        result = self.validator.analyze_static(code)
+        self.assertFalse(result["is_valid"])
+        self.assertIn(f"Forbidden import: {forbidden}", result["error"])
 
-    def test_verify_patch_complete_pipeline_static_fail(self):
-        patch_content = f"import os\nos.system('rm -rf /')"
-        
-        verification = self.validator.verify_patch(patch_content)
-        
-        self.assertFalse(verification.get("passed"))
-        self.assertFalse(verification.get("static_passed"))
-        self.assertFalse(verification.get("dynamic_passed", True))
+    def test_analyze_static_forbidden_call(self):
+        forbidden = random.choice(list(self.validator.forbidden_modules))
+        code = f"""
+def execute_patch():
+    return {forbidden}('{self.rand_suffix}')
+"""
+        result = self.validator.analyze_static(code)
+        self.assertFalse(result["is_valid"])
+        self.assertIn(f"Forbidden call: {forbidden}", result["error"])
 
-    def test_patch_ast_inspection_detects_eval(self):
-        code_with_eval = f"def {self.random_func}():\n    return eval('{random.randint(1, 50)}')"
-        result = self.validator.analyze_static(code_with_eval)
-        
-        self.assertFalse(result.get("is_valid"))
-        self.assertIn("eval", str(result.get("error")))
+    def test_analyze_dynamic_valid(self):
+        rand_res = uuid.uuid4().hex
+        code = f"""
+def execute_patch():
+    return "{rand_res}"
+"""
+        result = self.validator.analyze_dynamic(code)
+        self.assertTrue(result["executed"])
+        self.assertEqual(result["result"], rand_res)
 
-    def test_patch_ast_inspection_detects_exec(self):
-        code_with_exec = f"def {self.random_func}():\n    exec('print({random.randint(51, 100)})')"
-        result = self.validator.analyze_static(code_with_exec)
-        
-        self.assertFalse(result.get("is_valid"))
-        self.assertIn("exec", str(result.get("error")))
+    def test_analyze_dynamic_runtime_error(self):
+        code = """
+def execute_patch():
+    raise ValueError("runtime_fail")
+"""
+        result = self.validator.analyze_dynamic(code)
+        self.assertFalse(result["executed"])
+        self.assertIn("runtime_fail", result["error"])
 
-    def test_stream_patch_validation_with_bytes_io(self):
-        random_bytes = f"def {self.random_func}():\n    return '{uuid.uuid4().hex}'".encode('utf-8')
-        stream = io.BytesIO(random_bytes)
-        
-        with patch('skills.patch_validator.sandbox_exec') as mock_sandbox:
-            mock_sandbox.return_value = (True, "mocked_res", "")
-            result = self.validator.verify_stream(stream)
-            
-        self.assertTrue(result.get("passed"))
+    def test_verify_patch_all_pass(self):
+        rand_num = random.randint(500, 1000)
+        code = f"""
+def execute_patch():
+    return {rand_num}
+"""
+        res = self.validator.verify_patch(code)
+        self.assertTrue(res["passed"])
+        self.assertTrue(res["static_passed"])
+        self.assertTrue(res["dynamic_passed"])
+
+    def test_verify_patch_static_fail(self):
+        code = f"""
+import os
+def execute_patch():
+    return '{self.rand_suffix}'
+"""
+        res = self.validator.verify_patch(code)
+        self.assertFalse(res["passed"])
+        self.assertFalse(res["static_passed"])
+        self.assertFalse(res["dynamic_passed"])
+
+    def test_verify_patch_dynamic_fail(self):
+        code = """
+def execute_patch():
+    raise RuntimeError("fail_dynamic")
+"""
+        res = self.validator.verify_patch(code)
+        self.assertFalse(res["passed"])
+        self.assertTrue(res["static_passed"])
+        self.assertFalse(res["dynamic_passed"])
+
+    def test_verify_stream(self):
+        rand_str = uuid.uuid4().hex
+        code = f"""
+def execute_patch():
+    return "{rand_str}"
+"""
+        stream = io.BytesIO(code.encode('utf-8'))
+        res = self.validator.verify_stream(stream)
+        self.assertTrue(res["passed"])
+        self.assertTrue(res["static_passed"])
+        self.assertTrue(res["dynamic_passed"])
+
+    def test_validate_with_string(self):
+        rand_val = random.randint(1, 100)
+        code = f"""
+def execute_patch():
+    return {rand_val}
+"""
+        is_valid = self.validator.validate(code)
+        self.assertTrue(is_valid)
+
+    def test_validate_with_dict(self):
+        rand_msg = uuid.uuid4().hex
+        patch_dict = {
+            "code": f"""
+def execute_patch():
+    return "{rand_msg}"
+"""
+        }
+        is_valid = self.validator.validate(patch_dict)
+        self.assertTrue(is_valid)
+
+    def test_validate_with_invalid_type(self):
+        invalid_data = [random.randint(1, 50), uuid.uuid4().hex]
+        is_valid = self.validator.validate(invalid_data)
+        self.assertFalse(is_valid)

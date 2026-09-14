@@ -39,7 +39,7 @@ class ErrorPipeline:
         if not os.path.exists(log_path):
             with open(log_path, "w") as f:
                 f.write("INIT LOG")
-        return True
+        return self.analyzer.parse_log(log_path)
 
 class TelemetryErrorBridge:
     def process_telemetry_and_errors(self, stream_data):

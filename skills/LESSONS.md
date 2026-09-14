@@ -3,12 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-tIsNotNone(cached_data)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## secure_headers_url_validator (compose) — раундов: 5
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+ю
 
 ## resilient_secure_smart_crawler_hub_v2 (compose) — раундов: 2
 - Последняя ошибка перед фиксом: ^^^^^^^^^^^^^
@@ -336,4 +331,8 @@ tIsNotNone(cached_data)
 
 ## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 1
 - Последняя ошибка перед фиксом: ModuleNotFoundError: No module named 'skills.resilient_clean_rss_archiver'
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 1
+- Последняя ошибка перед фиксом: from skills.resilient_clean_rss_archiver import ResilientCleanRSSArchiver
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

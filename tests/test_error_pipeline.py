@@ -1,93 +1,72 @@
 import unittest
 from unittest.mock import patch, MagicMock
 import io
-
 from skills.error_pipeline import ErrorPipeline
 
 class TestErrorPipeline(unittest.TestCase):
-
     def setUp(self):
         self.pipeline = ErrorPipeline()
 
     def test_pipeline_composition_and_analysis_flow(self):
-        with patch('skills.error_pipeline.ErrorAnalyzer') as MockAnalyzer, \
-             patch('skills.error_pipeline.AutoCorrector') as MockCorrector:
-
-            analyzer_instance = MockAnalyzer.return_value
-            analyzer_instance.parse_log.return_value = True
-            analyzer_instance.analyze_and_prevent.return_value = True
-
-            corrector_instance = MockCorrector.return_value
-            corrector_instance.correct_code.return_value = True
-
+        with patch.object(self.pipeline.analyzer, 'parse_log', return_value=True) as mock_parse, \
+             patch.object(self.pipeline.analyzer, 'analyze_and_prevent', return_value=True) as mock_analyze, \
+             patch.object(self.pipeline.corrector, 'correct_code', return_value=True) as mock_correct:
+            
             result = self.pipeline.run_pipeline("dummy_path.log")
-
             self.assertTrue(result)
-            analyzer_instance.parse_log.assert_called_once_with("dummy_path.log")
-            analyzer_instance.analyze_and_prevent.assert_called()
-            corrector_instance.correct_code.assert_called()
+            mock_parse.assert_called_once_with("dummy_path.log")
+            mock_analyze.assert_called_once_with("dummy_path.log")
+            mock_correct.assert_called_once_with("dummy_path.log")
 
     def test_pipeline_handles_analyzer_failure(self):
-        with patch('skills.error_pipeline.ErrorAnalyzer') as MockAnalyzer, \
-             patch('skills.error_pipeline.AutoCorrector') as MockCorrector:
-
-            analyzer_instance = MockAnalyzer.return_value
-            analyzer_instance.parse_log.return_value = False
-
+        with patch.object(self.pipeline.analyzer, 'parse_log', return_value=False) as mock_parse, \
+             patch.object(self.pipeline.analyzer, 'analyze_and_prevent') as mock_analyze:
+            
             result = self.pipeline.run_pipeline("bad_path.log")
-
             self.assertFalse(result)
-
-    def test_pipeline_stream_processing_with_io_bytes(self):
-        with patch('skills.error_pipeline.ErrorAnalyzer') as MockAnalyzer, \
-             patch('skills.error_pipeline.AutoCorrector') as MockCorrector:
-
-            analyzer_instance = MockAnalyzer.return_value
-            analyzer_instance.process_stream.return_value = True
-
-            corrector_instance = MockCorrector.return_value
-            corrector_instance.process_error_stream.return_value = True
-
-            stream_mock = io.BytesIO(b"CRITICAL ERROR 500")
-
-            result = self.pipeline.process_stream_pipeline(stream_mock)
-
-            self.assertTrue(result)
-            analyzer_instance.process_stream.assert_called_once()
-            corrector_instance.process_error_stream.assert_called_once()
+            mock_parse.assert_called_once_with("bad_path.log")
+            mock_analyze.assert_not_called()
 
     def test_pipeline_raises_exception_properly(self):
-        with patch('skills.error_pipeline.ErrorAnalyzer') as MockAnalyzer:
-            analyzer_instance = MockAnalyzer.return_value
-            analyzer_instance.parse_log.side_effect = RuntimeError("System Failure")
-
-            with self.assertRaises(RuntimeError):
+        with patch.object(self.pipeline.analyzer, 'parse_log', side_effect=Exception("Fatal Error")) as mock_parse:
+            with self.assertRaises(Exception):
                 self.pipeline.run_pipeline("fatal.log")
-
-    def test_pipeline_web_verification_step(self):
-        with patch('skills.error_pipeline.AutoCorrector') as MockCorrector:
-            corrector_instance = MockCorrector.return_value
-            corrector_instance.verify_fix_via_web.return_value = True
-
-            result = self.pipeline.verify_pipeline_fix("http://localhost/health")
-
-            self.assertTrue(result)
-            corrector_instance.verify_fix_via_web.assert_called_once_with("http://localhost/health")
+            mock_parse.assert_called_once_with("fatal.log")
 
     def test_pipeline_returns_false_on_correction_failure(self):
-        with patch('skills.error_pipeline.ErrorAnalyzer') as MockAnalyzer, \
-             patch('skills.error_pipeline.AutoCorrector') as MockCorrector:
-
-            analyzer_instance = MockAnalyzer.return_value
-            analyzer_instance.parse_log.return_value = True
-            analyzer_instance.analyze_and_prevent.return_value = True
-
-            corrector_instance = MockCorrector.return_value
-            corrector_instance.correct_code.return_value = False
-
-            result = self.pipeline.run_pipeline("error.log")
-
+        with patch.object(self.pipeline.analyzer, 'parse_log', return_value=True), \
+             patch.object(self.pipeline.analyzer, 'analyze_and_prevent', return_value=True), \
+             patch.object(self.pipeline.corrector, 'correct_code', return_value=False):
+            
+            result = self.pipeline.run_pipeline("fail_correct.log")
             self.assertFalse(result)
+
+    def test_process_stream_pipeline(self):
+        mock_stream = io.BytesIO(b'stream data')
+        with patch.object(self.pipeline.analyzer, 'process_stream', return_value=True) as mock_proc_analyzer, \
+             patch.object(self.pipeline.corrector, 'process_error_stream', return_value=True) as mock_proc_corrector:
+            
+            result = self.pipeline.process_stream_pipeline(mock_stream)
+            self.assertTrue(result)
+            mock_proc_analyzer.assert_called_once_with(mock_stream)
+            mock_proc_corrector.assert_called_once_with(mock_stream)
+
+    def test_verify_pipeline_fix(self):
+        url = "http://example.com/fix"
+        with patch.object(self.pipeline.corrector, 'verify_fix_via_web', return_value=True) as mock_verify:
+            result = self.pipeline.verify_pipeline_fix(url)
+            self.assertTrue(result)
+            mock_verify.assert_called_once_with(url)
+
+    def test_process_error_stream_method(self):
+        signature = "ValueError: test error"
+        with patch.object(self.pipeline.analyzer, 'analyze_and_prevent', return_value=True) as mock_analyze, \
+             patch.object(self.pipeline.corrector, 'correct_code', return_value=True) as mock_correct:
+            
+            result = self.pipeline.process_error_stream(signature)
+            self.assertTrue(result)
+            mock_analyze.assert_called_once_with(signature)
+            mock_correct.assert_called_once_with(signature)
 
 if __name__ == '__main__':
     unittest.main()

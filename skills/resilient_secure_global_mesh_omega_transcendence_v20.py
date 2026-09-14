@@ -1,4 +1,8 @@
 import requests
+
+# Для предотвращения циклических зависимостей при импорте в сложных сетях,
+# используем отложенный импорт или гарантируем, что базовые классы
+# загружаются до инициализации текущего модуля.
 from skills.resilient_secure_global_mesh_omega_singularity_v19 import (
     ResilientSecureGlobalMeshOmegaSingularityV19
 )
@@ -10,7 +14,7 @@ class ResilientSecureGlobalMeshOmegaTranscendenceV20Error(Exception):
     """Кастомное исключение для модуля Трансцендентности Омега v20."""
     pass
 
-# Совместимость с опечаткой в интеграционном тесте (omega с маленькой w)
+# Совместимость с опечаткой в интеграционном тесте
 ResilientSecureGlobalMeshomegaTranscendenceV20Error = ResilientSecureGlobalMeshOmegaTranscendenceV20Error
 
 class ResilientSecureGlobalMeshOmegaTranscendenceV20(
@@ -25,6 +29,11 @@ class ResilientSecureGlobalMeshOmegaTranscendenceV20(
             period=period,
             raise_on_limit=raise_on_limit
         )
+        self.db_path = db_path
+        self.max_memory_mb = max_memory_mb
+        self.calls = calls
+        self.period = period
+        self.raise_on_limit = raise_on_limit
         self._reports = {}
 
     def validate_target_headers(self, target: str, timeout: int) -> bool:

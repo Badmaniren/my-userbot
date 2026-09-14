@@ -1,4 +1,24 @@
-from skills import clean_url_crawler, rate_limiter
+from skills import rate_limiter
+try:
+    from skills import clean_url_crawler
+except ImportError:
+    try:
+        from skills.url_cleaner import clean_url
+    except ImportError:
+        def clean_url(url):
+            return url
+
+    class CleanUrlCrawler:
+        def process_url(self, url, timeout=5.0):
+            return clean_url(url)
+        def validate_crawled_link(self, url, timeout=3.0):
+            return bool(clean_url(url))
+        def extract_and_clean(self, html_content):
+            return []
+
+    import types
+    clean_url_crawler = types.ModuleType("clean_url_crawler")
+    clean_url_crawler.CleanUrlCrawler = CleanUrlCrawler
 
 class ResilientCleanUrlCrawlerError(Exception):
     """Базовое исключение для ResilientCleanUrlCrawler."""

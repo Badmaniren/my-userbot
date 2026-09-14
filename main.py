@@ -1471,7 +1471,11 @@ def run_evolution_cycle():
         if poison_module and poison_module not in own_test_names and poison_retries < MAX_POISON_RETRIES:
             poison_retries += 1
             print(f"[!] Отравляющий файл {poison_module}.py не имеет отношения к '{mod_name}' — карантин ({poison_retries}/{MAX_POISON_RETRIES}) вместо правки своего кода.")
-            if delete_repo_file(f"{poison_module}.py", f"Карантин: {poison_module}.py блокировал задачу {mod_name} [skip ci]", branch=branch):
+            removed_from_branch = delete_repo_file(f"{poison_module}.py", f"Карантин: {poison_module}.py блокировал задачу {mod_name} [skip ci]", branch=branch)
+            # чистим и main — иначе КАЖДАЯ будущая ветка будет форкаться от main и
+            # снова наследовать этого же сироту, и карантин придётся повторять вечно
+            delete_repo_file(f"{poison_module}.py", f"Карантин: {poison_module}.py блокировал задачи [skip ci]", branch="main")
+            if removed_from_branch:
                 poison_quarantined.append(f"{poison_module}.py")
                 continue
         elif poison_module and poison_retries >= MAX_POISON_RETRIES:

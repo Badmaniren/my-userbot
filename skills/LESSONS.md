@@ -3,7 +3,11 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-tion: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.; АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
+ред фиксом: return self._mock_call(*args, **kwargs)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## resilient_secure_smart_crawler_hub_v9_autonomous_v2 (compose) — раундов: 4
+- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.; АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -315,8 +319,4 @@ tion: pass`! Обработай ошибку предсказуемо или п�
 
 ## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 1
 - Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/skills/secure_clean_compressed_rss_archiver.py", line 1, in <module>
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 1
-- Последняя ошибка перед фиксом: ImportError: Failed to import test module: test_smart_secure_compressed_sitemap_crawler
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

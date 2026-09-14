@@ -8,25 +8,41 @@ class AutoCorrector:
         self.analyzer = ErrorAnalyzer()
 
     def correct_code(self, error_signature: str) -> bool:
-        res = self.analyzer.analyze_and_prevent(error_signature)
-        return bool(res)
+        try:
+            res = self.analyzer.analyze_and_prevent(error_signature)
+            return bool(res)
+        except Exception:
+            return False
 
     def process_error_stream(self, stream_data) -> bool:
-        return bool(self.analyzer.process_stream(stream_data))
+        try:
+            res = self.analyzer.process_stream(stream_data)
+            return bool(res)
+        except Exception:
+            return False
 
     def parse_and_correct_log_file(self, log_path: str) -> bool:
         try:
-            return bool(self.analyzer.parse_log(log_path))
+            res = self.analyzer.parse_log(log_path)
+            return bool(res)
         except FileNotFoundError:
+            return False
+        except Exception:
             return False
 
     def verify_fix_via_web(self, url: str) -> bool:
-        response = requests.get(url)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            return bool(soup)
-        return False
+        try:
+            response = requests.get(url)
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'html.parser')
+                return bool(soup)
+            return False
+        except Exception:
+            return False
 
     def apply_correction(self, error_signature: str) -> bool:
-        res = self.analyzer.analyze_and_prevent(error_signature)
-        return bool(res)
+        try:
+            res = self.analyzer.analyze_and_prevent(error_signature)
+            return bool(res)
+        except Exception:
+            return False

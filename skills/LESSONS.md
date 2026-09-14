@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ом: File "/home/runner/work/my-userbot/my-userbot/skills/resilient_secure_smart_crawler_hub_v3.py", line 56, in process_stream
-- Статус: успешно прошёл тесты и влит в main
-
-## resilient_secure_smart_crawler_hub_v4 (compose) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
+пешно прошёл тесты и влит в main
 
 ## resilient_secure_smart_aggregator_v5 (compose) — раундов: 5
 - Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
@@ -332,4 +328,8 @@
 
 ## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 1
 - Последняя ошибка перед фиксом: from skills.resilient_secure_global_mesh_matrix_v7 import ResilientSecureGlobalMeshMatrixV7
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 1
+- Последняя ошибка перед фиксом: from skills.resilient_secure_global_mesh_node_v2 import ResilientSecureGlobalMeshNodeV2
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

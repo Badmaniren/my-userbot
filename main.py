@@ -1260,6 +1260,43 @@ def check_main_health() -> tuple:
     except Exception:
         return True, "", None
 
+def bulk_quarantine_orphaned_tests() -> list:
+    """
+    Каждый test_*.py у нас всегда назван по имени своего модуля (test_X.py или
+    test_X_integration.py для skills/X.py). Если X давно удалён (например, через
+    /cleanup или просто заброшен посреди истории с раздуванием имён), а тест
+    остался — при сборе тестов он падает на импорте и ломает ВЕСЬ прогон для
+    абсолютно любой задачи. Реактивный карантин по одному файлу за раунд (через
+    полный прогон CI на каждый) не масштабируется, если таких сирот сотни — это
+    именно то, что случилось. Чистим всё разом, статически, без единого прогона CI:
+    просто сверяем имя теста со списком реально существующих модулей.
+    """
+    url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents?ref=main")
+    try:
+        r = requests.get(url, headers=API_HEADERS, timeout=15)
+        if r.status_code != 200:
+            return []
+        test_files = [f["name"] for f in r.json() if f["name"].startswith("test_") and f["name"].endswith(".py")]
+    except Exception:
+        return []
+
+    manifest = get_skills_manifest()
+    existing = set(manifest.keys())
+
+    orphaned = []
+    for fname in test_files:
+        base = fname[:-3][len("test_"):]
+        if base.endswith("_integration"):
+            base = base[:-len("_integration")]
+        if base not in existing:
+            orphaned.append(fname)
+
+    deleted = []
+    for fname in orphaned:
+        if delete_repo_file(fname, f"Массовый карантин: skills/{fname} давно удалён, тест-сирота больше не нужен [skip ci]"):
+            deleted.append(fname)
+    return deleted
+
 def heal_main_if_poisoned() -> bool:
     healthy, error_text, run_id = check_main_health()
     if healthy:
@@ -1330,6 +1367,15 @@ def run_evolution_cycle():
     print("      ПИТЕКАНТРОП: БЕЗОПАСНЫЙ ЦИКЛ CI     ")
     print("==========================================")
 
+    print("[~] Массовая чистка тестов-сирот (без единого прогона CI)...")
+    orphan_tests = bulk_quarantine_orphaned_tests()
+    if orphan_tests:
+        print(f"[*] Удалено тестов-сирот: {len(orphan_tests)}")
+        preview = ", ".join(orphan_tests[:10])
+        if len(orphan_tests) > 10:
+            preview += f" ...и ещё {len(orphan_tests) - 10}"
+        send_tg(f"🧹 <b>Массовый карантин тестов-сирот</b>\n━━━━━━━━━━━━━━━━━━━\nУдалено: <b>{len(orphan_tests)}</b>\n<code>{html.escape(preview)}</code>")
+
     print("[~] Проверка здоровья main...")
     if heal_main_if_poisoned():
         print("[*] main вылечен в этом же проходе — продолжаю цикл на свежей базе.")
@@ -1399,6 +1445,9 @@ def run_evolution_cycle():
     stagnant_hits = 0
     tests_regenerated = False
     MAX_ATTEMPTS = 4
+    MAX_POISON_RETRIES = 5
+    poison_retries = 0
+    poison_quarantined = []
 
     while attempts <= MAX_ATTEMPTS:
         rounds_used = attempts
@@ -1419,11 +1468,26 @@ def run_evolution_cycle():
 
         poison_module = find_poisoning_import_error(last_error)
         own_test_names = {test_path[:-3], integration_test_path[:-3]}
-        if poison_module and poison_module not in own_test_names:
-            print(f"[!] Отравляющий файл {poison_module}.py не имеет отношения к '{mod_name}' — карантин вместо правки своего кода.")
+        if poison_module and poison_module not in own_test_names and poison_retries < MAX_POISON_RETRIES:
+            poison_retries += 1
+            print(f"[!] Отравляющий файл {poison_module}.py не имеет отношения к '{mod_name}' — карантин ({poison_retries}/{MAX_POISON_RETRIES}) вместо правки своего кода.")
             if delete_repo_file(f"{poison_module}.py", f"Карантин: {poison_module}.py блокировал задачу {mod_name} [skip ci]", branch=branch):
-                send_tg(f"🧟 Посторонний сломанный тест <code>{poison_module}.py</code> мешал <code>{mod_name}</code> — убрал в карантин, повторяю раунд.")
-                continue 
+                poison_quarantined.append(f"{poison_module}.py")
+                continue
+        elif poison_module and poison_retries >= MAX_POISON_RETRIES:
+            print(f"[!] Потолок карантина ({MAX_POISON_RETRIES}) исчерпан для '{mod_name}' — похоже, сирот в репозитории намного больше, чем ожидалось. Останавливаюсь и сообщаю, вместо бесконечного цикла.")
+            send_tg(
+                f"🧟 <b>Карантин уткнулся в потолок</b>\n━━━━━━━━━━━━━━━━━━━\n"
+                f"Для <code>{mod_name}</code> подряд нашлось {poison_retries}+ левых сломанных тестов "
+                f"({', '.join(poison_quarantined[:8])}{'...' if len(poison_quarantined) > 8 else ''}). "
+                "Похоже, сирот в репозитории куда больше, чем предполагалось — стоит запустить полную "
+                "чистку вручную, а не полагаться на реактивный карантин."
+            )
+            break
+
+        if poison_quarantined:
+            send_tg(f"🧟 Карантин по ходу задачи <code>{mod_name}</code>: убрано {len(poison_quarantined)} посторонних сломанных тестов, повторяю раунд.")
+            poison_quarantined = []
 
         error_signature = re.sub(r'\d+', '#', last_error)[-500:].strip()
         if prev_error_signature is not None and error_signature == prev_error_signature:

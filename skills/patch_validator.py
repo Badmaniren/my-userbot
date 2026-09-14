@@ -17,6 +17,35 @@ def sandbox_exec(code: str):
         return False, None, str(e)
 
 
+class ASTInspector(ast.NodeVisitor):
+    def __init__(self, forbidden=None):
+        self.forbidden = forbidden if forbidden is not None else {"os", "sys", "subprocess", "shutil", "eval", "exec"}
+        self.error = None
+
+    def visit_Import(self, node):
+        for alias in node.names:
+            base_name = alias.name.split('.')[0]
+            if base_name in self.forbidden or alias.name in self.forbidden:
+                self.error = f"Forbidden import: {base_name}"
+        self.generic_visit(node)
+
+    def visit_ImportFrom(self, node):
+        if node.module:
+            base_name = node.module.split('.')[0]
+            if base_name in self.forbidden:
+                self.error = f"Forbidden import: {base_name}"
+        for alias in node.names:
+            if alias.name in self.forbidden:
+                self.error = f"Forbidden import: {alias.name}"
+        self.generic_visit(node)
+
+    def visit_Call(self, node):
+        if isinstance(node.func, ast.Name):
+            if node.func.id in self.forbidden:
+                self.error = f"Forbidden call: {node.func.id}"
+        self.generic_visit(node)
+
+
 class PatchValidator:
     """
     Модуль статического и динамического анализа сгенерированных патчей
@@ -30,31 +59,6 @@ class PatchValidator:
             tree = ast.parse(code_str)
         except SyntaxError as e:
             return {"is_valid": False, "error": f"SyntaxError: {e}"}
-
-        class ASTInspector(ast.NodeVisitor):
-            def __init__(self, forbidden):
-                self.forbidden = forbidden
-                self.error = None
-
-            def visit_Import(self, node):
-                for alias in node.names:
-                    base_name = alias.name.split('.')[0]
-                    if base_name in self.forbidden:
-                        self.error = f"Forbidden import: {base_name}"
-                self.generic_visit(node)
-
-            def visit_ImportFrom(self, node):
-                if node.module:
-                    base_name = node.module.split('.')[0]
-                    if base_name in self.forbidden:
-                        self.error = f"Forbidden import: {base_name}"
-                self.generic_visit(node)
-
-            def visit_Call(self, node):
-                if isinstance(node.func, ast.Name):
-                    if node.func.id in self.forbidden:
-                        self.error = f"Forbidden call: {node.func.id}"
-                self.generic_visit(node)
 
         inspector = ASTInspector(self.forbidden_modules)
         inspector.visit(tree)
@@ -90,8 +94,17 @@ class PatchValidator:
             "dynamic_passed": dynamic_passed
         }
 
-    def verify_stream(self, stream: io.BytesIO) -> dict:
-        code_str = stream.read().decode('utf-8')
+    def verify_stream(self, stream) -> dict:
+        if hasattr(stream, "read"):
+            content = stream.read()
+            if isinstance(content, bytes):
+                code_str = content.decode('utf-8', errors='ignore')
+            else:
+                code_str = str(content)
+        elif isinstance(stream, (list, tuple)):
+            code_str = "".join([str(s) for s in stream])
+        else:
+            code_str = str(stream)
         return self.verify_patch(code_str)
 
     def validate(self, patch_data) -> bool:

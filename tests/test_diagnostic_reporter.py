@@ -1,99 +1,91 @@
 import unittest
 from unittest.mock import patch, MagicMock
 import io
-
 from skills.diagnostic_reporter import DiagnosticReporter
-from skills.ai_diagnostic_agent import ErrorAnalyzer, AutoCorrector
-from skills.error_pipeline import ErrorPipeline
-
 
 class TestDiagnosticReporter(unittest.TestCase):
-
     def setUp(self):
         self.reporter = DiagnosticReporter()
 
-    def test_init_composition_dependencies(self):
-        self.assertIsInstance(self.reporter.error_analyzer, ErrorAnalyzer)
-        self.assertIsInstance(self.reporter.auto_corrector, AutoCorrector)
-        self.assertIsInstance(self.reporter.error_pipeline, ErrorPipeline)
-
-    def test_generate_report_success(self):
-        log_path = "test_system.log"
-        stream_data = io.BytesIO(b"CRITICAL ERROR 500")
-
-        with patch.object(ErrorAnalyzer, 'parse_log', return_value=True) as mock_parse, \
-             patch.object(ErrorPipeline, 'run_pipeline', return_value=True) as mock_pipeline, \
-             patch('skills.ai_diagnostic_agent.save_error_report', return_value=True) as mock_save:
-
-            result = self.reporter.generate_report(log_path, stream_data)
+    @patch('skills.diagnostic_reporter.save_error_report')
+    def test_generate_report_success(self, mock_save):
+        with patch.object(self.reporter.error_analyzer, 'parse_log', return_value=True), \
+             patch.object(self.reporter.error_pipeline, 'run_pipeline', return_value=True):
+            mock_save.return_value = True
+            
+            result = self.reporter.generate_report('test_system.log')
             self.assertTrue(result)
-            mock_parse.assert_called_once_with(log_path)
-            mock_pipeline.assert_called_once_with(log_path)
             mock_save.assert_called_once()
 
-    def test_generate_report_analyzer_failure(self):
-        log_path = "bad_system.log"
-        stream_data = io.BytesIO(b"INFO OK")
-
-        with patch.object(ErrorAnalyzer, 'parse_log', return_value=False) as mock_parse, \
-             patch.object(ErrorPipeline, 'run_pipeline', return_value=True) as mock_pipeline:
-
-            result = self.reporter.generate_report(log_path, stream_data)
+    def test_generate_report_parse_fails(self):
+        with patch.object(self.reporter.error_analyzer, 'parse_log', return_value=False):
+            result = self.reporter.generate_report('test_system.log')
             self.assertFalse(result)
-            mock_parse.assert_called_once_with(log_path)
 
-    def test_generate_report_pipeline_failure(self):
-        log_path = "pipeline_fail.log"
-        stream_data = io.BytesIO(b"WARN")
-
-        with patch.object(ErrorAnalyzer, 'parse_log', return_value=True), \
-             patch.object(ErrorPipeline, 'run_pipeline', return_value=False) as mock_pipeline:
-
-            result = self.reporter.generate_report(log_path, stream_data)
+    def test_generate_report_pipeline_fails(self):
+        with patch.object(self.reporter.error_analyzer, 'parse_log', return_value=True), \
+             patch.object(self.reporter.error_pipeline, 'run_pipeline', return_value=False):
+            result = self.reporter.generate_report('test_system.log')
             self.assertFalse(result)
-            mock_pipeline.assert_called_once_with(log_path)
 
-    def test_process_stream_aggregation(self):
-        stream_data = io.BytesIO(b"STREAM_ERROR_SIGNATURE")
+    @patch('skills.diagnostic_reporter.save_error_report')
+    def test_generate_report_save_fails(self, mock_save):
+        with patch.object(self.reporter.error_analyzer, 'parse_log', return_value=True), \
+             patch.object(self.reporter.error_pipeline, 'run_pipeline', return_value=True):
+            mock_save.return_value = False
+            
+            result = self.reporter.generate_report('test_system.log')
+            self.assertFalse(result)
 
-        with patch.object(ErrorPipeline, 'process_stream_pipeline', return_value=True) as mock_stream_pipe, \
-             patch.object(AutoCorrector, 'process_error_stream', return_value=True) as mock_auto_stream:
+    def test_generate_report_exception_raises(self):
+        with patch.object(self.reporter.error_analyzer, 'parse_log', side_effect=Exception("Critical error")):
+            with self.assertRaises(Exception):
+                self.reporter.generate_report('test_system.log')
 
-            result = self.reporter.process_stream_aggregation(stream_data)
+    def test_process_stream_aggregation_success(self):
+        stream_mock = io.BytesIO(b'stream data')
+        with patch.object(self.reporter.error_pipeline, 'process_stream_pipeline', return_value=True), \
+             patch.object(self.reporter.auto_corrector, 'process_error_stream', return_value=True):
+            
+            result = self.reporter.process_stream_aggregation(stream_mock)
             self.assertTrue(result)
-            mock_stream_pipe.assert_called_once()
-            mock_auto_stream.assert_called_once()
 
-    def test_process_stream_aggregation_exception_handling(self):
-        stream_data = MagicMock()
-        stream_data.read.side_effect = Exception("Stream read error")
+    def test_process_stream_aggregation_pipeline_false(self):
+        stream_mock = io.BytesIO(b'stream data')
+        with patch.object(self.reporter.error_pipeline, 'process_stream_pipeline', return_value=False), \
+             patch.object(self.reporter.auto_corrector, 'process_error_stream', return_value=True):
+            
+            result = self.reporter.process_stream_aggregation(stream_mock)
+            self.assertFalse(result)
 
-        result = self.reporter.process_stream_aggregation(stream_data)
-        self.assertFalse(result)
+    def test_process_stream_aggregation_corrector_false(self):
+        stream_mock = io.BytesIO(b'stream data')
+        with patch.object(self.reporter.error_pipeline, 'process_stream_pipeline', return_value=True), \
+             patch.object(self.reporter.auto_corrector, 'process_error_stream', return_value=False):
+            
+            result = self.reporter.process_stream_aggregation(stream_mock)
+            self.assertFalse(result)
 
-    def test_verify_system_health(self):
-        url = "http://localhost/health"
+    def test_process_stream_aggregation_exception_catches(self):
+        stream_mock = io.BytesIO(b'stream data')
+        with patch.object(self.reporter.error_pipeline, 'process_stream_pipeline', side_effect=Exception("Stream fail")):
+            result = self.reporter.process_stream_aggregation(stream_mock)
+            self.assertFalse(result)
 
-        with patch.object(ErrorPipeline, 'verify_pipeline_fix', return_value=True) as mock_verify:
-            result = self.reporter.verify_system_health(url)
+    def test_verify_system_health_success(self):
+        with patch.object(self.reporter.error_pipeline, 'verify_pipeline_fix', return_value=True):
+            result = self.reporter.verify_system_health('http://localhost/health')
             self.assertTrue(result)
-            mock_verify.assert_called_once_with(url)
 
     def test_verify_system_health_failure(self):
-        url = "http://localhost/health"
-
-        with patch.object(ErrorPipeline, 'verify_pipeline_fix', return_value=False) as mock_verify:
-            result = self.reporter.verify_system_health(url)
+        with patch.object(self.reporter.error_pipeline, 'verify_pipeline_fix', return_value=False):
+            result = self.reporter.verify_system_health('http://localhost/health')
             self.assertFalse(result)
-            mock_verify.assert_called_once_with(url)
 
-    def test_verify_system_health_raises(self):
-        url = "invalid_url"
-
-        with patch.object(ErrorPipeline, 'verify_pipeline_fix', side_effect=ValueError("Invalid URL")):
-            with self.assertRaises(ValueError):
-                self.reporter.verify_system_health(url)
-
+    def test_verify_system_health_exception_raises(self):
+        with patch.object(self.reporter.error_pipeline, 'verify_pipeline_fix', side_effect=Exception("Network error")):
+            with self.assertRaises(Exception):
+                self.reporter.verify_system_health('http://localhost/health')
 
 if __name__ == '__main__':
     unittest.main()

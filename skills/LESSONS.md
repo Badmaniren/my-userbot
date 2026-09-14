@@ -3,7 +3,13 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-tics_v2 (compose) — раундов: 1
+есты и влит в main
+
+## resilient_secure_smart_crawler_hub_analytics (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## resilient_secure_smart_crawler_hub_analytics_v2 (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## resilient_secure_smart_crawler_hub_analytics_exporter (compose) — раундов: 4
@@ -322,8 +328,4 @@ tics_v2 (compose) — раундов: 1
 
 ## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 1
 - Последняя ошибка перед фиксом: from skills.resilient_secure_global_mesh_omega_hive_v15 import ResilientSecureGlobalMeshOmegaHiveV15
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 1
-- Последняя ошибка перед фиксом: from skills.resilient_secure_global_mesh_omega_singularity_v19 import (
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

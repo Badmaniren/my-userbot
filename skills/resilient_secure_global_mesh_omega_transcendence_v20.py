@@ -5,6 +5,7 @@ from skills.resilient_secure_global_mesh_omega_singularity_v19 import (
 from skills.resilient_secure_global_mesh_interface_v17 import (
     ResilientSecureGlobalMeshInterfaceV17
 )
+from skills.rate_limiter import RateLimiter
 
 class ResilientSecureGlobalMeshOmegaTranscendenceV20Error(Exception):
     """Кастомное исключение для модуля Трансцендентности Омега v20."""
@@ -26,6 +27,10 @@ class ResilientSecureGlobalMeshOmegaTranscendenceV20(
             raise_on_limit=raise_on_limit
         )
         self._reports = {}
+        self.rate_limiter = RateLimiter(calls=calls, period=period, raise_on_limit=raise_on_limit)
+
+    def rate_limit_check(self) -> None:
+        self.rate_limiter.acquire()
 
     def validate_target_headers(self, target: str, timeout: int) -> bool:
         try:

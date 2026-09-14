@@ -42,3 +42,6 @@
 ## telemetry_analyzer (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## telemetry_optimizer (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

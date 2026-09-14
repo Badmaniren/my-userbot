@@ -39,10 +39,7 @@ class AutoCorrector:
     def verify_fix_via_web(self, url: str) -> bool:
         try:
             response = requests.get(url)
-            if response.status_code == 200:
-                soup = BeautifulSoup(response.text, 'html.parser')
-                return bool(soup)
-            return False
+            return response.status_code == 200
         except Exception:
             return False
 

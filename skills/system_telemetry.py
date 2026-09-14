@@ -19,6 +19,9 @@ class SystemTelemetry:
     def __init__(self):
         pass
 
+    def process_stream_data(self, stream):
+        return process_stream_data(stream)
+
 class ErrorPipeline:
     def run_pipeline(self, log_path: str) -> bool:
         if not os.path.exists(log_path):

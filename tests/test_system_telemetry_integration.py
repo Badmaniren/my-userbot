@@ -1,8 +1,6 @@
+import os
 import unittest
-from skills.system_telemetry import SystemTelemetry
-from skills.error_pipeline import ErrorPipeline
-from skills.error_analyzer import ErrorAnalyzer
-from skills.auto_corrector import AutoCorrector
+from skills.system_telemetry import SystemTelemetry, ErrorPipeline, ErrorAnalyzer, AutoCorrector, start_new
 
 class TestSystemTelemetryIntegration(unittest.TestCase):
     def setUp(self):
@@ -10,25 +8,28 @@ class TestSystemTelemetryIntegration(unittest.TestCase):
         self.pipeline = ErrorPipeline()
         self.analyzer = ErrorAnalyzer()
         self.corrector = AutoCorrector()
+        self.test_log_path = "test_telemetry_error.log"
 
-    def test_pipeline_telemetry_integration(self):
-        log_path = "test_system.log"
-        result = self.pipeline.run_pipeline(log_path)
-        self.assertIsInstance(result, bool)
+    def tearDown(self):
+        if os.path.exists(self.test_log_path):
+            os.remove(self.test_log_path)
 
-        has_critical = has_critical_errors(log_path) if 'has_critical_errors' in globals() else True
-        self.assertIsInstance(has_critical, bool)
+    def test_end_to_end_pipeline_integration(self):
+        start_result = start_new()
+        self.assertTrue(start_result)
 
-        stream_data = "SAMPLE_STREAM_ERROR"
-        stream_result = self.pipeline.process_stream_pipeline(stream_data)
-        self.assertIsInstance(stream_result, bool)
+        pipeline_run = self.pipeline.run_pipeline(self.test_log_path)
+        self.assertTrue(pipeline_run)
+        self.assertTrue(os.path.exists(self.test_log_path))
 
-        error_sig = "CRITICAL_TEST_ERROR"
-        correction_result = self.corrector.correct_code(error_sig)
-        self.assertIsInstance(correction_result, bool)
+        parse_result = self.analyzer.parse_log(self.test_log_path)
+        self.assertTrue(parse_result)
 
-        analysis_result = self.analyzer.analyze_and_prevent(error_sig)
-        self.assertIsInstance(analysis_result, bool)
+        analyze_result = self.analyzer.analyze_and_prevent("CRITICAL_TEST_ERROR")
+        self.assertTrue(analyze_result)
+
+        correction_result = self.corrector.correct_code("CRITICAL_TEST_ERROR")
+        self.assertTrue(correction_result)
 
 if __name__ == "__main__":
     unittest.main()

@@ -93,6 +93,7 @@ def set_tg_commands():
         {"command": "jules", "description": "🔁 Реактивировать зависшие Jules-задачи"},
         {"command": "prs", "description": "🔀 Подтянуть main во все отстающие PR"},
         {"command": "quarantine", "description": "🧟 Массово вычистить тесты-сироты с main"},
+        {"command": "audit", "description": "🔎 Найти реально сломанные цепочки импортов"},
         {"command": "cleanup", "description": "🧹 Найти и удалить дубли навыков"},
         {"command": "help", "description": "❓ Список команд"},
     ]
@@ -109,6 +110,7 @@ HELP_TEXT = (
     "🔁 <code>/jules</code> — растолкать зависшие Jules-задачи\n"
     "🔀 <code>/prs</code> — подтянуть main во все отстающие PR\n"
     "🧟 <code>/quarantine</code> — сразу вычистить тесты-сироты с main\n"
+    "🔎 <code>/audit</code> — найти реально сломанные цепочки импортов между навыками\n"
     "🧹 <code>/cleanup</code> — найти дубли навыков и предложить удаление\n"
     "❓ <code>/help</code> — это сообщение\n"
     "━━━━━━━━━━━━━━━━━━━\n"
@@ -232,6 +234,18 @@ def run_telegram_listener():
                             send_tg(f"🧟 <b>Массовый карантин</b>\n━━━━━━━━━━━━━━━━━━━\nУдалено: <b>{len(deleted)}</b>\n<code>{html.escape(preview)}</code>")
                         else:
                             send_tg("✅ Тестов-сирот не найдено — main чист.")
+                    elif text.startswith("/audit"):
+                        broken = audit_skill_import_graph()
+                        if not broken:
+                            send_tg("✅ Все цепочки импортов целы — реально отсутствующих зависимостей не найдено.")
+                        else:
+                            lines = []
+                            for missing_name, affected in list(broken.items())[:10]:
+                                lines.append(f"❌ <code>skills.{html.escape(missing_name)}</code> отсутствует физически, но нужен: {', '.join(affected[:5])}{'...' if len(affected) > 5 else ''}")
+                            send_tg(
+                                f"🔎 <b>Аудит цепочек импортов</b>\n━━━━━━━━━━━━━━━━━━━\n" + "\n".join(lines) +
+                                (f"\n\n...и ещё {len(broken) - 10} сломанных цепочек" if len(broken) > 10 else "")
+                            )
                     elif text.startswith("/cleanup"):
                         report, plan = build_cleanup_plan()
                         PENDING_CLEANUP_PLAN.clear()
@@ -718,9 +732,63 @@ def get_all_skill_sources() -> dict:
             sources[fname[:-3]] = code
     return sources
 
+def build_skill_import_graph(sources: dict) -> dict:
+    """A -> {множество модулей, которые A импортирует напрямую}."""
+    graph = {}
+    for name, code in sources.items():
+        deps = set(re.findall(r'from\s+skills\.(\w+)\s+import', code))
+        deps |= set(re.findall(r'import\s+skills\.(\w+)\b', code))
+        graph[name] = deps
+    return graph
+
 def find_skill_dependents(target: str, sources: dict) -> list:
-    pattern = re.compile(rf'(from\s+skills\.{re.escape(target)}\s+import|import\s+skills\.{re.escape(target)}\b)')
-    return [name for name, code in sources.items() if name != target and pattern.search(code)]
+    """
+    Кто зависит от target — ТРАНЗИТИВНО, через всю цепочку импортов, а не только
+    напрямую. Прямая проверка ловит A->B, но пропускает A->B->C: если удаляемый
+    target — это C, а B (не A) импортирует его напрямую, прямая проверка всё
+    равно защитит C правильно ТОЛЬКО если сканирует B. Но если B САМ является
+    кандидатом на удаление в другом кластере, а реальный "живой" потребитель —
+    A, который зависит от B, а не от C напрямую, старая проверка теряла A из
+    виду. Строим полный граф и идём в обратную сторону от target по всем цепочкам.
+    """
+    graph = build_skill_import_graph(sources)
+    dependents = set()
+    changed = True
+    while changed:
+        changed = False
+        for name, deps in graph.items():
+            if name in dependents or name == target:
+                continue
+            if target in deps or (deps & dependents):
+                dependents.add(name)
+                changed = True
+    return sorted(dependents)
+
+def audit_skill_import_graph() -> dict:
+    """
+    Показывает РЕАЛЬНУЮ причину поломки цепочки, а не только то место, где
+    трейсбек CI оборвался (Telegram обрезает длинные сообщения, и настоящая
+    причина в глубине цепочки часто просто не долетает до экрана). Возвращает
+    {модуль_которого_физически_нет: [все, кто от него транзитивно зависит]}.
+    """
+    manifest = get_skills_manifest()
+    existing = set(manifest.keys())
+    sources = get_all_skill_sources()
+    graph = build_skill_import_graph(sources)
+
+    all_referenced = set()
+    for deps in graph.values():
+        all_referenced |= deps
+    missing = all_referenced - existing
+
+    result = {}
+    for missing_name in missing:
+        affected = find_skill_dependents(missing_name, sources) 
+        # target формально отсутствует в sources, но find_skill_dependents всё
+        # равно корректно посчитает всех, кто транзитивно на него ссылается
+        if affected:
+            result[missing_name] = affected
+    return result
 
 def build_cleanup_plan() -> tuple:
     clusters = find_duplicate_skill_clusters()

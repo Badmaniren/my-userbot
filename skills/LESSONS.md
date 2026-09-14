@@ -56,3 +56,7 @@
 ## ai_diagnostic_agent (create) — раундов: 2
 - Последняя ошибка перед фиксом: Ran 74 tests in 0.023s
 - Статус: успешно прошёл тесты и влит в main
+
+## diagnostic_reporter (compose) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
+- Статус: успешно прошёл тесты и влит в main

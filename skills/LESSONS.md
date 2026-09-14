@@ -3,12 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-se) — раундов: 5
-- Последняя ошибка перед фиксом: Traceback (most recent call last):
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## resilient_smart_url_aggregator_v2 (compose) — раундов: 5
-- Последняя ошибка перед фиксом: self.assertIsNotNone(cached_data)
+tIsNotNone(cached_data)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## secure_headers_url_validator (compose) — раундов: 5
@@ -337,4 +332,8 @@ se) — раундов: 5
 
 ## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 1
 - Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/test_resilient_secure_global_mesh_coordinator_v5_integration.py", line 3, in <module>
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 1
+- Последняя ошибка перед фиксом: ModuleNotFoundError: No module named 'skills.resilient_clean_rss_archiver'
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

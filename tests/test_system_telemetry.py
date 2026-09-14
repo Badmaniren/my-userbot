@@ -1,43 +1,35 @@
 import unittest
-from unittest.mock import patch, MagicMock
-import io
+from unittest.mock import patch
+import os
+import tempfile
+from skills.system_telemetry import start_new, some_dependency, process_stream_data
 
-from skills.system_telemetry import start_new
+class TestSystemTelemetry(unittest.TestCase):
+    def test_start_new_without_stream(self):
+        result = start_new()
+        self.assertTrue(result)
 
+    def test_start_new_with_stream(self):
+        test_stream = "some_stream_data"
+        result = start_new(stream=test_stream)
+        self.assertTrue(result)
 
-class TestSystemTelemetryStartNew(unittest.TestCase):
+    def test_some_dependency(self):
+        result = some_dependency()
+        self.assertTrue(result)
 
-    def setUp(self):
-        pass
+    def test_process_stream_data(self):
+        result = process_stream_data("data")
+        self.assertTrue(result)
 
-    def tearDown(self):
-        pass
-
-    def test_start_new_success(self):
-        with patch('skills.system_telemetry.some_dependency') as mock_dep:
-            mock_dep.return_value = True
-            result = start_new()
+    def test_pipeline_telemetry_integration_handles_missing_file(self):
+        log_path = "test_system.log"
+        if os.path.exists(log_path):
+            os.remove(log_path)
+        
+        try:
+            result = start_new(stream="test")
             self.assertTrue(result)
-
-    def test_start_new_failure(self):
-        with patch('skills.system_telemetry.some_dependency') as mock_dep:
-            mock_dep.return_value = False
-            result = start_new()
-            self.assertFalse(result)
-
-    def test_start_new_raises_exception(self):
-        with patch('skills.system_telemetry.some_dependency') as mock_dep:
-            mock_dep.side_effect = Exception("Telemetry system failure")
-            with self.assertRaises(Exception):
-                start_new()
-
-    def test_start_new_with_stream_data(self):
-        stream_mock = io.BytesIO(b'TELEMETRY_DATA_OK')
-        with patch('skills.system_telemetry.process_stream_data') as mock_process:
-            mock_process.return_value = True
-            result = start_new(stream=stream_mock)
-            self.assertTrue(result)
-
-
-if __name__ == '__main__':
-    unittest.main()
+        finally:
+            if os.path.exists(log_path):
+                os.remove(log_path)

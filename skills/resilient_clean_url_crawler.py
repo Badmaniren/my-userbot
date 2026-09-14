@@ -1,15 +1,4 @@
-try:
-    from skills import clean_url_crawler, rate_limiter
-except ImportError:
-    from skills import rate_limiter
-    class CleanUrlCrawlerStub:
-        def process_url(self, url, timeout=5.0):
-            return True
-        def validate_crawled_link(self, url, timeout=3.0):
-            return True
-        def extract_and_clean(self, html_content):
-            return []
-    clean_url_crawler = type("clean_url_crawler", (), {"CleanUrlCrawler": CleanUrlCrawlerStub})
+from skills import clean_url_crawler, rate_limiter
 
 class ResilientCleanUrlCrawlerError(Exception):
     """Базовое исключение для ResilientCleanUrlCrawler."""

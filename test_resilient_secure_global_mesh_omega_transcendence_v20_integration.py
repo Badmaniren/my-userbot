@@ -1,5 +1,7 @@
 import unittest
 from unittest.mock import patch
+import skills.resilient_secure_global_mesh_omega_singularity_v45
+import skills.resilient_secure_global_mesh_omega_transcendence_v32
 from skills.resilient_secure_global_mesh_omega_transcendence_v20 import (
     ResilientSecureGlobalMeshOmegaTranscendenceV20,
     ResilientSecureGlobalMeshOmegaTranscendenceV20Error,

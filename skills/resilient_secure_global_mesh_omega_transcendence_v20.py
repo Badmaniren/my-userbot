@@ -14,8 +14,7 @@ class ResilientSecureGlobalMeshOmegaTranscendenceV20Error(Exception):
 ResilientSecureGlobalMeshomegaTranscendenceV20Error = ResilientSecureGlobalMeshOmegaTranscendenceV20Error
 
 class ResilientSecureGlobalMeshOmegaTranscendenceV20(
-    ResilientSecureGlobalMeshOmegaSingularityV19,
-    ResilientSecureGlobalMeshInterfaceV17
+    ResilientSecureGlobalMeshOmegaSingularityV19
 ):
     def __init__(self, db_path=":memory:", max_memory_mb=512, calls=10, period=1.0, raise_on_limit=True):
         super().__init__(

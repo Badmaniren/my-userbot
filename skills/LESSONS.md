@@ -3,7 +3,14 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-art_crawler_hub_analytics_exporter (compose) — раундов: 1
+tics_v2 (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## resilient_secure_smart_crawler_hub_analytics_exporter (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## resilient_secure_smart_crawler_hub_analytics_exporter (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## resilient_secure_smart_crawler_hub_v7_orchestrator (start_new) — раундов: 4
@@ -319,8 +326,4 @@ art_crawler_hub_analytics_exporter (compose) — раундов: 1
 
 ## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 1
 - Последняя ошибка перед фиксом: from skills.resilient_secure_global_mesh_omega_singularity_v19 import (
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 1
-- Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/unittest/loader.py", line 362, in _get_module_from_name
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

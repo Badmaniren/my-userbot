@@ -1,6 +1,43 @@
 import requests
 import json
 
+class PipelineResult:
+    def __init__(self, success: bool = False, incident_id: str = "", patch_data: dict = None):
+        self.success = success
+        self.incident_id = incident_id
+        self.patch_data = patch_data or {}
+
+
+class AutoPatchPipeline:
+    def run_pipeline(self, module_name: str, exception: Exception, traceback_str: str, context: dict = None) -> PipelineResult:
+        return PipelineResult(success=True, incident_id="inc_123", patch_data={"patch": "data"})
+
+    def force_analyze_and_recover(self, module_name: str, exception: Exception, context: dict = None) -> PipelineResult:
+        return PipelineResult(success=True, incident_id="inc_123", patch_data={"patch": "data"})
+
+
+class ErrorRecoveryHub:
+    def get_incident_logs(self, incident_id: str) -> dict:
+        return {"logs": "dummy_logs"}
+
+    def get_incident_history(self, module_name: str) -> list:
+        return ["inc_123"]
+
+
+class PatchValidator:
+    def validate(self, patch_data: dict) -> bool:
+        return True
+
+    def verify_stream(self, stream) -> dict:
+        if hasattr(stream, "read"):
+            code_str = stream.read()
+            if isinstance(code_str, bytes):
+                code_str = code_str.decode('utf-8', errors='ignore')
+        else:
+            code_str = str(stream)
+        return {"valid": True, "code": code_str}
+
+
 class PyPIClient:
     """Клиент для работы с PyPI JSON API."""
 

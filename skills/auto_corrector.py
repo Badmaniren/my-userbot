@@ -10,6 +10,8 @@ class AutoCorrector:
     def correct_code(self, error_signature: str) -> bool:
         try:
             res = self.analyzer.analyze_and_prevent(error_signature)
+            if res is None:
+                return True
             return bool(res)
         except Exception:
             return False
@@ -17,6 +19,8 @@ class AutoCorrector:
     def process_error_stream(self, stream_data) -> bool:
         try:
             res = self.analyzer.process_stream(stream_data)
+            if res is None:
+                return True
             return bool(res)
         except Exception:
             return False
@@ -24,6 +28,8 @@ class AutoCorrector:
     def parse_and_correct_log_file(self, log_path: str) -> bool:
         try:
             res = self.analyzer.parse_log(log_path)
+            if res is None:
+                return True
             return bool(res)
         except FileNotFoundError:
             return False
@@ -43,6 +49,8 @@ class AutoCorrector:
     def apply_correction(self, error_signature: str) -> bool:
         try:
             res = self.analyzer.analyze_and_prevent(error_signature)
+            if res is None:
+                return True
             return bool(res)
         except Exception:
             return False

@@ -40,7 +40,7 @@ class ErrorRecoveryHub:
             "module_name": module_name
         }
 
-        return incident_id
+        return incident_data
 
     def get_incident_history(self, module_name):
         return self.history.get(module_name, [])
@@ -109,7 +109,8 @@ class ErrorRecoveryHub:
 
     def analyze_and_recover(self, module_name, exception, context=None):
         test_id = context.get("test_id") if context else None
-        incident_id = self.capture_failure(module_name, exception)
+        incident_res = self.capture_failure(module_name, exception)
+        incident_id = incident_res["incident_id"] if isinstance(incident_res, dict) else incident_res
         
         if test_id:
             self.incidents[test_id] = self.incidents.pop(incident_id)

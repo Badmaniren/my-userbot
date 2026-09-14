@@ -13,3 +13,7 @@
 ## patch_validator (create) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main
+
+## auto_patch_pipeline (compose) — раундов: 2
+- Последняя ошибка перед фиксом: resp = conn.urlopen(
+- Статус: успешно прошёл тесты и влит в main

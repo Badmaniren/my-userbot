@@ -1,7 +1,4 @@
-try:
-    from skills.resilient_clean_rss_archiver import ResilientCleanRSSArchiver
-except ImportError:
-    from skills.cached_rss_archiver import CachedRSSArchiver as ResilientCleanRSSArchiver
+from skills.resilient_clean_rss_archiver import ResilientCleanRSSArchiver
 from skills.clean_compressed_db_storage import CleanCompressedDBStorage
 
 

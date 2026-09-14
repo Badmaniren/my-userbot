@@ -1,9 +1,6 @@
 import functools
-from skills import resilient_clean_compressed_sitemap_parser as resilient_clean_compressed_sitemap_crawler, resilient_secure_clean_url_crawler_v2
-try:
-    from skills.resilient_clean_compressed_sitemap_crawler import ResilientCleanCompressedSitemapCrawler
-except ImportError:
-    from skills.resilient_clean_compressed_sitemap_parser import ResilientCleanCompressedSitemapParser as ResilientCleanCompressedSitemapCrawler
+from skills import resilient_clean_compressed_sitemap_crawler, resilient_secure_clean_url_crawler_v2
+from skills.resilient_clean_compressed_sitemap_crawler import ResilientCleanCompressedSitemapCrawler
 
 try:
     from utils import memory_profiler, rate_limiter

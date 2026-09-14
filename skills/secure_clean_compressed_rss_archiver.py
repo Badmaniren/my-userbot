@@ -1,6 +1,8 @@
-from skills.resilient_clean_rss_archiver import ResilientCleanRSSArchiver
+from skills.cached_rss_archiver import CachedRSSArchiver
 from skills.clean_compressed_db_storage import CleanCompressedDBStorage
 
+# Backward compatibility alias for tests patching ResilientCleanRSSArchiver
+ResilientCleanRSSArchiver = CachedRSSArchiver
 
 class SecureCleanCompressedRSSArchiverError(Exception):
     """Исключение для ошибок защищенного архиватора RSS."""
@@ -21,10 +23,10 @@ class SecureCleanCompressedRSSArchiver:
             self.storage = CleanCompressedDBStorage()
 
         try:
-            self.resilient_archiver = ResilientCleanRSSArchiver(db_path=self.db_path)
+            self.resilient_archiver = ResilientCleanRSSArchiver(db_path=self.db_path, max_memory_mb=self.max_memory_mb)
         except TypeError:
             try:
-                self.resilient_archiver = ResilientCleanRSSArchiver()
+                self.resilient_archiver = ResilientCleanRSSArchiver(db_path=self.db_path)
             except Exception:
                 self.resilient_archiver = ResilientCleanRSSArchiver.__new__(ResilientCleanRSSArchiver)
                 self.resilient_archiver.storage = self.storage

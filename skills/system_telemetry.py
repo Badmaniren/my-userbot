@@ -19,6 +19,9 @@ class SystemTelemetry:
     def __init__(self):
         pass
 
+    def collect(self, metrics_source: str):
+        return metrics_source
+
 class ErrorPipeline:
     def run_pipeline(self, log_path: str) -> bool:
         if not os.path.exists(log_path):

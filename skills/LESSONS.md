@@ -67,3 +67,6 @@
 ## predictive_fault_detector (create) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main
+
+## error_pipeline (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

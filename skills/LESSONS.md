@@ -3,7 +3,8 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ВАЛЕН Унгой, передан на эскалацию
+ фиксом: FAIL: test_memory_profiler_integration (test_smart_secure_compressed_rss_crawler_v3.TestSmartSecureCompressedRSSCrawlerV3.test_memory_profiler_integration)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## smart_secure_compressed_sitemap_crawler_v2 (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
@@ -336,8 +337,4 @@
 
 ## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 1
-- Последняя ошибка перед фиксом: __import__(name)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

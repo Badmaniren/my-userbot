@@ -75,7 +75,7 @@ class TestResilientSecureGlobalMeshOmegaTranscendenceV20Integration(unittest.Tes
     def test_analytics_reporting_flow(self):
         report_data = {"status": "transcended", "nodes": 49}
         self.mesh.export_analytics_report(self.target, report_data)
-        
+
         exported = self.mesh.get_exported_report(self.target)
         self.assertIsInstance(exported, dict)
         self.assertEqual(exported, report_data)

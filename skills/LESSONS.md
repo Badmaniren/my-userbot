@@ -25,3 +25,7 @@
 ## error_pipeline (compose) — раундов: 3
 - Последняя ошибка перед фиксом: ERROR: test_pipeline_returns_false_on_correction_failure (tests.test_error_pipeline.TestErrorPipeline.test_pipeline_returns_false_on_correction_failure)
 - Статус: успешно прошёл тесты и влит в main
+
+## system_telemetry (start_new) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main

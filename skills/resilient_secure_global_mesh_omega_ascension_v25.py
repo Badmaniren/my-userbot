@@ -27,35 +27,36 @@ class ResilientSecureGlobalMeshOmegaAscensionV25:
     def validate_target_headers(self, target: str, timeout: int) -> bool:
         try:
             response = requests.head(target, timeout=timeout)
-            return response.status_code == 200
+            return bool(response.status_code == 200)
         except Exception:
             return False
 
     def coordinate_expansion(self, target: str, timeout: int) -> bool:
         try:
             response = requests.get(target, timeout=timeout)
-            return response.status_code == 200
+            return bool(response.status_code == 200)
         except Exception:
             return False
 
     def coordinate_expansion_safe(self, target: str, timeout: int) -> bool:
         try:
             response = requests.get(target, timeout=timeout)
-            return response.status_code == 200
+            return bool(response.status_code == 200)
         except Exception:
             return False
 
     def route_request(self, target: str, timeout: int) -> str:
         response = requests.get(target, timeout=timeout)
-        return response.text
+        return str(response.text)
 
     def process_stream(self, target: str, timeout: int) -> None:
         requests.get(target, timeout=timeout, stream=True)
         return None
 
     def export_analytics_report(self, target: str, report_data: dict) -> None:
-        self._reports[target] = dict(report_data)
+        self._reports[target] = {**report_data}
         return None
 
     def get_exported_report(self, target: str) -> dict:
-        return self._reports.get(target, {})
+        report = self._reports.get(target, {})
+        return {**report}

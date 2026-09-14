@@ -949,6 +949,14 @@ def inspect_code_for_cheating(code: str, existing_skills: list, target_module: s
                     "АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! "
                     "Обработай ошибку предсказуемо или пробрось наружу через raise."
                 )
+        # ЖЕСТКАЯ БЛОКИРОВКА try...except ImportError ДЛЯ ЗАГЛУШЕК
+        if isinstance(node, ast.Try):
+            for handler in node.handlers:
+                if handler.type and getattr(handler.type, 'id', '') == 'ImportError':
+                    for subnode in ast.walk(handler):
+                        if isinstance(subnode, ast.ClassDef) or isinstance(subnode, ast.FunctionDef):
+                            return "АНТИЧИТ: Запрещено создавать классы-заглушки внутри `except ImportError:`! Импортируй честно, пусть падает, если модуля нет."
+
     return ""
 
 # 7. МАНИФЕСТ И ПАМЯТЬ
@@ -1265,12 +1273,12 @@ def architect_write_hard_tests(task: dict, manifest: dict, lessons: str, existin
         f"Описание: {task['description']}\n"
         f"{context_code}{_compose_context(task)}{context_stagnation}\n"
         f"СИГНАТУРЫ И ТИПЫ:\n{manifest_for_prompt(manifest, always_full=task.get('composed_of'))}\n\n"
-        "СТРОГИЕ ПРАВИЛА:\n"
-        "1. Библиотеки: standard lib, unittest, unittest.mock, requests, bs4. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО использовать pytest!\n"
-        "2. Запрещено вешать `@patch` над методами! Только `with patch(...) as mock:` внутри метода!\n"
-        "3. Валидация возвращает bool: проверяй `assertTrue(res)` или `assertFalse(res)`. НЕ ПИШИ `res[0]`!\n"
-        "4. Ошибки: ждёшь падения — используй `with self.assertRaises(...)`. Без assertRaises функция должна вернуть False, а не падать!\n"
-        "5. Моки потоков: если код вызывает `.read()`, подсовывай `io.BytesIO(b'...')`, а не dict!\n"
+        "СТРОГИЕ ПРАВИЛА (АНТИЧИТ НА ХАРДКОД И ЗАГЛУШКИ):\n"
+        "1. Библиотеки: standard lib, unittest, unittest.mock, requests, bs4, random, uuid, string. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕН pytest!\n"
+        "2. ХАОС В ДАННЫХ: ВСЕ входные строки, числа, пути к файлам и URL в тестах ДОЛЖНЫ БЫТЬ РАНДОМНЫМИ (используй uuid.uuid4().hex, random.choice, и т.д.). НИКАКИХ статичных строк типа 'error.log' или 'test_data'. Кодер не должен угадать входные данные!\n"
+        "3. СМЫСЛОВЫЕ АССЕРТЫ: Проверяй логику. Если тестируешь парсер — сгенерируй случайный ID, засунь его в мок/файл и проверь, что парсер вернул именно этот ID. Хватит писать тесты, которые проходятся пустой функцией с `return True`!\n"
+        "4. Запрещено вешать `@patch` над методами! Только `with patch(...) as mock:` внутри метода!\n"
+        "5. Моки потоков: если код вызывает `.read()`, подсовывай `io.BytesIO(b'случайный_мусор')`, а не dict!\n"
         "6. Верни ТОЛЬКО валидный код тестов Python без markdown."
     )
     return ask_gemini(prompt)
@@ -1283,7 +1291,8 @@ def architect_write_integration_test(task: dict, manifest: dict, lessons: str, e
         f"Описание: {task['description']}\n"
         f"{context_code}{_compose_context(task)}\n"
         f"СИГНАТУРЫ:\n{manifest_for_prompt(manifest, always_full=task.get('composed_of'))}\n\n"
-        "ПРАВИЛА: Смотри на возвращаемые типы (str, bool). Импортируй ТОЛЬКО существующие имена. Вызывай создаваемый модуль. Без markdown. ИСПОЛЬЗУЙ ТОЛЬКО unittest, КАТЕГОРИЧЕСКИ ЗАПРЕЩЕН pytest!"
+        "ПРАВИЛА: Импортируй ТОЛЬКО существующие имена. Вызывай создаваемый модуль. ИСПОЛЬЗУЙ ТОЛЬКО unittest (ЗАПРЕЩЕН pytest!).\n"
+        "ГЛАВНОЕ: Генерируй случайные входные данные (uuid, random), чтобы исключить хардкод-заглушки у кодера. Проверяй реальные изменения (появление файлов, возврат конкретных случайных ID). Без markdown."
     )
     return ask_gemini(prompt)
 
@@ -1298,8 +1307,8 @@ def unga_implement_hardened(task: dict, unit_test_code: str, integration_test_co
         f"ЮНИТ-ТЕСТЫ:\n{unit_test_code}\n\n"
         f"ИНТЕГРАЦИОННЫЕ ТЕСТЫ:\n{integration_test_code}\n\n"
         f"{context_err}\n"
-        "ПРАВИЛА: Валидация возвращает чистый bool. Исключения бросай только если в тестах есть assertRaises. "
-        "Мерж словарей через update или {**a, **b}. Без 'except Exception: pass'. Верни только чистый Python-код."
+        "ПРАВИЛА: Исключения бросай только если в тестах есть assertRaises.\n"
+        "ЗАПРЕТ НА ЧИТЕРСТВО: Тебе КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО использовать конструкции вида `try: from X import Y except ImportError: class Y:...` для создания фейковых классов-заглушек. Если зависимости нет — импортируй честно, пусть падает, либо вообще не трогай этот импорт. Без 'except Exception: pass'. Верни только чистый Python-код."
     )
     return ask_gemini(prompt)
 

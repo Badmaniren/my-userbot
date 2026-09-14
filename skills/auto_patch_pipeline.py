@@ -49,7 +49,11 @@ class AutoPatchPipeline:
             context = {}
 
         try:
-            incident_id = self.error_recovery_hub.capture_failure(module_name, exception, traceback_str)
+            res = self.error_recovery_hub.capture_failure(module_name, exception, traceback_str)
+            if isinstance(res, dict):
+                incident_id = res.get("incident_id")
+            else:
+                incident_id = str(res)
         except Exception as e:
             incident_id = f"inc_fallback_{id(e)}"
 

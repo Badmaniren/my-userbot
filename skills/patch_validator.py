@@ -85,13 +85,23 @@ class PatchValidator:
 
         passed = bool(static_res.get("is_valid")) and dynamic_passed
         return {
+            "valid": passed,
             "passed": passed,
             "static_passed": bool(static_res.get("is_valid")),
             "dynamic_passed": dynamic_passed
         }
 
-    def verify_stream(self, stream: io.BytesIO) -> dict:
-        code_str = stream.read().decode('utf-8')
+    def verify_stream(self, stream) -> dict:
+        if hasattr(stream, "read"):
+            raw = stream.read()
+            if isinstance(raw, bytes):
+                code_str = raw.decode('utf-8')
+            else:
+                code_str = str(raw)
+        elif isinstance(stream, bytes):
+            code_str = stream.decode('utf-8')
+        else:
+            code_str = str(stream)
         return self.verify_patch(code_str)
 
     def validate(self, patch_data) -> bool:

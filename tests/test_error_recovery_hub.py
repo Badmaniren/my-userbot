@@ -25,12 +25,14 @@ class TestErrorRecoveryHub(unittest.TestCase):
             mock_now.isoformat.return_value = uuid.uuid4().hex
             mock_datetime.now.return_value = mock_now
 
-            incident_id = self.hub.capture_failure(
+            captured = self.hub.capture_failure(
                 module_name=self.random_module_name,
                 exception=RuntimeError(self.random_error_msg),
                 traceback_str=self.random_traceback
             )
 
+            self.assertIsInstance(captured, dict)
+            incident_id = captured.get("incident_id")
             self.assertIsInstance(incident_id, str)
             self.assertTrue(len(incident_id) > 0)
             
@@ -42,11 +44,12 @@ class TestErrorRecoveryHub(unittest.TestCase):
         exception_types = [ValueError, TypeError, KeyError, ZeroDivisionError]
         chosen_exception = random.choice(exception_types)(self.random_error_msg)
 
-        incident_id = self.hub.capture_failure(
+        captured = self.hub.capture_failure(
             module_name=self.random_module_name,
             exception=chosen_exception,
             traceback_str=self.random_traceback
         )
+        incident_id = captured["incident_id"] if isinstance(captured, dict) else captured
 
         analysis = self.hub.analyze_failure(incident_id)
         
@@ -67,11 +70,12 @@ class TestErrorRecoveryHub(unittest.TestCase):
         mock_response.json.return_value = expected_patch_payload
         mock_requests_post.return_value = mock_response
 
-        incident_id = self.hub.capture_failure(
+        captured = self.hub.capture_failure(
             module_name=self.random_module_name,
             exception=AttributeError(self.random_error_msg),
             traceback_str=self.random_traceback
         )
+        incident_id = captured["incident_id"] if isinstance(captured, dict) else captured
 
         patch_result = self.hub.generate_patch(incident_id)
 
@@ -103,11 +107,12 @@ class TestErrorRecoveryHub(unittest.TestCase):
     def test_recovery_hub_rollback_on_failure(self):
         random_backup_data = f"backup_state_{uuid.uuid4().hex}"
         
-        incident_id = self.hub.capture_failure(
+        captured = self.hub.capture_failure(
             module_name=self.random_module_name,
             exception=SystemError(self.random_error_msg),
             traceback_str=self.random_traceback
         )
+        incident_id = captured["incident_id"] if isinstance(captured, dict) else captured
 
         with patch.object(self.hub, '_execute_patch', side_effect=Exception(f"Failed to apply: {uuid.uuid4().hex}")):
             with patch.object(self.hub, '_restore_backup') as mock_restore:

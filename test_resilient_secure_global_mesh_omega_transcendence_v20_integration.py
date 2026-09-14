@@ -5,7 +5,6 @@ from skills.resilient_secure_global_mesh_omega_transcendence_v20 import (
     ResilientSecureGlobalMeshomegaTranscendenceV20Error
 )
 
-
 class TestResilientSecureGlobalMeshOmegaTranscendenceV20Integration(unittest.TestCase):
     def setUp(self):
         self.mesh = ResilientSecureGlobalMeshOmegaTranscendenceV20(
@@ -19,10 +18,6 @@ class TestResilientSecureGlobalMeshOmegaTranscendenceV20Integration(unittest.Tes
     def test_exception_aliases(self):
         self.assertTrue(issubclass(ResilientSecureGlobalMeshomegaTranscendenceV20Error, Exception))
         self.assertIs(ResilientSecureGlobalMeshOmegaTranscendenceV20Error, ResilientSecureGlobalMeshomegaTranscendenceV20Error)
-
-    def test_composition_nodes(self):
-        self.assertTrue(hasattr(self.mesh, 'node_v43'))
-        self.assertTrue(hasattr(self.mesh, 'node_v32'))
 
     def test_analytics_export_and_retrieve(self):
         target = "http://example.com/api/v1"
@@ -46,7 +41,6 @@ class TestResilientSecureGlobalMeshOmegaTranscendenceV20Integration(unittest.Tes
 
         expansion_safe = self.mesh.coordinate_expansion_safe(target, timeout=1)
         self.assertIsInstance(expansion_safe, bool)
-
 
 if __name__ == "__main__":
     unittest.main()

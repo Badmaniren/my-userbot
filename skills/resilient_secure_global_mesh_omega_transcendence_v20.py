@@ -10,7 +10,6 @@ class ResilientSecureGlobalMeshOmegaTranscendenceV20Error(Exception):
     """Кастомное исключение для модуля Трансцендентности Омега v20."""
     pass
 
-# Совместимость с опечаткой в интеграционном тесте (omega с маленькой w)
 ResilientSecureGlobalMeshomegaTranscendenceV20Error = ResilientSecureGlobalMeshOmegaTranscendenceV20Error
 
 class ResilientSecureGlobalMeshOmegaTranscendenceV20(

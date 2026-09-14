@@ -1,26 +1,37 @@
 import unittest
+import tempfile
+import os
 from skills.error_pipeline import ErrorPipeline
-from skills.error_analyzer import ErrorAnalyzer
-from skills.auto_corrector import AutoCorrector
 
 class TestErrorPipelineIntegration(unittest.TestCase):
-
     def setUp(self):
         self.pipeline = ErrorPipeline()
-        self.analyzer = ErrorAnalyzer()
-        self.corrector = AutoCorrector()
+        self.test_file = tempfile.NamedTemporaryFile(delete=False, mode='w', encoding='utf-8')
+        self.test_file.write("ERROR: Test critical exception occurred during runtime.")
+        self.test_file.close()
 
-    def test_pipeline_real_integration(self):
-        test_signature = "TypeError: unsupported operand type"
-        
-        analysis_result = self.analyzer.analyze_and_prevent(test_signature)
-        self.assertIsInstance(analysis_result, bool)
+    def tearDown(self):
+        if os.path.exists(self.test_file.name):
+            os.unlink(self.test_file.name)
 
-        correction_result = self.corrector.correct_code(test_signature)
-        self.assertIsInstance(correction_result, bool)
+    def test_run_pipeline_integration(self):
+        result = self.pipeline.run_pipeline(self.test_file.name)
+        self.assertIsInstance(result, bool)
 
-        pipeline_result = self.pipeline.process_error_stream(test_signature)
-        self.assertIsInstance(pipeline_result, bool)
+    def test_process_stream_pipeline_integration(self):
+        stream_data = "ERROR: Stream exception data."
+        result = self.pipeline.process_stream_pipeline(stream_data)
+        self.assertIsInstance(result, bool)
 
-if __name__ == "__main__":
+    def test_verify_pipeline_fix_integration(self):
+        test_url = "http://localhost:8000/health"
+        result = self.pipeline.verify_pipeline_fix(test_url)
+        self.assertIsInstance(result, bool)
+
+    def test_process_error_stream_integration(self):
+        error_signature = "NullPointerException in module X"
+        result = self.pipeline.process_error_stream(error_signature)
+        self.assertIsInstance(result, bool)
+
+if __name__ == '__main__':
     unittest.main()

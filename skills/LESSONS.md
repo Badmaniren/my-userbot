@@ -3,12 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- перед фиксом: + []
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## resilient_secure_smart_aggregator_v6 (compose) — раундов: 5
-- Последняя ошибка перед фиксом: return super().coordinate_expansion(url, timeout)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+калацию
 
 ## resilient_secure_smart_crawler_hub_v5 (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
@@ -332,4 +327,8 @@
 
 ## resilient_secure_global_mesh_omega_singularity_v45 (refactor) — раундов: 1
 - Последняя ошибка перед фиксом: from skills.resilient_secure_global_mesh_cluster_sync_v8 import ResilientSecureGlobalMeshClusterSyncV8
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 1
+- Последняя ошибка перед фиксом: from skills.resilient_secure_global_mesh_nexus_v12 import ResilientSecureGlobalMeshNexusV12
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

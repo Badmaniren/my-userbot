@@ -1,4 +1,5 @@
-from skills import clean_url_crawler, rate_limiter
+from skills import rate_limiter
+from skills.smart_crawler import SmartCrawler as CleanUrlCrawler
 
 class ResilientCleanUrlCrawlerError(Exception):
     """Базовое исключение для ResilientCleanUrlCrawler."""
@@ -7,7 +8,11 @@ class ResilientCleanUrlCrawlerError(Exception):
 class ResilientCleanUrlCrawler:
     def __init__(self, calls=10, period=1.0, raise_on_limit=False):
         self.rate_limiter = rate_limiter.RateLimiter(calls=calls, period=period)
-        self.clean_crawler = clean_url_crawler.CleanUrlCrawler()
+        try:
+            from skills import clean_url_crawler
+            self.clean_crawler = clean_url_crawler.CleanUrlCrawler()
+        except (ImportError, AttributeError):
+            self.clean_crawler = CleanUrlCrawler()
         self.raise_on_limit = raise_on_limit
 
     def _acquire_limit(self):

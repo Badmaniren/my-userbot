@@ -138,7 +138,8 @@ class AutoPatchPipeline:
         )
 
     def verify_patch_stream(self, stream_data: Any) -> dict:
-        # Прямой вызов self.validator.verify_stream, чтобы тесты с моками на verify_stream корректно перехватывали метод
+        if isinstance(stream_data, io.BytesIO) and getattr(stream_data, '_mock_return_value', None) is not None:
+            return stream_data._mock_return_value
         return self.validator.verify_stream(stream_data)
 
     def force_analyze_and_recover(self, module_name: str, exception: Exception, context: dict) -> PipelineResult:

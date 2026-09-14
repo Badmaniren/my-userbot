@@ -10,7 +10,7 @@ class ResilientSecureGlobalMeshOmegaTranscendenceV20Error(Exception):
     """Кастомное исключение для модуля Трансцендентности Омега v20."""
     pass
 
-# Совместимость с опечаткой в интеграционном тесте (omega с маленькой w)
+# Совместимость с опечаткой в интеграционном тесте
 ResilientSecureGlobalMeshomegaTranscendenceV20Error = ResilientSecureGlobalMeshOmegaTranscendenceV20Error
 
 class ResilientSecureGlobalMeshOmegaTranscendenceV20(
@@ -25,37 +25,50 @@ class ResilientSecureGlobalMeshOmegaTranscendenceV20(
             period=period,
             raise_on_limit=raise_on_limit
         )
+        self._db_path = db_path
+        self._max_memory_mb = max_memory_mb
+        self._calls = calls
+        self._period = period
+        self._raise_on_limit = raise_on_limit
         self._reports = {}
 
-    def validate_target_headers(self, target: str, timeout: int) -> bool:
+    def validate_target_headers(self, target: str, timeout: int = 5) -> bool:
         try:
             response = requests.head(target, timeout=timeout)
             return response.status_code == 200
         except (requests.RequestException, OSError):
             return False
 
-    def coordinate_expansion(self, target: str, timeout: int) -> bool:
+    def coordinate_expansion(self, target: str, timeout: int = 5) -> bool:
         try:
             response = requests.get(target, timeout=timeout)
             return response.status_code == 200
         except (requests.RequestException, OSError):
             return False
 
-    def coordinate_expansion_safe(self, target: str, timeout: int) -> bool:
+    def coordinate_expansion_safe(self, target: str, timeout: int = 5) -> bool:
         try:
             response = requests.get(target, timeout=timeout)
             return response.status_code == 200
         except (requests.RequestException, OSError):
             return False
 
-    def route_request(self, target: str, timeout: int) -> str:
-        response = requests.get(target, timeout=timeout)
-        return response.text
+    def route_request(self, target: str, timeout: int = 5) -> str:
+        try:
+            response = requests.get(target, timeout=timeout)
+            response.raise_for_status()
+            return response.text
+        except (requests.RequestException, OSError):
+            return ""
 
-    def process_stream(self, target: str, timeout: int) -> None:
-        response = requests.get(target, timeout=timeout, stream=True)
-        for _ in response.iter_content(chunk_size=1024):
-            pass
+    def process_stream(self, target: str, timeout: int = 5) -> None:
+        try:
+            response = requests.get(target, timeout=timeout, stream=True)
+            response.raise_for_status()
+            for _ in response.iter_content(chunk_size=1024):
+                pass
+        except (requests.RequestException, OSError) as e:
+            raise ResilientSecureGlobalMeshOmegaTranscendenceV20Error(f"Stream processing failed for {target}") from e
 
     def export_analytics_report(self, target: str, report_data: dict) -> None:
         self._reports[target] = {**report_data}

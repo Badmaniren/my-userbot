@@ -2,20 +2,15 @@ import requests
 from skills.resilient_secure_global_mesh_omega_singularity_v19 import (
     ResilientSecureGlobalMeshOmegaSingularityV19
 )
-from skills.resilient_secure_global_mesh_interface_v17 import (
-    ResilientSecureGlobalMeshInterfaceV17
-)
 
 class ResilientSecureGlobalMeshOmegaTranscendenceV20Error(Exception):
     """Кастомное исключение для модуля Трансцендентности Омега v20."""
     pass
 
-# Совместимость с опечаткой в интеграционном тесте (omega с маленькой w)
 ResilientSecureGlobalMeshomegaTranscendenceV20Error = ResilientSecureGlobalMeshOmegaTranscendenceV20Error
 
 class ResilientSecureGlobalMeshOmegaTranscendenceV20(
-    ResilientSecureGlobalMeshOmegaSingularityV19,
-    ResilientSecureGlobalMeshInterfaceV17
+    ResilientSecureGlobalMeshOmegaSingularityV19
 ):
     def __init__(self, db_path=":memory:", max_memory_mb=512, calls=10, period=1.0, raise_on_limit=True):
         super().__init__(

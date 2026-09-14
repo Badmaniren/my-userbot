@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-спешно прошёл тесты и влит в main
-
-## resilient_secure_global_mesh_interface_v17 (compose) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+, передан на эскалацию
 
 ## resilient_secure_global_mesh_interface_v17 (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
@@ -274,6 +270,10 @@
 
 ## resilient_secure_global_mesh_omega_singularity_v19 (refactor) — раундов: 3
 - Последняя ошибка перед фиксом: from skills.resilient_secure_smart_crawler_hub_analytics_v2 import ResilientSecureSmartCrawlerHubAnalyticsV2
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 1
+- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 1

@@ -3,7 +3,10 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-скалацию
+ompose) — раундов: 5
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 36)
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## resilient_secure_smart_crawler_hub (compose) — раундов: 5
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
@@ -332,10 +335,6 @@
 
 ## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 1
 - Последняя ошибка перед фиксом: __import__(name)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 1
-- Последняя ошибка перед фиксом: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 1

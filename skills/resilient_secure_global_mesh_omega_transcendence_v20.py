@@ -10,7 +10,6 @@ class ResilientSecureGlobalMeshOmegaTranscendenceV20Error(Exception):
     """Кастомное исключение для модуля Трансцендентности Омега v20."""
     pass
 
-# Совместимость с опечаткой в интеграционном тесте (omega с маленькой w)
 ResilientSecureGlobalMeshomegaTranscendenceV20Error = ResilientSecureGlobalMeshOmegaTranscendenceV20Error
 
 class ResilientSecureGlobalMeshOmegaTranscendenceV20(
@@ -54,7 +53,7 @@ class ResilientSecureGlobalMeshOmegaTranscendenceV20(
 
     def process_stream(self, target: str, timeout: int) -> None:
         response = requests.get(target, timeout=timeout, stream=True)
-        for _ in response.iter_content(chunk_size=1024):
+        for chunk in response.iter_content(chunk_size=1024):
             pass
 
     def export_analytics_report(self, target: str, report_data: dict) -> None:

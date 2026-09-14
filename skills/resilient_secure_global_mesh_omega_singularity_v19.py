@@ -31,7 +31,7 @@ class ResilientSecureGlobalMeshOmegaSingularityV19:
         try:
             response = requests.head(url, timeout=timeout)
             return bool(response.status_code == 200)
-        except Exception:
+        except (requests.RequestException, Exception):
             return False
 
     def coordinate_expansion(self, url: str, timeout: float = 5.0) -> bool:
@@ -42,7 +42,7 @@ class ResilientSecureGlobalMeshOmegaSingularityV19:
         try:
             response = requests.get(url, timeout=timeout)
             return bool(response.status_code == 200)
-        except Exception:
+        except (requests.RequestException, Exception):
             return False
 
     def route_request(self, url: str, timeout: float = 5.0) -> str:

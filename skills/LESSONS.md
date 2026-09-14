@@ -3,7 +3,13 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-лит в main
+ передан на эскалацию
+
+## resilient_secure_global_mesh_omega_singularity_v19 (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## resilient_secure_global_mesh_omega_transcendence_v20 (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
 
 ## resilient_secure_global_mesh_omega_infinity_v21 (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
@@ -308,10 +314,6 @@
 
 ## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 1
 - Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## resilient_secure_global_mesh_omega_ascension_v25 (refactor) — раундов: 1
-- Последняя ошибка перед фиксом: from skills.resilient_secure_global_mesh_coordinator_v5 import ResilientSecureGlobalMeshCoordinatorV5
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## resilient_secure_global_mesh_omega_ascension_v25 (refactor) — раундов: 1

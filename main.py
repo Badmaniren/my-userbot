@@ -92,6 +92,7 @@ def set_tg_commands():
         {"command": "build", "description": "⚙️ Поставить задачу вручную"},
         {"command": "jules", "description": "🔁 Реактивировать зависшие Jules-задачи"},
         {"command": "prs", "description": "🔀 Подтянуть main во все отстающие PR"},
+        {"command": "quarantine", "description": "🧟 Массово вычистить тесты-сироты с main"},
         {"command": "cleanup", "description": "🧹 Найти и удалить дубли навыков"},
         {"command": "help", "description": "❓ Список команд"},
     ]
@@ -107,6 +108,7 @@ HELP_TEXT = (
     "⚙️ <code>/build &lt;описание&gt;</code> — поставить задачу вручную в очередь\n"
     "🔁 <code>/jules</code> — растолкать зависшие Jules-задачи\n"
     "🔀 <code>/prs</code> — подтянуть main во все отстающие PR\n"
+    "🧟 <code>/quarantine</code> — сразу вычистить тесты-сироты с main\n"
     "🧹 <code>/cleanup</code> — найти дубли навыков и предложить удаление\n"
     "❓ <code>/help</code> — это сообщение\n"
     "━━━━━━━━━━━━━━━━━━━\n"
@@ -164,6 +166,16 @@ def run_telegram_listener():
                                 PENDING_CLEANUP_PLAN.clear()
                             else:
                                 send_tg("ℹ️ План очистки устарел или пуст — вызови /cleanup заново.")
+                        elif cb_data == "run_quarantine":
+                            answer_tg_callback(callback["id"], "Чищу тесты-сироты...")
+                            deleted = bulk_quarantine_orphaned_tests()
+                            if deleted:
+                                preview = ", ".join(deleted[:15])
+                                if len(deleted) > 15:
+                                    preview += f" ...и ещё {len(deleted) - 15}"
+                                send_tg(f"🧟 <b>Массовый карантин</b>\n━━━━━━━━━━━━━━━━━━━\nУдалено: <b>{len(deleted)}</b>\n<code>{html.escape(preview)}</code>")
+                            else:
+                                send_tg("✅ Тестов-сирот не найдено — main чист.")
                         continue
 
                     msg = update.get("message", {})
@@ -211,6 +223,15 @@ def run_telegram_listener():
                         if dirty_urls:
                             msg += f"\n⚠️ С настоящими конфликтами: <b>{len(dirty_urls)}</b> (нужна ручная правка)."
                         send_tg(msg)
+                    elif text.startswith("/quarantine"):
+                        deleted = bulk_quarantine_orphaned_tests()
+                        if deleted:
+                            preview = ", ".join(deleted[:15])
+                            if len(deleted) > 15:
+                                preview += f" ...и ещё {len(deleted) - 15}"
+                            send_tg(f"🧟 <b>Массовый карантин</b>\n━━━━━━━━━━━━━━━━━━━\nУдалено: <b>{len(deleted)}</b>\n<code>{html.escape(preview)}</code>")
+                        else:
+                            send_tg("✅ Тестов-сирот не найдено — main чист.")
                     elif text.startswith("/cleanup"):
                         report, plan = build_cleanup_plan()
                         PENDING_CLEANUP_PLAN.clear()
@@ -1484,8 +1505,8 @@ def run_evolution_cycle():
                 f"🧟 <b>Карантин уткнулся в потолок</b>\n━━━━━━━━━━━━━━━━━━━\n"
                 f"Для <code>{mod_name}</code> подряд нашлось {poison_retries}+ левых сломанных тестов "
                 f"({', '.join(poison_quarantined[:8])}{'...' if len(poison_quarantined) > 8 else ''}). "
-                "Похоже, сирот в репозитории куда больше, чем предполагалось — стоит запустить полную "
-                "чистку вручную, а не полагаться на реактивный карантин."
+                "Похоже, сирот в репозитории куда больше, чем предполагалось.",
+                buttons=[[{"text": "🧟 Запустить массовую чистку сейчас", "callback_data": "run_quarantine"}]]
             )
             break
 

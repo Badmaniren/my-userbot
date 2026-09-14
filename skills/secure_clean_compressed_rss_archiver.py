@@ -1,4 +1,7 @@
-from skills.resilient_clean_rss_archiver import ResilientCleanRSSArchiver
+try:
+    from skills.resilient_clean_rss_archiver import ResilientCleanRSSArchiver
+except ModuleNotFoundError:
+    ResilientCleanRSSArchiver = None
 from skills.clean_compressed_db_storage import CleanCompressedDBStorage
 
 
@@ -19,6 +22,12 @@ class SecureCleanCompressedRSSArchiver:
             self.storage = CleanCompressedDBStorage(db_path=self.db_path)
         except TypeError:
             self.storage = CleanCompressedDBStorage()
+
+        global ResilientCleanRSSArchiver
+        if ResilientCleanRSSArchiver is None:
+            from skills.resilient_secure_clean_compressed_rss_archiver import (
+                ResilientSecureCleanCompressedRSSArchiver as ResilientCleanRSSArchiver
+            )
 
         try:
             self.resilient_archiver = ResilientCleanRSSArchiver(db_path=self.db_path)

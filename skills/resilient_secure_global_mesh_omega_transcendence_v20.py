@@ -30,21 +30,21 @@ class ResilientSecureGlobalMeshOmegaTranscendenceV20(
     def validate_target_headers(self, target: str, timeout: int) -> bool:
         try:
             response = requests.head(target, timeout=timeout)
-            return response.status_code == 200
+            return bool(response.status_code == 200)
         except (requests.RequestException, OSError):
             return False
 
     def coordinate_expansion(self, target: str, timeout: int) -> bool:
         try:
             response = requests.get(target, timeout=timeout)
-            return response.status_code == 200
+            return bool(response.status_code == 200)
         except (requests.RequestException, OSError):
             return False
 
     def coordinate_expansion_safe(self, target: str, timeout: int) -> bool:
         try:
             response = requests.get(target, timeout=timeout)
-            return response.status_code == 200
+            return bool(response.status_code == 200)
         except (requests.RequestException, OSError):
             return False
 
@@ -58,8 +58,12 @@ class ResilientSecureGlobalMeshOmegaTranscendenceV20(
             pass
 
     def export_analytics_report(self, target: str, report_data: dict) -> None:
-        self._reports[target] = {**report_data}
+        new_report = {}
+        new_report.update(report_data)
+        self._reports[target] = new_report
 
     def get_exported_report(self, target: str) -> dict:
         report = self._reports.get(target, {})
-        return {**report}
+        copied = {}
+        copied.update(report)
+        return copied

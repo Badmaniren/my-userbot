@@ -13,12 +13,16 @@ class ResilientSecureGlobalMeshOmegaTranscendenceV20Error(Exception):
 # Совместимость с опечаткой в интеграционном тесте (omega с маленькой w)
 ResilientSecureGlobalMeshomegaTranscendenceV20Error = ResilientSecureGlobalMeshOmegaTranscendenceV20Error
 
-class ResilientSecureGlobalMeshOmegaTranscendenceV20(
-    ResilientSecureGlobalMeshOmegaSingularityV19,
-    ResilientSecureGlobalMeshInterfaceV17
-):
+class ResilientSecureGlobalMeshOmegaTranscendenceV20(ResilientSecureGlobalMeshOmegaSingularityV19):
     def __init__(self, db_path=":memory:", max_memory_mb=512, calls=10, period=1.0, raise_on_limit=True):
         super().__init__(
+            db_path=db_path,
+            max_memory_mb=max_memory_mb,
+            calls=calls,
+            period=period,
+            raise_on_limit=raise_on_limit
+        )
+        self.interface_v17 = ResilientSecureGlobalMeshInterfaceV17(
             db_path=db_path,
             max_memory_mb=max_memory_mb,
             calls=calls,

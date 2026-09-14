@@ -12,6 +12,7 @@ import requests
 import threading
 from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from collections import deque
 
 # 1. FAIL-FAST ПРОВЕРКА ОКРУЖЕНИЯ
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "").strip()
@@ -26,8 +27,12 @@ if not GITHUB_TOKEN or not GITHUB_REPO or not API_KEYS:
     print("[FATAL] Отсутствуют критические переменные окружения (GITHUB_TOKEN, GITHUB_REPO, GEMINI_API_KEY)!")
     sys.exit(1)
 
+# Блокировки для потокобезопасности и защита от утечек памяти
+STATE_LOCK = threading.Lock()
+GEMINI_LOCK = threading.Lock()
+
 MANUAL_TASK_QUEUE = []
-HANDLED_JULES_COMMENTS = set()
+HANDLED_JULES_COMMENTS = deque(maxlen=2000)
 
 # 2. СЕРВЕР ЖИЗНИ ДЛЯ RENDER
 class DummyHandler(BaseHTTPRequestHandler):
@@ -80,8 +85,8 @@ def answer_tg_callback(callback_query_id: str, text: str = ""):
     url = f"https://api.telegram.org/bot{TG_TOKEN}/answerCallbackQuery"
     try:
         requests.post(url, json={"callback_query_id": callback_query_id, "text": text[:200]}, timeout=10)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[!] Ошибка answer_tg_callback: {e}")
 
 def set_tg_commands():
     if not TG_TOKEN:
@@ -99,8 +104,8 @@ def set_tg_commands():
     ]
     try:
         requests.post(url, json={"commands": commands}, timeout=10)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[!] Ошибка set_tg_commands: {e}")
 
 HELP_TEXT = (
     "🐒 <b>Пульт управления Питекантропом</b>\n"
@@ -195,12 +200,14 @@ def run_telegram_listener():
                     elif text.startswith("/build"):
                         task_desc = text[6:].strip()
                         if task_desc:
-                            MANUAL_TASK_QUEUE.append(task_desc)
+                            with STATE_LOCK:
+                                MANUAL_TASK_QUEUE.append(task_desc)
                             send_tg(f"🫡 <b>Задача принята в очередь</b>\n━━━━━━━━━━━━━━━━━━━\n<code>{html.escape(task_desc)}</code>")
                         else:
                             send_tg("⚠️ Укажи описание задачи после команды:\n<code>/build утилита_для_парсинга</code>")
                     elif text.startswith("/status"):
-                        q_len = len(MANUAL_TASK_QUEUE)
+                        with STATE_LOCK:
+                            q_len = len(MANUAL_TASK_QUEUE)
                         epic_preview = get_epic_context()
                         if len(epic_preview) > 800:
                             epic_preview = epic_preview[:800] + "..."
@@ -254,7 +261,8 @@ def run_telegram_listener():
                         send_tg(report, buttons=buttons)
                     elif text:
                         send_tg("🤷 Не знаю такой команды.\n" + HELP_TEXT)
-        except Exception:
+        except Exception as e:
+            print(f"[!] Ошибка основного цикла TG-лиссенера: {e}")
             time.sleep(5)
         time.sleep(1)
 
@@ -278,21 +286,24 @@ API_HEADERS = {
 }
 
 def get_current_key():
-    global KEY_INDEX
-    return API_KEYS[KEY_INDEX % len(API_KEYS)]
+    with GEMINI_LOCK:
+        return API_KEYS[KEY_INDEX % len(API_KEYS)]
 
 def rotate_key():
     global KEY_INDEX, MODELS_CACHE
-    if len(API_KEYS) > 1:
-        KEY_INDEX = (KEY_INDEX + 1) % len(API_KEYS)
-        MODELS_CACHE["expires_at"] = 0
-        print(f"[!] Ротация ключа Gemini -> #{KEY_INDEX}")
+    with GEMINI_LOCK:
+        if len(API_KEYS) > 1:
+            KEY_INDEX = (KEY_INDEX + 1) % len(API_KEYS)
+            MODELS_CACHE["expires_at"] = 0
+            print(f"[!] Ротация ключа Gemini -> #{KEY_INDEX}")
 
 def get_viable_models(key: str) -> list:
     global MODELS_CACHE
     now = time.time()
-    if MODELS_CACHE["key"] == key and MODELS_CACHE["expires_at"] > now and MODELS_CACHE["models"]:
-        return MODELS_CACHE["models"]
+    
+    with GEMINI_LOCK:
+        if MODELS_CACHE["key"] == key and MODELS_CACHE["expires_at"] > now and MODELS_CACHE["models"]:
+            return MODELS_CACHE["models"]
 
     url = clean_url(f"{API_BASE}models?key={key}")
     try:
@@ -311,13 +322,15 @@ def get_viable_models(key: str) -> list:
                         viable.append(m)
                         if len(viable) >= 2:
                             break
-                except Exception:
+                except Exception as e:
+                    print(f"[!] Сбой при тесте модели {m}: {e}")
                     continue
             if viable:
-                MODELS_CACHE = {"models": viable, "expires_at": now + 3600, "key": key}
+                with GEMINI_LOCK:
+                    MODELS_CACHE = {"models": viable, "expires_at": now + 3600, "key": key}
                 return viable
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[!] Ошибка получения списка моделей: {e}")
     return []
 
 def strip_markdown(text: str) -> str:
@@ -349,7 +362,8 @@ def ask_gemini(prompt: str, json_mode: bool = False) -> str:
                 if r.status_code in [429, 503]:
                     rotate_key()
                     time.sleep(2)
-            except Exception:
+            except Exception as e:
+                print(f"[!] Ошибка запроса к Gemini ({model}): {e}")
                 time.sleep(2)
     return ""
 
@@ -561,7 +575,8 @@ def reactivate_stuck_jules_issues() -> int:
             del_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues/{number}/labels/jules")
             try:
                 requests.delete(del_url, headers=API_HEADERS, timeout=10)
-            except Exception:
+            except Exception as e:
+                print(f"[!] Ошибка снятия лейбла: {e}")
                 pass
         if add_jules_label(number):
             reactivated += 1
@@ -600,7 +615,9 @@ def run_jules_babysitter():
                         "jules has failed" in body or "try again later by removing and re-adding" in body
                     ):
                         print(f"[*] Jules споткнулся в Issue #{num} (коммент #{c_id}). Перезапуск задачи...")
-                        HANDLED_JULES_COMMENTS.add(c_id)
+                        
+                        with STATE_LOCK:
+                            HANDLED_JULES_COMMENTS.append(c_id)
 
                         del_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues/{num}/labels/jules")
                         requests.delete(del_url, headers=API_HEADERS, timeout=10)
@@ -618,7 +635,8 @@ def refresh_stuck_prs() -> tuple:
         if res.status_code != 200:
             return 0, []
         pr_numbers = [p.get("number") for p in res.json() if p.get("number")]
-    except Exception:
+    except Exception as e:
+        print(f"[!] Ошибка получения PR: {e}")
         return 0, []
 
     refreshed = 0
@@ -657,7 +675,8 @@ def cleanup_orphan_branches() -> int:
             return 0
         branch_names = [b["name"] for b in br_res.json() if b["name"].startswith("unga-")]
         branches_with_pr = {pr["head"]["ref"] for pr in pr_res.json()}
-    except Exception:
+    except Exception as e:
+        print(f"[!] Сбой при получении веток для чистки: {e}")
         return 0
 
     deleted = 0
@@ -681,7 +700,8 @@ def cleanup_orphan_branches() -> int:
             r = requests.delete(del_url, headers=API_HEADERS, timeout=10)
             if r.status_code in [200, 204]:
                 deleted += 1
-        except Exception:
+        except Exception as e:
+            print(f"[!] Сбой при удалении ветки {name}: {e}")
             pass
     return deleted
 
@@ -733,7 +753,6 @@ def get_all_skill_sources() -> dict:
     return sources
 
 def build_skill_import_graph(sources: dict) -> dict:
-    """A -> {множество модулей, которые A импортирует напрямую}."""
     graph = {}
     for name, code in sources.items():
         deps = set(re.findall(r'from\s+skills\.(\w+)\s+import', code))
@@ -742,15 +761,6 @@ def build_skill_import_graph(sources: dict) -> dict:
     return graph
 
 def find_skill_dependents(target: str, sources: dict) -> list:
-    """
-    Кто зависит от target — ТРАНЗИТИВНО, через всю цепочку импортов, а не только
-    напрямую. Прямая проверка ловит A->B, но пропускает A->B->C: если удаляемый
-    target — это C, а B (не A) импортирует его напрямую, прямая проверка всё
-    равно защитит C правильно ТОЛЬКО если сканирует B. Но если B САМ является
-    кандидатом на удаление в другом кластере, а реальный "живой" потребитель —
-    A, который зависит от B, а не от C напрямую, старая проверка теряла A из
-    виду. Строим полный граф и идём в обратную сторону от target по всем цепочкам.
-    """
     graph = build_skill_import_graph(sources)
     dependents = set()
     changed = True
@@ -765,12 +775,6 @@ def find_skill_dependents(target: str, sources: dict) -> list:
     return sorted(dependents)
 
 def audit_skill_import_graph() -> dict:
-    """
-    Показывает РЕАЛЬНУЮ причину поломки цепочки, а не только то место, где
-    трейсбек CI оборвался (Telegram обрезает длинные сообщения, и настоящая
-    причина в глубине цепочки часто просто не долетает до экрана). Возвращает
-    {модуль_которого_физически_нет: [все, кто от него транзитивно зависит]}.
-    """
     manifest = get_skills_manifest()
     existing = set(manifest.keys())
     sources = get_all_skill_sources()
@@ -784,8 +788,6 @@ def audit_skill_import_graph() -> dict:
     result = {}
     for missing_name in missing:
         affected = find_skill_dependents(missing_name, sources) 
-        # target формально отсутствует в sources, но find_skill_dependents всё
-        # равно корректно посчитает всех, кто транзитивно на него ссылается
         if affected:
             result[missing_name] = affected
     return result
@@ -1350,16 +1352,6 @@ def check_main_health() -> tuple:
         return True, "", None
 
 def bulk_quarantine_orphaned_tests() -> list:
-    """
-    Каждый test_*.py у нас всегда назван по имени своего модуля (test_X.py или
-    test_X_integration.py для skills/X.py). Если X давно удалён (например, через
-    /cleanup или просто заброшен посреди истории с раздуванием имён), а тест
-    остался — при сборе тестов он падает на импорте и ломает ВЕСЬ прогон для
-    абсолютно любой задачи. Реактивный карантин по одному файлу за раунд (через
-    полный прогон CI на каждый) не масштабируется, если таких сирот сотни — это
-    именно то, что случилось. Чистим всё разом, статически, без единого прогона CI:
-    просто сверяем имя теста со списком реально существующих модулей.
-    """
     url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents?ref=main")
     try:
         r = requests.get(url, headers=API_HEADERS, timeout=15)
@@ -1411,10 +1403,6 @@ def heal_main_if_poisoned() -> bool:
     return False
 
 def is_jules_working_on(mod_name: str) -> bool:
-    """
-    Проверяет, занят ли Jules модулем прямо сейчас.
-    Возвращает False, если Jules уже закончил работу (открыл PR) или сдох.
-    """
     url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues")
     try:
         res = requests.get(url, headers=API_HEADERS, params={"state": "open", "per_page": 30}, timeout=10)
@@ -1487,7 +1475,9 @@ def run_evolution_cycle():
     lessons = get_lessons_context()
     epic = get_epic_context()
 
-    manual_task = MANUAL_TASK_QUEUE.pop(0) if MANUAL_TASK_QUEUE else ""
+    with STATE_LOCK:
+        manual_task = MANUAL_TASK_QUEUE.pop(0) if MANUAL_TASK_QUEUE else ""
+        
     if manual_task:
         print(f"[!] ВЗЯТА РУЧНАЯ ЗАДАЧА ИЗ TELEGRAM: {manual_task}")
         send_tg(f"⚙️ <b>Питекантроп начал сборку:</b>\n<i>{html.escape(manual_task)}</i>")
@@ -1561,8 +1551,6 @@ def run_evolution_cycle():
             poison_retries += 1
             print(f"[!] Отравляющий файл {poison_module}.py не имеет отношения к '{mod_name}' — карантин ({poison_retries}/{MAX_POISON_RETRIES}) вместо правки своего кода.")
             removed_from_branch = delete_repo_file(f"{poison_module}.py", f"Карантин: {poison_module}.py блокировал задачу {mod_name} [skip ci]", branch=branch)
-            # чистим и main — иначе КАЖДАЯ будущая ветка будет форкаться от main и
-            # снова наследовать этого же сироту, и карантин придётся повторять вечно
             delete_repo_file(f"{poison_module}.py", f"Карантин: {poison_module}.py блокировал задачи [skip ci]", branch="main")
             if removed_from_branch:
                 poison_quarantined.append(f"{poison_module}.py")

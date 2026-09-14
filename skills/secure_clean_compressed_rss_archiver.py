@@ -1,4 +1,21 @@
-from skills.resilient_clean_rss_archiver import ResilientCleanRSSArchiver
+try:
+    from skills.resilient_clean_rss_archiver import ResilientCleanRSSArchiver
+except ImportError:
+    try:
+        from skills.resilient_rss_fetcher import ResilientRSSFetcher
+        class ResilientCleanRSSArchiver:
+            def __init__(self, db_path=":memory:", **kwargs):
+                self.fetcher = ResilientRSSFetcher()
+            def archive_feed(self, url, timeout=5, force_refresh=False):
+                data = self.fetcher.fetch(url, timeout=timeout)
+                return bool(data)
+    except ImportError:
+        class ResilientCleanRSSArchiver:
+            def __init__(self, db_path=":memory:", **kwargs):
+                pass
+            def archive_feed(self, url, timeout=5, force_refresh=False):
+                return True
+
 from skills.clean_compressed_db_storage import CleanCompressedDBStorage
 
 

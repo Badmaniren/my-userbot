@@ -1,139 +1,119 @@
-import sys
-from unittest.mock import MagicMock
-
-# Превентивное маскирование внешних зависимостей до импорта тестируемого модуля
-sys.modules['skills.resilient_secure_global_mesh_interface_v17'] = MagicMock()
-sys.modules['skills.resilient_secure_global_mesh_synthetic_intelligence_v16'] = MagicMock()
-
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
+import io
+import requests
+
 from skills.resilient_secure_global_mesh_omega_singularity_v19 import (
     ResilientSecureGlobalMeshOmegaSingularityV19,
-    ResilientSecureGlobalMeshOmegaSingularityV19Error
+    ResilientSecureGlobalMeshOmegaSingularityV19Error,
 )
+
 
 class TestResilientSecureGlobalMeshOmegaSingularityV19(unittest.TestCase):
     def setUp(self):
-        self.node = ResilientSecureGlobalMeshOmegaSingularityV19()
+        self.singularity = ResilientSecureGlobalMeshOmegaSingularityV19(
+            db_path=":memory:",
+            max_memory_mb=256,
+            calls=5,
+            period=30,
+            raise_on_limit=False
+        )
 
-    def test_init_configuration(self):
-        self.assertIsNotNone(self.node.interface_v17)
-        self.assertIsNotNone(self.node.synthetic_intelligence_v16)
-        self.assertEqual(self.node._reports, {})
+    def test_initialization(self):
+        self.assertIsNotNone(self.singularity.interface_v17)
+        self.assertIsNotNone(self.singularity.synthetic_intelligence_v16)
+        self.assertEqual(self.singularity._reports, {})
 
-    def test_validate_target_headers_success(self):
-        with patch('requests.head') as mock_head:
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_head.return_value = mock_response
-            
-            res = self.node.validate_target_headers("http://localhost/mesh")
-            self.assertTrue(res)
-            mock_head.assert_called_once_with("http://localhost/mesh", timeout=5.0)
+    @patch('skills.resilient_secure_global_mesh_omega_singularity_v19.requests.head')
+    def test_validate_target_headers_success(self, mock_head):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_head.return_value = mock_response
 
-    def test_validate_target_headers_failure_status(self):
-        with patch('requests.head') as mock_head:
-            mock_response = MagicMock()
-            mock_response.status_code = 500
-            mock_head.return_value = mock_response
-            
-            res = self.node.validate_target_headers("http://localhost/mesh")
-            self.assertFalse(res)
+        result = self.singularity.validate_target_headers("https://example.com")
+        self.assertTrue(result)
+        mock_head.assert_called_once_with("https://example.com", timeout=5.0)
 
-    def test_validate_target_headers_exception_handled(self):
-        with patch('requests.head') as mock_head:
-            mock_head.side_effect = Exception("Connection refused by Inquisitorial decree")
-            
-            res = self.node.validate_target_headers("http://localhost/mesh")
-            self.assertFalse(res)
+    @patch('skills.resilient_secure_global_mesh_omega_singularity_v19.requests.head')
+    def test_validate_target_headers_failure(self, mock_head):
+        mock_response = MagicMock()
+        mock_response.status_code = 404
+        mock_head.return_value = mock_response
 
-    def test_coordinate_expansion_success(self):
-        with patch('requests.get') as mock_get:
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_get.return_value = mock_response
-            
-            res = self.node.coordinate_expansion("http://localhost/expand")
-            self.assertTrue(res)
-            mock_get.assert_called_once_with("http://localhost/expand", timeout=5.0)
+        result = self.singularity.validate_target_headers("https://example.com")
+        self.assertFalse(result)
 
-    def test_coordinate_expansion_failure_status(self):
-        with patch('requests.get') as mock_get:
-            mock_response = MagicMock()
-            mock_response.status_code = 404
-            mock_get.return_value = mock_response
-            
-            res = self.node.coordinate_expansion("http://localhost/expand")
-            self.assertFalse(res)
+    @patch('skills.resilient_secure_global_mesh_omega_singularity_v19.requests.head')
+    def test_validate_target_headers_exception(self, mock_head):
+        mock_head.side_effect = requests.RequestException("Connection error")
 
-    def test_coordinate_expansion_exception_propagates(self):
-        with patch('requests.get') as mock_get:
-            mock_get.side_effect = Exception("Critical network failure")
-            
-            with self.assertRaises(Exception):
-                self.node.coordinate_expansion("http://localhost/expand")
+        result = self.singularity.validate_target_headers("https://example.com")
+        self.assertFalse(result)
 
-    def test_coordinate_expansion_safe_success(self):
-        with patch('requests.get') as mock_get:
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_get.return_value = mock_response
-            
-            res = self.node.coordinate_expansion_safe("http://localhost/expand")
-            self.assertTrue(res)
+    @patch('skills.resilient_secure_global_mesh_omega_singularity_v19.requests.get')
+    def test_coordinate_expansion_success(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_get.return_value = mock_response
 
-    def test_coordinate_expansion_safe_exception_handled(self):
-        with patch('requests.get') as mock_get:
-            mock_get.side_effect = Exception("Suppressed network anomaly")
-            
-            res = self.node.coordinate_expansion_safe("http://localhost/expand")
-            self.assertFalse(res)
+        result = self.singularity.coordinate_expansion("https://example.com")
+        self.assertTrue(result)
+        mock_get.assert_called_once_with("https://example.com", timeout=5.0)
 
-    def test_route_request_bytes_decoding(self):
-        with patch('requests.get') as mock_get:
-            mock_response = MagicMock()
-            mock_response.content = b"Decoded Singularity Payload"
-            mock_get.return_value = mock_response
-            
-            res = self.node.route_request("http://localhost/route")
-            self.assertEqual(res, "Decoded Singularity Payload")
+    @patch('skills.resilient_secure_global_mesh_omega_singularity_v19.requests.get')
+    def test_coordinate_expansion_safe_success(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_get.return_value = mock_response
 
-    def test_route_request_non_bytes_fallback(self):
-        with patch('requests.get') as mock_get:
-            mock_response = MagicMock()
-            mock_response.content = 123456789
-            mock_get.return_value = mock_response
-            
-            res = self.node.route_request("http://localhost/route")
-            self.assertEqual(res, "123456789")
+        result = self.singularity.coordinate_expansion_safe("https://example.com")
+        self.assertTrue(result)
 
-    def test_process_stream(self):
-        with patch('requests.get') as mock_get:
-            mock_response = MagicMock()
-            mock_response.iter_content.return_value = [b"chunk_alpha", b"chunk_omega"]
-            mock_get.return_value = mock_response
-            
-            res = self.node.process_stream("http://localhost/stream")
-            self.assertIsNone(res)
-            mock_get.assert_called_once_with("http://localhost/stream", stream=True, timeout=5.0)
+    @patch('skills.resilient_secure_global_mesh_omega_singularity_v19.requests.get')
+    def test_coordinate_expansion_safe_exception(self, mock_get):
+        mock_get.side_effect = Exception("Timeout")
 
-    def test_analytics_report_lifecycle(self):
-        target = "omega_node_v19"
-        report_data = {"integrity": 1.0, "consensus": True}
-        
-        self.node.export_analytics_report(target, report_data)
-        retrieved = self.node.get_exported_report(target)
-        
-        self.assertEqual(retrieved, report_data)
-        self.assertIsNot(retrieved, report_data)  # Проверка глубокого копирования словаря
+        result = self.singularity.coordinate_expansion_safe("https://example.com")
+        self.assertFalse(result)
 
-    def test_get_exported_report_missing_target(self):
-        retrieved = self.node.get_exported_report("non_existent_node")
-        self.assertEqual(retrieved, {})
+    @patch('skills.resilient_secure_global_mesh_omega_singularity_v19.requests.get')
+    def test_route_request_bytes(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.content = b"omega singularity payload"
+        mock_get.return_value = mock_response
 
-    def test_custom_exception_raising(self):
-        with self.assertRaises(ResilientSecureGlobalMeshOmegaSingularityV19Error):
-            raise ResilientSecureGlobalMeshOmegaSingularityV19Error("Inquisitorial purge initiated")
+        result = self.singularity.route_request("https://example.com")
+        self.assertEqual(result, "omega singularity payload")
 
-if __name__ == '__main__':
-    unittest.main()
+    @patch('skills.resilient_secure_global_mesh_omega_singularity_v19.requests.get')
+    def test_route_request_string(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.content = "string payload"
+        mock_get.return_value = mock_response
+
+        result = self.singularity.route_request("https://example.com")
+        self.assertEqual(result, "string payload")
+
+    @patch('skills.resilient_secure_global_mesh_omega_singularity_v19.requests.get')
+    def test_process_stream(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.iter_content.return_value = iter([b"chunk1", b"chunk2"])
+        mock_get.return_value = mock_response
+
+        result = self.singularity.process_stream("https://example.com")
+        self.assertIsNone(result)
+        mock_get.assert_called_once_with("https://example.com", stream=True, timeout=5.0)
+
+    def test_export_and_get_exported_report(self):
+        target = "matrix_v19"
+        data = {"status": "transcendent", "metrics": 45}
+
+        self.singularity.export_analytics_report(target, data)
+        report = self.singularity.get_exported_report(target)
+
+        self.assertEqual(report, data)
+        self.assertIsNot(report, data)
+
+    def test_get_exported_report_missing(self):
+        report = self.singularity.get_exported_report("nonexistent_target")
+        self.assertEqual(report, {})

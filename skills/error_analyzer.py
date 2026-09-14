@@ -3,9 +3,12 @@ import io
 
 class ErrorAnalyzer:
     def parse_log(self, file_path: str) -> bool:
-        with open(file_path, "rb") as f:
-            content = f.read()
-        return bool(content)
+        try:
+            with open(file_path, "rb") as f:
+                content = f.read()
+            return bool(content)
+        except (FileNotFoundError, OSError):
+            return False
 
     def _query_knowledge_base(self, error_signature: str) -> bool:
         return "NullPointerException" in error_signature

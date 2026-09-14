@@ -1266,7 +1266,7 @@ def architect_write_hard_tests(task: dict, manifest: dict, lessons: str, existin
         f"{context_code}{_compose_context(task)}{context_stagnation}\n"
         f"СИГНАТУРЫ И ТИПЫ:\n{manifest_for_prompt(manifest, always_full=task.get('composed_of'))}\n\n"
         "СТРОГИЕ ПРАВИЛА:\n"
-        "1. Библиотеки: standard lib, unittest, unittest.mock, requests, bs4.\n"
+        "1. Библиотеки: standard lib, unittest, unittest.mock, requests, bs4. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО использовать pytest!\n"
         "2. Запрещено вешать `@patch` над методами! Только `with patch(...) as mock:` внутри метода!\n"
         "3. Валидация возвращает bool: проверяй `assertTrue(res)` или `assertFalse(res)`. НЕ ПИШИ `res[0]`!\n"
         "4. Ошибки: ждёшь падения — используй `with self.assertRaises(...)`. Без assertRaises функция должна вернуть False, а не падать!\n"
@@ -1283,7 +1283,7 @@ def architect_write_integration_test(task: dict, manifest: dict, lessons: str, e
         f"Описание: {task['description']}\n"
         f"{context_code}{_compose_context(task)}\n"
         f"СИГНАТУРЫ:\n{manifest_for_prompt(manifest, always_full=task.get('composed_of'))}\n\n"
-        "ПРАВИЛА: Смотри на возвращаемые типы (str, bool). Импортируй ТОЛЬКО существующие имена. Вызывай создаваемый модуль. Без markdown."
+        "ПРАВИЛА: Смотри на возвращаемые типы (str, bool). Импортируй ТОЛЬКО существующие имена. Вызывай создаваемый модуль. Без markdown. ИСПОЛЬЗУЙ ТОЛЬКО unittest, КАТЕГОРИЧЕСКИ ЗАПРЕЩЕН pytest!"
     )
     return ask_gemini(prompt)
 

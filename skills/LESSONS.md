@@ -3,7 +3,14 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ешно прошёл тесты и влит в main
+Н Унгой, передан на эскалацию
+
+## resilient_secure_smart_crawler_hub_v7_orchestrator (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## resilient_secure_smart_crawler_hub_v8_enterprise (compose) — раундов: 2
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main
 
 ## resilient_secure_smart_crawler_hub_v9_autonomous (compose) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
@@ -315,8 +322,4 @@
 
 ## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 1
 - Последняя ошибка перед фиксом: from skills.resilient_secure_smart_crawler_hub_v4 import ResilientSecureSmartCrawlerHubV4
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 1
-- Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/skills/resilient_secure_smart_crawler_hub_analytics_exporter.py", line 1, in <module>
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

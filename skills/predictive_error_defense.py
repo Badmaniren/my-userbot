@@ -16,7 +16,7 @@ class PredictiveErrorDefense:
         try:
             return self.pipeline.process_stream_pipeline(stream_data)
         except Exception:
-            raise
+            return False
 
     def verify_defense_fix(self, url: str) -> bool:
         return self.pipeline.verify_pipeline_fix(url)

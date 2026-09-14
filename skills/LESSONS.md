@@ -3,14 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ю
-
-## resilient_secure_smart_crawler_hub_v2 (compose) — раундов: 2
-- Последняя ошибка перед фиксом: ^^^^^^^^^^^^^
-- Статус: успешно прошёл тесты и влит в main
-
-## resilient_secure_smart_crawler_hub_v3 (compose) — раундов: 2
-- Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/skills/resilient_secure_smart_crawler_hub_v3.py", line 56, in process_stream
+ом: File "/home/runner/work/my-userbot/my-userbot/skills/resilient_secure_smart_crawler_hub_v3.py", line 56, in process_stream
 - Статус: успешно прошёл тесты и влит в main
 
 ## resilient_secure_smart_crawler_hub_v4 (compose) — раундов: 1
@@ -335,4 +328,8 @@
 
 ## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 1
 - Последняя ошибка перед фиксом: from skills.resilient_clean_rss_archiver import ResilientCleanRSSArchiver
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 1
+- Последняя ошибка перед фиксом: from skills.resilient_secure_global_mesh_matrix_v7 import ResilientSecureGlobalMeshMatrixV7
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

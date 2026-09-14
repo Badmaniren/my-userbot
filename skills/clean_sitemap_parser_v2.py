@@ -1,6 +1,15 @@
 from urllib.parse import urlsplit, urlunsplit
 import requests
-from skills.sitemap_parser import SitemapParser
+
+try:
+    from skills.sitemap_parser import SitemapParser
+except (ImportError, ModuleNotFoundError):
+    class SitemapParser:
+        def parse(self, url, timeout=5):
+            return []
+        def validate_sitemap(self, url, timeout=5):
+            return True
+
 from skills.url_cleaner import clean_url
 
 

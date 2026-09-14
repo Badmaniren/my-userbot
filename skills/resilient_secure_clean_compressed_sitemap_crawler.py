@@ -1,6 +1,12 @@
 import functools
-from skills import resilient_clean_compressed_sitemap_crawler, resilient_secure_clean_url_crawler_v2
-from skills.resilient_clean_compressed_sitemap_crawler import ResilientCleanCompressedSitemapCrawler
+try:
+    from skills import resilient_clean_compressed_sitemap_crawler
+    from skills.resilient_clean_compressed_sitemap_crawler import ResilientCleanCompressedSitemapCrawler
+except (ImportError, ModuleNotFoundError):
+    from skills import resilient_clean_compressed_sitemap_parser as resilient_clean_compressed_sitemap_crawler
+    from skills.resilient_clean_compressed_sitemap_parser import ResilientCleanCompressedSitemapParser as ResilientCleanCompressedSitemapCrawler
+
+from skills import resilient_secure_clean_url_crawler_v2
 
 try:
     from utils import memory_profiler, rate_limiter
@@ -25,7 +31,10 @@ class ResilientSecureCleanCompressedSitemapCrawlerError(Exception):
 
 class ResilientSecureCleanCompressedSitemapCrawler(ResilientCleanCompressedSitemapCrawler):
     def __init__(self, db_path=":memory:", max_memory_mb=128, calls=10, period=1.0, raise_on_limit=True):
-        super().__init__()
+        try:
+            super().__init__()
+        except TypeError:
+            super().__init__(db_path=db_path)
         self.db_path = db_path
         self.max_memory_mb = max_memory_mb
         self.calls = calls
@@ -58,13 +67,17 @@ class ResilientSecureCleanCompressedSitemapCrawler(ResilientCleanCompressedSitem
     def crawl(self, url, timeout=5):
         @self._apply_guards
         def _execute():
-            return super(ResilientSecureCleanCompressedSitemapCrawler, self).crawl(url, timeout)
+            if hasattr(super(ResilientSecureCleanCompressedSitemapCrawler, self), "crawl"):
+                return super(ResilientSecureCleanCompressedSitemapCrawler, self).crawl(url, timeout)
+            return super(ResilientSecureCleanCompressedSitemapCrawler, self).parse(url, timeout)
         return _execute()
 
     def crawl_and_clean(self, url, timeout=5):
         @self._apply_guards
         def _execute():
-            return super(ResilientSecureCleanCompressedSitemapCrawler, self).crawl_and_clean(url, timeout)
+            if hasattr(super(ResilientSecureCleanCompressedSitemapCrawler, self), "crawl_and_clean"):
+                return super(ResilientSecureCleanCompressedSitemapCrawler, self).crawl_and_clean(url, timeout)
+            return super(ResilientSecureCleanCompressedSitemapCrawler, self).parse_and_clean(url, timeout)
         return _execute()
 
 def resilient_secure_clean_compressed_sitemap_crawler_flow(

@@ -25,6 +25,11 @@ class ResilientSecureGlobalMeshOmegaTranscendenceV20(
             period=period,
             raise_on_limit=raise_on_limit
         )
+        self.db_path = db_path
+        self.max_memory_mb = max_memory_mb
+        self.calls = calls
+        self.period = period
+        self.raise_on_limit = raise_on_limit
         self._reports = {}
 
     def validate_target_headers(self, target: str, timeout: int) -> bool:

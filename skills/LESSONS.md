@@ -77,3 +77,6 @@
 
 ## predictive_diagnostic_hub (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## predictive_diagnostic_hub (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

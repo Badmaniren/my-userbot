@@ -1,41 +1,60 @@
 import unittest
-import os
-import tempfile
 from skills.predictive_diagnostic_hub import PredictiveDiagnosticHub
 
+
 class TestPredictiveDiagnosticHubIntegration(unittest.TestCase):
+
     def setUp(self):
         self.hub = PredictiveDiagnosticHub()
-        self.test_log_fd, self.test_log_path = tempfile.mkstemp(suffix=".log")
-        os.write(self.test_log_fd, b"CRITICAL: Test predictive diagnostic error signature 0xDEADBEEF")
-        os.close(self.test_log_fd)
+        self.valid_log_path = "test_system.log"
+        self.valid_signature = "ERR_CRITICAL_001"
+        self.valid_stream = {"metric": "CPU_HIGH", "error": True}
+        self.valid_url = "http://localhost:8080/health"
+
+        with open(self.valid_log_path, "w") as f:
+            f.write("2023-10-01 10:00:00 ERROR Test error signature\n")
 
     def tearDown(self):
-        if os.path.exists(self.test_log_path):
-            os.remove(self.test_log_path)
+        import os
+        if os.path.exists(self.valid_log_path):
+            os.remove(self.valid_log_path)
 
-    def test_hub_composition_and_pipeline(self):
-        signature = "0xDEADBEEF"
-        stream_data = {"error": "stream_failure", "code": 500}
-        health_url = "http://localhost:8080/health"
+    def test_run_autonomous_center(self):
+        result = self.hub.run_autonomous_center(self.valid_log_path, self.valid_signature)
+        self.assertIsInstance(result, bool)
 
-        defense_res = self.hub.process_predictive_defense(self.test_log_path)
-        self.assertIsInstance(defense_res, bool)
+    def test_process_stream_center(self):
+        result = self.hub.process_stream_center(self.valid_stream)
+        self.assertIsInstance(result, bool)
 
-        stream_defense_res = self.hub.process_stream_defense_data(stream_data)
-        self.assertIsInstance(stream_defense_res, bool)
+    def test_verify_and_heal_system(self):
+        result = self.hub.verify_and_heal_system(self.valid_url)
+        self.assertIsInstance(result, bool)
 
-        action_res = self.hub.handle_hub_action(self.test_log_path, signature)
-        self.assertIsInstance(action_res, bool)
+    def test_process_predictive_defense(self):
+        result = self.hub.process_predictive_defense(self.valid_log_path)
+        self.assertIsInstance(result, bool)
 
-        stream_action_res = self.hub.process_hub_stream_action(stream_data)
-        self.assertIsInstance(stream_action_res, bool)
+    def test_process_stream_defense_data(self):
+        result = self.hub.process_stream_defense_data(self.valid_stream)
+        self.assertIsInstance(result, bool)
 
-        verify_res = self.hub.verify_hub_system_health(health_url)
-        self.assertIsInstance(verify_res, bool)
+    def test_handle_hub_action(self):
+        result = self.hub.handle_hub_action(self.valid_log_path, self.valid_signature)
+        self.assertIsInstance(result, bool)
 
-        pipeline_res = self.hub.run_comprehensive_hub_pipeline(self.test_log_path, signature)
-        self.assertIsInstance(pipeline_res, bool)
+    def test_process_hub_stream_action(self):
+        result = self.hub.process_hub_stream_action(self.valid_stream)
+        self.assertIsInstance(result, bool)
+
+    def test_verify_hub_system_health(self):
+        result = self.hub.verify_hub_system_health(self.valid_url)
+        self.assertIsInstance(result, bool)
+
+    def test_run_comprehensive_hub_pipeline(self):
+        result = self.hub.run_comprehensive_hub_pipeline(self.valid_log_path, self.valid_signature)
+        self.assertIsInstance(result, bool)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -60,3 +60,6 @@
 ## diagnostic_reporter (compose) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: успешно прошёл тесты и влит в main
+
+## diagnostic_action_hub (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

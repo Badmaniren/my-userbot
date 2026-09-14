@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ерез raise.
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## resilient_secure_smart_crawler_hub_v10_autonomous_enterprise (compose) — раундов: 1
+_enterprise (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## resilient_secure_smart_crawler_hub_v11_global_mesh (compose) — раундов: 1
@@ -324,3 +320,7 @@
 ## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 1
 - Последняя ошибка перед фиксом: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## resilient_secure_global_mesh_omega_singularity_v19 (refactor) — раундов: 1
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main

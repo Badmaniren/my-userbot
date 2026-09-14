@@ -24,7 +24,7 @@ class ResilientSecureGlobalMeshOmegaSingularityV45:
         try:
             response = requests.head(target, timeout=timeout)
             return bool(response.status_code == 200)
-        except requests.RequestException:
+        except Exception:
             return False
 
     def coordinate_expansion(self, target: str, timeout: int) -> bool:

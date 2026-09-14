@@ -1,4 +1,8 @@
-from skills import clean_url_crawler, rate_limiter
+try:
+    from skills import clean_url_crawler
+except ImportError:
+    from skills import smart_crawler as clean_url_crawler
+from skills import rate_limiter
 
 class ResilientCleanUrlCrawlerError(Exception):
     """Базовое исключение для ResilientCleanUrlCrawler."""

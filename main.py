@@ -1254,7 +1254,7 @@ def _compose_context(task: dict) -> str:
     composed_of = task.get("composed_of") or []
     if not composed_of:
         return ""
-    return f"\nЭТО КОМПОЗИЦИЯ: модуль ОБЯЗАН импортировать и использовать существу навыки {composed_of}.\n"
+    return f"\nЭТО КОМПОЗИЦИЯ: модуль ОБЯЗАН импортировать и использовать существующие навыки {composed_of}.\n"
 
 def architect_write_hard_tests(task: dict, manifest: dict, lessons: str, existing_code: str = "", error_log: str = "") -> str:
     context_code = f"КОД ДО РЕФАКТОРИНГА:\n{existing_code}\n" if existing_code else ""
@@ -1392,7 +1392,10 @@ def delete_repo_file(path: str, message: str, branch: str = "main") -> bool:
 
 def find_poisoning_import_error(error_text: str) -> str:
     m = re.search(r"Failed to import test module:\s*(\S+)", error_text or "")
-    return m.group(1).strip() if m else ""
+    if m:
+        # ПИТОН ПИШЕТ МОДУЛИ ЧЕРЕЗ ТОЧКУ, А НАМ НУЖЕН СЛЕШ ДЛЯ ФАЙЛА
+        return m.group(1).strip().replace(".", "/")
+    return ""
 
 def check_main_health() -> tuple:
     url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/actions/runs")
@@ -1678,7 +1681,9 @@ def run_evolution_cycle():
 
         issue_url = escalate_to_github_issue(mod_name, decision.get('description', ''), last_error, branch)
 
-        err_snippet = last_error.splitlines()[-5:] if last_error else ["Неизвестная ошибка"]
+        # Вытаскиваем полезные строки без мусора, чтобы не было пустых блоков в Телеге
+        clean_lines = [l for l in (last_error or "Неизвестная ошибка").splitlines() if l.strip() and not l.startswith("---") and not l.startswith("===") and "Ran " not in l and "FAILED" not in l]
+        err_snippet = clean_lines[:10] if clean_lines else ["Неизвестная ошибка"]
         escaped_err = html.escape("\n".join(err_snippet))
 
         if issue_url:

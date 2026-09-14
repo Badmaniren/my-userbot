@@ -7,7 +7,11 @@ class ErrorPipeline:
         self.corrector = AutoCorrector()
 
     def run_pipeline(self, log_path: str) -> bool:
-        parsed = self.analyzer.parse_log(log_path)
+        try:
+            parsed = self.analyzer.parse_log(log_path)
+        except Exception:
+            raise
+        
         if not parsed:
             return False
         

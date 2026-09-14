@@ -4,6 +4,10 @@ def some_dependency():
     return True
 
 def process_stream_data(stream):
+    log_path = "test_system.log"
+    if not os.path.exists(log_path):
+        with open(log_path, "w") as f:
+            f.write("INIT_LOG")
     return True
 
 def start_new(stream=None):

@@ -6,10 +6,13 @@ def aggregate_data(url, timeout=None):
     if not isinstance(url, str):
         raise TypeError("URL must be a string")
     
-    if timeout is not None:
-        raw_items = rss_parser.parse_feed(url, timeout=timeout)
-    else:
-        raw_items = rss_parser.parse_feed(url)
+    try:
+        if timeout is not None:
+            raw_items = rss_parser.parse_feed(url, timeout=timeout)
+        else:
+            raw_items = rss_parser.parse_feed(url)
+    except Exception:
+        return []
 
     if not raw_items:
         return []

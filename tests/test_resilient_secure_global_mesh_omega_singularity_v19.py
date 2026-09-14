@@ -1,12 +1,5 @@
-import sys
-from unittest.mock import MagicMock
-
-# Превентивное маскирование внешних зависимостей до импорта тестируемого модуля
-sys.modules['skills.resilient_secure_global_mesh_interface_v17'] = MagicMock()
-sys.modules['skills.resilient_secure_global_mesh_synthetic_intelligence_v16'] = MagicMock()
-
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from skills.resilient_secure_global_mesh_omega_singularity_v19 import (
     ResilientSecureGlobalMeshOmegaSingularityV19,
     ResilientSecureGlobalMeshOmegaSingularityV19Error

@@ -33,7 +33,7 @@ class DiagnosticReporter:
         try:
             response = requests.get(url)
             return response.status_code == 200
-        except requests.RequestException:
+        except (requests.RequestException, Exception):
             return False
 
 

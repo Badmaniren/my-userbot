@@ -3,13 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-т в main
-
-## resilient_secure_global_mesh_node_v2 (compose) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: успешно прошёл тесты и влит в main
-
-## resilient_secure_global_mesh_router_v3 (compose) — раундов: 1
+ent_secure_global_mesh_router_v3 (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## resilient_secure_global_mesh_coordinator_v4 (compose) — раундов: 4
@@ -316,6 +310,10 @@
 ## resilient_secure_global_mesh_omega_singularity_v19 (refactor) — раундов: 1
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main
+
+## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 1
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 1
 - Последняя ошибка перед фиксом: FAILED (errors=2)

@@ -3,7 +3,11 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-d_synchronizer_v13 (compose) — раундов: 3
+mesh_nexus_v12 (compose) — раундов: 2
+- Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## resilient_secure_global_mesh_distributed_synchronizer_v13 (compose) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: успешно прошёл тесты и влит в main
 
@@ -292,10 +296,6 @@ d_synchronizer_v13 (compose) — раундов: 3
 
 ## resilient_secure_global_mesh_omega_singularity_v19 (refactor) — раундов: 3
 - Последняя ошибка перед фиксом: from skills.resilient_secure_smart_crawler_hub_analytics_v2 import ResilientSecureSmartCrawlerHubAnalyticsV2
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 1
-- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## resilient_secure_global_mesh_omega_transcendence_v20 (refactor) — раундов: 1

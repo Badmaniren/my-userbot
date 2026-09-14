@@ -33,6 +33,7 @@ GEMINI_LOCK = threading.Lock()
 
 MANUAL_TASK_QUEUE = []
 HANDLED_JULES_COMMENTS = deque(maxlen=2000)
+PINGED_DIRTY_PRS = set()
 
 # 2. СЕРВЕР ЖИЗНИ ДЛЯ RENDER
 class DummyHandler(BaseHTTPRequestHandler):
@@ -96,10 +97,11 @@ def set_tg_commands():
         {"command": "status", "description": "📊 Текущий статус и эпик"},
         {"command": "build", "description": "⚙️ Поставить задачу вручную"},
         {"command": "jules", "description": "🔁 Реактивировать зависшие Jules-задачи"},
-        {"command": "prs", "description": "🔀 Подтянуть main во все отстающие PR"},
+        {"command": "prs", "description": "🔀 Подтянуть main и пнуть Jules чинить конфликты"},
         {"command": "quarantine", "description": "🧟 Массово вычистить тесты-сироты с main"},
         {"command": "audit", "description": "🔎 Найти реально сломанные цепочки импортов"},
         {"command": "cleanup", "description": "🧹 Найти и удалить дубли навыков"},
+        {"command": "nuke", "description": "☢️ Сжечь все скиллы к хуям (полный вайп)"},
         {"command": "help", "description": "❓ Список команд"},
     ]
     try:
@@ -113,10 +115,11 @@ HELP_TEXT = (
     "📊 <code>/status</code> — что бот делает сейчас и какой эпик в работе\n"
     "⚙️ <code>/build &lt;описание&gt;</code> — поставить задачу вручную в очередь\n"
     "🔁 <code>/jules</code> — растолкать зависшие Jules-задачи\n"
-    "🔀 <code>/prs</code> — подтянуть main во все отстающие PR\n"
+    "🔀 <code>/prs</code> — подтянуть main во все PR и заставить Jules чинить конфликты\n"
     "🧟 <code>/quarantine</code> — сразу вычистить тесты-сироты с main\n"
     "🔎 <code>/audit</code> — найти реально сломанные цепочки импортов между навыками\n"
     "🧹 <code>/cleanup</code> — найти дубли навыков и предложить удаление\n"
+    "☢️ <code>/nuke</code> — стереть память и удалить все навыки, чтобы начать с нуля\n"
     "❓ <code>/help</code> — это сообщение\n"
     "━━━━━━━━━━━━━━━━━━━\n"
     "<i>Кнопки внизу экрана дублируют команды — жми, а не печатай.</i>"
@@ -159,11 +162,11 @@ def run_telegram_listener():
                             else:
                                 send_tg("ℹ️ Открытых Jules-задач не найдено — реактивировать нечего.")
                         elif cb_data == "refreshprs":
-                            answer_tg_callback(callback["id"], "Обновляю PR от main...")
-                            refreshed, dirty_urls = refresh_stuck_prs()
-                            msg = f"🔀 Обновлено PR: <b>{refreshed}</b>."
+                            answer_tg_callback(callback["id"], "Обновляю PR от main и пинаю Jules...")
+                            refreshed, dirty_urls, pinged_jules = refresh_stuck_prs()
+                            msg = f"🔀 Обновлено PR (без конфликтов): <b>{refreshed}</b>."
                             if dirty_urls:
-                                msg += f"\n⚠️ С настоящими конфликтами: <b>{len(dirty_urls)}</b> (нужна ручная правка)."
+                                msg += f"\n⚠️ С конфликтами: <b>{len(dirty_urls)}</b>. Отправлено команд Jules на фикс: <b>{pinged_jules}</b>."
                             send_tg(msg)
                         elif cb_data == "confirm_cleanup":
                             answer_tg_callback(callback["id"], "Удаляю дубли...")
@@ -188,7 +191,7 @@ def run_telegram_listener():
                     msg = update.get("message", {})
                     chat_id = str(msg.get("chat", {}).get("id", ""))
                     text = msg.get("text", "").strip()
-                    text = re.sub(r'^[📊🔁⚙️❓]\s*', '', text)
+                    text = re.sub(r'^[📊🔁⚙️❓☢️]\s*', '', text)
 
                     if chat_id != TG_ADMIN_ID:
                         continue
@@ -197,6 +200,10 @@ def run_telegram_listener():
                         send_tg(HELP_TEXT, keyboard=True)
                     elif text.startswith("/help"):
                         send_tg(HELP_TEXT)
+                    elif text.startswith("/nuke"):
+                        send_tg("☢️ <b>ПРОТОКОЛ СУДНОГО ДНЯ ЗАПУЩЕН</b>\nВыжигаю все навыки и тесты, стираю память...")
+                        count = nuke_everything()
+                        send_tg(f"✅ <b>Вайп завершён!</b>\n━━━━━━━━━━━━━━━━━━━\nУдалено файлов: <b>{count}</b>.\nПамять стёрта. Репозиторий девственно чист.")
                     elif text.startswith("/build"):
                         task_desc = text[6:].strip()
                         if task_desc:
@@ -227,10 +234,10 @@ def run_telegram_listener():
                         else:
                             send_tg("ℹ️ Открытых Jules-задач не найдено.")
                     elif text.startswith("/prs"):
-                        refreshed, dirty_urls = refresh_stuck_prs()
-                        msg = f"🔀 Обновлено PR: <b>{refreshed}</b>."
+                        refreshed, dirty_urls, pinged_jules = refresh_stuck_prs()
+                        msg = f"🔀 Обновлено PR (без конфликтов): <b>{refreshed}</b>."
                         if dirty_urls:
-                            msg += f"\n⚠️ С настоящими конфликтами: <b>{len(dirty_urls)}</b> (нужна ручная правка)."
+                            msg += f"\n⚠️ С конфликтами: <b>{len(dirty_urls)}</b>. Отправлено команд Jules на фикс: <b>{pinged_jules}</b>."
                         send_tg(msg)
                     elif text.startswith("/quarantine"):
                         deleted = bulk_quarantine_orphaned_tests()
@@ -520,14 +527,13 @@ def escalate_to_github_issue(mod_name: str, task_desc: str, last_error: str, bra
         f"- **Рабочая ветка:** `{branch}`\n"
         f"- **Исходная цель:** {task_desc}\n\n"
         f"#### Трейсбек последней ошибки из GitHub Actions:\n```text\n{last_error}\n```\n\n"
-        f"> **Инструкция для Jules:**\n"
-        f"> 1. Переключись в ветку `{branch}`.\n"
-        f"> 2. Исправь код модуля `skills/{mod_name}.py` и тесты в папке `tests/` (`tests/test_{mod_name}.py` / `tests/test_{mod_name}_integration.py`).\n"
-        f"> 3. Добейся успешного прохождения `python -m unittest discover -s tests` и открой Pull Request в `main`.\n"
-        f"> 4. **НЕ трогай `main.py`, `skills/EPIC.md` и `skills/LESSONS.md`** — это общие файлы, "
-        f"в них постоянно пишет автономный цикл, и правки здесь почти гарантированно приведут "
-        f"к конфликту при мерже. Если для фикса реально нужны изменения в `main.py` — опиши это "
-        f"отдельным комментарием к issue вместо прямой правки."
+        f"> **CRITICAL INSTRUCTIONS FOR JULES:**\n"
+        f"> 1. Checkout the branch `{branch}`.\n"
+        f"> 2. Fix the module `skills/{mod_name}.py` and its tests.\n"
+        f"> 3. Open a Pull Request to `main`.\n"
+        f"> 4. **DO NOT TOUCH `main.py`, `skills/EPIC.md` OR `skills/LESSONS.md` UNDER ANY CIRCUMSTANCES.** "
+        f"These files are automatically updated by the main system. If you attempt to edit them to log your progress, "
+        f"you will cause fatal merge conflicts and fail this task."
     )
     payload = {"title": f"Jules Task: исправить сбой модуля {mod_name}", "body": body}
     try:
@@ -633,13 +639,14 @@ def refresh_stuck_prs() -> tuple:
     try:
         res = requests.get(list_url, headers=API_HEADERS, params={"state": "open", "per_page": 50}, timeout=10)
         if res.status_code != 200:
-            return 0, []
+            return 0, [], 0
         pr_numbers = [p.get("number") for p in res.json() if p.get("number")]
     except Exception as e:
         print(f"[!] Ошибка получения PR: {e}")
-        return 0, []
+        return 0, [], 0
 
     refreshed = 0
+    pinged_jules_count = 0
     dirty_urls = []
     for number in pr_numbers:
         detail_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/pulls/{number}")
@@ -662,8 +669,21 @@ def refresh_stuck_prs() -> tuple:
                 pass
         elif state == "dirty":
             dirty_urls.append(pr_data.get("html_url", f"#{number}"))
+            
+            if number not in PINGED_DIRTY_PRS:
+                comments_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues/{number}/comments")
+                payload = {
+                    "body": "@jules This PR has merge conflicts (likely in `LESSONS.md`). Please use your terminal access to pull `main`, resolve the conflicts by fully accepting the `main` branch version for `skills/LESSONS.md` and `skills/EPIC.md`, and push the fix."
+                }
+                try:
+                    p_res = requests.post(comments_url, headers=API_HEADERS, json=payload, timeout=10)
+                    if p_res.status_code in [200, 201]:
+                        PINGED_DIRTY_PRS.add(number)
+                        pinged_jules_count += 1
+                except Exception as e:
+                    print(f"[!] Ошибка при пинке Jules в PR #{number}: {e}")
 
-    return refreshed, dirty_urls
+    return refreshed, dirty_urls, pinged_jules_count
 
 def cleanup_orphan_branches() -> int:
     branches_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/branches")
@@ -705,7 +725,42 @@ def cleanup_orphan_branches() -> int:
             pass
     return deleted
 
-NOISE_PREFIXES = ["resilient_", "secure_", "clean_", "compressed_", "smart_", "global_", "mesh_"]
+# ЯДЕРНАЯ ОПЦИЯ (ВАЙП)
+def nuke_everything() -> int:
+    deleted = 0
+    for folder in ["skills", "tests"]:
+        url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents/{folder}?ref=main")
+        try:
+            r = requests.get(url, headers=API_HEADERS, timeout=10)
+            if r.status_code == 200:
+                for f in r.json():
+                    fname = f["name"]
+                    if fname not in ["__init__.py", "EPIC.md", "LESSONS.md"]:
+                        sha = f.get("sha")
+                        path = f"{folder}/{fname}"
+                        res = requests.delete(
+                            clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents/{path}"),
+                            headers=API_HEADERS,
+                            json={"message": f"☢️ NUKE: удаление {path} [skip ci]", "sha": sha, "branch": "main"},
+                            timeout=10
+                        )
+                        if res.status_code in [200, 204]:
+                            deleted += 1
+        except Exception as e:
+            print(f"[!] Ошибка при ядерном ударе по {folder}: {e}")
+
+    base_sha = get_main_sha()
+    if base_sha:
+        commit_file_to_branch("main", "skills/EPIC.md", EPIC_HEADER, "☢️ NUKE: сброс памяти (Эпик) [skip ci]")
+        commit_file_to_branch("main", "skills/LESSONS.md", LESSONS_HEADER, "☢️ NUKE: сброс памяти (Уроки) [skip ci]")
+        
+    return deleted
+
+NOISE_PREFIXES = [
+    "resilient_", "secure_", "clean_", "compressed_", "smart_", "global_", "mesh_",
+    "orchestrator_", "coordinator_", "manager_", "omega_", "transcendence_", "nexus_",
+    "core_", "ultimate_", "advanced_"
+]
 PENDING_CLEANUP_PLAN = []
 
 def _normalize_skill_name(name: str) -> str:
@@ -1061,7 +1116,8 @@ FILLER_TOKENS = {
     "robust", "hardened", "autonomous", "advanced", "enhanced", "safe",
     "optimized", "optimised", "reliable", "improved", "final", "omega",
     "singularity", "ultimate", "core", "pro", "v1", "v2", "v3", "v4", "v5",
-    "v6", "v7", "v8", "v9", "v10", "v11", "v12"
+    "v6", "v7", "v8", "v9", "v10", "v11", "v12", "orchestrator", "coordinator",
+    "manager", "nexus", "transcendence"
 }
 
 def _core_tokens(name: str) -> set:
@@ -1128,6 +1184,7 @@ def dream_action(manifest: dict, lessons: str, epic: str, manual_prompt: str = "
             "а дубликат, раздувающий репозиторий и CI. Если хочешь улучшить X — module_name='X', не 'secure_X'.\n"
             f"{compose_hint}\n"
             "ТРЕБОВАНИЯ: Python 3.11, requests, beautifulsoup4 (bs4).\n"
+            "ЖЕСТКОЕ ОГРАНИЧЕНИЕ ПО ИМЕНАМ: ЗАПРЕЩЕНО использовать слова-паразиты в module_name (secure, global, mesh, resilient, omega, transcendence, orchestrator, manager, coordinator). Имя должно быть простым и по делу (например, 'rss_parser').\n"
             "Верни СТРОГО JSON:\n"
             "{\n"
             '  "action": "create" или "refactor" или "compose",\n'
@@ -1197,7 +1254,7 @@ def _compose_context(task: dict) -> str:
     composed_of = task.get("composed_of") or []
     if not composed_of:
         return ""
-    return f"\nЭТО КОМПОЗИЦИЯ: модуль ОБЯЗАН импортировать и использовать существующие навыки {composed_of}.\n"
+    return f"\nЭТО КОМПОЗИЦИЯ: модуль ОБЯЗАН импортировать и использовать существу навыки {composed_of}.\n"
 
 def architect_write_hard_tests(task: dict, manifest: dict, lessons: str, existing_code: str = "", error_log: str = "") -> str:
     context_code = f"КОД ДО РЕФАКТОРИНГА:\n{existing_code}\n" if existing_code else ""
@@ -1458,15 +1515,15 @@ def run_evolution_cycle():
         print("[*] main вылечен в этом же проходе — продолжаю цикл на свежей базе.")
 
     print("[~] Профилактика: обновляю отстающие PR от main, чищу мусорные ветки...")
-    refreshed, dirty_urls = refresh_stuck_prs()
+    refreshed, dirty_urls, pinged = refresh_stuck_prs()
     orphans_deleted = cleanup_orphan_branches()
-    if refreshed or orphans_deleted:
-        print(f"[*] Обновлено PR: {refreshed}, удалено мусорных веток: {orphans_deleted}")
+    if refreshed or orphans_deleted or pinged:
+        print(f"[*] Обновлено PR: {refreshed}, удалено веток: {orphans_deleted}, пнуто Jules: {pinged}")
     if dirty_urls:
         buttons = [[{"text": f"🔗 Конфликт в PR #{u.rstrip('/').split('/')[-1]}", "url": u}] for u in dirty_urls[:5]]
         send_tg(
             f"⚠️ <b>Настоящие конфликты в {len(dirty_urls)} PR</b>\n━━━━━━━━━━━━━━━━━━━\n"
-            "Автоматическое обновление не спасает — нужна ручная (или Jules-) правка.",
+            f"Отправил Jules в терминал чинить это дерьмо.",
             buttons=buttons
         )
 

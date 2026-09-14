@@ -21,3 +21,7 @@
 ## error_pipeline (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## error_pipeline (compose) — раундов: 3
+- Последняя ошибка перед фиксом: ERROR: test_pipeline_returns_false_on_correction_failure (tests.test_error_pipeline.TestErrorPipeline.test_pipeline_returns_false_on_correction_failure)
+- Статус: успешно прошёл тесты и влит в main

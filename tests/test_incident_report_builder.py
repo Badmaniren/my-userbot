@@ -1,109 +1,91 @@
 import unittest
-from unittest.mock import patch, MagicMock
-import uuid
+from unittest.mock import patch, mock_open
 import random
+import uuid
 import string
 import io
-import json
-
 from skills.incident_report_builder import IncidentReportBuilder
 
 class TestIncidentReportBuilder(unittest.TestCase):
-
     def setUp(self):
         self.builder = IncidentReportBuilder()
-        self.random_incident_id = uuid.uuid4().hex
-        self.random_module_name = ''.join(random.choices(string.ascii_lowercase, k=10))
-        self.random_error_msg = ''.join(random.choices(string.ascii_letters + string.space, k=25))
-        self.random_output_path = f"/tmp/{uuid.uuid4().hex}.json"
-        self.random_format = random.choice(["json", "xml", "csv", "yaml"])
+        self.random_metric_payload = {str(uuid.uuid4().hex): random.randint(1, 100)}
+        self.random_audit_data = {str(uuid.uuid4().hex): str(uuid.uuid4().hex)}
+        self.random_epic_id = str(uuid.uuid4().hex)
+        self.random_stream_data = str(uuid.uuid4().hex)
+        self.random_format = random.choice(["json", "csv", "xml"])
+        self.random_module_name = str(uuid.uuid4().hex)
+        self.random_payload = {str(uuid.uuid4().hex): str(uuid.uuid4().hex)}
+        self.random_output_path = f"/{uuid.uuid4().hex}/{uuid.uuid4().hex}.txt"
+        self.random_summary_payload = str(uuid.uuid4().hex)
 
     def test_composition_and_initialization(self):
-        self.assertIsNotNone(self.builder, "Архитектор-Инквизитор недоволен: модуль не инициализирован.")
-        self.assertTrue(hasattr(self.builder, 'metric_collector'), "Нарушение композиции: отсутствует patch_metric_collector")
-        self.assertTrue(hasattr(self.builder, 'audit_reporter'), "Нарушение композиции: отсутствует dependency_audit_reporter")
+        self.assertIsNotNone(self.builder.metric_collector)
+        self.assertIsNotNone(self.builder.audit_reporter)
+        from skills.patch_metric_collector import PatchMetricCollector
+        from skills.dependency_audit_reporter import DependencyAuditReporter
+        self.assertIsInstance(self.builder.metric_collector, PatchMetricCollector)
+        self.assertIsInstance(self.builder.audit_reporter, DependencyAuditReporter)
 
-    def test_build_incident_report_success(self):
-        random_metric_payload = {
-            "incident_id": self.random_incident_id,
-            "module": self.random_module_name,
-            "success": True,
-            "latency": random.uniform(0.1, 5.0)
-        }
-        random_audit_data = {
-            "dependencies": [
-                {"package": "requests", "installed": "2.28.1", "vulnerable": False},
-                {"package": "urllib3", "installed": "1.26.5", "vulnerable": True}
-            ],
-            "scan_id": uuid.uuid4().hex
-        }
-        expected_report_str = json.dumps({
-            "incident_id": self.random_incident_id,
-            "status": "SECURE_AND_PATCHED"
-        })
+    def test_build_report_success(self):
+        expected_recorded = {str(uuid.uuid4().hex): random.randint(100, 999)}
+        expected_report = str(uuid.uuid4().hex)
 
-        with patch('skills.patch_metric_collector.PatchMetricCollector.record_metric') as mock_record, \
-             patch('skills.dependency_audit_reporter.DependencyAuditReporter.generate_report') as mock_gen_report:
+        with patch.object(self.builder.metric_collector, 'record_metric', return_value=expected_recorded) as mock_record, \
+             patch.object(self.builder.audit_reporter, 'generate_report', return_value=expected_report) as mock_generate:
+            
+            result = self.builder.build_report(self.random_metric_payload, self.random_audit_data)
+            
+            mock_record.assert_called_once_with(self.random_metric_payload)
+            mock_generate.assert_called_once_with(self.random_audit_data)
+            self.assertEqual(result, f"{expected_recorded} {expected_report}")
 
-            mock_record.return_value = random_metric_payload
-            mock_gen_report.return_value = expected_report_str
+    def test_export_analytics(self):
+        expected_export = str(uuid.uuid4().hex)
 
-            if hasattr(self.builder, 'build_report'):
-                result = self.builder.build_report(random_metric_payload, random_audit_data)
-                self.assertIn(self.random_incident_id, str(result))
-                mock_record.assert_called_once_with(random_metric_payload)
-                mock_gen_report.assert_called_once_with(random_audit_data)
-            else:
-                self.fail("Метод build_report отсутствует в IncidentReportBuilder")
-
-    def test_export_incident_analytics_chaos_data(self):
-        random_stream_data = io.BytesIO(uuid.uuid4().bytes + uuid.uuid4().bytes)
-        random_epic_id = f"EPIC-{random.randint(1000, 9999)}"
-
-        with patch('skills.dependency_audit_reporter.DependencyAuditReporter.finalize_epic') as mock_finalize, \
-             patch('skills.dependency_audit_reporter.DependencyAuditReporter.export_summary') as mock_export:
-
-            mock_finalize.return_value = True
-            mock_export.return_value = f"EXPORTED_{self.random_format.upper()}_{self.random_incident_id}"
-
-            if hasattr(self.builder, 'export_analytics'):
-                res = self.builder.export_analytics(random_epic_id, random_stream_data, self.random_format)
-                self.assertIn(self.random_format.upper(), res)
-                mock_finalize.assert_called_once_with(random_epic_id, random_stream_data)
-            else:
-                self.fail("Метод export_analytics отсутствует в IncidentReportBuilder")
+        with patch.object(self.builder.audit_reporter, 'finalize_epic', return_value=True) as mock_finalize, \
+             patch.object(self.builder.audit_reporter, 'export_summary', return_value=expected_export) as mock_export:
+            
+            result = self.builder.export_analytics(self.random_epic_id, self.random_stream_data, self.random_format)
+            
+            mock_finalize.assert_called_once_with(self.random_epic_id, self.random_stream_data)
+            mock_export.assert_called_once_with(self.random_epic_id, self.random_stream_data, self.random_format)
+            self.assertEqual(result, expected_export)
 
     def test_generate_epic_incident_pipeline(self):
-        random_payload = {
-            "incident": self.random_incident_id,
-            "error_trace": self.random_error_msg,
-            "score": random.randint(1, 100)
-        }
+        expected_summary = str(uuid.uuid4().hex)
+        expected_pipeline_result = True
 
-        with patch('skills.patch_metric_collector.PatchMetricCollector.get_metrics_summary') as mock_get_summary, \
-             patch('skills.dependency_audit_reporter.DependencyAuditReporter.generate_epic_report') as mock_epic_gen:
+        with patch.object(self.builder.metric_collector, 'get_metrics_summary', return_value=expected_summary) as mock_get_metrics, \
+             patch.object(self.builder.audit_reporter, 'generate_epic_report', return_value=expected_pipeline_result) as mock_generate_epic:
+            
+            result = self.builder.generate_epic_incident_pipeline(self.random_module_name, self.random_payload, self.random_output_path)
+            
+            mock_get_metrics.assert_called_once_with(self.random_module_name)
+            mock_generate_epic.assert_called_once_with(self.random_module_name, self.random_payload, self.random_output_path)
+            self.assertEqual(result, expected_pipeline_result)
 
-            mock_get_summary.return_value = f"SUMMARY_FOR_{self.random_module_name}"
-            mock_epic_gen.return_value = True
+    def test_export_raw_metrics(self):
+        expected_result = random.choice([True, False])
 
-            if hasattr(self.builder, 'generate_epic_incident_pipeline'):
-                success = self.builder.generate_epic_incident_pipeline(self.random_module_name, random_payload, self.random_output_path)
-                self.assertTrue(success)
-                mock_get_summary.assert_called_once_with(self.random_module_name)
-                mock_epic_gen.assert_called_once()
-            else:
-                self.fail("Метод generate_epic_incident_pipeline отсутствует в IncidentReportBuilder")
+        with patch.object(self.builder.metric_collector, 'export_metrics', return_value=expected_result) as mock_export:
+            result = self.builder.export_raw_metrics(self.random_output_path, self.random_format)
+            
+            mock_export.assert_called_once_with(self.random_output_path, self.random_format)
+            self.assertEqual(result, expected_result)
 
-    def test_metric_export_delegation(self):
-        with patch('skills.patch_metric_collector.PatchMetricCollector.export_metrics') as mock_export_metrics:
-            mock_export_metrics.return_value = True
+    def test_generate_summary_report(self):
+        result = self.builder.generate_summary_report(self.random_summary_payload)
+        self.assertEqual(result, str(self.random_summary_payload))
 
-            if hasattr(self.builder, 'export_raw_metrics'):
-                res = self.builder.export_raw_metrics(self.random_output_path, self.random_format)
-                self.assertTrue(res)
-                mock_export_metrics.assert_called_once_with(self.random_output_path, self.random_format)
-            else:
-                self.fail("Метод export_raw_metrics отсутствует в IncidentReportBuilder")
+    def test_export_incident_report(self):
+        m = mock_open()
+        with patch("builtins.open", m):
+            result = self.builder.export_incident_report(self.random_summary_payload, self.random_output_path)
+            
+            m.assert_called_once_with(self.random_output_path, "w")
+            m().write.assert_called_once_with(str(self.random_summary_payload))
+            self.assertTrue(result)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

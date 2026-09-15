@@ -1,6 +1,6 @@
 import os
 import io
-from skills.incident_trend_analyzer import IncidentTrendAnalyzer, analyze_incident_trends
+from skills.incident_trend_analyzer import IncidentTrendAnalyzer
 from skills.incident_trend_forecaster import IncidentTrendForecaster
 from skills.system_health_monitoring_gateway import SystemHealthMonitoringGateway
 

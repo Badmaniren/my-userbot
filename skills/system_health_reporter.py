@@ -1,15 +1,14 @@
 import io
 import json
 import os
-from skills.error_recovery_hub import ErrorRecoveryHub
-from skills.incident_aggregator import IncidentAggregator
-from skills.dependency_audit_reporter import DependencyAuditReporter
-from skills.recovery_dashboard_generator import RecoveryDashboardGenerator
+from skills.system_health_aggregator import SystemHealthAggregator
+from skills.recovery_report_exporter import RecoveryReportExporter
 
 
 class SystemHealthReporter:
     def __init__(self):
-        pass
+        self._aggregator = SystemHealthAggregator()
+        self._exporter = RecoveryReportExporter()
 
     def _collect_system_metrics(self, module_name):
         return {
@@ -20,57 +19,29 @@ class SystemHealthReporter:
         }
 
     def generate_health_report(self, module_name, incident_data=None, audit_summary=None, metrics=None):
-        metrics_data = self._collect_system_metrics(module_name)
-        
-        if isinstance(incident_data, dict):
-            metrics_data.update(incident_data)
-            if "incident_id" in incident_data:
-                metrics_data["incident_id"] = incident_data["incident_id"]
-        
-        report_dict = {
-            "module": module_name,
-            "metrics": metrics_data,
-            "incident_data": incident_data,
-            "audit_summary": audit_summary,
-            "system_metrics": metrics
-        }
-        
-        return json.dumps(report_dict, ensure_ascii=False)
+        result = self._aggregator.collect_and_aggregate(
+            module_name,
+            incident_data,
+            audit_summary,
+            metrics,
+            None,
+            None,
+            None
+        )
+        if isinstance(result, str):
+            return result
+        return json.dumps(result, ensure_ascii=False)
 
     def parse_stream_data(self, stream):
         if not isinstance(stream, io.IOBase):
             return None
-        
-        raw_bytes = stream.read()
-        return {
-            "raw_length": len(raw_bytes),
-            "data": raw_bytes
-        }
+        return self._aggregator.parse_reporter_stream(stream)
 
     def export_report_file(self, payload, file_path):
-        try:
-            with open(file_path, 'w', encoding='utf-8') as f:
-                if isinstance(payload, dict):
-                    json.dump(payload, f, ensure_ascii=False)
-                else:
-                    f.write(str(payload))
-            return True
-        except Exception:
-            return False
+        return self._aggregator.save_dashboard_file(payload, file_path)
 
     def export_health_report(self, health_report, file_path):
-        try:
-            with open(file_path, 'w', encoding='utf-8') as f:
-                if isinstance(health_report, (dict, list)):
-                    json.dump(health_report, f, ensure_ascii=False)
-                else:
-                    f.write(str(health_report))
-            return True
-        except Exception:
-            return False
+        return self._aggregator.save_health_report(health_report, file_path)
 
     def aggregate_system_metrics(self, incidents_list, patches_list):
-        return {
-            "total_incidents": len(incidents_list) if incidents_list else 0,
-            "total_patches": len(patches_list) if patches_list else 0
-        }
+        return self._aggregator.aggregate_system_metrics(incidents_list, patches_list)

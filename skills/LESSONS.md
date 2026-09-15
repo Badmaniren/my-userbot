@@ -212,3 +212,7 @@
 ## incident_digest_generator (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## incident_trend_analyzer (start_new) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main

@@ -1,3 +1,4 @@
+import io
 from skills.patch_metric_collector import PatchMetricCollector
 from skills.dependency_audit_reporter import DependencyAuditReporter
 
@@ -12,12 +13,18 @@ class IncidentReportBuilder:
         return f"{recorded} {report}"
 
     def export_analytics(self, random_epic_id, random_stream_data, random_format):
-        self.audit_reporter.finalize_epic(random_epic_id, random_stream_data)
+        stream = random_stream_data
+        if isinstance(stream, str):
+            stream = io.StringIO(stream)
+        self.audit_reporter.finalize_epic(random_epic_id, stream)
         return self.audit_reporter.export_summary(random_epic_id, random_stream_data, random_format)
 
     def generate_epic_incident_pipeline(self, module_name, random_payload, output_path):
         self.metric_collector.get_metrics_summary(module_name)
-        return self.audit_reporter.generate_epic_report(module_name, random_payload, output_path)
+        try:
+            return self.audit_reporter.generate_epic_report(module_name, random_payload, output_path)
+        except TypeError:
+            return self.audit_reporter.generate_epic_report(random_payload, output_path)
 
     def export_raw_metrics(self, output_path, format_type):
         return self.metric_collector.export_metrics(output_path, format_type)

@@ -74,3 +74,21 @@ class SystemHealthReporter:
             "total_incidents": len(incidents_list) if incidents_list else 0,
             "total_patches": len(patches_list) if patches_list else 0
         }
+
+    def generate(self, telemetry_feed=None, module_name="system_health_telemetry", **kwargs):
+        if telemetry_feed is None:
+            telemetry_feed = []
+        if isinstance(telemetry_feed, str):
+            return self.generate_health_report(module_name, metrics={"raw": telemetry_feed})
+
+        metrics = {
+            "feed_items": len(telemetry_feed) if isinstance(telemetry_feed, (list, dict, set)) else 1,
+            "feed_data": telemetry_feed
+        }
+        report_data = {
+            "module": module_name,
+            "telemetry_feed": telemetry_feed,
+            "metrics": metrics,
+            "status": "HEALTHY"
+        }
+        return report_data

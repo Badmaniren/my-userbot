@@ -79,3 +79,11 @@ class SystemHealthTelemetryCollector:
             json.dump({module_name: agg_result, "status": "OK"}, f)
             
         return {module_name: agg_result}
+
+    def collect(self, aggregated_data, **kwargs):
+        telemetry_payload = {
+            "status": "COLLECTED",
+            "telemetry_data": aggregated_data,
+            "metrics_count": len(aggregated_data) if isinstance(aggregated_data, (dict, list)) else 1
+        }
+        return telemetry_payload

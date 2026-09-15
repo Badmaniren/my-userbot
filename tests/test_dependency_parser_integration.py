@@ -1,48 +1,58 @@
 import unittest
 import uuid
 import random
-from skills.dependency_parser import parse_dependency_string
-from skills.pypi_client import PyPIClient
+import io
+from skills.dependency_parser import DependencyParser, parse_dependency
 
 class TestDependencyParserIntegration(unittest.TestCase):
     def setUp(self):
-        self.random_string_id = str(uuid.uuid4())
-        self.client = PyPIClient()
+        self.parser = DependencyParser()
+        self.random_suffix = str(uuid.uuid4())[:8]
 
-    def test_dependency_parser_integration_with_pypi(self):
-        package_name = f"requests-{self.random_string_id[:6]}"
-        raw_requires_dist = [
-            f"urllib3 (>=1.21.1,<1.27)",
-            f"idna (<3,>=2.5)",
-            f"certifi (>=2017.4.17)"
-        ]
+    def test_parse_valid_requirement(self):
+        pkg_name = f"requests-{self.random_suffix}"
+        version = f"{random.randint(1, 3)}.{random.randint(0, 9)}.{random.randint(0, 9)}"
+        req_str = f"{pkg_name} (>={version})"
         
-        parsed_results = []
-        for req in raw_requires_dist:
-            parsed = parse_dependency_string(req)
-            if parsed:
-                parsed_results.append(parsed)
-
-        self.assertGreaterEqual(len(parsed_results), 1)
-        
-        for item in parsed_results:
-            self.assertIn("name", item)
-            self.assertIn("version_constraint", item)
-
-    def test_randomized_dependency_parsing(self):
-        versions = [f"1.{random.randint(0, 9)}.{random.randint(0, 9)}" for _ in range(3)]
-        test_cases = [
-            f"numpy (>={versions[0]})",
-            f"pandas (>={versions[1]},<2.0.0)",
-            f"scipy =={versions[2]}"
-        ]
-        
-        selected_case = random.choice(test_cases)
-        result = parse_dependency_string(selected_case)
+        result = self.parser.parse(req_str)
         
         self.assertIsInstance(result, dict)
-        self.assertIn("name", result)
-        self.assertTrue(len(result["name"]) > 0)
+        self.assertEqual(result['name'], pkg_name)
+        self.assertEqual(result['version_constraint'], f">={version}")
+        self.assertEqual(result['constraints'], f">={version}")
+        self.assertEqual(result['extras'], [])
+        self.assertIsNone(result['marker'])
 
-if __name__ == "__main__":
+    def test_parse_stream_integration(self):
+        pkg_1 = f"pkg-alpha-{self.random_suffix}"
+        pkg_2 = f"pkg-beta-{self.random_suffix}"
+        
+        stream_data = f"# Comment line\n{pkg_1}==1.0.0\n\n{pkg_2}>=2.0.0; python_version < '3.10'\n".encode('utf-8')
+        stream = io.BytesIO(stream_data)
+        
+        results = self.parser.parse_stream(stream)
+        
+        self.assertIsInstance(results, list)
+        self.assertEqual(len(results), 2)
+        
+        self.assertEqual(results[0]['name'], pkg_1)
+        self.assertEqual(results[0]['version_constraint'], "==1.0.0")
+        
+        self.assertEqual(results[1]['name'], pkg_2)
+        self.assertEqual(results[1]['version_constraint'], ">=2.0.0")
+        self.assertIn("python_version", results[1]['marker'])
+
+    def test_parse_fallback_mechanism(self):
+        malformed_req = f"invalid_req_syntax_{self.random_suffix} !@#$"
+        
+        result = parse_dependency(malformed_req)
+        
+        self.assertIsInstance(result, dict)
+        self.assertTrue(result['name'].startswith("invalid_req_syntax"))
+        self.assertIsNone(result['constraints'])
+        self.assertIsNone(result['version_constraint'])
+        self.assertEqual(result['extras'], [])
+        self.assertIsNone(result['marker'])
+
+if __name__ == '__main__':
     unittest.main()

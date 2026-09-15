@@ -1,4 +1,5 @@
 from uuid import uuid4
+import json
 
 def start_new(success=True, incident_id=None, error=None, raw_result=None, patch_data=None):
     if incident_id is None:

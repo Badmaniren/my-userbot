@@ -13,10 +13,6 @@ def parse_requirement(raw_req: str):
     # Удаляем экстра-фичи в квадратных скобках, например, requests[security] -> requests
     line = re.sub(r'\[.*?\]', '', line)
 
-    # Регулярное выражение для поиска имени пакета и блока с версиями
-    # Имя пакета может содержать буквы, цифры, дефисы, подчеркивания и точки
-    # Версионные ограничения часто находятся в скобках или просто после имени
-    
     # Сначала проверим вариант со скобками: pkg (>=1.0.0, <2.0.0) или pkg (==1.0)
     match_with_parens = re.match(r'^([A-Za-z0-9_.-]+)\s*\((.*?)\)$', line)
     
@@ -25,11 +21,9 @@ def parse_requirement(raw_req: str):
         constraints_str = match_with_parens.group(2).strip()
     else:
         # Вариант без скобок: pkg >=1.0.0, <2.0.0 или просто pkg
-        # Ищем первое вхождение оператора или пробела
         parts = re.split(r'\s+([<>=!~]=?|[<>])\s*', line, maxsplit=1)
         name = parts[0].strip()
         if len(parts) > 1:
-            # Воссоздаем строку ограничений
             constraints_str = "".join(parts[1:])
         else:
             constraints_str = ""
@@ -39,7 +33,6 @@ def parse_requirement(raw_req: str):
 
     # Парсим список ограничений, разделенных запятыми
     constraints = []
-    # Каждое ограничение имеет вид: оператор + версия (например, >=2.0.0)
     raw_constraints = constraints_str.split(',')
     
     op_ver_pattern = re.compile(r'^\s*([<>=!~]=?|[<>])\s*([A-Za-z0-9_.-]+)\s*$')
@@ -52,7 +45,6 @@ def parse_requirement(raw_req: str):
         if m:
             constraints.append((m.group(1), m.group(2)))
         else:
-            # Если оператор слит или задан иначе, пробуем распарсить общим путем
             sub_m = re.match(r'^([<>=!~]=?|[<>])\s*(.*)$', rc)
             if sub_m:
                 constraints.append((sub_m.group(1), sub_m.group(2).strip()))

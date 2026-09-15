@@ -171,3 +171,6 @@
 
 ## recovery_report_exporter (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## recovery_dashboard_generator (create) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

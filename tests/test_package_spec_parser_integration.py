@@ -1,82 +1,84 @@
 import unittest
+import io
+import json
 import uuid
 import random
-from io import BytesIO
-from skills.package_spec_parser import (
-    PyPIClient,
-    AutoPatchPipeline,
-    ErrorRecoveryHub,
-    PatchValidator,
-    PipelineResult,
-    ASTInspector
-)
+from skills.package_spec_parser import PackageSpecParser, PackageSpec, PyPIClient, AutoPatchPipeline, ErrorRecoveryHub, PatchValidator
 
 class TestPackageSpecParserIntegration(unittest.TestCase):
+
     def setUp(self):
-        self.pypi_client = PyPIClient(base_url="https://pypi.org/pypi")
-        self.recovery_hub = ErrorRecoveryHub()
+        self.parser = PackageSpecParser()
+        self.pypi_client = PyPIClient()
         self.pipeline = AutoPatchPipeline()
-        self.patch_validator = PatchValidator()
-        self.module_name = f"test_module_{uuid.uuid4().hex[:8]}"
-        self.random_version = f"1.{random.randint(0, 9)}.{random.randint(0, 9)}"
+        self.recovery_hub = ErrorRecoveryHub()
+        self.validator = PatchValidator()
+        self.random_seed = str(uuid.uuid4())[:8]
 
-    def test_integration_spec_parser_pipeline(self):
-        raw_requires_dist = [
-            f"requests (>=2.{random.randint(0, 9)}.0)",
-            "pytest >= 6.0; python_version < '3.11'",
-            "optional-dep[extra] ; extra == 'dev'"
+    def test_parse_single_spec_integration(self):
+        pkg_name = f"requests-{self.random_seed}"
+        version_num = f"{random.randint(1, 5)}.{random.randint(0, 9)}"
+        spec_str = f"{pkg_name} (>={version_num},<3.0); python_version < '3.11'"
+        
+        spec = self.parser.parse(spec_str)
+        
+        self.assertIsInstance(spec, PackageSpec)
+        self.assertEqual(spec.name, pkg_name)
+        self.assertIn(version_num, spec.version)
+        self.assertIsNotNone(spec.marker)
+
+    def test_parse_stream_integration(self):
+        pkgs = [
+            f"numpy_{self.random_seed} (>=1.20)",
+            f"pandas_{self.random_seed} [dev,test] ; extra == 'dev'",
+            f"scipy_{self.random_seed} == 1.7.3"
         ]
+        stream_data = "\n".join(pkgs).encode('utf-8')
+        stream = io.BytesIO(stream_data)
         
-        stream_data = f'{{"package": "{self.module_name}", "version": "{self.random_version}", "requires_dist": {str(raw_requires_dist)}}}'
-        stream = BytesIO(stream_data.encode('utf-8'))
-
-        parsed_stream = self.pypi_client.parse_stream_data(stream)
-        self.assertIsNotNone(parsed_stream)
-        self.assertEqual(parsed_stream.get("package"), self.module_name)
-
-        exc = ValueError(f"Dependency resolution failed for {self.module_name}")
-        traceback_str = f"Traceback (most recent call last):\n  File 'test.py', line {random.randint(1, 100)}, in <module>\n    raise ValueError"
+        results = self.parser.parse_stream(stream)
         
-        context = {
-            "requires_dist": parsed_stream.get("requires_dist"),
-            "random_token": uuid.uuid4().hex
-        }
+        self.assertEqual(len(results), 3)
+        self.assertEqual(results[0].name, f"numpy_{self.random_seed}")
+        self.assertEqual(results[1].extras, ["dev", "test"])
+        self.assertEqual(results[2].version, "==1.7.3")
 
-        pipeline_result = self.pipeline.run_pipeline(
-            module_name=self.module_name,
-            exception=exc,
-            traceback_str=traceback_str,
-            context=context
+    def test_pypi_client_stream_data_integration(self):
+        random_project = f"test-proj-{uuid.uuid4()}"
+        payload = {"info": {"name": random_project, "version": "1.0.0"}, "urls": []}
+        stream = io.BytesIO(json.dumps(payload).encode('utf-8'))
+        
+        data = self.pypi_client.parse_stream_data(stream)
+        
+        self.assertIsInstance(data, dict)
+        self.assertEqual(data["info"]["name"], random_project)
+
+    def test_pipeline_and_recovery_integration(self):
+        mod_name = f"module_{uuid.uuid4().hex[:6]}"
+        exc_msg = f"RuntimeError_{uuid.uuid4()}"
+        
+        result = self.pipeline.run_pipeline(
+            module_name=mod_name,
+            exception=Exception(exc_msg),
+            traceback_str="Traceback (most recent call last):\n  File 'test.py', line 1",
+            context={"seed": self.random_seed}
         )
-
-        self.assertIsInstance(pipeline_result, PipelineResult)
-        incident_id = pipeline_result.incident_id
-        self.assertIsNotNone(incident_id)
-
-        history = self.recovery_hub.get_incident_history(self.module_name)
+        
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.incident_id)
+        
+        logs = self.recovery_hub.get_incident_logs(result.incident_id)
+        self.assertIsInstance(logs, dict)
+        
+        history = self.recovery_hub.get_incident_history(mod_name)
         self.assertIsInstance(history, list)
 
-        logs = self.recovery_hub.get_incident_logs(incident_id)
-        self.assertIsInstance(logs, dict)
-
-        random_code = f"import math\ndef dynamic_func_{random.randint(1000, 9999)}():\n    return math.sqrt({random.randint(1, 100)})"
-        validation_res = self.patch_validator.verify_patch(random_code)
+    def test_patch_validator_integration(self):
+        sample_code = f"x = {random.randint(100, 999)}\nprint(x)"
+        validation_res = self.validator.verify_patch(sample_code)
+        
         self.assertIsInstance(validation_res, dict)
+        self.assertTrue(self.validator.validate("some patch data"))
 
-        if pipeline_result.patch_data:
-            is_valid = self.patch_validator.validate(pipeline_result.patch_data)
-            self.assertIsInstance(is_valid, bool)
-
-    def test_force_analyze_and_recover_flow(self):
-        test_exception = RuntimeError(f"Critical error {uuid.uuid4().hex}")
-        forced_result = self.pipeline.force_analyze_and_recover(
-            module_name=self.module_name,
-            exception=test_exception,
-            context={"attempt": random.randint(1, 50)}
-        )
-        self.assertIsInstance(forced_result, PipelineResult)
-        self.assertTrue(hasattr(forced_result, "success"))
-        self.assertTrue(hasattr(forced_result, "incident_id"))
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

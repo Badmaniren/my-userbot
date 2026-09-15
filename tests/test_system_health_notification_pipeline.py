@@ -2,104 +2,148 @@ import unittest
 from unittest.mock import patch, MagicMock
 import uuid
 import random
-import string
 import io
 
 from skills.system_health_notification_pipeline import SystemHealthNotificationPipeline
-from skills.system_health_aggregator import SystemHealthAggregator
-from skills.notification_channel_dispatcher import NotificationChannelDispatcher
-
 
 class TestSystemHealthNotificationPipeline(unittest.TestCase):
 
     def setUp(self):
-        self.pipeline = SystemHealthNotificationPipeline()
-        self.random_module = ''.join(random.choices(string.ascii_lowercase, k=10))
-        self.random_incident_id = uuid.uuid4().hex
-        self.random_message = ''.join(random.choices(string.ascii_letters, k=20))
-        self.random_level = random.choice(['CRITICAL', 'ERROR', 'WARNING', 'FATAL'])
-        self.random_channel = ''.join(random.choices(string.ascii_lowercase, k=8))
-        self.random_config = {uuid.uuid4().hex: uuid.uuid4().hex}
+        self.channel_name = f"channel_{uuid.uuid4().hex[:8]}"
+        self.config = {"active": True, "url": f"https://{uuid.uuid4().hex[:8]}.com"}
+        self.incident_id = str(random.randint(1000, 9999))
+        self.level = random.choice(["CRITICAL", "WARNING", "INFO"])
+        self.message = f"msg_{uuid.uuid4().hex[:8]}"
 
-    def test_pipeline_initialization(self):
-        self.assertIsInstance(self.pipeline.aggregator, SystemHealthAggregator)
-        self.assertIsInstance(self.pipeline.dispatcher, NotificationChannelDispatcher)
-
-    def test_run_health_check_and_notify_success(self):
-        mock_health_data = {
-            uuid.uuid4().hex: uuid.uuid4().hex,
+    @patch('skills.system_health_notification_pipeline.SystemHealthAggregator')
+    @patch('skills.system_health_notification_pipeline.NotificationChannelDispatcher')
+    def test_run_health_check_and_notify_critical(self, mock_dispatcher_cls, mock_aggregator_cls):
+        mock_aggregator = mock_aggregator_cls.return_value
+        mock_dispatcher = mock_dispatcher_cls.return_value
+        
+        health_data = {
             "status": "CRITICAL",
-            "incident_id": self.random_incident_id,
-            "message": self.random_message
+            "incident_id": self.incident_id,
+            "message": self.message
         }
+        mock_aggregator.aggregate_and_report.return_value = health_data
+        
+        expected_broadcast = {self.channel_name: True}
+        mock_dispatcher.broadcast.return_value = expected_broadcast
 
-        with patch.object(SystemHealthAggregator, 'aggregate_and_report', return_value=mock_health_data) as mock_aggregate, \
-             patch.object(NotificationChannelDispatcher, 'broadcast', return_value={self.random_channel: True}) as mock_broadcast:
+        pipeline = SystemHealthNotificationPipeline(health_aggregator=mock_aggregator, channel_dispatcher=mock_dispatcher)
+        result = pipeline.run_health_check_and_notify()
 
-            result = self.pipeline.run_health_check_and_notify()
+        mock_aggregator.aggregate_and_report.assert_called_once()
+        mock_dispatcher.broadcast.assert_called_once_with(health_data)
+        self.assertEqual(result, expected_broadcast)
 
-            mock_aggregate.assert_called_once()
-            mock_broadcast.assert_called_once()
-            self.assertIn(self.random_channel, result)
-            self.assertTrue(result[self.random_channel])
-
-    def test_run_health_check_and_notify_no_critical(self):
-        mock_health_data = {
-            uuid.uuid4().hex: uuid.uuid4().hex,
-            "status": "HEALTHY"
+    @patch('skills.system_health_notification_pipeline.SystemHealthAggregator')
+    @patch('skills.system_health_notification_pipeline.NotificationChannelDispatcher')
+    def test_run_health_check_and_notify_non_critical(self, mock_dispatcher_cls, mock_aggregator_cls):
+        mock_aggregator = mock_aggregator_cls.return_value
+        mock_dispatcher = mock_dispatcher_cls.return_value
+        
+        health_data = {
+            "status": random.choice(["OK", "WARNING", "HEALTHY"]),
+            "incident_id": self.incident_id,
+            "message": self.message
         }
+        mock_aggregator.aggregate_and_report.return_value = health_data
 
-        with patch.object(SystemHealthAggregator, 'aggregate_and_report', return_value=mock_health_data) as mock_aggregate, \
-             patch.object(NotificationChannelDispatcher, 'broadcast') as mock_broadcast:
+        pipeline = SystemHealthNotificationPipeline(health_aggregator=mock_aggregator, channel_dispatcher=mock_dispatcher)
+        result = pipeline.run_health_check_and_notify()
 
-            result = self.pipeline.run_health_check_and_notify()
+        mock_aggregator.aggregate_and_report.assert_called_once()
+        mock_dispatcher.broadcast.assert_not_called()
+        self.assertEqual(result, {})
 
-            mock_aggregate.assert_called_once()
-            mock_broadcast.assert_not_called()
-            self.assertEqual(result, {})
-
-    def test_process_stream_and_dispatch(self):
-        random_stream_content = json_bytes = io.BytesIO(f'{{"incident_id": "{self.random_incident_id}", "level": "{self.random_level}", "message": "{self.random_message}"}}'.encode('utf-8'))
-        random_path = f"/{uuid.uuid4().hex}/{uuid.uuid4().hex}.json"
-
+    @patch('skills.system_health_notification_pipeline.SystemHealthAggregator')
+    @patch('skills.system_health_notification_pipeline.NotificationChannelDispatcher')
+    def test_process_stream_and_dispatch(self, mock_dispatcher_cls, mock_aggregator_cls):
+        mock_aggregator = mock_aggregator_cls.return_value
+        mock_dispatcher = mock_dispatcher_cls.return_value
+        
+        stream_data = io.BytesIO(uuid.uuid4().bytes)
+        path = f"/var/log/{uuid.uuid4().hex[:6]}.log"
+        
         parsed_data = {
-            "incident_id": self.random_incident_id,
-            "level": self.random_level,
-            "message": self.random_message
+            "level": self.level,
+            "incident_id": self.incident_id,
+            "message": self.message
         }
+        mock_aggregator.process_stream.return_value = parsed_data
+        
+        formatted_payload = {"formatted": self.message}
+        mock_dispatcher.format_payload.return_value = formatted_payload
+        
+        expected_broadcast = {self.channel_name: True}
+        mock_dispatcher.broadcast.return_value = expected_broadcast
 
-        formatted_payload = {
-            "id": self.random_incident_id,
-            "lvl": self.random_level,
-            "msg": self.random_message
-        }
+        pipeline = SystemHealthNotificationPipeline(health_aggregator=mock_aggregator, channel_dispatcher=mock_dispatcher)
+        result = pipeline.process_stream_and_dispatch(stream_data, path)
 
-        with patch.object(SystemHealthAggregator, 'process_stream', return_value=parsed_data) as mock_process, \
-             patch.object(NotificationChannelDispatcher, 'format_payload', return_value=formatted_payload) as mock_format, \
-             patch.object(NotificationChannelDispatcher, 'broadcast', return_value={self.random_channel: True}) as mock_broadcast:
+        mock_aggregator.process_stream.assert_called_once_with(stream_data, path)
+        mock_dispatcher.format_payload.assert_called_once_with(self.level, self.incident_id, self.message)
+        mock_dispatcher.broadcast.assert_called_once_with(formatted_payload)
+        self.assertEqual(result, expected_broadcast)
 
-            result = self.pipeline.process_stream_and_dispatch(random_stream_content, random_path)
+    @patch('skills.system_health_notification_pipeline.SystemHealthAggregator')
+    @patch('skills.system_health_notification_pipeline.NotificationChannelDispatcher')
+    def test_register_alert_channel(self, mock_dispatcher_cls, mock_aggregator_cls):
+        mock_dispatcher = mock_dispatcher_cls.return_value
+        pipeline = SystemHealthNotificationPipeline(
+            health_aggregator=mock_aggregator_cls.return_value,
+            channel_dispatcher=mock_dispatcher
+        )
 
-            mock_process.assert_called_once_with(random_stream_content, random_path)
-            mock_format.assert_called_once_with(self.random_level, self.random_incident_id, self.random_message)
-            mock_broadcast.assert_called_once_with(formatted_payload)
-            self.assertTrue(result.get(self.random_channel))
+        pipeline.register_alert_channel(self.channel_name, self.config)
+        mock_dispatcher.register_channel.assert_called_once_with(self.channel_name, self.config)
 
-    def test_register_and_dispatch_custom_alert(self):
-        with patch.object(NotificationChannelDispatcher, 'register_channel') as mock_register, \
-             patch.object(NotificationChannelDispatcher, 'dispatch', return_value=True) as mock_dispatch:
+    @patch('skills.system_health_notification_pipeline.SystemHealthAggregator')
+    @patch('skills.system_health_notification_pipeline.NotificationChannelDispatcher')
+    def test_send_custom_alert(self, mock_dispatcher_cls, mock_aggregator_cls):
+        mock_dispatcher = mock_dispatcher_cls.return_value
+        mock_dispatcher.dispatch.return_value = True
+        
+        payload = {"alert": uuid.uuid4().hex}
+        pipeline = SystemHealthNotificationPipeline(
+            health_aggregator=mock_aggregator_cls.return_value,
+            channel_dispatcher=mock_dispatcher
+        )
 
-            self.pipeline.register_alert_channel(self.random_channel, self.random_config)
-            mock_register.assert_called_once_with(self.random_channel, self.random_config)
+        result = pipeline.send_custom_alert(self.channel_name, payload)
+        mock_dispatcher.dispatch.assert_called_once_with(self.channel_name, payload)
+        self.assertTrue(result)
 
-            payload = {
-                uuid.uuid4().hex: self.random_message
-            }
-            dispatch_result = self.pipeline.send_custom_alert(self.random_channel, payload)
+    @patch('skills.system_health_notification_pipeline.SystemHealthAggregator')
+    @patch('skills.system_health_notification_pipeline.NotificationChannelDispatcher')
+    def test_process_and_notify(self, mock_dispatcher_cls, mock_aggregator_cls):
+        mock_aggregator = mock_aggregator_cls.return_value
+        mock_dispatcher = mock_dispatcher_cls.return_value
+        
+        aggregation_mock = {"status": "OK", "id": uuid.uuid4().hex}
+        mock_aggregator.aggregate_and_report.return_value = aggregation_mock
+        
+        mock_dispatcher.channels = {self.channel_name: {"active": False}}
+        mock_dispatcher.dispatch.return_value = False
+        mock_dispatcher.broadcast.return_value = {self.channel_name: True}
 
-            mock_dispatch.assert_called_once_with(self.random_channel, payload)
-            self.assertTrue(dispatch_result)
+        incidents_list = [{"level": self.level, "id": self.incident_id, "message": self.message}]
+        patches_list = [uuid.uuid4().hex]
 
+        pipeline = SystemHealthNotificationPipeline(health_aggregator=mock_aggregator, channel_dispatcher=mock_dispatcher)
+        result = pipeline.process_and_notify(incidents_list, patches_list, self.channel_name)
+
+        mock_aggregator.aggregate_and_report.assert_called_once()
+        self.assertTrue(mock_dispatcher.channels[self.channel_name]["active"])
+        mock_dispatcher.dispatch.assert_called_once()
+        mock_dispatcher.broadcast.assert_called_once()
+        
+        self.assertIn("aggregation_result", result)
+        self.assertIn("dispatch_result", result)
+        self.assertEqual(result["aggregation_result"], aggregation_mock)
+        self.assertTrue(result["dispatch_result"])
 
 if __name__ == '__main__':
     unittest.main()

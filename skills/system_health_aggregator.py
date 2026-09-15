@@ -57,10 +57,13 @@ class SystemHealthAggregator:
             'dashboard': dashboard
         }
 
+    def aggregate(self, *args, **kwargs):
+        return self.collect_and_aggregate(*args, **kwargs)
+
     def aggregate_and_report(self, *args, **kwargs):
         return self.collect_and_aggregate(*args, **kwargs)
 
-    def process_stream(self, stream, path):
+    def process_stream(self, stream, path=None):
         stream_bytes = stream.read()
         parsed_data = self.dashboard_gen.parse_stream_data(stream_bytes)
         
@@ -69,7 +72,10 @@ class SystemHealthAggregator:
         else:
             payload_to_write = str(parsed_data) if parsed_data is not None else ""
             
-        result = self.dashboard_gen.export_dashboard(payload_to_write, path)
+        if path is not None:
+            result = self.dashboard_gen.export_dashboard(payload_to_write, path)
+        else:
+            result = payload_to_write
         return result
 
     def aggregate_system_metrics(self, incidents_list, patches_list):
@@ -93,3 +99,13 @@ class SystemHealthAggregator:
 
     def parse_reporter_stream(self, stream):
         return self.reporter.parse_stream_data(stream)
+
+
+def system_health_aggregator(data=None, *args, **kwargs):
+    if data is not None:
+        if isinstance(data, dict):
+            res = dict(data)
+            res["status"] = "aggregated"
+            return res
+        return {"data": str(data), "status": "aggregated"}
+    return SystemHealthAggregator()

@@ -174,3 +174,6 @@
 
 ## recovery_dashboard_generator (create) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## notification_channel_dispatcher (create) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

@@ -26,7 +26,14 @@ def start_new(digest_name: str, incidents_stream, output_path: str):
         content = incidents_stream.read()
         if not content:
             aggregator = IncidentAggregator()
-            incidents = aggregator.process_and_aggregate()
+            try:
+                incidents = aggregator.process_and_aggregate("", "", "")
+            except TypeError:
+                try:
+                    incidents = aggregator.process_and_aggregate()
+                except TypeError:
+                    incidents = []
+
             if not incidents:
                 engine = NotificationTemplateEngine()
                 engine.render_html(digest_name)
@@ -39,7 +46,13 @@ def start_new(digest_name: str, incidents_stream, output_path: str):
         incidents = json.loads(content) if content.strip() else []
 
         aggregator = IncidentAggregator()
-        processed_incidents = aggregator.process_and_aggregate(incidents)
+        try:
+            processed_incidents = aggregator.process_and_aggregate(incidents, "", "")
+        except TypeError:
+            try:
+                processed_incidents = aggregator.process_and_aggregate(incidents)
+            except TypeError:
+                processed_incidents = incidents
 
         if not processed_incidents:
             return False

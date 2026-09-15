@@ -1,75 +1,96 @@
 import unittest
-from unittest.mock import patch, MagicMock
+import io
+import json
 import uuid
 import random
-import string
-import io
+import xml.etree.ElementTree as ET
+from unittest.mock import patch, MagicMock
 from skills.incident_aggregator import IncidentAggregator
 
 class TestIncidentAggregator(unittest.TestCase):
     def setUp(self):
         self.aggregator = IncidentAggregator()
-        self.rand_incident_id = str(uuid.uuid4())
-        self.rand_module_name = f"module_{uuid.uuid4().hex[:8]}"
-        self.rand_error_msg = f"error_{uuid.uuid4().hex[:6]}"
-        self.rand_metric_value = random.randint(1, 1000)
 
-    def test_aggregate_incident_metrics_success(self):
-        raw_metrics = {
-            "incident_id": self.rand_incident_id,
-            "module": self.rand_module_name,
-            "error": self.rand_error_msg,
-            "load_time": self.rand_metric_value
+    def test_aggregate_metrics_with_id_mocking_network(self):
+        incident_id = uuid.uuid4().hex
+        mock_data = {
+            "module": uuid.uuid4().hex,
+            "error": uuid.uuid4().hex,
+            "load_time": random.uniform(0.1, 10.0)
         }
-        
-        with patch("skills.incident_aggregator.IncidentAggregator._fetch_external_telemetry") as mock_fetch:
-            mock_fetch.return_value = raw_metrics
-            result = self.aggregator.aggregate_metrics(self.rand_incident_id)
-            
-            self.assertIsInstance(result, dict)
-            self.assertEqual(result.get("incident_id"), self.rand_incident_id)
-            self.assertEqual(result.get("module"), self.rand_module_name)
-            self.assertIn("analyzed_at", result)
 
-    def test_process_pipeline_results_chaos(self):
-        pipeline_stream = io.BytesIO(f"INCIDENT_ID:{self.rand_incident_id}|STATUS:FAILED|ERR:{self.rand_error_msg}".encode('utf-8'))
-        
-        result = self.aggregator.process_stream(pipeline_stream)
-        
-        self.assertIsNotNone(result)
-        self.assertIn(self.rand_incident_id, result.get("processed_ids", []))
-        self.assertEqual(result.get("error_caught"), self.rand_error_msg)
-
-    def test_build_summary_analytics(self):
-        mock_history = [
-            {"id": str(uuid.uuid4()), "module": self.rand_module_name, "success": False},
-            {"id": str(uuid.uuid4()), "module": self.rand_module_name, "success": True}
-        ]
-        
-        with patch("skills.incident_aggregator.ErrorRecoveryHub") as mock_hub_class:
-            mock_hub_instance = mock_hub_class.return_value
-            mock_hub_instance.get_incident_history.return_value = mock_history
+        with patch('requests.get') as mock_get:
+            mock_response = MagicMock()
+            mock_response.json.return_value = mock_data
+            mock_get.return_value = mock_response
             
-            summary = self.aggregator.build_analytics(self.rand_module_name)
+            result = self.aggregator.aggregate_metrics(incident_id)
             
-            self.assertIsInstance(summary, dict)
-            self.assertEqual(summary.get("total_incidents"), 2)
-            self.assertEqual(summary.get("module"), self.rand_module_name)
-            self.assertTrue(0.0 <= summary.get("success_rate", -1.0) <= 100.0)
+            self.assertEqual(result["incident_id"], incident_id)
+            self.assertEqual(result["module"], mock_data["module"])
+            self.assertEqual(result["error"], mock_data["error"])
+            self.assertEqual(result["load_time"], mock_data["load_time"])
+            mock_get.assert_called_once()
 
-    def test_export_aggregated_report_format(self):
-        export_payload = {
+    def test_aggregate_metrics_list_input(self):
+        count = random.randint(1, 5)
+        incidents = [{"id": uuid.uuid4().hex} for _ in range(count)]
+        
+        result = self.aggregator.aggregate_metrics(incidents)
+        
+        self.assertEqual(len(result["incidents"]), count)
+        self.assertIn("analyzed_at", result)
+        self.assertEqual(result["incidents"], incidents)
+
+    def test_process_stream_parsing(self):
+        incident_id = uuid.uuid4().hex
+        error_msg = uuid.uuid4().hex
+        stream_content = f"INCIDENT_ID:{incident_id}|ERR:{error_msg}".encode('utf-8')
+        stream = io.BytesIO(stream_content)
+        
+        result = self.aggregator.process_stream(stream)
+        
+        self.assertIn(incident_id, result["processed_ids"])
+        self.assertEqual(result["error_caught"], error_msg)
+
+    def test_build_analytics_logic(self):
+        module_name = uuid.uuid4().hex
+        total = random.randint(10, 20)
+        success = random.randint(0, total)
+        history = [{"success": True} for _ in range(success)] + [{"success": False} for _ in range(total - success)]
+        
+        with patch('skills.incident_aggregator.ErrorRecoveryHub') as mock_hub_class:
+            mock_hub = mock_hub_class.return_value
+            mock_hub.get_incident_history.return_value = history
+            
+            result = self.aggregator.build_analytics(module_name)
+            
+            self.assertEqual(result["module"], module_name)
+            self.assertEqual(result["total_incidents"], total)
+            expected_rate = (success / total) * 100.0 if total > 0 else 0.0
+            self.assertEqual(result["success_rate"], expected_rate)
+
+    def test_export_summary_formats(self):
+        payload = {
             "report_id": uuid.uuid4().hex,
-            "target_module": self.rand_module_name,
-            "criticality": random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
+            "target_module": uuid.uuid4().hex,
+            "criticality": random.choice(["low", "medium", "high"])
         }
         
-        output_format = random.choice(["json", "csv", "xml"])
-        report_str = self.aggregator.export_summary(export_payload, format=output_format)
+        # Test JSON
+        json_out = self.aggregator.export_summary(payload, format="json")
+        self.assertEqual(json.loads(json_out), payload)
         
-        self.assertIsInstance(report_str, str)
-        self.assertIn(export_payload["report_id"], report_str)
-        self.assertIn(self.rand_module_name, report_str)
+        # Test XML
+        xml_out = self.aggregator.export_summary(payload, format="xml")
+        root = ET.fromstring(xml_out)
+        for k, v in payload.items():
+            self.assertEqual(root.find(k).text, str(v))
+            
+        # Test Default (CSV-like)
+        csv_out = self.aggregator.export_summary(payload, format="txt")
+        self.assertIn(payload["report_id"], csv_out)
+        self.assertIn(payload["target_module"], csv_out)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

@@ -1,5 +1,6 @@
 import json
 import uuid
+import re
 from packaging.requirements import Requirement
 from packaging.markers import Marker
 
@@ -17,25 +18,20 @@ class PackageSpec:
 def parse_package_spec(spec_string):
     if not spec_string or not spec_string.strip():
         return None
-    try:
-        # Очищаем от лишних скобок вокруг версий вроде (>=2.0.0)
-        cleaned = spec_string.strip()
-        if cleaned.startswith('(') and cleaned.endswith(')'):
-            cleaned = cleaned[1:-1].strip()
+    
+    cleaned = spec_string.strip()
+    if cleaned.startswith('(') and cleaned.endswith(')'):
+        cleaned = cleaned[1:-1].strip()
         
-        req = Requirement(cleaned)
-        version_str = str(req.specifier) if req.specifier else None
-        marker_str = str(req.marker) if req.marker else None
-        return PackageSpec(
-            name=req.name,
-            version=version_str,
-            extras=list(req.extras),
-            marker=marker_str
-        )
-    except Exception:
-        # Согласно правилам: Исключения бросай только если в тестах есть assertRaises.
-        # В тестах тут ожидается либо объект, либо None при неверном синтаксисе.
-        return None
+    req = Requirement(cleaned)
+    version_str = str(req.specifier) if req.specifier else None
+    marker_str = str(req.marker) if req.marker else None
+    return PackageSpec(
+        name=req.name,
+        version=version_str,
+        extras=list(req.extras),
+        marker=marker_str
+    )
 
 
 class PackageSpecParser:

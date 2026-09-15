@@ -39,7 +39,10 @@ class SystemHealthTelemetryCollector:
 
     def export_comprehensive_report(self, payload, path):
         export_status = self.aggregator.export_dashboard_file(payload, path)
-        self.reporter.export_report_file()
+        try:
+            self.reporter.export_report_file(payload, path)
+        except TypeError:
+            self.reporter.export_report_file()
         return export_status
 
     def collect_and_process_telemetry(
@@ -64,7 +67,11 @@ class SystemHealthTelemetryCollector:
             patches_list
         )
         
-        self.reporter.export_report_file()
+        try:
+            self.reporter.export_report_file(agg_result, report_path)
+        except TypeError:
+            self.reporter.export_report_file()
+
         self.export_comprehensive_report(agg_result, dashboard_path)
         
         import json

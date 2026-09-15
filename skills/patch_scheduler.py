@@ -8,7 +8,10 @@ class PatchScheduler:
     def schedule_patch(self, module_name, exception, traceback_str):
         hub = ErrorRecoveryHub()
         incident_id = hub.capture_failure(module_name, exception, traceback_str)
-        return hub.analyze_and_recover(incident_id)
+        try:
+            return hub.analyze_and_recover(module_name, exception, {"incident_id": incident_id, "traceback": traceback_str})
+        except TypeError:
+            return hub.analyze_and_recover(incident_id)
 
     def batch_schedule(self, failures):
         hub = ErrorRecoveryHub()

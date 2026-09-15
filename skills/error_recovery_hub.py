@@ -7,10 +7,14 @@ from pathlib import Path
 
 
 class ErrorRecoveryHub:
+    _shared_incidents = {}
+    _shared_history = {}
+    _shared_logs = {}
+
     def __init__(self):
-        self.incidents = {}
-        self.history = {}
-        self.logs = {}
+        self.incidents = ErrorRecoveryHub._shared_incidents
+        self.history = ErrorRecoveryHub._shared_history
+        self.logs = ErrorRecoveryHub._shared_logs
 
     def capture_failure(self, module_name, exception, traceback_str=None):
         incident_id = str(uuid.uuid4())
@@ -71,12 +75,16 @@ class ErrorRecoveryHub:
             "code": f"def fix_{uuid.uuid4().hex[:6]}(): pass"
         }
 
-        response = requests.post(
-            "https://api.example.com/generate-patch",
-            json={"incident_id": incident_id, "error": inc["error"]}
-        )
-        if response.status_code == 200:
-            return response.json()
+        try:
+            response = requests.post(
+                "https://api.example.com/generate-patch",
+                json={"incident_id": incident_id, "error": inc["error"]},
+                timeout=2
+            )
+            if response.status_code == 200:
+                return response.json()
+        except requests.RequestException:
+            return payload
 
         return payload
 

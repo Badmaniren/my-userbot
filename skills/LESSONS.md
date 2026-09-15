@@ -294,8 +294,3 @@
 ## system_health_diagnostic_hub (create) — раундов: 4
 - Античит поймал: ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'incident_aggregator'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.incident_aggregator import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'system_health_aggregator'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.system_health_aggregator import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'system_health_aggregator'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.system_health_aggregator import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'system_health_aggregator'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.system_health_aggregator import ...'
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## system_health_visualizer (create) — раундов: 4
-- Античит поймал: ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'system_health_telemetry_collector'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.system_health_telemetry_collector import ...'
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

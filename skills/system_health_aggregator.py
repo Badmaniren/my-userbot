@@ -57,6 +57,9 @@ class SystemHealthAggregator:
             'dashboard': dashboard
         }
 
+    def aggregate(self, system_id=None):
+        return self.collect_and_aggregate(module_name=system_id)
+
     def aggregate_and_report(self, *args, **kwargs):
         return self.collect_and_aggregate(*args, **kwargs)
 

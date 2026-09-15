@@ -1,3 +1,4 @@
+import io
 from skills.system_health_aggregator import SystemHealthAggregator
 from skills.system_health_reporter import SystemHealthReporter
 
@@ -31,6 +32,9 @@ class SystemHealthTelemetryCollector:
         except TypeError:
             self.reporter.generate_health_report()
         return agg_result
+
+    def stream_telemetry(self, system_id=None):
+        return io.BytesIO(f"telemetry_data_{system_id}".encode("utf-8"))
 
     def process_telemetry_stream(self, stream, path):
         stream_result = self.aggregator.process_stream(stream, path)

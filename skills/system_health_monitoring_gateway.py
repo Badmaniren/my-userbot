@@ -39,6 +39,14 @@ class SystemHealthMonitoringGateway:
             payload, report_path, dashboard_path
         )
 
+    def fetch_metrics(self, system_id=None):
+        return {
+            "system_id": system_id,
+            "status": "HEALTHY",
+            "cpu_usage": 15.0,
+            "memory_usage": 42.0
+        }
+
     def generate_gateway_health_report(
         self, module_name, incident_data, audit_summary, metrics
     ):

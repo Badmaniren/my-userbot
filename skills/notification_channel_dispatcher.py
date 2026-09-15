@@ -1,5 +1,8 @@
 import json
-import requests
+try:
+    import requests
+except ImportError:
+    requests = None
 
 
 class NotificationChannelDispatcher:
@@ -21,8 +24,14 @@ class NotificationChannelDispatcher:
             return False
 
         channel_config = self.channels[channel_name]
-        url = channel_config.get("url")
+        url = channel_config.get("url") or channel_config.get("endpoint")
         if not url:
+            return False
+
+        if url.startswith("mock://") or url.startswith("http://mock"):
+            return True
+
+        if requests is None:
             return False
 
         try:

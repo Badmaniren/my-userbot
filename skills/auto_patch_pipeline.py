@@ -2,7 +2,7 @@ from skills.error_recovery_hub import ErrorRecoveryHub
 from skills.patch_validator import PatchValidator
 
 class PipelineResult(dict):
-    def __init__(self, success: bool, incident_id: str = None, error: str = None, raw_result=None, patch_data=None):
+    def __init__(self, success: bool, incident_id: str = None, error: str = None, raw_result=None, patch_data=None, **kwargs):
         super().__init__()
         self.success = success
         self.incident_id = incident_id
@@ -18,6 +18,10 @@ class PipelineResult(dict):
         self["status"] = "success" if success else "failed"
         if patch_data is not None:
             self["patch_data"] = patch_data
+
+        for k, v in kwargs.items():
+            self[k] = v
+            setattr(self, k, v)
 
     def __getitem__(self, key):
         if key == "incident_id":

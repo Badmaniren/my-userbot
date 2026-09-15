@@ -1,68 +1,80 @@
 import unittest
-import os
-import json
 import uuid
 import random
+import os
+import json
 import tempfile
 from skills.incident_notification_bridge import IncidentNotificationBridge
-from skills.incident_aggregator import IncidentAggregator
 from skills.notification_channel_dispatcher import NotificationChannelDispatcher
 from skills.notification_template_engine import NotificationTemplateEngine
+from skills.incident_severity_evaluator import IncidentSeverityEvaluator
+from skills.notification_webhook_broadcaster import NotificationWebhookBroadcaster
 
 class TestIncidentNotificationBridgeIntegration(unittest.TestCase):
     def setUp(self):
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.aggregator = IncidentAggregator()
+        self.storage_dir = tempfile.mkdtemp()
         self.dispatcher = NotificationChannelDispatcher()
         self.template_engine = NotificationTemplateEngine()
+        self.severity_evaluator = IncidentSeverityEvaluator()
+        self.webhook_broadcaster = NotificationWebhookBroadcaster()
         
         self.bridge = IncidentNotificationBridge(
             dispatcher=self.dispatcher,
             template_engine=self.template_engine,
-            storage_dir=self.temp_dir.name
+            webhook_broadcaster=self.webhook_broadcaster,
+            storage_dir=self.storage_dir,
+            severity_evaluator=self.severity_evaluator
         )
 
     def tearDown(self):
-        self.temp_dir.cleanup()
+        for root, dirs, files in os.walk(self.storage_dir, topdown=False):
+            for name in files:
+                os.remove(os.path.join(root, name))
+            for name in dirs:
+                os.rmdir(os.path.join(root, name))
+        os.rmdir(self.storage_dir)
 
-    def test_end_to_end_incident_processing_and_storage(self):
-        random_id = f"inc_{uuid.uuid4().hex}"
-        severity_levels = ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
-        selected_severity = random.choice(severity_levels)
+    def test_end_to_end_critical_incident_dispatch_and_evaluation(self):
+        rand_id = str(uuid.uuid4())
+        error_message = f"Critical system failure index {random.randint(1000, 9999)}"
         
-        raw_incident = {
-            "incident_id": random_id,
-            "severity": selected_severity,
-            "description": f"Integration test security event {random.randint(1000, 9999)}",
-            "source": "vulnerability_scanner"
+        aggregated_incident = {
+            "id": rand_id,
+            "message": error_message,
+            "traceboard_str": "Traceback (most recent call last):\n  File 'system.py', line 42, in run\n    raise SystemError()"
         }
 
-        aggregated_data = self.aggregator.aggregate([raw_incident]) if hasattr(self.aggregator, "aggregate") else raw_incident
-        if isinstance(aggregated_data, list) and len(aggregated_data) > 0:
-            incident_payload = aggregated_data[0]
-        else:
-            incident_payload = raw_incident
+        result = self.bridge.dispatch_critical_incident(aggregated_incident)
 
-        incident_payload["incident_id"] = random_id
+        self.assertTrue(result.get("success"))
+        self.assertEqual(result.get("incident_id"), rand_id)
+        self.assertEqual(result.get("dispatch_id"), f"dispatch_{rand_id}")
 
-        dispatch_result = self.bridge.dispatch_critical_incident(incident_payload)
-        
-        self.assertEqual(dispatch_result.get("incident_id"), random_id)
-        self.assertTrue(dispatch_result.get("success"))
+        self.assertIn("severity_assessment", aggregated_incident)
+        self.assertIsInstance(aggregated_incident["severity_assessment"], dict)
 
-        expected_file_path = os.path.join(self.temp_dir.name, f"{random_id}.json")
-        self.assertTrue(os.path.exists(expected_file_path), "Файл критического инцидента не был создан в storage_dir")
+        expected_file_path = os.path.join(self.storage_dir, f"{rand_id}.json")
+        self.assertTrue(os.path.exists(expected_file_path))
 
-        with open(expected_file_path, 'r', encoding='utf-8') as f:
+        with open(expected_file_path, "r", encoding="utf-8") as f:
             stored_data = json.load(f)
-        self.assertEqual(stored_data.get("incident_id"), random_id)
-        self.assertEqual(stored_data.get("severity"), selected_severity)
+            self.assertEqual(stored_data.get("id"), rand_id)
+            self.assertEqual(stored_data.get("message"), error_message)
+            self.assertIn("severity_assessment", stored_data)
 
-        processed_first = self.bridge.process_incident(incident_payload, channel="default_channel")
-        self.assertTrue(processed_first)
+    def test_process_incident_deduplication_and_template_flow(self):
+        incident_id = str(uuid.uuid4())
+        payload = {
+            "incident_id": incident_id,
+            "service": f"auth-service-{random.randint(1, 100)}",
+            "status": "DOWN"
+        }
 
-        processed_duplicate = self.bridge.process_incident(incident_payload, channel="default_channel")
-        self.assertFalse(processed_duplicate, "Дубликат инцидента должен быть отклонен мостом")
+        first_processed = self.bridge.process_incident(payload)
+        self.assertTrue(first_processed)
+
+        second_processed = self.bridge.process_incident(payload)
+        self.assertFalse(second_processed)
 
 if __name__ == "__main__":
     unittest.main()

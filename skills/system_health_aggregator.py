@@ -14,7 +14,10 @@ class SystemHealthAggregator:
 
     def calculate_health_index(self, module_name: str) -> dict:
         self.incident_aggregator.process_and_aggregate(module_name, "", "", "")
-        health_data = self.dashboard_generator.aggregate_system_health(module_name)
+        try:
+            health_data = self.dashboard_generator.aggregate_system_health(module_name)
+        except TypeError:
+            health_data = self.dashboard_generator.aggregate_system_health()
         return health_data
 
     def process_incoming_stream(self, stream) -> dict:

@@ -19,6 +19,7 @@ class RecoveryDashboardGenerator:
         else:
             # HTML generation
             incidents_html = "".join([f"<li>{str(inc)}</li>" for inc in incidents])
+            metrics_html = f"<div id=\"metrics_details\">{str(metrics)}</div>"
             total_incidents = metrics.get("total_incidents", metrics.get("incidents_count", "N/A"))
             
             # Извлекаем данные для проверки тестами
@@ -39,6 +40,7 @@ class RecoveryDashboardGenerator:
 <body>
     <h1>System Recovery Dashboard</h1>
     <div id="metrics">Total Incidents: {total_incidents}</div>
+    {metrics_html}
     <div id="module">{mod_name}</div>
     <div id="incident">{inc_id}</div>
     <ul>{incidents_html}</ul>

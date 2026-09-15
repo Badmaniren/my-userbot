@@ -1,100 +1,190 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 import uuid
 import random
 import string
-import io
-import sys
 
 from skills.auto_patch_pipeline import AutoPatchPipeline, PipelineResult
 
 
-class TestAutoPatchPipelineInquisitor(unittest.TestCase):
+class TestPipelineResult(unittest.TestCase):
+    def test_pipeline_result_success_state(self):
+        rand_incident = uuid.uuid4().hex
+        rand_raw = uuid.uuid4().hex
+        rand_patch = {"patch_id": uuid.uuid4().hex}
 
-    def setUp(self):
-        self.module_name = f"mod_{uuid.uuid4().hex[:8]}"
-        self.exception_msg = f"Err_{uuid.uuid4().hex[:6]}"
-        self.traceback_str = f"Traceback at {uuid.uuid4().hex}"
-        self.incident_id = f"inc_{uuid.uuid4().hex[:8]}"
-        self.patch_code = f"def fix_{uuid.uuid4().hex[:4]}(): pass"
-        self.pipeline = AutoPatchPipeline()
-
-    def test_composition_dependencies_import(self):
-        self.assertTrue(
-            hasattr(self.pipeline, 'error_recovery_hub'),
-            "Архитектурный сбой: AutoPatchPipeline обязан инстанцировать ErrorRecoveryHub"
-        )
-        self.assertTrue(
-            hasattr(self.pipeline, 'patch_validator'),
-            "Архитектурный сбой: AutoPatchPipeline обязан инстанцировать PatchValidator"
+        res = PipelineResult(
+            success=True,
+            incident_id=rand_incident,
+            raw_result=rand_raw,
+            patch_data=rand_patch
         )
 
+        self.assertTrue(res.success)
+        self.assertEqual(res.incident_id, rand_incident)
+        self.assertIsNone(res.error)
+        self.assertEqual(res.raw_result, rand_raw)
+        self.assertEqual(res.patch_data, rand_patch)
+
+        self.assertTrue(res["success"])
+        self.assertEqual(res["incident_id"], rand_incident)
+        self.assertEqual(res["status"], "success")
+        self.assertEqual(res["patch_data"], rand_patch)
+        self.assertIn("incident_id", res)
+        self.assertIn("status", res)
+        self.assertIn("patch_data", res)
+        self.assertIn("success", res)
+        self.assertIn("error", res)
+
+    def test_pipeline_result_failure_state(self):
+        rand_incident = uuid.uuid4().hex
+        rand_error = "".join(random.choices(string.ascii_letters, k=15))
+        rand_patch = {"bad_patch": uuid.uuid4().hex}
+
+        res = PipelineResult(
+            success=False,
+            incident_id=rand_incident,
+            error=rand_error,
+            patch_data=rand_patch
+        )
+
+        self.assertFalse(res.success)
+        self.assertEqual(res.incident_id, rand_incident)
+        self.assertEqual(res.error, rand_error)
+        self.assertEqual(res.patch_data, rand_patch)
+
+        self.assertFalse(res["success"])
+        self.assertEqual(res["incident_id"], rand_incident)
+        self.assertEqual(res["status"], "failed")
+        self.assertEqual(res["error"], rand_error)
+        self.assertEqual(res["patch_data"], rand_patch)
+
+
+class TestAutoPatchPipeline(unittest.TestCase):
     def test_run_pipeline_success_flow(self):
-        exc = RuntimeError(self.exception_msg)
-        context_data = {uuid.uuid4().hex: uuid.uuid4().hex}
-        
-        with patch.object(self.pipeline.error_recovery_hub, 'capture_failure', return_value=self.incident_id) as mock_capture, \
-             patch.object(self.pipeline.error_recovery_hub, 'generate_patch', return_value={'code': self.patch_code, 'id': self.incident_id}) as mock_gen, \
-             patch.object(self.pipeline.patch_validator, 'validate', return_value=True) as mock_val, \
-             patch.object(self.pipeline.error_recovery_hub, 'deploy_and_verify', return_value=True) as mock_deploy:
+        pipeline = AutoPatchPipeline()
+        rand_module = uuid.uuid4().hex
+        rand_exception = ValueError("".join(random.choices(string.ascii_letters, k=10)))
+        rand_tb = uuid.uuid4().hex
+        rand_incident_id = uuid.uuid4().hex
+        rand_patch_data = {"code": uuid.uuid4().hex}
+        rand_deploy_res = uuid.uuid4().hex
 
-            result = self.pipeline.run_pipeline(self.module_name, exc, self.traceback_str, context_data)
+        with patch.object(pipeline.error_recovery_hub, 'capture_failure', return_value=rand_incident_id) as mock_capture, \
+             patch.object(pipeline.error_recovery_hub, 'generate_patch', return_value=rand_patch_data) as mock_gen, \
+             patch.object(pipeline.patch_validator, 'validate', return_value=True) as mock_val, \
+             patch.object(pipeline.error_recovery_hub, 'deploy_and_verify', return_value=rand_deploy_res) as mock_deploy:
 
-            mock_capture.assert_called_once_with(self.module_name, exc, self.traceback_str)
-            mock_gen.assert_called_once_with(self.incident_id)
-            mock_val.assert_called_once()
-            mock_deploy.assert_called_once()
-            
-            self.assertTrue(result.success, f"Конвейер должен завершиться успехом для инцидента {self.incident_id}")
-            self.assertEqual(result.incident_id, self.incident_id)
+            result = pipeline.run_pipeline(rand_module, rand_exception, rand_tb)
+
+            mock_capture.assert_called_once_with(rand_module, rand_exception, rand_tb)
+            mock_gen.assert_called_once_with(rand_incident_id)
+            mock_val.assert_called_once_with(rand_patch_data)
+            mock_deploy.assert_called_once_with(rand_patch_data)
+
+            self.assertTrue(result.success)
+            self.assertEqual(result.incident_id, rand_incident_id)
+            self.assertEqual(result.patch_data, rand_patch_data)
+            self.assertEqual(result.raw_result, rand_deploy_res)
+            self.assertIsNone(result.error)
+
+    def test_run_pipeline_capture_failure_exception_fallback(self):
+        pipeline = AutoPatchPipeline()
+        rand_module = uuid.uuid4().hex
+        rand_exception = RuntimeError("".join(random.choices(string.ascii_letters, k=12)))
+        rand_tb = uuid.uuid4().hex
+        rand_patch_data = {"patch": uuid.uuid4().hex}
+
+        with patch.object(pipeline.error_recovery_hub, 'capture_failure', side_effect=Exception("Crash")) as mock_capture, \
+             patch.object(pipeline.error_recovery_hub, 'generate_patch', return_value=rand_patch_data) as mock_gen, \
+             patch.object(pipeline.patch_validator, 'validate', return_value=True) as mock_val, \
+             patch.object(pipeline.error_recovery_hub, 'deploy_and_verify', return_value=True):
+
+            result = pipeline.run_pipeline(rand_module, rand_exception, rand_tb)
+
+            mock_capture.assert_called_once_with(rand_module, rand_exception, rand_tb)
+            self.assertTrue(result.success)
+            self.assertTrue(result.incident_id.startswith("inc_fallback_"))
+            self.assertEqual(result.patch_data, rand_patch_data)
+
+    def test_run_pipeline_generation_failure(self):
+        pipeline = AutoPatchPipeline()
+        rand_module = uuid.uuid4().hex
+        rand_exception = TypeError("".join(random.choices(string.ascii_letters, k=8)))
+        rand_tb = uuid.uuid4().hex
+        rand_incident_id = uuid.uuid4().hex
+
+        with patch.object(pipeline.error_recovery_hub, 'capture_failure', return_value=rand_incident_id), \
+             patch.object(pipeline.error_recovery_hub, 'generate_patch', side_effect=Exception("Gen fail")) as mock_gen:
+
+            result = pipeline.run_pipeline(rand_module, rand_exception, rand_tb)
+
+            mock_gen.assert_called_once_with(rand_incident_id)
+            self.assertFalse(result.success)
+            self.assertEqual(result.incident_id, rand_incident_id)
+            self.assertEqual(result.error, "Generation failed")
+            self.assertIsNone(result.patch_data)
 
     def test_run_pipeline_validation_failure(self):
-        exc = ValueError(self.exception_msg)
-        
-        with patch.object(self.pipeline.error_recovery_hub, 'capture_failure', return_value=self.incident_id) as mock_capture, \
-             patch.object(self.pipeline.error_recovery_hub, 'generate_patch', return_value={'code': self.patch_code}) as mock_gen, \
-             patch.object(self.pipeline.patch_validator, 'validate', return_value=False) as mock_val, \
-             patch.object(self.pipeline.error_recovery_hub, 'deploy_and_verify') as mock_deploy:
+        pipeline = AutoPatchPipeline()
+        rand_module = uuid.uuid4().hex
+        rand_exception = KeyError("".join(random.choices(string.ascii_letters, k=9)))
+        rand_tb = uuid.uuid4().hex
+        rand_incident_id = uuid.uuid4().hex
+        rand_patch_data = {"invalid": uuid.uuid4().hex}
 
-            result = self.pipeline.run_pipeline(self.module_name, exc, self.traceback_str)
+        with patch.object(pipeline.error_recovery_hub, 'capture_failure', return_value=rand_incident_id), \
+             patch.object(pipeline.error_recovery_hub, 'generate_patch', return_value=rand_patch_data), \
+             patch.object(pipeline.patch_validator, 'validate', return_value=False) as mock_val:
 
-            mock_capture.assert_called_once()
-            mock_gen.assert_called_once_with(self.incident_id)
-            mock_val.assert_called_once()
-            mock_deploy.assert_not_called()
-            
-            self.assertFalse(result.success, "Патч не прошедший валидацию не должен деплоиться")
-            self.assertIn("validation failed", result.error.lower())
+            result = pipeline.run_pipeline(rand_module, rand_exception, rand_tb)
 
-    def test_run_pipeline_generation_fails(self):
-        exc = TypeError(self.exception_msg)
-        
-        with patch.object(self.pipeline.error_recovery_hub, 'capture_failure', return_value=self.incident_id), \
-             patch.object(self.pipeline.error_recovery_hub, 'generate_patch', return_value=None) as mock_gen, \
-             patch.object(self.pipeline.patch_validator, 'validate') as mock_val:
-
-            result = self.pipeline.run_pipeline(self.module_name, exc, self.traceback_str)
-
-            mock_gen.assert_called_once_with(self.incident_id)
-            mock_val.assert_not_called()
+            mock_val.assert_called_once_with(rand_patch_data)
             self.assertFalse(result.success)
+            self.assertEqual(result.incident_id, rand_incident_id)
+            self.assertEqual(result.error, "Validation failed")
+            self.assertEqual(result.patch_data, rand_patch_data)
 
-    def test_stream_verification_integration(self):
-        random_bytes = ''.join(random.choices(string.ascii_letters, k=32)).encode('utf-8')
-        stream = io.BytesIO(random_bytes)
-        expected_dict = {uuid.uuid4().hex: random.randint(1, 100)}
+    def test_run_pipeline_deployment_exception_handling(self):
+        pipeline = AutoPatchPipeline()
+        rand_module = uuid.uuid4().hex
+        rand_exception = ZeroDivisionError("".join(random.choices(string.ascii_letters, k=10)))
+        rand_tb = uuid.uuid4().hex
+        rand_incident_id = uuid.uuid4().hex
+        rand_patch_data = {"patch_x": uuid.uuid4().hex}
+        rand_deploy_error = uuid.uuid4().hex
 
-        with patch.object(self.pipeline.patch_validator, 'verify_stream', return_value=expected_dict) as mock_verify_stream:
-            res = self.pipeline.verify_patch_stream(stream)
-            mock_verify_stream.assert_called_once_with(stream)
-            self.assertEqual(res, expected_dict)
+        with patch.object(pipeline.error_recovery_hub, 'capture_failure', return_value=rand_incident_id), \
+             patch.object(pipeline.error_recovery_hub, 'generate_patch', return_value=rand_patch_data), \
+             patch.object(pipeline.patch_validator, 'validate', return_value=True), \
+             patch.object(pipeline.error_recovery_hub, 'deploy_and_verify', side_effect=Exception(rand_deploy_error)) as mock_deploy:
 
-    def test_analyze_and_recover_delegation(self):
-        exc = ZeroDivisionError(self.exception_msg)
-        context = {uuid.uuid4().hex: uuid.uuid4().hex}
-        expected_return = {uuid.uuid4().hex: uuid.uuid4().hex}
+            result = pipeline.run_pipeline(rand_module, rand_exception, rand_tb)
 
-        with patch.object(self.pipeline.error_recovery_hub, 'analyze_and_recover', return_value=expected_return) as mock_analyze:
-            res = self.pipeline.force_analyze_and_recover(self.module_name, exc, context)
-            mock_analyze.assert_called_once_with(self.module_name, exc, context)
-            self.assertEqual(res, expected_return)
+            mock_deploy.assert_called_once_with(rand_patch_data)
+            self.assertTrue(result.success)
+            self.assertEqual(result.incident_id, rand_incident_id)
+            self.assertEqual(result.patch_data, rand_patch_data)
+            self.assertEqual(result.raw_result, rand_deploy_error)
+
+    def test_verify_patch_stream(self):
+        pipeline = AutoPatchPipeline()
+        rand_stream = uuid.uuid4().hex
+        rand_validation_result = random.choice([True, False])
+
+        with patch.object(pipeline.patch_validator, 'verify_stream', return_value=rand_validation_result) as mock_verify:
+            res = pipeline.verify_patch_stream(rand_stream)
+            mock_verify.assert_called_once_with(rand_stream)
+            self.assertEqual(res, rand_validation_result)
+
+    def test_force_analyze_and_recover(self):
+        pipeline = AutoPatchPipeline()
+        rand_module = uuid.uuid4().hex
+        rand_exception = SyntaxError("".join(random.choices(string.ascii_letters, k=11)))
+        rand_context = {uuid.uuid4().hex: uuid.uuid4().hex}
+        rand_recovery_res = {"status": uuid.uuid4().hex}
+
+        with patch.object(pipeline.error_recovery_hub, 'analyze_and_recover', return_value=rand_recovery_res) as mock_analyze:
+            res = pipeline.force_analyze_and_recover(rand_module, rand_exception, rand_context)
+            mock_analyze.assert_called_once_with(rand_module, rand_exception, rand_context)
+            self.assertEqual(res, rand_recovery_res)

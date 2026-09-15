@@ -1,5 +1,6 @@
 import json
 import requests
+import io
 
 
 class PyPIClient:
@@ -30,10 +31,17 @@ class PyPIClient:
         return self.get_dependencies(pkg_name, version)
 
     def parse_stream_data(self, stream) -> dict | None:
+        if isinstance(stream, bytes):
+            stream = io.BytesIO(stream)
+        
         content = stream.read()
         if isinstance(content, bytes):
             content = content.decode("utf-8")
-        return json.loads(content)
+        
+        try:
+            return json.loads(content)
+        except (json.JSONDecodeError, TypeError):
+            return None
 
 
 class PipelineResult:

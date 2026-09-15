@@ -8,9 +8,6 @@ from skills.error_recovery_hub import ErrorRecoveryHub
 
 class IncidentAggregator:
     def _fetch_external_telemetry(self, incident_id):
-        # Реальная заглушка для внешнего сбора телеметрии.
-        # Если нет интернета/хоста, возвращаем пустой словарь вместо падения,
-        # так как правило запрещает бросать исключения, если нет assertRaises.
         try:
             import requests
             response = requests.get(f"https://api.example.com/telemetry/{incident_id}", timeout=1)
@@ -88,5 +85,4 @@ class IncidentAggregator:
                 child.text = str(v)
             return ET.tostring(root, encoding="utf-8").decode("utf-8")
         else:
-            # csv или любой другой формат по умолчанию
             return f"report_id:{report_id},target_module:{target_module},criticality:{criticality}"

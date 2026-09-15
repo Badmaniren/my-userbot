@@ -1,85 +1,76 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, mock_open
+import json
+import io
 import uuid
 import random
-import string
-import io
-import sys
-import os
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
-
+from datetime import datetime
 from skills.dependency_audit_reporter import DependencyAuditReporter
 
-
 class TestDependencyAuditReporter(unittest.TestCase):
-
     def setUp(self):
         self.reporter = DependencyAuditReporter()
-        self.random_epic_id = uuid.uuid4().hex
-        self.random_vuln_count = random.randint(1, 100)
-        self.random_pkg_name = ''.join(random.choices(string.ascii_lowercase, k=10))
-        self.random_version = f"{random.randint(0, 9)}.{random.randint(0, 9)}.{random.randint(0, 9)}"
-        self.random_cve = f"CVE-{random.randint(2000, 2024)}-{random.randint(1000, 9999)}"
 
-    def test_generate_report_success_logic(self):
-        audit_data = {
-            "epic_id": self.random_epic_id,
-            "vulnerabilities_found": self.random_vuln_count,
-            "package": self.random_pkg_name,
-            "version": self.random_version,
-            "cve": self.random_cve
-        }
+    def test_generate_report_success(self):
+        key = uuid.uuid4().hex
+        value = uuid.uuid4().hex
+        audit_data = {key: value}
+        
+        result_json = self.reporter.generate_report(audit_data)
+        parsed = json.loads(result_json)
+        
+        self.assertEqual(parsed[key], value)
+        self.assertIn("timestamp", parsed)
 
-        with patch('skills.dependency_audit_reporter.datetime') as mock_datetime:
-            random_timestamp = uuid.uuid4().hex
-            mock_datetime.now.return_value.isoformat.return_value = random_timestamp
+    def test_generate_report_error(self):
+        err_code = random.randint(1000, 9999)
+        audit_data = {"error_code": err_code}
+        
+        with patch("sys.stderr", new_callable=io.StringIO) as mock_stderr:
+            result = self.reporter.generate_report(audit_data)
             
-            report = self.reporter.generate_report(audit_data)
+        self.assertIn(f"ERROR: code {err_code}", result)
+        self.assertIn(f"ERROR: code {err_code}", mock_stderr.getvalue())
 
-            self.assertIn(self.random_epic_id, report)
-            self.assertIn(str(self.random_vuln_count), report)
-            self.assertIn(self.random_pkg_name, report)
-            self.assertIn(self.random_cve, report)
-            self.assertIn(random_timestamp, report)
-
-    def test_finalize_epic_audit_with_stream(self):
-        random_stream_data = f"AUDIT_LOG_{uuid.uuid4().hex}_STATUS_OK".encode('utf-8')
-        mock_stream = io.BytesIO(random_stream_data)
-
-        with patch('skills.dependency_audit_reporter.open', create=True) as mock_open:
-            mock_file = MagicMock()
-            mock_open.return_value.__enter__.return_value = mock_file
+    def test_finalize_epic(self):
+        epic_id = uuid.uuid4().hex
+        raw_data = uuid.uuid4().bytes
+        stream = io.BytesIO(raw_data)
+        expected_filename = f"epic_{epic_id}_audit.log"
+        
+        m_open = mock_open()
+        with patch("builtins.open", m_open):
+            success = self.reporter.finalize_epic(epic_id, stream)
             
-            result = self.reporter.finalize_epic(self.random_epic_id, mock_stream)
+        self.assertTrue(success)
+        m_open.assert_called_once_with(expected_filename, "wb")
+        m_open().write.assert_called_once_with(raw_data)
 
-            self.assertTrue(result)
-            mock_open.assert_called_once()
-            mock_file.write.assert_called_once_with(random_stream_data)
+    def test_export_summary(self):
+        payload_key = uuid.uuid4().hex
+        payload_val = uuid.uuid4().hex
+        payload = {payload_key: payload_val}
+        
+        exported = self.reporter.export_summary(payload, format="json")
+        parsed = json.loads(exported)
+        
+        self.assertEqual(parsed[payload_key], payload_val)
 
-    def test_audit_report_failure_handling(self):
-        malformed_data = {
-            "corrupted_key": uuid.uuid4().hex,
-            "error_code": random.randint(500, 999)
-        }
-
-        with patch('skills.dependency_audit_reporter.sys.stderr', new=io.StringIO()) as mock_stderr:
-            report = self.reporter.generate_report(malformed_data)
+    def test_generate_epic_report(self):
+        payload_key = uuid.uuid4().hex
+        payload_val = uuid.uuid4().hex
+        payload = {payload_key: payload_val}
+        output_path = f"{uuid.uuid4().hex}.json"
+        
+        m_open = mock_open()
+        with patch("builtins.open", m_open):
+            success = self.reporter.generate_epic_report(payload, output_path)
             
-            self.assertIsNotNone(report)
-            self.assertIn("ERROR", report)
-            self.assertIn(str(malformed_data["error_code"]), report)
+        self.assertTrue(success)
+        m_open.assert_called_once_with(output_path, "w", encoding="utf-8")
+        written_data = "".join(call.args[0] for call in m_open().write.call_args_list)
+        parsed_written = json.loads(written_data)
+        self.assertEqual(parsed_written[payload_key], payload_val)
 
-    def test_export_audit_summary_json(self):
-        summary_payload = {
-            "audit_uuid": uuid.uuid4().hex,
-            "score": random.uniform(0.0, 10.0),
-            "status": random.choice(["SECURE", "VULNERABLE", "CRITICAL"])
-        }
-
-        json_output = self.reporter.export_summary(summary_payload, format="json")
-
-        self.assertIn(summary_payload["audit_uuid"], json_output)
-        self.assertIn(str(summary_payload["score"]), json_output)
-        self.assertIn(summary_payload["status"], json_output)
-        self.assertTrue(json_output.startswith("{") or json_output.startswith("
+if __name__ == "__main__":
+    unittest.main()

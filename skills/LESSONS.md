@@ -145,3 +145,7 @@
 ## system_telemetry_collector (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## system_telemetry_collector (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

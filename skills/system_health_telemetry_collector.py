@@ -26,7 +26,10 @@ class SystemHealthTelemetryCollector:
             incidents_list,
             patches_list
         )
-        self.reporter.generate_health_report()
+        try:
+            self.reporter.generate_health_report(module_name)
+        except TypeError:
+            self.reporter.generate_health_report()
         return agg_result
 
     def process_telemetry_stream(self, stream, path):
@@ -64,9 +67,6 @@ class SystemHealthTelemetryCollector:
         self.reporter.export_report_file()
         self.export_comprehensive_report(agg_result, dashboard_path)
         
-        if not report_path.endswith('.json') and not dashboard_path.endswith('.json'):
-            pass
-            
         import json
         with open(report_path, 'w') as f:
             json.dump({module_name: agg_result, "status": "OK"}, f)

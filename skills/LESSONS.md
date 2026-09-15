@@ -299,7 +299,3 @@
 - Античит поймал: ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'system_health_telemetry_collector'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.system_health_telemetry_collector import ...'
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## incident_severity_evaluator (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -82,7 +82,6 @@ class TestErrorRecoveryHub(unittest.TestCase):
 
     def test_apply_patch_to_module(self):
         random_file_content = f"# {uuid.uuid4().hex}\noriginal_variable = {random.randint(100, 999)}\n"
-        mock_file_data = io.BytesIO(random_file_content.encode('utf-8'))
 
         with patch('skills.error_recovery_hub.open', create=True) as mock_open:
             mock_file_instance = MagicMock()
@@ -101,8 +100,6 @@ class TestErrorRecoveryHub(unittest.TestCase):
             mock_file_instance.write.assert_called()
 
     def test_recovery_hub_rollback_on_failure(self):
-        random_backup_data = f"backup_state_{uuid.uuid4().hex}"
-        
         incident_id = self.hub.capture_failure(
             module_name=self.random_module_name,
             exception=SystemError(self.random_error_msg),
@@ -131,6 +128,25 @@ class TestErrorRecoveryHub(unittest.TestCase):
         patch_res = self.hub.generate_patch(fake_incident_id)
         self.assertIsInstance(patch_res, dict)
         self.assertTrue(patch_res.get('error') or patch_res.get('status') == 'not_found')
+
+    def test_analyze_and_recover_with_incident_id(self):
+        incident_id = self.hub.capture_failure(
+            module_name=self.random_module_name,
+            exception=RuntimeError(self.random_error_msg),
+            traceback_str=self.random_traceback
+        )
+        res = self.hub.analyze_and_recover(incident_id)
+        self.assertTrue(res["success"])
+        self.assertEqual(res["incident_id"], incident_id)
+
+    def test_analyze_and_recover_with_module_and_exception(self):
+        res = self.hub.analyze_and_recover(
+            module_name=self.random_module_name,
+            exception=RuntimeError(self.random_error_msg),
+            context={"test_id": "test_123"}
+        )
+        self.assertTrue(res["success"])
+        self.assertEqual(res["incident_id"], "test_123")
 
 
 if __name__ == '__main__':

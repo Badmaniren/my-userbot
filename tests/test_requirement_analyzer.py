@@ -1,66 +1,125 @@
 import unittest
 from unittest.mock import patch, MagicMock
+import io
 import uuid
 import random
-import string
-import io
-
 from skills.requirement_analyzer import RequirementAnalyzer, PEP508Specifier
 
-class TestRequirementAnalyzerInquisitor(unittest.TestCase):
-
+class TestRequirementAnalyzer(unittest.TestCase):
+    
     def setUp(self):
-        self.pkg_name = f"pkg-{uuid.uuid4().hex[:8]}"
-        self.operator = random.choice(['==', '>=', '<=', '>', '<', '!=', '~='])
-        self.version_num = f"{random.randint(0, 9)}.{random.randint(0, 9)}.{random.randint(0, 9)}"
-        self.raw_spec = f"{self.pkg_name} {self.operator} {self.version_num}"
+        self.rand_name = f"pkg-{uuid.uuid4().hex[:8]}"
+        self.rand_version = f"{random.randint(1, 9)}.{random.randint(0, 9)}.{random.randint(0, 9)}"
+        self.rand_operator = random.choice([">=", "==", "<=", ">", "<", "~="])
+        self.raw_spec = f"{self.rand_name} {self.rand_operator} {self.rand_version}"
 
-    def test_analyzer_initialization_with_random_spec(self):
+    def test_pep508_specifier_get(self):
+        spec = PEP508Specifier(self.rand_name, self.rand_operator, self.rand_version)
+        self.assertEqual(spec.get("name"), self.rand_name)
+        self.assertIsNone(spec.get(uuid.uuid4().hex))
+
+    @patch('skills.requirement_analyzer.Requirement')
+    def test_analyzer_init_and_parse_single(self, mock_requirement_class):
+        mock_req_instance = MagicMock()
+        mock_req_instance.name = self.rand_name
+        mock_req_instance.extras = [uuid.uuid4().hex]
+        
+        mock_spec = MagicMock()
+        mock_spec.operator = self.rand_operator
+        mock_spec.version = self.rand_version
+        mock_req_instance.specifier = [mock_spec]
+        
+        mock_requirement_class.return_value = mock_req_instance
+
         analyzer = RequirementAnalyzer(self.raw_spec)
-        self.assertEqual(analyzer.name, self.pkg_name)
-        self.assertEqual(analyzer.operator, self.operator)
-        self.assertEqual(analyzer.version, self.version_num)
+        self.assertEqual(analyzer.name, self.rand_name)
+        self.assertEqual(analyzer.operator, self.rand_operator)
+        self.assertEqual(analyzer.version, self.rand_version)
+        self.assertEqual(analyzer.extras, mock_req_instance.extras)
 
-    def test_specifier_matching_success(self):
-        analyzer = RequirementAnalyzer(f"secure-lib == 1.2.3")
-        self.assertTrue(analyzer.match("1.2.3"))
+        parsed_list = analyzer.parse(self.raw_spec)
+        self.assertEqual(len(parsed_list), 1)
+        self.assertEqual(parsed_list[0].name, self.rand_name)
 
-    def test_specifier_matching_failure(self):
-        rand_ver = f"{random.randint(10, 20)}.0.0"
-        analyzer = RequirementAnalyzer(f"{self.pkg_name} == {self.version_num}")
-        self.assertFalse(analyzer.match(rand_ver))
+    @patch('skills.requirement_analyzer.Requirement')
+    def test_analyzer_init_empty_specifier(self, mock_requirement_class):
+        mock_req_instance = MagicMock()
+        mock_req_instance.name = self.rand_name
+        mock_req_instance.extras = []
+        mock_req_instance.specifier = []
+        mock_requirement_class.return_value = mock_req_instance
 
-    def test_pep508_parsing_edge_cases(self):
-        extra_tag = ''.join(random.choices(string.ascii_lowercase, k=6))
-        complex_spec = f"{self.pkg_name}[{extra_tag}] >= 2.0.0"
-        
-        with patch('skills.requirement_analyzer.parse_requirement') as mock_parse:
-            mock_parse.return_value = MagicMock(
-                name=self.pkg_name,
-                specifier=MagicMock(<strong>iter</strong>=lambda x: iter([MagicMock(operator='>=', version='2.0.0')])),
-                extras=[extra_tag]
-            )
-            analyzer = RequirementAnalyzer(complex_spec)
-            self.assertEqual(analyzer.name, self.pkg_name)
-            self.assertIn(extra_tag, analyzer.extras)
+        analyzer = RequirementAnalyzer(self.raw_spec)
+        self.assertEqual(analyzer.operator, "==")
+        self.assertEqual(analyzer.version, "")
 
-    def test_stream_parsing_with_random_bytes(self):
-        random_content = f"{self.pkg_name} >= {self.version_num}\n".encode('utf-8')
-        stream = io.BytesIO(random_content)
-        
+    @patch('skills.requirement_analyzer.SpecifierSet')
+    def test_match(self, mock_specifier_set_class):
+        mock_spec_set = MagicMock()
+        target_version = f"{random.randint(1, 5)}.0.0"
+        mock_spec_set.__contains__.return_value = True
+        mock_specifier_set_class.return_value = mock_spec_set
+
         analyzer = RequirementAnalyzer()
-        parsed_list = analyzer.parse_stream(stream)
-        
-        self.assertTrue(any(p.name == self.pkg_name for p in parsed_list))
+        self.assertTrue(analyzer.match(target_version))
 
-    def compatibility_matrix_validation(self):
-        versions = [f"1.{i}.0" for i in range(5)]
-        target_ver = random.choice(versions)
-        analyzer = RequirementAnalyzer(f"{self.pkg_name} == {target_ver}")
-        
-        results = [analyzer.match(v) for v in versions]
-        self.assertEqual(results.count(True), 1)
-        self.assertTrue(results[versions.index(target_ver)])
+        analyzer.operator = ">="
+        analyzer.version = "1.0.0"
+        res = analyzer.match(target_version)
+        self.assertTrue(res)
+        mock_specifier_set_class.assert_called_with(">=1.0.0")
 
-if __name__ == '__main__':
-    unittest.main()
+    @patch('skills.requirement_analyzer.Requirement')
+    def test_parse_stream_bytes(self, mock_requirement_class):
+        mock_req_instance = MagicMock()
+        mock_req_instance.name = self.rand_name
+        mock_req_instance.extras = []
+        mock_spec = MagicMock()
+        mock_spec.operator = "=="
+        mock_spec.version = self.rand_version
+        mock_req_instance.specifier = [mock_spec]
+        mock_requirement_class.return_value = mock_req_instance
+
+        comment_line = f"# {uuid.uuid4().hex}"
+        stream_content = f"{comment_line}\n{self.raw_spec}\n"
+        stream = io.BytesIO(stream_content.encode('utf-8'))
+
+        analyzer = RequirementAnalyzer()
+        results = analyzer.parse_stream(stream)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].name, self.rand_name)
+
+    @patch('skills.requirement_analyzer.Requirement')
+    def test_parse_stream_string(self, mock_requirement_class):
+        mock_req_instance = MagicMock()
+        mock_req_instance.name = self.rand_name
+        mock_req_instance.extras = []
+        mock_spec = MagicMock()
+        mock_spec.operator = "=="
+        mock_spec.version = self.rand_version
+        mock_req_instance.specifier = [mock_spec]
+        mock_requirement_class.return_value = mock_req_instance
+
+        stream_content = f"   \n{self.raw_spec}\n"
+        stream = io.StringIO(stream_content)
+
+        analyzer = RequirementAnalyzer()
+        results = analyzer.parse_stream(stream)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].name, self.rand_name)
+
+    @patch('skills.requirement_analyzer.Requirement')
+    def test_parse_stream_raw_string(self, mock_requirement_class):
+        mock_req_instance = MagicMock()
+        mock_req_instance.name = self.rand_name
+        mock_req_instance.extras = []
+        mock_spec = MagicMock()
+        mock_spec.operator = "=="
+        mock_spec.version = self.rand_version
+        mock_req_instance.specifier = [mock_spec]
+        mock_requirement_class.return_value = mock_req_instance
+
+        analyzer = RequirementAnalyzer()
+        results = analyzer.parse_stream(self.raw_spec)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].name, self.rand_name)

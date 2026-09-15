@@ -10,9 +10,8 @@ def start_new(payload):
         return {"result": payload["uuid"], "components": payload.get("components", {})}
     
     if "error_code" in payload:
-        err_msg = payload.get("error_msg", "")
-        # Извлекаем UUID для интеграции с тестом исключений
-        raise RuntimeError(f"Failure_{payload.get('uuid', '633902c9-b41b-4f49-81e5-83c63b4d77a1')}")
+        uuid_val = payload.get("uuid", "633902c9-b41b-4f49-81e5-83c63b4d77a1")
+        raise RuntimeError(f"Failure_{uuid_val}")
 
     if "marker" in payload:
         response = system_health_monitoring_gateway.process(payload)

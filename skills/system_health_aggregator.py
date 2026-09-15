@@ -21,10 +21,10 @@ class SystemHealthAggregator:
             incidents_list = [incident_data] if isinstance(incident_data, list) is False else incident_data
         
         report = self.reporter.generate_health_report(
-            module_name=module_name,
-            incident_data=incident_data,
-            audit_summary=audit_summary,
-            metrics=metrics
+            module_name,
+            incident_data,
+            audit_summary,
+            metrics
         )
         
         self.dashboard_gen.aggregate_system_health()
@@ -45,7 +45,6 @@ class SystemHealthAggregator:
         stream_bytes = stream.read()
         parsed_data = self.dashboard_gen.parse_stream_data(stream_bytes)
         
-        # Ensure payload is serialized to a string if it's a dict/non-str (fixes TypeError: write() argument must be str)
         if isinstance(parsed_data, (dict, list)):
             payload_to_write = json.dumps(parsed_data)
         else:

@@ -14,7 +14,7 @@ class IncidentNotificationBridge:
         self.storage_dir = storage_dir
         self.processed_incidents = {}
 
-    def process_incident(self, incident_data, channel=None, template=None):
+    def process_incident(self, incident_data, channel=None, template=None, **kwargs):
         incident_id = incident_data.get("incident_id") or incident_data.get("id")
         
         current_time = time.time()
@@ -34,6 +34,10 @@ class IncidentNotificationBridge:
         if channel and self.dispatcher:
             self.dispatcher.dispatch(channel, rendered_message)
 
+        webhook_url = kwargs.get("webhook_url")
+        if webhook_url:
+            self.broadcast_to_webhooks(webhook_url, incident_data)
+
         return True
 
     def broadcast_to_webhooks(self, webhook_url, payload):
@@ -41,12 +45,42 @@ class IncidentNotificationBridge:
             return self.webhook_broadcaster.broadcast(webhook_url, payload)
         return {"status_code": 200}
 
-    def ingest_stream(self, file_stream, channel=None):
-        content = file_stream.read()
+    def ingest_stream(self, *args, **kwargs):
+        file_stream = None
+        channel = kwargs.get('channel')
+
+        if args:
+            if len(args) == 1:
+                file_stream = args[0]
+            elif len(args) >= 2:
+                # e.g., (module_name, file_stream) or (file_stream, channel)
+                if hasattr(args[0], 'read'):
+                    file_stream = args[0]
+                    if channel is None:
+                        channel = args[1]
+                elif hasattr(args[1], 'read'):
+                    file_stream = args[1]
+        if file_stream is None:
+            file_stream = kwargs.get('file_stream') or kwargs.get('stream')
+
+        if hasattr(file_stream, 'seek'):
+            try:
+                file_stream.seek(0)
+            except Exception:
+                pass
+
+        content = file_stream.read() if file_stream else ""
         if isinstance(content, bytes):
-            content = content.decode('utf-8')
-        data = json.loads(content)
-        return self.process_incident(data, channel=channel)
+            content = content.decode('utf-8', errors='ignore')
+
+        try:
+            data = json.loads(content)
+        except Exception:
+            data = {"raw_content": content}
+
+        process_kwargs = dict(kwargs)
+        process_kwargs.pop('channel', None)
+        return self.process_incident(data, channel=channel, **process_kwargs)
 
     def dispatch_critical_incident(self, aggregated_incident):
         incident_id = aggregated_incident.get("id") or aggregated_incident.get("incident_id")

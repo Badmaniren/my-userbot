@@ -40,7 +40,7 @@ class IncidentSeverityEvaluator:
         }
 
     def evaluate_stream(self, module_name: str, stream_data):
-        parsed = self.template_engine.parse_stream_data(stream_data)
+        parsed = self.template_engine.parse_stream_data(stream_data) or {}
         inc_id = parsed.get("parsed_id") or parsed.get("incident_id")
         freq = parsed.get("frequency", parsed.get("count", 1))
         

@@ -47,13 +47,21 @@ class NotificationTemplateEngine:
 
     def parse_stream_data(self, stream) -> Optional[Dict[str, Any]]:
         try:
+            if hasattr(stream, 'seek'):
+                try:
+                    stream.seek(0)
+                except Exception:
+                    pass
             content = stream.read()
             if isinstance(content, bytes):
                 content = content.decode('utf-8', errors='ignore')
-            data = json.loads(content)
-            if isinstance(data, dict):
-                return data
-            return None
+            try:
+                data = json.loads(content)
+                if isinstance(data, dict):
+                    return data
+            except Exception:
+                pass
+            return {"content": content, "raw_content": content}
         except Exception:
             return None
 

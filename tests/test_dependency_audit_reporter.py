@@ -32,6 +32,13 @@ class TestDependencyAuditReporter(unittest.TestCase):
         self.assertIn(f"ERROR: code {err_code}", result)
         self.assertIn(f"ERROR: code {err_code}", mock_stderr.getvalue())
 
+    def test_generate_report_string_input(self):
+        str_input = f"audit_str_{uuid.uuid4().hex}"
+        result_json = self.reporter.generate_report(str_input)
+        parsed = json.loads(result_json)
+        self.assertEqual(parsed["data"], str_input)
+        self.assertIn("timestamp", parsed)
+
     def test_finalize_epic(self):
         epic_id = uuid.uuid4().hex
         raw_data = uuid.uuid4().bytes

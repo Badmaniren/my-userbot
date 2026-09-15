@@ -6,8 +6,10 @@ class DependencyAuditReporter:
     def __init__(self):
         pass
 
-    def generate_report(self, audit_data: dict) -> str:
+    def generate_report(self, audit_data) -> str:
         timestamp = datetime.now().isoformat()
+        if not isinstance(audit_data, dict):
+            audit_data = {"data": audit_data}
         if "error_code" in audit_data:
             err_msg = f"ERROR: code {audit_data['error_code']} at {timestamp}"
             sys.stderr.write(err_msg)

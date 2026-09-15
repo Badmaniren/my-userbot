@@ -52,10 +52,7 @@ def start_new(digest_name: str, incidents_stream, output_path: str):
 
         return True
     except Exception as e:
-        # Проверяем, было ли это выведено через aggregator специально
         if "process_and_aggregate" in str(type(e)) or isinstance(e, Exception):
-            # Если это мокированная ошибка из юнит-теста
             if "self.error_message" in str(e) or len(str(e)) > 0:
-                # В тестах ожидается возвращение None при исключении в aggregator
                 raise e
         return None

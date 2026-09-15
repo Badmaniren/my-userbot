@@ -5,13 +5,37 @@ class IncidentAggregator:
     def __init__(self):
         self.hub = ErrorRecoveryHub()
         self.collector = PatchMetricCollector()
+        self.incidents = {}
+
+    def register_incident(self, incident_id: str, component: str, metadata: dict):
+        if component not in self.incidents:
+            self.incidents[component] = []
+        self.incidents[component].append({
+            "incident_id": incident_id,
+            "component": component,
+            "metadata": metadata
+        })
 
     def process_and_aggregate(self, module_name, exception, traceback_str, incident_id=None):
         if not incident_id:
             incident_id = self.hub.capture_failure(module_name, exception, traceback_str)
         else:
-            # На случай, если в тестах требуется зарегистрировать или передать существующий
-            pass
+            if hasattr(self.hub, 'incidents') and incident_id not in self.hub.incidents:
+                self.hub.incidents[incident_id] = {
+                    "incident_id": incident_id,
+                    "module_name": module_name,
+                    "error": str(exception),
+                    "exception_type": type(exception).__name__,
+                    "traceback": traceback_str,
+                }
+            if hasattr(self.hub, 'history'):
+                if module_name not in self.hub.history:
+                    self.hub.history[module_name] = []
+                self.hub.history[module_name].append({
+                    "incident_id": incident_id,
+                    "module_name": module_name,
+                    "error": str(exception)
+                })
 
         analysis = self.hub.analyze_failure(incident_id) if hasattr(self.hub, 'analyze_failure') else {}
         

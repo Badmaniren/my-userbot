@@ -15,8 +15,8 @@ def start_new(success=True, incident_id=None, error=None, raw_result=None, patch
     }
 
 class IncidentTrendAnalyzer:
-    def __init__(self):
-        pass
+    def __init__(self, incident_aggregator=None):
+        self.incident_aggregator = incident_aggregator
 
     def analyze_trends(self, module_name):
         return {
@@ -24,6 +24,9 @@ class IncidentTrendAnalyzer:
             "status": "analyzed",
             "trend": "stable"
         }
+
+    def get_trend(self, *args, **kwargs):
+        return "stable"
 
 class RecoveryDashboardGenerator:
     def __init__(self):

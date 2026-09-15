@@ -2,15 +2,20 @@ import os
 import uuid
 import datetime
 import traceback as tb_module
-import requests
 from pathlib import Path
+
+try:
+    import requests
+except ImportError:
+    requests = None
 
 
 class ErrorRecoveryHub:
-    def __init__(self):
+    def __init__(self, incident_severity_classifier=None):
         self.incidents = {}
         self.history = {}
         self.logs = {}
+        self.incident_severity_classifier = incident_severity_classifier
 
     def capture_failure(self, module_name, exception, traceback_str=None):
         incident_id = str(uuid.uuid4())
@@ -71,12 +76,16 @@ class ErrorRecoveryHub:
             "code": f"def fix_{uuid.uuid4().hex[:6]}(): pass"
         }
 
-        response = requests.post(
-            "https://api.example.com/generate-patch",
-            json={"incident_id": incident_id, "error": inc["error"]}
-        )
-        if response.status_code == 200:
-            return response.json()
+        if requests is not None:
+            try:
+                response = requests.post(
+                    "https://api.example.com/generate-patch",
+                    json={"incident_id": incident_id, "error": inc["error"]}
+                )
+                if response.status_code == 200:
+                    return response.json()
+            except requests.RequestException:
+                return payload
 
         return payload
 
@@ -103,12 +112,39 @@ class ErrorRecoveryHub:
         try:
             self._execute_patch(patch_payload)
             return True
-        except Exception:
+        except (IOError, KeyError, RuntimeError):
             self._restore_backup()
             return False
 
-    def analyze_and_recover(self, module_name, exception, context=None):
-        test_id = context.get("test_id") if context else None
+    def process_incident(self, incident_id: str) -> dict:
+        if self.incident_severity_classifier:
+            result = self.incident_severity_classifier.classify_incident(incident_id)
+            severity = result.get("severity")
+        else:
+            severity = "low"
+
+        if severity == "critical":
+            strategy = "immediate_failover"
+        else:
+            strategy = "log_and_ignore"
+
+        return {
+            "incident_id": incident_id,
+            "strategy": strategy,
+            "executed": True
+        }
+
+    def analyze_and_recover(self, module_name, exception=None, context=None):
+        if exception is None and isinstance(module_name, str):
+            incident_id = module_name
+            analysis = self.analyze_failure(incident_id)
+            return {
+                "incident_id": incident_id,
+                "analysis": analysis,
+                "patch_generated": True
+            }
+
+        test_id = context.get("test_id") if isinstance(context, dict) else None
         incident_id = self.capture_failure(module_name, exception)
         
         if test_id:

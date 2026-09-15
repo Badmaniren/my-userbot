@@ -11,14 +11,17 @@ class IncidentDigestGenerator:
         self.aggregator = aggregator or IncidentAggregator()
         self.template_engine = template_engine or NotificationTemplateEngine()
 
-    def generate_digest(self, module_name, incidents, template_name, format='text'):
+    def generate_digest(self, module_name, incidents=None, template_name=None, format='text'):
         """Агрегирует инциденты и генерирует дайджест."""
+        if incidents is None:
+            incidents = []
+            
         for incident in incidents:
             self.aggregator.process_and_aggregate(
-                module_name=module_name,
-                exception=incident.get("exception"),
-                traceback_str=incident.get("traceback_str"),
-                incident_id=incident.get("incident_id")
+                module_name,
+                incident.get("exception"),
+                incident.get("traceback_str"),
+                incident.get("incident_id")
             )
 
         context = {

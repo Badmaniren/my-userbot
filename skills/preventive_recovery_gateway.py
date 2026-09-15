@@ -75,8 +75,10 @@ class PreventiveRecoveryGateway:
             message=message
         )
         
-        if channel_name not in getattr(self.dispatcher, "channels", {}):
-            self.dispatcher.register_channel(channel_name, {"routing_key": "default", "severity": level})
+        channels = getattr(self.dispatcher, "channels", None)
+        if channels is None or channel_name not in channels:
+            if hasattr(self.dispatcher, "register_channel"):
+                self.dispatcher.register_channel(channel_name, {"routing_key": "default", "severity": level})
 
         notification_dispatch = self.dispatcher.dispatch(channel_name, payload)
 

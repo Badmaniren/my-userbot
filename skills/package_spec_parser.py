@@ -16,10 +16,10 @@ class PackageSpec:
 
 
 def parse_package_spec(spec_string):
-    if not spec_string or not spec_string.strip():
+    if not spec_string or not str(spec_string).strip():
         return None
     
-    cleaned = spec_string.strip()
+    cleaned = str(spec_string).strip()
     if cleaned.startswith('(') and cleaned.endswith(')'):
         cleaned = cleaned[1:-1].strip()
         

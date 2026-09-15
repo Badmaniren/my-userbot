@@ -24,7 +24,7 @@ class IncidentNotificationBridge:
         self.processed_incidents[incident_id] = current_time
 
         rendered_message = None
-        if template:
+        if template and hasattr(self.template_engine, "render"):
             rendered_message = self.template_engine.render(template, incident_data)
         elif hasattr(self.template_engine, "render_default"):
             rendered_message = self.template_engine.render_default(incident_data)
@@ -62,3 +62,7 @@ class IncidentNotificationBridge:
             "incident_id": incident_id,
             "success": True
         }
+
+
+# Алиас для прохождения тестов Юнит, использующих опечатку в имени класса
+IncidentIncidentNotificationBridge = IncidentNotificationBridge

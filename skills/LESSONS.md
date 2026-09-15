@@ -75,7 +75,3 @@
 ## package_dependency_resolver (create) — раундов: 4
 - Последняя ошибка перед фиксом: AssertionError: None is not an instance of <class 'dict'>
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## requirement_parser (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

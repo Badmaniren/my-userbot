@@ -93,3 +93,13 @@ class SystemHealthAggregator:
 
     def parse_reporter_stream(self, stream):
         return self.reporter.parse_stream_data(stream)
+
+
+def get_aggregated_health_data(source_id=None, timeframe_hours=None):
+    aggregator = SystemHealthAggregator()
+    result = aggregator.collect_and_aggregate()
+    if source_id is not None:
+        result["source_id"] = source_id
+    if timeframe_hours is not None:
+        result["timeframe_hours"] = timeframe_hours
+    return result

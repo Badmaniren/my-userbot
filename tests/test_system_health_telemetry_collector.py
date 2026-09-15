@@ -72,7 +72,7 @@ class TestSystemHealthTelemetryCollector(unittest.TestCase):
             result = self.collector.process_telemetry_stream(mock_stream, self.rand_path)
 
             mock_agg_stream.assert_called_once_with(mock_stream, self.rand_path)
-            mock_rep_parse.assert_called_once()
+            mock_rep_parse.assert_called_once_with(mock_stream)
             self.assertEqual(result, expected_parsed_data)
 
     def test_export_comprehensive_report(self):

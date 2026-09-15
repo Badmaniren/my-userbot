@@ -23,6 +23,11 @@ class NotificationChannelDispatcher:
         channel_config = self.channels[channel_name]
         url = channel_config.get("url")
         if not url:
+            if isinstance(channel_config, dict) and (
+                channel_config.get("active", False)
+                or channel_config.get("type") in ("console", "stream", "mock")
+            ):
+                return True
             return False
 
         try:

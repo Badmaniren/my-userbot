@@ -1,6 +1,54 @@
 import io
-from packaging.requirements import Requirement
-from packaging.version import Version
+import re
+
+try:
+    from packaging.requirements import Requirement
+except ImportError:
+    class Requirement:  # type: ignore
+        def __init__(self, requirement_string: str):
+            if not requirement_string or not isinstance(requirement_string, str):
+                raise ValueError("Invalid requirement string")
+
+            if ";" in requirement_string:
+                req_part, marker_part = requirement_string.split(";", 1)
+                self.marker = marker_part.strip() or None
+            else:
+                req_part = requirement_string
+                self.marker = None
+
+            req_part = req_part.strip()
+
+            pattern = r'^\s*([a-zA-Z0-9_\-\.]+)(?:\s*\[\s*([^\]]+)\s*\])?\s*(.*)$'
+            match = re.match(pattern, req_part)
+            if not match:
+                raise ValueError(f"Invalid requirement string: {requirement_string}")
+
+            name, extras_str, specifier_str = match.groups()
+
+            # Validate specifiers if present: must match valid PEP 440 specifiers or direct references/parentheses
+            if specifier_str:
+                spec_clean = specifier_str.strip()
+                # PEP 440 specifiers pattern or @ URL
+                spec_pattern = r'^(?:(?:==|!=|<=|>=|~=|===|<|>|!=)\s*[a-zA-Z0-9_\-\.\*\+]+|\(.*\)|@\s*\S+)(?:\s*,\s*(?:==|!=|<=|>=|~=|===|<|>|!=)\s*[a-zA-Z0-9_\-\.\*\+]+)*$'
+                if not re.match(spec_pattern, spec_clean):
+                    raise ValueError(f"Invalid requirement string: {requirement_string}")
+            match = re.match(pattern, req_part)
+            if not match:
+                raise ValueError(f"Invalid requirement string: {requirement_string}")
+
+            name, extras_str, specifier_str = match.groups()
+            self.name = name
+
+            if extras_str:
+                self.extras = {e.strip() for e in extras_str.split(",") if e.strip()}
+            else:
+                self.extras = set()
+
+            specifier_str = specifier_str.strip() if specifier_str else ""
+            if specifier_str.startswith("(") and specifier_str.endswith(")"):
+                specifier_str = specifier_str[1:-1].strip()
+
+            self.specifier = specifier_str if specifier_str else None
 
 
 class DependencyParser:

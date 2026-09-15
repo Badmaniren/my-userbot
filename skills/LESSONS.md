@@ -323,3 +323,7 @@
 
 ## incident_severity_evaluator (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## incident_notification_broadcaster (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

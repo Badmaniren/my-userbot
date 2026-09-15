@@ -1,47 +1,79 @@
 import unittest
+import os
 import uuid
 import random
-import os
-from skills.incident_priority_resolver import resolve_incident_priority
-from skills.incident_aggregator import aggregate_incidents
-from skills.incident_trend_analyzer import analyze_incident_trends
+from skills.incident_priority_resolver import IncidentPriorityResolver, resolve_incident_priority
+from skills.incident_trend_analyzer import IncidentTrendAnalyzer
+from skills.incident_trend_forecaster import IncidentTrendForecaster
+from skills.system_health_monitoring_gateway import SystemHealthMonitoringGateway
+
 
 class TestIncidentPriorityResolverIntegration(unittest.TestCase):
 
-    def test_resolve_incident_priority_integration(self):
-        unique_incident_id = str(uuid.uuid4())
-        random_error_count = random.randint(10, 5000)
-        random_system_load = round(random.uniform(50.0, 99.9), 2)
+    def setUp(self):
+        self.resolver = IncidentPriorityResolver()
+        self.system_id = f"sys-{uuid.uuid4()}"
+        self.incident_id = f"inc-{uuid.uuid4()}"
+        self.report_file_path = f"report_{self.incident_id}.txt"
+
+    def tearDown(self):
+        if os.path.exists(self.report_file_path):
+            try:
+                os.remove(self.report_file_path)
+            except OSError:
+                pass
+
+    def test_resolve_integration_flow(self):
+        severity = round(random.uniform(10.0, 99.9), 2)
+        anomaly = random.choice([True, False])
         
-        raw_incident_payload = {
-            "incident_id": unique_incident_id,
-            "error_count": random_error_count,
-            "system_load": random_system_load,
-            "metric_source": "integration_test_gateway"
+        trend_data = {
+            "severity_score": severity,
+            "anomaly_detected": anomaly,
+            "metrics": {
+                "cpu_load": random.randint(40, 100)
+            }
         }
 
-        aggregated_data = aggregate_incidents([raw_incident_payload])
-        
-        self.assertIn("aggregated_metrics", aggregated_data)
-        
-        trend_report = analyze_incident_trends(aggregated_data)
-        
-        self.assertIn("trend_coefficient", trend_report)
+        priority = self.resolver.resolve(self.system_id, trend_data)
+        self.assertIn(priority, ["CRITICAL", "HIGH", "MEDIUM", "LOW"])
 
-        resolved_priority_output = resolve_incident_priority(
-            incident_id=unique_incident_id,
-            trend_data=trend_report
-        )
-
-        self.assertIsInstance(resolved_priority_output, dict)
-        self.assertEqual(resolved_priority_output.get("target_incident_id"), unique_incident_id)
-        self.assertIn("priority_level", resolved_priority_output)
+    def test_evaluate_stream_integration(self):
+        gateway = SystemHealthMonitoringGateway()
+        result = self.resolver.evaluate_stream(gateway, self.system_id)
         
-        artifact_path = resolved_priority_output.get("report_file_path")
-        if artifact_path:
-            self.assertTrue(os.path.exists(artifact_path))
-            if os.path.exists(artifact_path):
-                os.remove(artifact_path)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("system_id"), self.system_id)
+        self.assertIn("priority", result)
+        self.assertIn("error_code", result)
+
+    def test_calculate_from_forecast_integration(self):
+        priority = self.resolver.calculate_from_forecast(self.system_id)
+        self.assertIn(priority, ["CRITICAL", "HIGH", "MEDIUM"])
+
+    def test_resolve_incident_priority_file_generation(self):
+        severity = round(random.uniform(0.0, 100.0), 2)
+        anomaly = random.choice([True, False])
+        
+        trend_data = {
+            "severity_score": severity,
+            "anomaly_detected": anomaly
+        }
+
+        result = resolve_incident_priority(self.incident_id, trend_data)
+
+        self.assertEqual(result.get("target_incident_id"), self.incident_id)
+        self.assertIn(result.get("priority_level"), ["CRITICAL", "HIGH", "MEDIUM", "LOW"])
+        
+        generated_path = result.get("report_file_path")
+        self.assertEqual(generated_path, self.report_file_path)
+        self.assertTrue(os.path.exists(generated_path))
+
+        with open(generated_path, "r") as f:
+            content = f.read()
+            self.assertIn(self.incident_id, content)
+            self.assertIn(result.get("priority_level"), content)
+
 
 if __name__ == "__main__":
     unittest.main()

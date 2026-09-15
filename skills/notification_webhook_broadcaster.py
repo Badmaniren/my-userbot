@@ -8,7 +8,7 @@ class NotificationWebhookBroadcaster:
 
     def broadcast_incident(self, severity, incident_id, raw_data, template_name):
         payload = self.template_engine.generate_notification_payload(severity, incident_id, raw_data)
-        rendered_text = self.template_engine.render_text(payload, template_name)
+        rendered_text = self.template_engine.render_text(template_name, payload)
         payload["rendered_text"] = rendered_text
         return self.dispatcher.broadcast(payload)
 

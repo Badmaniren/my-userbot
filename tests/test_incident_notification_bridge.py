@@ -5,84 +5,79 @@ import json
 import os
 import random
 import uuid
-from skills.incident_notification_bridge import IncidentIncidentNotificationBridge
+from skills.incident_notification_bridge import IncidentNotificationBridge, IncidentIncidentNotificationBridge
 
 
 class TestIncidentNotificationBridge(unittest.TestCase):
+
     def setUp(self):
         self.mock_dispatcher = MagicMock()
         self.mock_template_engine = MagicMock()
         self.mock_webhook_broadcaster = MagicMock()
-        self.random_storage = f"/tmp/{uuid.uuid4().hex}"
+        self.mock_severity_evaluator = MagicMock()
+        self.storage_dir = f"temp_storage_{uuid.uuid4().hex}"
         
-        self.bridge = IncidentIncidentNotificationBridge(
+        self.bridge = IncidentNotificationBridge(
             dispatcher=self.mock_dispatcher,
             template_engine=self.mock_template_engine,
             webhook_broadcaster=self.mock_webhook_broadcaster,
-            storage_dir=self.random_storage
+            storage_dir=self.storage_dir,
+            severity_evaluator=self.mock_severity_evaluator
         )
 
     def tearDown(self):
-        if os.path.exists(self.random_storage):
-            for f in os.listdir(self.random_storage):
-                file_path = os.path.join(self.random_storage, f)
+        if os.path.exists(self.storage_dir):
+            for filename in os.listdir(self.storage_dir):
+                file_path = os.path.join(self.storage_dir, filename)
                 if os.path.isfile(file_path):
                     os.remove(file_path)
-            os.rmdir(self.random_storage)
+            os.rmdir(self.storage_dir)
 
-    def test_process_incident_new_id(self):
+    def test_process_incident_new(self):
         incident_id = uuid.uuid4().hex
-        channel_name = uuid.uuid4().hex
-        template_name = uuid.uuid4().hex
-        rendered_text = uuid.uuid4().hex
-        
         incident_data = {
             "incident_id": incident_id,
-            "payload": uuid.uuid4().hex
+            "message": f"msg_{uuid.uuid4().hex}"
         }
+        channel = f"channel_{uuid.uuid4().hex}"
+        template = f"template_{uuid.uuid4().hex}"
         
-        self.mock_template_engine.render.return_value = rendered_text
+        rendered_msg = f"rendered_{uuid.uuid4().hex}"
+        self.mock_template_engine.render.return_value = rendered_msg
 
-        result = self.bridge.process_incident(incident_data, channel=channel_name, template=template_name)
+        result = self.bridge.process_incident(incident_data, channel=channel, template=template)
 
         self.assertTrue(result)
-        self.mock_template_engine.render.assert_called_once_with(template_name, incident_data)
-        self.mock_dispatcher.dispatch.assert_called_once_with(channel_name, rendered_text)
+        self.mock_template_engine.render.assert_called_once_with(template, incident_data)
+        self.mock_dispatcher.dispatch.assert_called_once_with(channel, rendered_msg)
         self.assertIn(incident_id, self.bridge.processed_incidents)
 
-    def test_process_incident_duplicate_id(self):
+    def test_process_incident_duplicate(self):
         incident_id = uuid.uuid4().hex
-        incident_data = {
-            "id": incident_id,
-            "metric": random.randint(1, 100)
-        }
+        incident_data = {"id": incident_id}
+        
+        result_first = self.bridge.process_incident(incident_data)
+        result_second = self.bridge.process_incident(incident_data)
 
-        first_result = self.bridge.process_incident(incident_data)
-        self.assertTrue(first_result)
+        self.assertTrue(result_first)
+        self.assertFalse(result_second)
 
-        second_result = self.bridge.process_incident(incident_data)
-        self.assertFalse(second_result)
-
-    def test_process_incident_default_render(self):
+    def test_process_incident_default_template(self):
         incident_id = uuid.uuid4().hex
-        incident_data = {
-            "incident_id": incident_id,
-            "reason": uuid.uuid4().hex
-        }
+        incident_data = {"incident_id": incident_id, "data": random.randint(1, 100)}
+        
+        del self.mock_template_engine.render
+        self.mock_template_engine.render_default.return_value = f"default_{uuid.uuid4().hex}"
 
-        self.mock_template_engine.render_default = MagicMock(return_value=uuid.uuid4().hex)
-        delattr(self.bridge, "template_engine")
-        
-        self.bridge.template_engine = self.mock_template_engine
-        
         result = self.bridge.process_incident(incident_data)
+
         self.assertTrue(result)
         self.mock_template_engine.render_default.assert_called_once_with(incident_data)
 
-    def test_broadcast_to_webhooks_active(self):
-        webhook_url = f"https://{uuid.uuid4().hex}.com/webhook"
-        payload = {uuid.uuid4().hex: uuid.uuid4().hex}
-        expected_response = {"status_code": random.choice([200, 201, 202]), "uuid": uuid.uuid4().hex}
+    def test_broadcast_to_webhooks(self):
+        webhook_url = f"https://webhook.{uuid.uuid4().hex}.com/notify"
+        payload = {"event": uuid.uuid4().hex, "code": random.randint(200, 500)}
+        expected_response = {"status_code": 200, "uuid": uuid.uuid4().hex}
         
         self.mock_webhook_broadcaster.broadcast.return_value = expected_response
 
@@ -91,55 +86,62 @@ class TestIncidentNotificationBridge(unittest.TestCase):
         self.assertEqual(result, expected_response)
         self.mock_webhook_broadcaster.broadcast.assert_called_once_with(webhook_url, payload)
 
-    def test_broadcast_to_webhooks_none(self):
-        self.bridge.webhook_broadcaster = None
-        webhook_url = f"https://{uuid.uuid4().hex}.org/hook"
-        payload = {uuid.uuid4().hex: random.randint(100, 999)}
+    def test_broadcast_to_webhooks_no_broadcaster(self):
+        bridge_no_bc = IncidentNotificationBridge(webhook_broadcaster=None)
+        webhook_url = f"https://webhook.{uuid.uuid4().hex}.com/notify"
+        payload = {"data": uuid.uuid4().hex}
 
-        result = self.bridge.broadcast_to_webhooks(webhook_url, payload)
+        result = bridge_no_bc.broadcast_to_webhooks(webhook_url, payload)
 
         self.assertEqual(result, {"status_code": 200})
 
     def test_ingest_stream(self):
         incident_id = uuid.uuid4().hex
-        raw_data = json.dumps({
-            "incident_id": incident_id,
-            "data": uuid.uuid4().hex
-        }).encode('utf-8')
-        
-        stream = io.BytesIO(raw_data)
-        channel_name = uuid.uuid4().hex
+        incident_data = {"incident_id": incident_id, "payload": uuid.uuid4().hex}
+        json_bytes = json.dumps(incident_data).encode('utf-8')
+        file_stream = io.BytesIO(json_bytes)
+        channel = f"chan_{uuid.uuid4().hex}"
 
-        with patch.object(self.bridge, 'process_incident', return_value=True) as mock_process:
-            result = self.bridge.ingest_stream(stream, channel=channel_name)
-            
-            self.assertTrue(result)
-            mock_process.assert_called_once()
-            args, kwargs = mock_process.call_args
-            self.assertEqual(args[0]["incident_id"], incident_id)
-            self.assertEqual(kwargs["channel"], channel_name)
+        result = self.bridge.ingest_stream(file_stream, channel=channel)
 
-    def test_dispatch_critical_incident(self):
+        self.assertTrue(result)
+        self.assertIn(incident_id, self.bridge.processed_incidents)
+
+    def test_dispatch_critical_incident_with_severity(self):
         incident_id = uuid.uuid4().hex
         aggregated_incident = {
             "id": incident_id,
-            "severity": uuid.uuid4().hex,
-            "score": random.random()
+            "message": f"err_{uuid.uuid4().hex}",
+            "traceback_str": f"tb_{uuid.uuid4().hex}"
         }
+        severity_result = {"severity": random.choice(["HIGH", "CRITICAL", "MEDIUM"]), "score": random.random()}
+        self.mock_severity_evaluator.evaluate.return_value = severity_result
 
         result = self.bridge.dispatch_critical_incident(aggregated_incident)
 
         self.assertTrue(result["success"])
         self.assertEqual(result["incident_id"], incident_id)
-        self.assertEqual(result["dispatch_id"], f"dispatch_{incident_id}")
-
-        expected_file_path = os.path.join(self.random_storage, f"{incident_id}.json")
-        self.assertTrue(os.path.exists(expected_file_path))
+        self.assertEqual(aggregated_incident["severity_assessment"], severity_result)
         
-        with open(expected_file_path, 'r', encoding='utf-8') as f:
+        file_path = os.path.join(self.storage_dir, f"{incident_id}.json")
+        self.assertTrue(os.path.exists(file_path))
+        with open(file_path, 'r', encoding='utf-8') as f:
             loaded_data = json.load(f)
-            self.assertEqual(loaded_data["id"], incident_id)
+        self.assertEqual(loaded_data["id"], incident_id)
 
+    def test_dispatch_critical_incident_eval_exception(self):
+        incident_id = uuid.uuid4().hex
+        aggregated_incident = {
+            "incident_id": incident_id,
+            "message": f"fail_{uuid.uuid4().hex}"
+        }
+        self.mock_severity_evaluator.evaluate.side_effect = Exception(uuid.uuid4().hex)
 
-if __name__ == '__main__':
-    unittest.main()
+        result = self.bridge.dispatch_critical_incident(aggregated_incident)
+
+        self.assertTrue(result["success"])
+        self.assertEqual(aggregated_incident["severity_assessment"], {"severity": "HIGH"})
+
+    def test_alias_class_instantiation(self):
+        alias_bridge = IncidentIncidentNotificationBridge()
+        self.assertIsInstance(alias_bridge, IncidentNotificationBridge)

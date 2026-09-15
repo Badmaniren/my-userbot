@@ -1,3 +1,4 @@
+import json
 from skills.system_health_reporter import SystemHealthReporter
 from skills.recovery_dashboard_generator import RecoveryDashboardGenerator
 
@@ -43,16 +44,27 @@ class SystemHealthAggregator:
     def process_stream(self, stream, path):
         stream_bytes = stream.read()
         parsed_data = self.dashboard_gen.parse_stream_data(stream_bytes)
-        result = self.dashboard_gen.export_dashboard(parsed_data, path)
+        
+        # Ensure payload is serialized to a string if it's a dict/non-str (fixes TypeError: write() argument must be str)
+        if isinstance(parsed_data, (dict, list)):
+            payload_to_write = json.dumps(parsed_data)
+        else:
+            payload_to_write = str(parsed_data) if parsed_data is not None else ""
+            
+        result = self.dashboard_gen.export_dashboard(payload_to_write, path)
         return result
 
     def aggregate_metrics_from_lists(self, incidents_list, patches_list):
         return self.reporter.aggregate_system_metrics(incidents_list, patches_list)
 
     def save_dashboard_file(self, payload, path):
+        if isinstance(payload, (dict, list)):
+            payload = json.dumps(payload)
         self.dashboard_gen.export_dashboard_file(payload, path)
 
     def save_health_report(self, health_report, path):
+        if isinstance(health_report, (dict, list)):
+            health_report = json.dumps(health_report)
         self.reporter.export_health_report(health_report, path)
 
     def parse_reporter_stream(self, stream):

@@ -1,5 +1,6 @@
 from skills.auto_patch_pipeline import AutoPatchPipeline
 from skills.error_recovery_hub import ErrorRecoveryHub
+import io
 
 
 class ExecutionResult:
@@ -18,11 +19,22 @@ class PatchAutoExecutor:
     def execute_auto_patch(self, module_name, exception, traceback_str, context=None):
         try:
             return self.pipeline.run_pipeline(module_name, exception, traceback_str, context)
-        except Exception:
+        except Exception as e:
             fallback = self.hub.analyze_and_recover(module_name, exception, context)
-            return fallback
+            if fallback is not None:
+                if not hasattr(fallback, 'success'):
+                    fallback.success = False
+                if not hasattr(fallback, 'incident_id'):
+                    fallback.incident_id = getattr(e, 'incident_id', "unknown")
+                if not hasattr(fallback, 'patch_data'):
+                    fallback.patch_data = {}
+                return fallback
+            return ExecutionResult(success=False, incident_id="unknown", patch_data={}, error=e)
 
     def verify_stream(self, stream_data):
+        if isinstance(stream_data, dict):
+            import json
+            stream_data = io.BytesIO(json.dumps(stream_data).encode('utf-8'))
         return self.pipeline.verify_patch_stream(stream_data)
 
     def force_recovery(self, module_name, exception, context=None):

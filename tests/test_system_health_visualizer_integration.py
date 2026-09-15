@@ -1,41 +1,46 @@
 import unittest
-import uuid
-import random
 import os
+import uuid
 import tempfile
-from skills.system_health_visualizer import system_health_visualizer
-from skills.system_health_telemetry_collector import system_health_telemetry_collector
-from skills.system_health_aggregator import system_health_aggregator
+from skills.system_health_visualizer import SystemHealthVisualizer, system_health_visualizer
 
 class TestSystemHealthVisualizerIntegration(unittest.TestCase):
-    def test_health_visualization_pipeline(self):
-        random_node_id = f"node-{uuid.uuid4()}"
-        random_cpu_load = round(random.uniform(10.0, 99.9), 2)
-        random_memory_usage = round(random.uniform(20.0, 95.5), 2)
-        
-        telemetry_data = {
-            "node_id": random_node_id,
-            "metrics": {
-                "cpu_load": random_cpu_load,
-                "memory_usage": random_memory_usage
+    def setUp(self):
+        self.visualizer = SystemHealthVisualizer()
+        self.system_id = f"sys_{uuid.uuid4().hex[:8]}"
+        self.node_id = f"node_{uuid.uuid4().hex[:8]}"
+        self.metric_value = uuid.uuid4().hex[:6]
+
+    def test_visualize_critical_metrics_integration(self):
+        result = self.visualizer.visualize_critical_metrics(self.system_id)
+        self.assertIsInstance(result, dict)
+        self.assertIn("chart_rendering", result)
+        self.assertEqual(result["chart_rendering"], "success")
+
+    def test_build_realtime_status_graph_integration(self):
+        result = self.visualizer.build_realtime_status_graph(self.system_id)
+        self.assertIsInstance(result, dict)
+        self.assertIn("nodes", result)
+        self.assertIn("edges", result)
+
+    def test_system_health_visualizer_functional_with_file_output(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_file = os.path.join(tmpdir, "subdir", f"chart_{uuid.uuid4().hex[:6]}.txt")
+            
+            payload = {
+                "node_id": self.node_id,
+                "metrics": {"cpu_load": self.metric_value}
             }
-        }
-        
-        collected_telemetry = system_health_telemetry_collector(telemetry_data)
-        self.assertIsNotNone(collected_telemetry)
-        
-        aggregated_health = system_health_aggregator(collected_telemetry)
-        self.assertIn("status", aggregated_health)
-        
-        with tempfile.TemporaryDirectory() as temp_dir:
-            random_chart_name = f"health_chart_{uuid.uuid4()}.png"
-            output_path = os.path.join(temp_dir, random_chart_name)
             
-            visualization_result = system_health_visualizer(aggregated_health, output_path=output_path)
+            result = system_health_visualizer(payload, output_path=output_file)
             
-            self.assertTrue(os.path.exists(output_path), "График состояния системы не был создан на диске.")
-            self.assertEqual(visualization_result.get("target_node"), random_node_id)
-            self.assertIn(str(random_cpu_load), str(visualization_result.get("rendered_metrics", "")))
+            self.assertEqual(result["target_node"], self.node_id)
+            self.assertIn(self.metric_value, result["rendered_metrics"])
+            self.assertTrue(os.path.exists(output_file))
+            
+            with open(output_file, "r", encoding="utf-8") as f:
+                content = f.read()
+                self.assertEqual(content, "CHART_DATA")
 
 if __name__ == "__main__":
     unittest.main()

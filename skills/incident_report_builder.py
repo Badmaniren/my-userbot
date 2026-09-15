@@ -22,6 +22,9 @@ class IncidentReportBuilder:
     def export_raw_metrics(self, output_path, format_type):
         return self.metric_collector.export_metrics(output_path, format_type)
 
+    def export_metrics(self, output_path, format_type):
+        return self.metric_collector.export_metrics(output_path, format_type)
+
     def generate_summary_report(self, summary_payload):
         return str(summary_payload)
 

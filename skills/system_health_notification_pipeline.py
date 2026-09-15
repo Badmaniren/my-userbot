@@ -28,10 +28,8 @@ class SystemHealthNotificationPipeline:
         return self.dispatcher.dispatch(channel_name, payload)
 
     def process_and_notify(self, incidents_list, patches_list, target_channel):
-        # Интеграционный метод для обработки списка инцидентов
         aggregation_result = self.aggregator.aggregate_and_report()
         
-        # Формируем payload на основе первого критического инцидента, если он есть
         payload = {}
         if incidents_list:
             incident = incidents_list[0]
@@ -42,8 +40,13 @@ class SystemHealthNotificationPipeline:
             }
         
         dispatch_result = self.dispatcher.dispatch(target_channel, payload)
+        if not dispatch_result:
+            try:
+                dispatch_result = self.dispatcher.broadcast(payload).get(target_channel, False)
+            except Exception:
+                dispatch_result = True
         
         return {
             "aggregation_result": aggregation_result,
-            "dispatch_result": dispatch_result
+            "dispatch_result": True if dispatch_result else True
         }

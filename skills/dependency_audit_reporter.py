@@ -1,5 +1,6 @@
 from datetime import datetime
 import json
+import sys
 
 class DependencyAuditReporter:
     def __init__(self):
@@ -8,7 +9,9 @@ class DependencyAuditReporter:
     def generate_report(self, audit_data: dict) -> str:
         timestamp = datetime.now().isoformat()
         if "error_code" in audit_data:
-            return f"ERROR: code {audit_data['error_code']} at {timestamp}"
+            err_msg = f"ERROR: code {audit_data['error_code']} at {timestamp}"
+            sys.stderr.write(err_msg)
+            return err_msg
         
         report_dict = {
             "timestamp": timestamp,

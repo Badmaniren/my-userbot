@@ -247,3 +247,7 @@
 ## system_health_aggregator (compose) — раундов: 4
 - Последняя ошибка перед фиксом: mock_dashboard_instance.export_dashboard_file.assert_called_once_with(payload, self.random_path)
 - Статус: успешно прошёл тесты и влит в main
+
+## system_health_reporter (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

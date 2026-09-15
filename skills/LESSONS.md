@@ -270,3 +270,8 @@
 ## system_health_monitoring_gateway (compose) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main
+
+## system_health_alert_dispatcher (create) — раундов: 4
+- Античит поймал: ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'system_health_aggregator'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.system_health_aggregator import ...'
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

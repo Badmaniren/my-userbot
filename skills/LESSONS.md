@@ -141,7 +141,3 @@
 
 ## auto_patch_pipeline (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
-
-## system_telemetry_collector (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

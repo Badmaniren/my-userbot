@@ -17,7 +17,7 @@ class NotificationTemplateEngine:
         # Базовая заглушка для загрузки шаблона, может переопределяться через patch.object
         if template_name in self.templates:
             return self.templates[template_name]
-        return "Incident: {incident_id} | Module: {module_name} | Error: {error}"
+        return "Incident: {incident_id} | Module: {module_name} | Error: {error} | Severity: {severity}"
 
     def render_text(self, template_name: str, context: Dict[str, Any]) -> str:
         template_str = self._load_template(template_name)
@@ -71,7 +71,7 @@ class NotificationTemplateEngine:
         # Шаблон по умолчанию для интеграционных тестов
         if template_name == "incident_notification":
             inc_id = context.get("incident_id", "")
-            mod_name = context.get("module_name", "")
+            mod_name = context.get("module_name", "") or context.get("module", "")
             err = context.get("error", "")
             if format.lower() == "html":
                 return f"<html><body><h1>Incident: {inc_id}</h1><p>Module: {mod_name}</p><p>Error: {err}</p></body></html>"

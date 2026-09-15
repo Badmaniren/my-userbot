@@ -216,3 +216,6 @@
 ## incident_trend_analyzer (start_new) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main
+
+## incident_trend_forecaster (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

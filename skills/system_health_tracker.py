@@ -26,7 +26,9 @@ class SystemHealthTracker:
     def get_average_metric(self, metric_name):
         if metric_name not in self.metrics or not self.metrics[metric_name]:
             return 0.0
-        values = [val for _, val, _ in self.metrics[metric_name]]
+        values = [val for _, val, _ in self.metrics[metric_name] if val is not None]
+        if not values:
+            return 0.0
         return sum(values) / len(values)
 
     def get_error_frequency(self, window):
@@ -66,11 +68,11 @@ class SystemHealthTracker:
             }
             
             if comp in self.metrics:
-                exec_times = [val for _, val, tags in self.metrics[comp] if tags.get("type") == "execution_time"]
+                exec_times = [val for _, val, tags in self.metrics[comp] if tags.get("type") == "execution_time" and val is not None]
                 if exec_times:
                     comp_summary["last_execution_time"] = exec_times[-1]
                 
-                cpu_values = [val for _, val, tags in self.metrics[comp] if tags.get("type") == "resource"]
+                cpu_values = [val for _, val, tags in self.metrics[comp] if tags.get("type") == "resource" and val is not None]
                 if cpu_values:
                     comp_summary["cpu_percent"] = cpu_values[-1]
             

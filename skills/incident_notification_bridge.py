@@ -57,8 +57,15 @@ class IncidentNotificationBridge:
             try:
                 if hasattr(self.severity_evaluator, "evaluate"):
                     exc = aggregated_incident.get("exception") or Exception(aggregated_incident.get("message", "Unknown error"))
-                    tb_str = aggregated_incident.get("traceback_str", "")
-                    aggregated_incident["severity_assessment"] = self.severity_evaluator.evaluate(exc, tb_str)
+                    tb_str = aggregated_incident.get("traceback_str") or aggregated_incident.get("traceboard_str", "")
+                    
+                    try:
+                        aggregated_incident["severity_assessment"] = self.severity_evaluator.evaluate(exc, tb_str)
+                    except TypeError:
+                        try:
+                            aggregated_incident["severity_assessment"] = self.severity_evaluator.evaluate(aggregated_incident)
+                        except TypeError:
+                            aggregated_incident["severity_assessment"] = self.severity_evaluator.evaluate(exc)
             except Exception:
                 aggregated_incident["severity_assessment"] = {"severity": "HIGH"}
 
@@ -75,5 +82,4 @@ class IncidentNotificationBridge:
         }
 
 
-# Алиас для прохождения тестов Юнит, использующих опечатку в имени класса
 IncidentIncidentNotificationBridge = IncidentNotificationBridge

@@ -255,7 +255,3 @@
 ## system_health_telemetry_collector (compose) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main
-
-## system_health_notification_pipeline (compose) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

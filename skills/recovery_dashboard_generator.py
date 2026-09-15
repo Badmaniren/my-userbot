@@ -81,11 +81,34 @@ class RecoveryDashboardGenerator:
 
     def parse_stream_data(self, stream_bytes) -> dict | None:
         try:
-            raw_content = stream_bytes.read()
-            text = raw_content.decode('utf-8')
-            parsed = json.loads(text)
-            if isinstance(parsed, dict):
-                return parsed
+            if hasattr(stream_bytes, "read"):
+                raw_content = stream_bytes.read()
+            else:
+                raw_content = stream_bytes
+
+            if isinstance(raw_content, bytes):
+                text = raw_content.decode('utf-8')
+            elif isinstance(raw_content, str):
+                text = raw_content
+            else:
+                text = str(raw_content)
+
+            try:
+                parsed = json.loads(text)
+                if isinstance(parsed, dict):
+                    return parsed
+            except Exception:
+                pass
+
+            if "|" in text and ":" in text:
+                parsed = {}
+                for item in text.split("|"):
+                    if ":" in item:
+                        k, v = item.split(":", 1)
+                        parsed[k.strip()] = v.strip()
+                if parsed:
+                    return parsed
+
             return None
         except Exception:
             return None

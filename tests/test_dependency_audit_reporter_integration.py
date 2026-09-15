@@ -1,69 +1,82 @@
 import unittest
+import os
+import json
 import uuid
 import random
-import os
-import tempfile
+from io import BytesIO
 from skills.dependency_audit_reporter import DependencyAuditReporter
-from skills.vulnerability_scanner import VulnerabilityScanner
 from skills.package_requirement_reader import PyPIClient
-from skills.error_recovery_hub import ErrorRecoveryHub
-from skills.auto_patch_pipeline import PipelineResult as AutoPatchPipelineResult
 
 class TestDependencyAuditReporterIntegration(unittest.TestCase):
-
     def setUp(self):
         self.reporter = DependencyAuditReporter()
-        self.scanner = VulnerabilityScanner()
-        self.pypi_client = PyPIClient(base_url="https://pypi.org/pypi")
-        self.recovery_hub = ErrorRecoveryHub()
-        self.random_pkg_id = f"test-pkg-{uuid.uuid4()}"
-        self.random_version = f"{random.randint(1, 3)}.{random.randint(0, 9)}.{random.randint(0, 9)}"
-        self.temp_dir = tempfile.TemporaryDirectory()
+        self.pypi_client = PyPIClient("https://pypi.org")
+        self.epic_id = str(uuid.uuid4())
+        self.output_filename = f"epic_{self.epic_id}_audit.log"
+        self.report_filepath = f"epic_{self.epic_id}_summary.json"
 
     def tearDown(self):
-        self.temp_dir.cleanup()
+        for path in [self.output_filename, self.report_filepath]:
+            if os.path.exists(path):
+                os.remove(path)
 
-    def test_end_to_end_audit_and_report_generation(self):
-        target_package = self.random_pkg_id
-        target_version = self.random_version
+    def test_full_audit_and_epic_workflow_integration(self):
+        random_vulnerabilities_count = random.randint(1, 10)
+        random_package = f"test-pkg-{uuid.uuid4()}"
+        random_version = f"{random.randint(0, 2)}.{random.randint(0, 9)}.{random.randint(0, 9)}"
 
-        try:
-            metadata = self.pypi_client.get_package_metadata(target_package, target_version)
-        except Exception as e:
-            metadata = {"name": target_package, "version": target_version, "error": str(e)}
-
-        scan_result = self.scanner.scan_dependency(target_package, target_version) if hasattr(self.scanner, "scan_dependency") else {"status": "scanned", "package": target_package}
-
-        report_payload = {
-            "epic_id": str(uuid.uuid4()),
-            "package": target_package,
-            "version": target_version,
-            "metadata": metadata,
-            "scan_data": scan_result,
-            "metrics": {
-                "risk_score": random.uniform(0.0, 10.0),
-                "vulnerabilities_found": random.randint(0, 5)
-            }
+        audit_payload = {
+            "epic_id": self.epic_id,
+            "target_package": random_package,
+            "version": random_version,
+            "vulnerabilities_found": random_vulnerabilities_count
         }
 
-        report_path = os.path.join(self.temp_dir.name, f"audit_report_{uuid.uuid4()}.json")
+        report_str = self.reporter.generate_report(audit_payload)
+        parsed_report = json.loads(report_str)
         
-        generation_result = self.reporter.generate_epic_report(report_payload, output_path=report_path)
+        self.assertEqual(parsed_report["epic_id"], self.epic_id)
+        self.assertEqual(parsed_report["target_package"], random_package)
+        self.assertEqual(parsed_report["vulnerabilities_found"], random_vulnerabilities_count)
+        self.assertIn("timestamp", parsed_report)
 
-        self.assertTrue(os.path.exists(report_path), "Интеграционный тест не смог обнаружить сгенерированный файл отчета аудита.")
+        summary_payload = {
+            "status": "COMPLETED",
+            "audit_summary": parsed_report
+        }
+        exported_summary_str = self.reporter.export_summary(summary_payload, format="json")
         
-        with open(report_path, "r", encoding="utf-8") as f:
-            content = f.read()
-            self.assertIn(target_package, content, "В сгенерированном отчете отсутствуют данные о тестируемом пакете.")
+        stream_data = exported_summary_str.encode("utf-8")
+        stream = BytesIO(stream_data)
 
-        if report_payload["metrics"]["vulnerabilities_found"] > 0:
-            dummy_exception = ValueError(f"Vulnerability limit exceeded for {target_package}")
-            incident = self.recovery_hub.analyze_and_recover(
-                module_name="dependency_audit_reporter",
-                exception=dummy_exception,
-                context=report_payload
-            )
-            self.assertIsInstance(incident, AutoPatchPipelineResult)
+        finalize_result = self.reporter.finalize_epic(self.epic_id, stream)
+        self.assertTrue(finalize_result)
+        self.assertTrue(os.path.exists(self.output_filename))
+
+        with open(self.output_filename, "rb") as f:
+            file_content = f.read().decode("utf-8")
+        
+        reloaded_summary = json.loads(file_content)
+        self.assertEqual(reloaded_summary["status"], "COMPLETED")
+        self.assertEqual(reloaded_summary["audit_summary"]["epic_id"], self.epic_id)
+
+        epic_report_payload = {
+            "epic": self.epic_id,
+            "metrics": {
+                "scanned_dependencies": random.randint(5, 50),
+                "issues": random_vulnerabilities_count
+            }
+        }
+        
+        report_written = self.reporter.generate_epic_report(epic_report_payload, self.report_filepath)
+        self.assertTrue(report_written)
+        self.assertTrue(os.path.exists(self.report_filepath))
+
+        with open(self.report_filepath, "r", encoding="utf-8") as f:
+            written_data = json.load(f)
+            
+        self.assertEqual(written_data["epic"], self.epic_id)
+        self.assertEqual(written_data["metrics"]["issues"], random_vulnerabilities_count)
 
 if __name__ == "__main__":
     unittest.main()

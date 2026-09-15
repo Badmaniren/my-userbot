@@ -1,78 +1,100 @@
 import unittest
+import os
 import uuid
 import random
-import os
-import tempfile
+import io
+import json
 from skills.system_health_reporter import SystemHealthReporter
-from skills.error_recovery_hub import ErrorRecoveryHub
-from skills.incident_aggregator import IncidentAggregator
-from skills.dependency_audit_reporter import DependencyAuditReporter
-from skills.recovery_dashboard_generator import RecoveryDashboardGenerator
+from skills.system_health_aggregator import SystemHealthAggregator
+from skills.recovery_report_exporter import RecoveryReportExporter
 
 class TestSystemHealthReporterIntegration(unittest.TestCase):
-
     def setUp(self):
-        self.reporter = SystemHealthHealthReporter = SystemHealthReporter()
-        self.recovery_hub = ErrorRecoveryHub()
-        self.incident_aggregator = IncidentAggregator()
-        self.dependency_reporter = DependencyAuditReporter()
-        self.dashboard_generator = RecoveryDashboardGenerator()
+        self.reporter = SystemHealthReporter()
+        self.aggregator = SystemHealthAggregator()
+        self.exporter = RecoveryReportExporter()
+        self.test_dir = f"test_dir_{uuid.uuid4().hex}"
+        os.makedirs(self.test_dir, exist_ok=True)
+
+    def tearDown(self):
+        for root, dirs, files in os.walk(self.test_dir, topdown=False):
+            for name in files:
+                os.remove(os.path.join(root, name))
+            for name in dirs:
+                os.rmdir(os.path.join(root, name))
+        if os.path.exists(self.test_dir):
+            os.rmdir(self.test_dir)
+
+    def test_full_health_reporting_pipeline_integration(self):
+        random_module = f"module_{uuid.uuid4().hex[:8]}"
+        random_incident_id = f"INC-{random.randint(1000, 9999)}"
+        random_error_msg = f"Error code {random.randint(500, 599)}"
+        random_severity = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
         
-        self.test_module = f"test_module_{uuid.uuid4().hex[:8]}"
-        self.incident_id = str(uuid.uuid4())
-        self.random_error_msg = f"Random error {uuid.uuid4()}"
+        incident_data = {
+            "incident_id": random_incident_id,
+            "error": random_error_msg,
+            "severity": random_severity
+        }
+        
+        audit_summary = {
+            "vulnerabilities_found": random.randint(0, 10),
+            "status": "passed"
+        }
+        
+        metrics = {
+            "cpu_usage": round(random.uniform(10.0, 99.0), 2),
+            "memory_usage": round(random.uniform(20.0, 90.0), 2)
+        }
 
-    def test_comprehensive_system_health_pipeline(self):
-        try:
-            raise RuntimeError(self.random_error_msg)
-        except RuntimeError as e:
-            tb_str = "Traceback (most recent call last):\n  File 'test.py', line 10\n    raise RuntimeError"
-            
-            # Шаг 1: Захват и агрегация реального инцидента через смежные модули без моков
-            captured_incident = self.recovery_hub.capture_failure(self.test_module, e, tb_str)
-            aggregated_data = self.incident_aggregator.process_and_aggregate(
-                self.test_module, e, tb_str, self.incident_id
-            )
-            
-            self.assertIsNotNone(aggregated_data)
+        health_report_json = self.reporter.generate_health_report(
+            module_name=random_module,
+            incident_data=incident_data,
+            audit_summary=audit_summary,
+            metrics=metrics
+        )
+        
+        parsed_report = json.loads(health_report_json)
+        self.assertEqual(parsed_report["module"], random_module)
+        self.assertEqual(parsed_report["metrics"]["incident_id"], random_incident_id)
+        self.assertEqual(parsed_report["metrics"]["error"], random_error_msg)
+        self.assertEqual(parsed_report["metrics"]["severity"], random_severity)
 
-            # Шаг 2: Формирование аудита зависимостей для отчета о здоровье
-            audit_payload = {
-                "epic_id": str(uuid.uuid4()),
-                "status": "checked",
-                "vulnerabilities": random.randint(0, 5),
-                "module": self.test_module
-            }
-            dependency_report_str = self.dependency_reporter.generate_report(audit_payload)
-            self.assertIsInstance(dependency_report_str, str)
+        file_path = os.path.join(self.test_dir, f"report_{uuid.uuid4().hex}.json")
+        export_result = self.reporter.export_health_report(parsed_report, file_path)
+        self.assertTrue(export_result)
+        self.assertTrue(os.path.exists(file_path))
 
-            # Шаг 3: Сбор метрик для дашборда
-            dashboard_metrics = self.dashboard_generator.aggregate_system_health()
-            self.assertIsInstance(dashboard_metrics, dict)
+        with open(file_path, 'r', encoding='utf-8') as f:
+            file_content = json.load(f)
+        self.assertEqual(file_content["metrics"]["incident_id"], random_incident_id)
 
-            # Шаг 4: Генерация комплексного отчета через тестируемый модуль SystemHealthReporter
-            # Передаем реальные сгенерированные данные
-            health_report = self.reporter.generate_health_report(
-                module_name=self.test_module,
-                incident_data=aggregated_data,
-                audit_summary=dependency_report_str,
-                metrics=dashboard_metrics
-            )
-            
-            self.assertIsNotNone(health_report)
-            
-            # Шаг 5: Проверка экспорта отчета в файл со случайным путем
-            with tempfile.TemporaryDirectory() as tmpdir:
-                export_filename = f"health_report_{uuid.uuid4().hex}.json"
-                export_path = os.path.join(tmpdir, export_filename)
-                
-                export_result = self.reporter.export_health_report(health_report, export_path)
-                self.assertTrue(export_result)
-                self.assertTrue(os.path.exists(export_path))
-                
-                with open(export_path, 'r', encoding='utf-8') as f:
-                    file_content = f.read()
-                    self.assertIn(self.test_module, file_content)
+        stream_data = io.BytesIO(f"Telemetry stream {uuid.uuid4().hex}".encode('utf-8'))
+        stream_parsed = self.reporter.parse_stream_data(stream_data)
+        self.assertIsNotNone(stream_parsed)
+        self.assertIn("raw_length", stream_parsed)
+        self.assertGreater(stream_parsed["raw_length"], 0)
+
+        incidents_list = [random_incident_id for _ in range(random.randint(1, 5))]
+        patches_list = [f"patch_{uuid.uuid4().hex[:4]}" for _ in range(random.randint(1, 5))]
+        aggregated_metrics = self.reporter.aggregate_system_metrics(incidents_list, patches_list)
+        self.assertEqual(aggregated_metrics["total_incidents"], len(incidents_list))
+        self.assertEqual(aggregated_metrics["total_patches"], len(patches_list))
+
+        comprehensive_report = self.exporter.generate_comprehensive_report(
+            module_name=random_module,
+            exception=Exception(random_error_msg),
+            traceback_str="Traceback dummy",
+            incident_id=random_incident_id,
+            audit_data=audit_summary
+        )
+        self.assertIsInstance(comprehensive_report, dict)
+
+        epic_id = f"EPIC-{random.randint(100, 999)}"
+        export_epic_path = os.path.join(self.test_dir, f"epic_{uuid.uuid4().hex}.json")
+        epic_export_result = self.exporter.export_epic_report_file(comprehensive_report, export_epic_path)
+        self.assertTrue(epic_export_result)
+        self.assertTrue(os.path.exists(export_epic_path))
 
 if __name__ == '__main__':
     unittest.main()

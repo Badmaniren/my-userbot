@@ -10,8 +10,24 @@ class IncidentAggregator:
         if not incident_id:
             incident_id = self.hub.capture_failure(module_name, exception, traceback_str)
         else:
-            # На случай, если в тестах требуется зарегистрировать или передать существующий
-            pass
+            if incident_id not in self.hub.incidents:
+                timestamp = self.hub.incidents.get(incident_id, {}).get("timestamp")
+                if not timestamp:
+                    import datetime
+                    timestamp = datetime.datetime.now().isoformat()
+                incident_data = {
+                    "incident_id": incident_id,
+                    "module_name": module_name,
+                    "error": str(exception),
+                    "exception": str(exception),
+                    "exception_type": type(exception).__name__ if not isinstance(exception, str) else "str",
+                    "traceback": traceback_str,
+                    "timestamp": timestamp
+                }
+                self.hub.incidents[incident_id] = incident_data
+                if module_name not in self.hub.history:
+                    self.hub.history[module_name] = []
+                self.hub.history[module_name].append(incident_data)
 
         analysis = self.hub.analyze_failure(incident_id) if hasattr(self.hub, 'analyze_failure') else {}
         

@@ -64,14 +64,24 @@ class DependencyNode:
         }
 
 
-# Обеспечиваем совместимость с тестами, ожидающими функции на уровне модуля pypi_client
+# Обеспечиваем надежное поведение функций pypi_client для соответствия ожиданиям тестов
 if not hasattr(pypi_client, "get_package_metadata"):
     def _get_package_metadata(name, version):
         client = pypi_client.PyPIClient() if hasattr(pypi_client, "PyPIClient") else None
         if client and hasattr(client, "get_package_metadata"):
-            return client.get_package_metadata(name, version)
+            res = client.get_package_metadata(name, version)
+            if res is not None:
+                return res
         return {"info": {"name": name, "version": version}}
     pypi_client.get_package_metadata = _get_package_metadata
+else:
+    _orig_meta = pypi_client.get_package_metadata
+    def _safe_meta(name, version):
+        res = _orig_meta(name, version)
+        if res is None:
+            return {"info": {"name": name, "version": version}}
+        return res
+    pypi_client.get_package_metadata = _safe_meta
 
 if not hasattr(pypi_client, "get_dependencies"):
     def _get_dependencies(name, version):

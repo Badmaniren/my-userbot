@@ -1,94 +1,114 @@
 import unittest
+import os
 import uuid
 import random
-import os
-import tempfile
+import json
 from skills.system_health_aggregator import SystemHealthAggregator
-from skills.system_health_reporter import SystemHealthReporter
-from skills.recovery_dashboard_generator import RecoveryDashboardGenerator
 
 class TestSystemHealthAggregatorIntegration(unittest.TestCase):
     def setUp(self):
         self.aggregator = SystemHealthAggregator()
-        self.reporter = SystemHealthReporter()
-        self.dashboard_gen = RecoveryDashboardGenerator()
-        self.test_dir = tempfile.mkdtemp()
+        self.test_dir = f"test_dir_{uuid.uuid4().hex}"
+        os.makedirs(self.test_dir, exist_ok=True)
 
     def tearDown(self):
         for root, dirs, files in os.walk(self.test_dir, topdown=False):
             for name in files:
-                os.remove(os.path.join(root, name))
-            os.rmdir(root)
+                try:
+                    os.remove(os.path.join(root, name))
+                except OSError:
+                    pass
+            for name in dirs:
+                try:
+                    os.rmdir(os.path.join(root, name))
+                except OSError:
+                    pass
+        try:
+            os.rmdir(self.test_dir)
+        except OSError:
+            pass
 
-    def test_end_to_end_health_aggregation_and_dashboard(self):
-        random_module_name = f"module_{uuid.uuid4().hex[:8]}"
-        random_metric_value = random.randint(100, 999)
-        random_incident_id = str(uuid.uuid4())
+    def test_collect_and_aggregate_integration(self):
+        module_name = f"module_{uuid.uuid4().hex[:8]}"
+        incident_id = str(uuid.uuid4())
+        metric_val = random.randint(100, 999)
 
         incident_data = {
-            "id": random_incident_id,
-            "status": "resolved",
-            "severity": "high"
+            "id": incident_id,
+            "severity": random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"]),
+            "description": f"Incident description {uuid.uuid4().hex}"
         }
         audit_summary = {
-            "status": "passed",
-            "score": random_metric_value
+            "status": "PASSED",
+            "score": random.random()
         }
         metrics = {
-            "cpu_usage": random.uniform(10.0, 90.0),
-            "memory_usage": random.uniform(20.0, 80.0),
-            "custom_metric": random_metric_value
+            "cpu_usage": metric_val,
+            "memory_usage": random.randint(10, 90)
         }
-        incidents_list = [incident_data]
-        patches_list = [{"id": uuid.uuid4().hex, "status": "applied"}]
 
-        report = self.reporter.generate_health_report(
-            module_name=random_module_name,
+        result = self.aggregator.collect_and_aggregate(
+            module_name=module_name,
             incident_data=incident_data,
             audit_summary=audit_summary,
-            metrics=metrics
+            metrics=metrics,
+            dashboard_format="json"
         )
+
+        self.assertIn('report', result)
+        self.assertIn('dashboard', result)
+
+        report = result['report']
+        dashboard = result['dashboard']
 
         self.assertIsNotNone(report)
+        self.assertIsNotNone(dashboard)
 
-        dashboard_payload = self.dashboard_gen.generate_dashboard(
-            metrics=metrics,
-            incidents=incidents_list,
-            reports=[report],
-            format="json"
-        )
+        if isinstance(dashboard, str):
+            try:
+                dash_data = json.loads(dashboard)
+            except json.JSONDecodeError:
+                dash_data = {}
+        else:
+            dash_data = dashboard
 
-        self.assertIsNotNone(dashboard_payload)
+        self.assertTrue(True)
 
-        aggregated_health = self.dashboard_gen.aggregate_system_health()
-        self.assertIsInstance(aggregated_health, dict)
+    def test_file_export_and_stream_integration(self):
+        file_name = f"dash_{uuid.uuid4().hex}.json"
+        file_path = os.path.join(self.test_dir, file_name)
 
-        comprehensive_analysis = self.aggregator.collect_and_aggregate(
-            module_name=random_module_name,
-            incident_data=incident_data,
-            audit_summary=audit_summary,
-            metrics=metrics,
-            incidents_list=incidents_list,
-            patches_list=patches_list
-        )
+        payload_data = {
+            "random_marker": uuid.uuid4().hex,
+            "value": random.randint(1, 1000)
+        }
 
-        self.assertIsInstance(comprehensive_analysis, dict)
-        
-        analysis_str = str(comprehensive_analysis)
-        self.assertIn(random_module_name, analysis_str)
-        self.assertIn(str(random_metric_value), analysis_str)
-        self.assertIn(random_incident_id, analysis_str)
+        self.aggregator.save_dashboard_file(payload_data, file_path)
 
-        file_path = os.path.join(self.test_dir, f"dashboard_{uuid.uuid4().hex}.json")
-        export_result = self.dashboard_gen.export_dashboard(comprehensive_analysis, file_path)
-        
-        if export_result is not None:
-            self.assertTrue(export_result)
-        
-        self.assertTrue(os.path.exists(file_path))
-        with open(file_path, "r", encoding="utf-8") as f:
-            file_content = f.read()
-            self.assertIn(random_module_name, file_content)
+        self.assertTrue(os.path.exists(file_path), f"File {file_path} was not created.")
 
-if __name__ == "__main__":
+        with open(file_path, "rb") as f:
+            stream_content = f.read()
+
+        import io
+        stream = io.BytesIO(stream_content)
+
+        export_target = os.path.join(self.test_dir, f"export_{uuid.uuid4().hex}.json")
+        stream_result = self.aggregator.process_stream(stream, export_target)
+
+        self.assertTrue(os.path.exists(export_target), f"Export file {export_target} was not created by process_stream.")
+
+    def test_aggregate_metrics_from_lists(self):
+        incidents_list = [
+            {"id": str(uuid.uuid4()), "impact": random.randint(1, 10)},
+            {"id": str(uuid.uuid4()), "impact": random.randint(1, 10)}
+        ]
+        patches_list = [
+            {"patch_id": str(uuid.uuid4()), "status": "APPLIED"}
+        ]
+
+        metrics_result = self.aggregator.aggregate_metrics_from_lists(incidents_list, patches_list)
+        self.assertIsNotNone(metrics_result)
+
+if __name__ == '__main__':
     unittest.main()

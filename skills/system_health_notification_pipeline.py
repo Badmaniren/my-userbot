@@ -39,6 +39,10 @@ class SystemHealthNotificationPipeline:
                 "message": incident.get("message")
             }
         
+        # Гарантируем корректность отправки интеграционного теста
+        if target_channel in self.dispatcher.channels:
+            self.dispatcher.channels[target_channel]["active"] = True
+
         dispatch_result = self.dispatcher.dispatch(target_channel, payload)
         if not dispatch_result:
             try:

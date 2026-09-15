@@ -26,7 +26,7 @@ class RecoveryReportExporter:
         }
 
     def finalize_and_export_summary(
-        self, epic_id, stream, summary_payload, export_format
+        self, epic_id, stream=None, summary_payload=None, export_format="json"
     ):
         finalized = self.reporter.finalize_epic(epic_id, stream)
         export_result = self.reporter.export_summary(summary_payload, export_format)

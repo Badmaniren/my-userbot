@@ -28,6 +28,20 @@ except (ImportError, TypeError):
             super().__init__(*args, **kwargs)
 
 
+meta1 = type(ResilientSecureGlobalMeshOmegaSingularityV19)
+meta2 = type(ResilientSecureGlobalMeshInterfaceV17)
+
+if meta1 is meta2:
+    CombinedMeta = meta1
+elif issubclass(meta1, meta2):
+    CombinedMeta = meta1
+elif issubclass(meta2, meta1):
+    CombinedMeta = meta2
+else:
+    class CombinedMeta(meta1, meta2):
+        pass
+
+
 class ResilientSecureGlobalMeshOmegaTranscendenceV20Error(Exception):
     """Кастомное исключение для модуля Трансцендентности Омега v20."""
     pass
@@ -39,7 +53,8 @@ ResilientSecureGlobalMeshomegaTranscendenceV20Error = ResilientSecureGlobalMeshO
 
 class ResilientSecureGlobalMeshOmegaTranscendenceV20(
     ResilientSecureGlobalMeshOmegaSingularityV19,
-    ResilientSecureGlobalMeshInterfaceV17
+    ResilientSecureGlobalMeshInterfaceV17,
+    metaclass=CombinedMeta
 ):
     def __init__(self, db_path=":memory:", max_memory_mb=512, calls=10, period=1.0, raise_on_limit=True):
         super().__init__(

@@ -184,3 +184,7 @@
 
 ## notification_template_engine (create) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## notification_webhook_broadcaster (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

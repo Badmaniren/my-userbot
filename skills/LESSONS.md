@@ -303,7 +303,3 @@
 ## incident_severity_evaluator (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## incident_priority_resolver (create) — раундов: 4
-- Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/unittest/mock.py", line 1446, in __enter__
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

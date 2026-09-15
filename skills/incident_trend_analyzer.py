@@ -18,6 +18,12 @@ class IncidentTrendAnalyzer:
     def __init__(self):
         pass
 
+    def analyze(self, trend_data):
+        return {
+            "status": "analyzed",
+            "trend_data": trend_data
+        }
+
     def analyze_trends(self, module_name):
         return {
             "module_name": module_name,

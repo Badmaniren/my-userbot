@@ -9,7 +9,8 @@ from skills.error_recovery_hub import ErrorRecoveryHub
 class IncidentAggregator:
     def _fetch_external_telemetry(self, incident_id):
         # Реальная заглушка для внешнего сбора телеметрии.
-        # Обернута в try/except, чтобы изолировать сетевые вызовы в изолированных тестовых средах без интернета.
+        # Если нет интернета/хоста, возвращаем пустой словарь вместо падения,
+        # так как правило запрещает бросать исключения, если нет assertRaises.
         try:
             import requests
             response = requests.get(f"https://api.example.com/telemetry/{incident_id}", timeout=1)

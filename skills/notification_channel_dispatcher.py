@@ -21,15 +21,27 @@ class NotificationChannelDispatcher:
             return False
 
         channel_config = self.channels[channel_name]
-        url = channel_config.get("url")
-        if not url:
+        if channel_config.get("active") is False:
             return False
 
-        try:
-            response = requests.post(url, json=payload)
-            return response.status_code == 200
-        except Exception:
-            return False
+        channel_type = channel_config.get("type")
+        url = channel_config.get("url")
+
+        if channel_type in ("stdout", "console"):
+            try:
+                print(json.dumps(payload, ensure_ascii=False))
+                return True
+            except Exception:
+                return False
+
+        if url:
+            try:
+                response = requests.post(url, json=payload)
+                return response.status_code == 200
+            except Exception:
+                return False
+
+        return False
 
     def broadcast(self, payload: dict) -> dict:
         """Рассылает уведомление по всем зарегистрированным каналам."""

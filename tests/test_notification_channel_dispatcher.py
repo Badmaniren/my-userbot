@@ -74,6 +74,34 @@ class TestNotificationChannelDispatcher(unittest.TestCase):
             
             self.assertFalse(result)
 
+    def test_dispatch_stdout_success(self):
+        config = {
+            "type": "stdout",
+            "active": True
+        }
+        self.dispatcher.register_channel(self.random_channel, config)
+        payload = {
+            "incident_id": self.random_incident,
+            "message": self.random_message
+        }
+        with patch('sys.stdout', new_callable=io.StringIO) as mock_stdout:
+            result = self.dispatcher.dispatch(self.random_channel, payload)
+            self.assertTrue(result)
+            self.assertIn(self.random_incident, mock_stdout.getvalue())
+
+    def test_dispatch_inactive_channel(self):
+        config = {
+            "type": "stdout",
+            "active": False
+        }
+        self.dispatcher.register_channel(self.random_channel, config)
+        payload = {
+            "incident_id": self.random_incident,
+            "message": self.random_message
+        }
+        result = self.dispatcher.dispatch(self.random_channel, payload)
+        self.assertFalse(result)
+
     def test_dispatch_unknown_channel(self):
         unknown_chan = uuid.uuid4().hex
         payload = {

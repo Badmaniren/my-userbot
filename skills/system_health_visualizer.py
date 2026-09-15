@@ -1,8 +1,14 @@
 import io
 import os
 from skills.system_health_monitoring_gateway import SystemHealthMonitoringGateway
-from skills.system_health_telemetry_collector import SystemHealthTelemetryCollector, system_health_telemetry_collector
-from skills.system_health_aggregator import SystemHealthAggregator, system_health_aggregator
+from skills.system_health_telemetry_collector import SystemHealthTelemetryCollector
+from skills.system_health_aggregator import SystemHealthAggregator
+
+# Определяем локальную переменную-заглушку, если она требуется импортом, но отсутствует в модуле телеметрии
+try:
+    from skills.system_health_telemetry_collector import system_health_telemetry_collector
+except ImportError:
+    system_health_telemetry_collector = None
 
 class SystemHealthVisualizer:
     def visualize_critical_metrics(self, system_id: str) -> dict:

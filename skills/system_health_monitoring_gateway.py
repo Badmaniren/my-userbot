@@ -3,8 +3,8 @@ from skills.system_health_reporter import SystemHealthReporter
 
 
 class SystemHealthMonitoringGateway:
-    def __init__(self):
-        self.audit_pipeline = SystemHealthAuditPipeline()
+    def __init__(self, audit_pipeline=None):
+        self.audit_pipeline = audit_pipeline if audit_pipeline is not None else SystemHealthAuditPipeline(monitoring_gateway=self)
         self.reporter = SystemHealthReporter()
 
     def run_monitoring_gateway_pipeline(
@@ -57,6 +57,13 @@ class SystemHealthMonitoringGateway:
 
     def aggregate_gateway_system_metrics(self, incidents_list, patches_list):
         return self.reporter.aggregate_system_metrics(incidents_list, patches_list)
+
+    def capture_system_state(self, module_name, metrics, incident_data):
+        return {
+            "module_name": module_name,
+            "metrics": metrics,
+            "incident_data": incident_data
+        }
 
     def execute_monitoring_and_reporting_pipeline(
         self,

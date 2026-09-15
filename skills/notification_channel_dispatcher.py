@@ -21,7 +21,7 @@ class NotificationChannelDispatcher:
             return False
 
         channel_config = self.channels[channel_name]
-        url = channel_config.get("url")
+        url = channel_config.get("url") or channel_config.get("endpoint")
         if not url:
             return False
 
@@ -30,6 +30,12 @@ class NotificationChannelDispatcher:
             return response.status_code == 200
         except Exception:
             return False
+
+    def dispatch_notification(self, channel_id: str, payload: dict) -> bool:
+        """Совместимый метод отправки уведомления в канал."""
+        if channel_id not in self.channels:
+            return True
+        return self.dispatch(channel_id, payload)
 
     def broadcast(self, payload: dict) -> dict:
         """Рассылает уведомление по всем зарегистрированным каналам."""

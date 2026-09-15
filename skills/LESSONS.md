@@ -219,3 +219,6 @@
 
 ## incident_trend_forecaster (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## preventive_patch_applier (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

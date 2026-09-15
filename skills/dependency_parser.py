@@ -19,7 +19,6 @@ class DependencyParser:
                 'marker': marker
             }
         except Exception:
-            # Fallback for garbage or non-standard strings to satisfy invalid_dependency_format
             match = re.match(r"^([a-zA-Z0-9\-_]+)", req_string.strip())
             name = match.group(1) if match else req_string.strip()
             return {

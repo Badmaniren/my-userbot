@@ -7,6 +7,17 @@ class SystemHealthTelemetryCollector:
         self.aggregator = SystemHealthAggregator()
         self.reporter = SystemHealthReporter()
 
+    def collect(self, source_id=None, load_factor=None, telemetry_data=None):
+        data = telemetry_data or {}
+        if source_id is not None:
+            data["source_id"] = source_id
+        if load_factor is not None:
+            data["load_factor"] = load_factor
+        return data
+
+    def collect_telemetry(self, telemetry_data=None, source_id=None, load_factor=None):
+        return self.collect(source_id=source_id, load_factor=load_factor, telemetry_data=telemetry_data)
+
     def collect_and_aggregate_telemetry(
         self,
         module_name,

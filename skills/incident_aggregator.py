@@ -6,6 +6,19 @@ class IncidentAggregator:
         self.hub = ErrorRecoveryHub()
         self.collector = PatchMetricCollector()
 
+    def aggregate(self, telemetry=None, incident_tag=None, **kwargs):
+        telemetry_data = telemetry or {}
+        source_id = getattr(telemetry_data, "source_id", None)
+        if not source_id and isinstance(telemetry_data, dict):
+            source_id = telemetry_data.get("source_id")
+
+        return {
+            "source_id": source_id,
+            "incident_tag": incident_tag,
+            "telemetry": telemetry_data,
+            "status": "aggregated"
+        }
+
     def process_and_aggregate(self, module_name, exception, traceback_str, incident_id=None):
         if not incident_id:
             incident_id = self.hub.capture_failure(module_name, exception, traceback_str)

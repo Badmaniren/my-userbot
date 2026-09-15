@@ -168,3 +168,6 @@
 
 ## incident_aggregator (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## recovery_report_exporter (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

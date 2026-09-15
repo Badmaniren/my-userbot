@@ -86,6 +86,19 @@ class SystemHealthMonitoringGateway:
             module_name, incident_data, audit_summary, metrics
         )
 
+        if isinstance(health_report, str):
+            health_report = {
+                "module_name": module_name,
+                "incident_data": incident_data,
+                "audit_summary": audit_summary,
+                "metrics": metrics,
+                "report": health_report
+            }
+        elif isinstance(health_report, dict) and "module_name" not in health_report:
+            health_report["module_name"] = module_name
+            if "audit_summary" not in health_report:
+                health_report["audit_summary"] = audit_summary
+
         self.export_gateway_report_file(health_report, report_path)
 
         return {

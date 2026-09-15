@@ -200,7 +200,3 @@
 ## incident_digest_generator (start_new) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## system_health_aggregator (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

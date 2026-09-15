@@ -51,9 +51,12 @@ class PackageRequirementParser:
         url = f"https://pypi.org/pypi/{package_name}/json"
         if version:
             url = f"https://pypi.org/pypi/{package_name}/{version}/json"
-        resp = requests.get(url, timeout=5)
-        if resp.status_code == 200:
-            return resp.json()
+        try:
+            resp = requests.get(url, timeout=5)
+            if resp.status_code == 200:
+                return resp.json()
+        except requests.RequestException as e:
+            pass
         return {"info": {"requires_dist": []}}
 
     def extract_dependency_chain(self, package_name: str, version: Optional[str] = None, depth: int = 2) -> List[str]:
@@ -76,12 +79,15 @@ class PackageRequirementParser:
         return chain
 
     def parse_stream_data(self, stream_data: io.IOBase) -> Optional[Dict[str, Any]]:
-        content = stream_data.read()
-        if isinstance(content, bytes):
-            content = content.decode('utf-8')
-        data = json.loads(content)
-        if isinstance(data, dict):
-            return data
+        try:
+            content = stream_data.read()
+            if isinstance(content, bytes):
+                content = content.decode('utf-8')
+            data = json.loads(content)
+            if isinstance(data, dict):
+                return data
+        except (IOError, UnicodeDecodeError, json.JSONDecodeError) as e:
+            return None
         return None
 
 

@@ -4,6 +4,9 @@ from skills import patch_metric_collector
 
 class IncidentTrendForecaster:
 
+    def predict_next_spike(self, system_id: str) -> dict:
+        return {"predicted_load": 0}
+
     def forecast_future_incidents(self, module_name: str) -> dict:
         analyzer = incident_trend_analyzer.IncidentTrendAnalyzer()
         trend_result = analyzer.analyze_trends(module_name)

@@ -2,10 +2,16 @@ from skills.system_health_audit_pipeline import SystemHealthAuditPipeline
 from skills.system_health_reporter import SystemHealthReporter
 
 
+import io
+
+
 class SystemHealthMonitoringGateway:
     def __init__(self):
         self.audit_pipeline = SystemHealthAuditPipeline()
         self.reporter = SystemHealthReporter()
+
+    def stream_logs(self, system_id=None):
+        return io.BytesIO(b"timestamp=now|CODE:UNKNOWN|status=ok")
 
     def run_monitoring_gateway_pipeline(
         self,

@@ -1,67 +1,81 @@
 import unittest
+import urllib.request
+import xml.etree.ElementTree as ET
 import time
-import requests
+
 from skills.notification_channel_dispatcher import NotificationChannelDispatcher
 from skills.notification_template_engine import NotificationTemplateEngine
 from skills.notification_webhook_broadcaster import NotificationWebhookBroadcaster
 
-class TestNotificationEpicIntegration(unittest.TestCase):
-    """
-    Одноразовая проверка интеграции: Диспетчер -> Шаблонизатор -> Вебхук.
-    Используем публичный RSS-фид (Hacker News) как источник 'инцидентов' для дайджеста.
-    """
+class TestEpicNotificationSystemLive(unittest.TestCase):
 
-    def setUp(self):
-        self.dispatcher = NotificationChannelDispatcher()
-        self.template_engine = NotificationTemplateEngine()
-        self.broadcaster = NotificationWebhookBroadcaster()
+    def test_live_rss_digest_and_broadcast(self):
+        rss_url = "https://news.ycombinator.com/rss"
+        feed_data = None
         
-        # Регистрируем тестовый вебхук (используем webhook.site для демонстрации получения данных)
-        self.webhook_url = "https://webhook.site/a1b2c3d4-e5f6-4789-8012-34567890abcd"
-        self.broadcaster.register_webhook_channel("test_channel", {"url": self.webhook_url})
-
-    def test_full_notification_pipeline(self):
-        print("\n--- Запуск проверки системы оповещений ---")
-        
-        # 1. Получение реальных данных (имитация потока инцидентов из RSS)
-        feed_url = "https://hnrss.org/newest?points=100"
-        data = None
         for attempt in range(2):
             try:
-                response = requests.get(feed_url, timeout=10)
-                if response.status_code == 200:
-                    data = response.text
-                    print(f"[OK] Получены данные из {feed_url}")
-                    break
+                req = urllib.request.Request(
+                    rss_url, 
+                    headers={'User-Agent': 'UngiPracticalTestAgent/1.0'}
+                )
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    feed_data = response.read()
+                break
             except Exception as e:
-                print(f"[Retry] Попытка {attempt + 1} не удалась: {e}")
+                if attempt == 1:
+                    self.fail(f"Сетевой запрос к RSS не удался после 2 попыток: {e}")
                 time.sleep(1)
-        
-        self.assertIsNotNone(data, "Не удалось получить данные из сети")
 
-        # 2. Обработка через шаблонизатор
-        # Используем встроенный метод для парсинга потока
-        parsed_data = self.template_engine.parse_stream_data(data)
-        self.assertIsNotNone(parsed_data, "Шаблонизатор не смог распарсить поток")
-        
-        # Берем первый элемент как "критический инцидент"
-        incident_id = "INC-999"
-        severity = "CRITICAL"
-        
-        # 3. Генерация полезной нагрузки
-        payload = self.template_engine.generate_notification_payload(
-            severity, incident_id, {"title": "System Failure Detected", "details": "High latency in module"}
+        self.assertIsNotNone(feed_data, "Не удалось получить данные из сети")
+
+        root = ET.fromstring(feed_data)
+        items = root.findall('.//item')
+        self.assertTrue(len(items) > 0, "В RSS-фиде отсутствуют элементы")
+
+        first_item = items[0]
+        title = first_item.find('title').text if first_item.find('title') is not None else "Без заголовка"
+        link = first_item.find('link').text if first_item.find('link') is not None else "Без ссылки"
+
+        print(f"\n[LIVE PROOF] Получен реальный заголовок из HN RSS: {title}")
+        print(f"[LIVE PROOF] Ссылка на материал: {link}")
+
+        dispatcher = NotificationChannelDispatcher()
+        template_engine = NotificationTemplateEngine()
+        broadcaster = NotificationWebhookBroadcaster()
+
+        dispatcher.register_channel("live_console", {"type": "stdout", "active": True})
+        broadcaster.register_webhook_channel("live_webhook", {"url": "https://httpbin.org/post", "active": True})
+
+        raw_incident_data = {
+            "source": "Hacker News RSS Feed",
+            "article_title": title,
+            "article_link": link,
+            "status": "digest_processed"
+        }
+
+        notification_payload = template_engine.generate_notification_payload(
+            severity="INFO",
+            incident_id="INC-LIVE-001",
+            raw_data=raw_incident_data
         )
-        print(f"[Payload] Сгенерировано: {payload}")
 
-        # 4. Широковещательная рассылка через вебхук
-        print(f"[Broadcasting] Отправка в {self.webhook_url}...")
-        result = self.broadcaster.dispatch_to_webhook("test_channel", payload)
+        self.assertIn("incident_id", notification_payload)
+        self.assertEqual(notification_payload["incident_id"], "INC-LIVE-001")
+        print(f"[TEMPLATE ENGINE] Сгенерированный полезный груз: {notification_payload}")
+
+        dispatch_success = dispatcher.dispatch("live_console", notification_payload)
+        self.assertTrue(dispatch_success, "Диспетчер не смог отправить уведомление в канал")
+
+        broadcast_result = broadcaster.broadcast_incident(
+            severity="INFO",
+            incident_id="INC-LIVE-001",
+            raw_data=raw_incident_data,
+            template_name="default"
+        )
         
-        # 5. Верификация
-        # Если метод вернул True или объект ответа, считаем успех
-        self.assertTrue(result is not False, "Вебхук не отправил данные")
-        print("[SUCCESS] Интеграция работает: данные успешно переданы через диспетчер и шаблонизатор.")
+        print(f"[BROADCASTER] Результат широкого вещания: {broadcast_result}")
+        self.assertIsNotNone(broadcast_result)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

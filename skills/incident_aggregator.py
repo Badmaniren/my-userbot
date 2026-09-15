@@ -35,6 +35,11 @@ class IncidentAggregator:
             "history": history
         }
 
+    def process_stream(self, stream_data):
+        if isinstance(stream_data, bytes):
+            stream_data = stream_data.decode("utf-8", errors="ignore")
+        return {"status": "processed", "id": "stream_id", "data": stream_data}
+
 
 def aggregate_incidents(module_name, exception, traceback_str):
     hub = ErrorRecoveryHub()

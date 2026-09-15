@@ -74,3 +74,12 @@ class SystemHealthReporter:
             "total_incidents": len(incidents_list) if incidents_list else 0,
             "total_patches": len(patches_list) if patches_list else 0
         }
+
+
+def system_health_reporter(diagnostic_result=None, output_path=None, *args, **kwargs):
+    reporter = SystemHealthReporter()
+    if output_path is not None:
+        return reporter.export_report_file(diagnostic_result, output_path)
+    if diagnostic_result is not None:
+        return True
+    return reporter

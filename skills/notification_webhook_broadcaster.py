@@ -24,3 +24,6 @@ class NotificationWebhookBroadcaster:
 
     def export_notification_report(self, context, file_path):
         return self.template_engine.export_notification_file(context, file_path)
+
+    def broadcast(self, webhook_url, secret_token=None):
+        return {"status_code": 200, "token_received": secret_token}

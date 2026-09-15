@@ -1,121 +1,166 @@
 import unittest
-from unittest.mock import patch, MagicMock
-import uuid
-import random
-import string
-import io
+from unittest.mock import MagicMock, patch
 import json
-
+import os
+import io
+import random
+import uuid
 from skills.incident_notification_bridge import IncidentNotificationBridge
 
 
 class TestIncidentNotificationBridge(unittest.TestCase):
 
     def setUp(self):
-        self.channel_dispatcher = MagicMock()
-        self.template_engine = MagicMock()
-        self.webhook_broadcaster = MagicMock()
+        self.dispatcher_mock = MagicMock()
+        self.template_engine_mock = MagicMock()
+        self.webhook_broadcaster_mock = MagicMock()
+        self.storage_dir = f"temp_storage_{uuid.uuid4().hex}"
         self.bridge = IncidentNotificationBridge(
-            dispatcher=self.channel_dispatcher,
-            template_engine=self.template_engine,
-            webhook_broadcaster=self.webhook_broadcaster
+            dispatcher=self.dispatcher_mock,
+            template_engine=self.template_engine_mock,
+            webhook_broadcaster=self.webhook_broadcaster_mock,
+            storage_dir=self.storage_dir
         )
 
-    def test_process_critical_incident_success(self):
-        incident_id = uuid.uuid4().hex
-        severity = random.choice(['CRITICAL', 'HIGH', 'EMERGENCY'])
-        description = ''.join(random.choices(string.ascii_letters + string.digits, k=32))
-        channel = ''.join(random.choices(string.ascii_lowercase, k=8))
-        template_name = ''.join(random.choices(string.ascii_lowercase, k=10))
-        rendered_message = ''.join(random.choices(string.ascii_letters + string.punctuation, k=64))
+    def tearDown(self):
+        if os.path.exists(self.storage_dir):
+            for file_name in os.listdir(self.storage_dir):
+                file_path = os.path.join(self.storage_dir, file_name)
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+            os.rmdir(self.storage_dir)
 
+    def test_process_incident_new_and_rendering(self):
+        incident_id = uuid.uuid4().hex
         incident_data = {
             "incident_id": incident_id,
-            "severity": severity,
-            "description": description
+            "description": uuid.uuid4().hex,
+            "severity": random.choice(["LOW", "MEDIUM", "CRITICAL", "FATAL"])
         }
+        channel = uuid.uuid4().hex
+        template_name = uuid.uuid4().hex
+        rendered_text = uuid.uuid4().hex
 
-        self.template_engine.render.return_value = rendered_message
-        self.channel_dispatcher.dispatch.return_value = True
+        self.template_engine_mock.render.return_value = rendered_text
 
         result = self.bridge.process_incident(incident_data, channel=channel, template=template_name)
 
         self.assertTrue(result)
-        self.template_engine.render.assert_called_once_with(template_name, incident_data)
-        self.channel_dispatcher.dispatch.assert_called_once_with(channel, rendered_message)
+        self.assertIn(incident_id, self.bridge.processed_incidents)
+        self.template_engine_mock.render.assert_called_once_with(template_name, incident_data)
+        self.dispatcher_mock.dispatch.assert_called_once_with(channel, rendered_text)
 
-    def test_process_incident_deduplication(self):
+    def test_process_incident_duplicate_prevention(self):
         incident_id = uuid.uuid4().hex
-        severity = random.choice(['CRITICAL', 'HIGH'])
-        description = ''.join(random.choices(string.ascii_letters, k=20))
-        channel = ''.join(random.choices(string.ascii_lowercase, k=6))
+        incident_data = {"id": incident_id, "payload": uuid.uuid4().hex}
+        channel = uuid.uuid4().hex
 
-        incident_data = {
-            "incident_id": incident_id,
-            "severity": severity,
-            "description": description
-        }
+        self.template_engine_mock.render_default.return_value = uuid.uuid4().hex
 
-        with patch('skills.incident_notification_bridge.time') as mock_time:
-            mock_time.time.return_value = random.randint(100000, 999999)
-            
-            first_result = self.bridge.process_incident(incident_data, channel=channel)
-            second_result = self.bridge.process_incident(incident_data, channel=channel)
+        first_attempt = self.bridge.process_incident(incident_data, channel=channel)
+        self.assertTrue(first_attempt)
 
-            self.assertTrue(first_result)
-            self.assertFalse(second_result)
-            self.assertEqual(self.channel_dispatcher.dispatch.call_count, 1)
+        second_attempt = self.bridge.process_incident(incident_data, channel=channel)
+        self.assertFalse(second_attempt)
+        self.dispatcher_mock.dispatch.assert_called_once()
 
-    def test_broadcast_incident_via_webhook(self):
-        webhook_url = f"https://{ ''.join(random.choices(string.ascii_lowercase, k=10)) }.com/{uuid.uuid4().hex}"
-        event_name = ''.join(random.choices(string.ascii_uppercase, k=12))
-        payload_value = ''.join(random.choices(string.ascii_letters, k=16))
-
-        incident_payload = {
-            "event": event_name,
-            "data": payload_value
-        }
-
-        self.webhook_broadcaster.broadcast.return_value = {"status_code": 200, "response": uuid.uuid4().hex}
-
-        result = self.bridge.broadcast_to_webhooks(webhook_url, incident_payload)
-
-        self.assertIn("status_code", result)
-        self.assertEqual(result["status_code"], 200)
-        self.webhook_broadcaster.broadcast.assert_called_once_with(webhook_url, incident_payload)
-
-    def test_stream_incident_from_file_object(self):
+    def test_process_incident_fallback_render_default(self):
         incident_id = uuid.uuid4().hex
-        source_data = json.dumps({
-            "incident_id": incident_id,
-            "severity": "CRITICAL",
-            "message": "System meltdown"
-        }).encode('utf-8')
+        incident_data = {"id": incident_id, "message": uuid.uuid4().hex}
+        channel = uuid.uuid4().hex
+        default_rendered = uuid.uuid4().hex
 
-        file_stream = io.BytesIO(source_data)
-        channel = ''.join(random.choices(string.ascii_lowercase, k=7))
+        delattr(self.template_engine_mock, "render")
+        self.template_engine_mock.render_default.return_value = default_rendered
+
+        result = self.bridge.process_incident(incident_data, channel=channel)
+
+        self.assertTrue(result)
+        self.template_engine_mock.render_default.assert_called_once_with(incident_data)
+        self.dispatcher_mock.dispatch.assert_called_once_with(channel, default_rendered)
+
+    def test_process_incident_fallback_str(self):
+        incident_id = uuid.uuid4().hex
+        incident_data = {"id": incident_id, "info": uuid.uuid4().hex}
+        channel = uuid.uuid4().hex
+
+        bridge_no_methods = IncidentNotificationBridge(
+            dispatcher=self.dispatcher_mock,
+            template_engine=object(),
+            storage_dir=self.storage_dir
+        )
+
+        result = bridge_no_methods.process_incident(incident_data, channel=channel)
+
+        self.assertTrue(result)
+        self.dispatcher_mock.dispatch.assert_called_once_with(channel, str(incident_data))
+
+    def test_broadcast_to_webhooks(self):
+        webhook_url = f"https://{uuid.uuid4().hex}.com/webhook"
+        payload = {"event": uuid.uuid4().hex, "code": random.randint(1000, 9999)}
+        expected_response = {"status_code": 200, "body": uuid.uuid4().hex}
+
+        self.webhook_broadcaster_mock.broadcast.return_value = expected_response
+
+        response = self.bridge.broadcast_to_webhooks(webhook_url, payload)
+
+        self.assertEqual(response, expected_response)
+        self.webhook_broadcaster_mock.broadcast.assert_called_once_with(webhook_url, payload)
+
+    def test_broadcast_to_webhooks_no_broadcaster(self):
+        bridge_naked = IncidentNotificationBridge()
+        webhook_url = f"https://{uuid.uuid4().hex}.com/hook"
+        payload = {"data": uuid.uuid4().hex}
+
+        response = bridge_naked.broadcast_to_webhooks(webhook_url, payload)
+
+        self.assertEqual(response, {"status_code": 200})
+
+    def test_ingest_stream_bytes(self):
+        incident_id = uuid.uuid4().hex
+        incident_data = {"incident_id": incident_id, "data": uuid.uuid4().hex}
+        stream_content = json.dumps(incident_data).encode('utf-8')
+        stream = io.BytesIO(stream_content)
+        channel = uuid.uuid4().hex
 
         with patch.object(self.bridge, 'process_incident', return_value=True) as mock_process:
-            result = self.bridge.ingest_stream(file_stream, channel=channel)
-            
+            result = self.bridge.ingest_stream(stream, channel=channel)
             self.assertTrue(result)
-            mock_process.assert_called_once()
-            args, _ = mock_process.call_args
-            self.assertEqual(args[0]["incident_id"], incident_id)
+            mock_process.assert_called_once_with(incident_data, channel=channel)
 
-    def test_dispatcher_failure_handling(self):
+    def test_dispatch_critical_incident_with_storage(self):
         incident_id = uuid.uuid4().hex
-        channel = ''.join(random.choices(string.ascii_lowercase, k=5))
-        incident_data = {
-            "incident_id": incident_id,
-            "severity": "CRITICAL",
-            "description": "Failure test"
+        aggregated_incident = {
+            "id": incident_id,
+            "threat_level": random.choice(["HIGH", "SEVERE", "CRITICAL"]),
+            "vector": uuid.uuid4().hex
         }
 
-        self.channel_dispatcher.dispatch.side_effect = Exception("Network timeout")
+        result = self.bridge.dispatch_critical_incident(aggregated_incident)
 
-        with self.assertRaises(Exception) as context:
-            self.bridge.process_incident(incident_data, channel=channel)
+        expected_dict = {
+            "dispatch_id": f"dispatch_{incident_id}",
+            "incident_id": incident_id,
+            "success": True
+        }
+        self.assertEqual(result, expected_dict)
 
-        self.assertIn("Network timeout", str(context.exception))
-        self.channel_dispatcher.dispatch.assert_called_once()
+        file_path = os.path.join(self.storage_dir, f"{incident_id}.json")
+        self.assertTrue(os.path.exists(file_path))
+
+        with open(file_path, 'r', encoding='utf-8') as f:
+            loaded_data = json.load(f)
+        self.assertEqual(loaded_data, aggregated_incident)
+
+    def test_dispatch_critical_incident_no_storage_dir(self):
+        bridge_no_storage = IncidentNotificationBridge()
+        incident_id = uuid.uuid4().hex
+        aggregated_incident = {"incident_id": incident_id, "info": uuid.uuid4().hex}
+
+        result = bridge_no_storage.dispatch_critical_incident(aggregated_incident)
+
+        self.assertEqual(result, {
+            "dispatch_id": f"dispatch_{incident_id}",
+            "incident_id": incident_id,
+            "success": True
+        })

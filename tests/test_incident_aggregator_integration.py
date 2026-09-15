@@ -1,39 +1,33 @@
 import unittest
 import uuid
 import random
+from datetime import datetime
 from skills.incident_aggregator import IncidentAggregator
 from skills.error_recovery_hub import ErrorRecoveryHub
-from skills.patch_metric_collector import start_new
 
 class TestIncidentAggregatorIntegration(unittest.TestCase):
-    def test_aggregate_real_incident_metrics(self):
+    def test_build_analytics_real_integration(self):
         aggregator = IncidentAggregator()
         hub = ErrorRecoveryHub()
 
         module_name = f"test_module_{uuid.uuid4().hex[:8]}"
-        random_error_msg = f"Random connection failure {uuid.uuid4()}"
-        exc = RuntimeError(random_error_msg)
-        tb_str = "Traceback (most recent call last):\n  File 'test.py', line 1, in <module>\nRuntimeError"
+        random_error_msg = f"Error_{uuid.uuid4().hex[:6]}"
+        random_tb = f"Traceback at line {random.randint(1, 100)}"
 
-        incident_id = hub.capture_failure(module_name, exc, tb_str)
-        self.assertIsNotNone(incident_id)
+        try:
+            raise RuntimeError(random_error_msg)
+        except RuntimeError as e:
+            hub.capture_failure(module_name, e, random_tb)
 
-        analysis = hub.analyze_failure(incident_id)
-        patch = hub.generate_patch(incident_id)
+        analytics = aggregator.build_analytics(module_name)
 
-        success_flag = random.choice([True, False])
-        metric_result = start_new(
-            success=success_flag,
-            incident_id=incident_id,
-            error=None if success_flag else random_error_msg,
-            raw_result=analysis,
-            patch_data=patch
-        )
+        self.assertIsInstance(analytics, dict)
+        self.assertEqual(analytics.get("module"), module_name)
+        self.assertGreaterEqual(analytics.get("total_incidents"), 1)
+        self.assertIn("success_rate", analytics)
 
-        aggregated_data = aggregator.aggregate_metrics([metric_result])
-        
-        self.assertIsInstance(aggregated_data, dict)
-        self.assertIn(incident_id, [item.get('incident_id') for item in aggregated_data.get('incidents', [])])
+        history = hub.get_incident_history(module_name)
+        self.assertTrue(any(h.get("error") == random_error_msg for h in history))
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

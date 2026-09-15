@@ -243,3 +243,7 @@
 - Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: FAILED (failures=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## system_health_aggregator (compose) — раундов: 4
+- Последняя ошибка перед фиксом: mock_dashboard_instance.export_dashboard_file.assert_called_once_with(payload, self.random_path)
+- Статус: успешно прошёл тесты и влит в main

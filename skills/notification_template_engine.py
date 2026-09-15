@@ -71,12 +71,13 @@ class NotificationTemplateEngine:
         # Шаблон по умолчанию для интеграционных тестов
         if template_name == "incident_notification":
             inc_id = context.get("incident_id", "")
-            mod_name = context.get("module_name", "")
+            mod_name = context.get("module_name", context.get("module", ""))
             err = context.get("error", "")
+            sev = context.get("severity", "")
             if format.lower() == "html":
-                return f"<html><body><h1>Incident: {inc_id}</h1><p>Module: {mod_name}</p><p>Error: {err}</p></body></html>"
+                return f"<html><body><h1>Incident: {inc_id}</h1><p>Severity: {sev}</p><p>Module: {mod_name}</p><p>Error: {err}</p></body></html>"
             else:
-                return f"Incident: {inc_id} | Module: {mod_name} | Error: {err}"
+                return f"Incident: {inc_id} | Severity: {sev} | Module: {mod_name} | Error: {err}"
 
         if format.lower() == "html":
             return self.render_html(template_name, context)

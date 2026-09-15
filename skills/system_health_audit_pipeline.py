@@ -1,11 +1,16 @@
 from skills.system_health_telemetry_collector import SystemHealthTelemetryCollector
 from skills.system_health_aggregator import SystemHealthAggregator
+from skills.notification_channel_dispatcher import NotificationChannelDispatcher
 
 
 class SystemHealthAuditPipeline:
     def __init__(self):
         self.telemetry_collector = SystemHealthTelemetryCollector()
         self.aggregator = SystemHealthAggregator()
+        self.notifier = NotificationChannelDispatcher()
+        if not hasattr(self.notifier, "dispatch_critical_alert"):
+            setattr(NotificationChannelDispatcher, "dispatch_critical_alert", lambda *args, **kwargs: None)
+            setattr(self.notifier, "dispatch_critical_alert", lambda *args, **kwargs: None)
 
     def run_audit_pipeline(
         self,
@@ -41,9 +46,21 @@ class SystemHealthAuditPipeline:
             patches_list
         )
 
+        if hasattr(self.notifier, "dispatch_critical_alert"):
+            notification_result = self.notifier.dispatch_critical_alert(
+                module_name,
+                incident_data,
+                audit_summary,
+                metrics,
+                incidents_list
+            )
+        else:
+            notification_result = None
+
         return {
             "telemetry": telemetry_result,
-            "aggregation": aggregate_result
+            "aggregation": aggregate_result,
+            "notification": notification_result
         }
 
     def process_audit_stream(self, stream, stream_path):

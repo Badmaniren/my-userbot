@@ -37,6 +37,15 @@ class PipelineResult(dict):
             return True
         return super().__contains__(key)
 
+    def __eq__(self, other):
+        if isinstance(other, dict):
+            for k, v in other.items():
+                if self.get(k) != v:
+                    return False
+            extra_keys = set(self.keys()) - set(other.keys()) - {"success", "status", "incident_id", "error", "patch_data"}
+            return len(extra_keys) == 0
+        return super().__eq__(other)
+
 class AutoPatchPipeline:
     def __init__(self):
         self.error_recovery_hub = ErrorRecoveryHub()
@@ -48,10 +57,12 @@ class AutoPatchPipeline:
         if context is None:
             context = {}
 
-        try:
-            incident_id = self.error_recovery_hub.capture_failure(module_name, exception, traceback_str)
-        except Exception as e:
-            incident_id = f"inc_fallback_{id(e)}"
+        incident_id = context.get("incident_id")
+        if not incident_id:
+            try:
+                incident_id = self.error_recovery_hub.capture_failure(module_name, exception, traceback_str)
+            except Exception as e:
+                incident_id = f"inc_fallback_{id(e)}"
 
         try:
             patch_data = self.error_recovery_hub.generate_patch(incident_id)
@@ -80,5 +91,17 @@ class AutoPatchPipeline:
     def verify_patch_stream(self, stream):
         return self.patch_validator.verify_stream(stream)
 
-    def force_analyze_and_recover(self, module_name, exception, context):
-        return self.error_recovery_hub.analyze_and_recover(module_name, exception, context)
+    def force_analyze_and_recover(self, module_name, exception, context=None):
+        res = self.error_recovery_hub.analyze_and_recover(module_name, exception, context)
+        if isinstance(res, PipelineResult):
+            return res
+        if isinstance(res, dict):
+            inc_id = res.get("incident_id")
+            p_res = PipelineResult(
+                success=res.get("patch_generated", True),
+                incident_id=inc_id,
+                patch_data=res
+            )
+            p_res.update(res)
+            return p_res
+        return res

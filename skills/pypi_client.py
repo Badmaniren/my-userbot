@@ -88,3 +88,22 @@ class PyPIClient:
             return json.loads(content)
         except Exception:
             return None
+
+
+_default_client = PyPIClient()
+
+
+def get_package_metadata(package_name: str, version: str = None) -> dict:
+    return _default_client.get_package_metadata(package_name, version)
+
+
+def get_dependencies(package_name: str, version: str = None) -> list:
+    return _default_client.get_dependencies(package_name, version)
+
+
+def get_release_versions(package_name: str) -> list:
+    return _default_client.get_release_versions(package_name)
+
+
+def get_package_dependencies(package_name: str, version: str = None) -> list:
+    return _default_client.get_package_dependencies(package_name, version)

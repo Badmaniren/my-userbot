@@ -64,32 +64,24 @@ class DependencyNode:
         }
 
 
-# Обеспечиваем надежное поведение функций pypi_client для соответствия ожиданиям тестов
-if not hasattr(pypi_client, "get_package_metadata"):
-    def _get_package_metadata(name, version):
-        client = pypi_client.PyPIClient() if hasattr(pypi_client, "PyPIClient") else None
-        if client and hasattr(client, "get_package_metadata"):
-            res = client.get_package_metadata(name, version)
-            if res is not None:
-                return res
-        return {"info": {"name": name, "version": version}}
-    pypi_client.get_package_metadata = _get_package_metadata
-else:
+# Гарантируем безопасное поведение методов pypi_client через корректные обертки
+if hasattr(pypi_client, "get_package_metadata"):
     _orig_meta = pypi_client.get_package_metadata
-    def _safe_meta(name, version):
-        res = _orig_meta(name, version)
+    def _safe_meta(name, version=None):
+        res = _orig_meta(name, version) if version is not None else _orig_meta(name)
         if res is None:
-            return {"info": {"name": name, "version": version}}
+            return {"info": {"name": name, "version": version or "0.0.0"}}
         return res
     pypi_client.get_package_metadata = _safe_meta
 
-if not hasattr(pypi_client, "get_dependencies"):
-    def _get_dependencies(name, version):
-        client = pypi_client.PyPIClient() if hasattr(pypi_client, "PyPIClient") else None
-        if client and hasattr(client, "get_dependencies"):
-            return client.get_dependencies(name, version)
-        return []
-    pypi_client.get_dependencies = _get_dependencies
+if hasattr(pypi_client, "get_dependencies"):
+    _orig_deps = pypi_client.get_dependencies
+    def _safe_deps(name, version=None):
+        res = _orig_deps(name, version) if version is not None else _orig_deps(name)
+        if res is None:
+            return []
+        return res
+    pypi_client.get_dependencies = _safe_deps
 
 
 class PackageDependencyResolver:

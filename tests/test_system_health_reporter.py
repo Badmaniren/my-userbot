@@ -84,6 +84,20 @@ class TestSystemHealthReporter(unittest.TestCase):
         self.assertEqual(aggregated["total_incidents"], len(incidents_list))
         self.assertEqual(aggregated["total_patches"], len(patches_list))
 
+    def test_generate_list_feed(self):
+        telemetry_feed = [{"title": "Item 1", "link": "http://example.com/1"}]
+        report = self.reporter.generate(telemetry_feed, module_name=self.random_module)
+        self.assertIsInstance(report, dict)
+        self.assertEqual(report["status"], "HEALTHY")
+        self.assertEqual(report["telemetry_feed"], telemetry_feed)
+        self.assertEqual(report["metrics"]["feed_items"], 1)
+
+    def test_generate_string_feed(self):
+        telemetry_feed = "raw telemetry log"
+        report = self.reporter.generate(telemetry_feed, module_name=self.random_module)
+        self.assertIsInstance(report, str)
+        self.assertIn(self.random_module, report)
+
 
 if __name__ == "__main__":
     unittest.main()

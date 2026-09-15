@@ -93,3 +93,27 @@ class SystemHealthAggregator:
 
     def parse_reporter_stream(self, stream):
         return self.reporter.parse_stream_data(stream)
+
+    def aggregate(self, report, **kwargs):
+        if isinstance(report, str):
+            try:
+                report_data = json.loads(report)
+            except Exception:
+                report_data = {"raw_report": report}
+        elif isinstance(report, dict):
+            report_data = report
+        else:
+            report_data = {"report_obj": str(report)}
+
+        module_name = report_data.get("module", "aggregated_system_health")
+        metrics = report_data.get("metrics", {})
+
+        aggregated_result = self.collect_and_aggregate(
+            module_name=module_name,
+            incident_data=report_data.get("incident_data"),
+            audit_summary=report_data.get("audit_summary"),
+            metrics=metrics
+        )
+        aggregated_result["input_report"] = report_data
+        aggregated_result["status"] = "AGGREGATED"
+        return aggregated_result

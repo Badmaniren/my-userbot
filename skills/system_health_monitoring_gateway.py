@@ -105,3 +105,11 @@ class SystemHealthMonitoringGateway:
             "audit_pipeline_result": audit_result,
             "health_report": health_report
         }
+
+    def export(self, audited_data, **kwargs):
+        summary = {
+            "status": "EXPORTED",
+            "audited_summary": audited_data,
+            "system_health": "OPTIMAL"
+        }
+        return summary

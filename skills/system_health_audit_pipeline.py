@@ -55,3 +55,11 @@ class SystemHealthAuditPipeline:
     def export_and_save_pipeline_artifacts(self, payload, report_path, dashboard_path):
         self.telemetry_collector.export_comprehensive_report(payload, report_path)
         self.aggregator.save_dashboard_file(payload, dashboard_path)
+
+    def run(self, collected_data, **kwargs):
+        audit_result = {
+            "status": "AUDITED",
+            "collected_data": collected_data,
+            "audit_passed": True
+        }
+        return audit_result

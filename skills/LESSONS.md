@@ -234,3 +234,7 @@
 ## system_health_aggregator (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## system_health_aggregator (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

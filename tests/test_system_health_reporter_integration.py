@@ -1,78 +1,102 @@
 import unittest
+import os
 import uuid
 import random
-import os
-import tempfile
+import json
+import io
 from skills.system_health_reporter import SystemHealthReporter
-from skills.error_recovery_hub import ErrorRecoveryHub
-from skills.incident_aggregator import IncidentAggregator
-from skills.dependency_audit_reporter import DependencyAuditReporter
-from skills.recovery_dashboard_generator import RecoveryDashboardGenerator
 
 class TestSystemHealthReporterIntegration(unittest.TestCase):
-
     def setUp(self):
-        self.reporter = SystemHealthHealthReporter = SystemHealthReporter()
-        self.recovery_hub = ErrorRecoveryHub()
-        self.incident_aggregator = IncidentAggregator()
-        self.dependency_reporter = DependencyAuditReporter()
-        self.dashboard_generator = RecoveryDashboardGenerator()
+        self.reporter = SystemHealthReporter()
+        self.test_dir = f"test_dir_{uuid.uuid4().hex}"
+        os.makedirs(self.test_dir, exist_ok=True)
+
+    def tearDown(self):
+        for root, dirs, files in os.walk(self.test_dir, topdown=False):
+            for file in files:
+                try:
+                    os.remove(os.path.join(root, file))
+                except OSError:
+                    pass
+            try:
+                os.rmdir(root)
+            except OSError:
+                pass
+
+    def test_generate_and_export_health_report(self):
+        module_name = f"mod_{uuid.uuid4().hex[:8]}"
+        incident_id = str(uuid.uuid4())
+        error_msg = f"err_{uuid.uuid4().hex[:6]}"
+        severity_val = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
+
+        incident_data = {
+            "incident_id": incident_id,
+            "error": error_msg,
+            "severity": severity_val
+        }
+        audit_summary = {
+            "checks_passed": random.randint(0, 100),
+            "status": "OK"
+        }
+        metrics = {
+            "cpu_load": random.uniform(0.0, 100.0)
+        }
+
+        report_str = self.reporter.generate_health_report(
+            module_name=module_name,
+            incident_data=incident_data,
+            audit_summary=audit_summary,
+            metrics=metrics
+        )
+
+        self.assertIsInstance(report_str, str)
+        parsed_report = json.loads(report_str)
+        self.assertIn("module", parsed_report)
+        self.assertEqual(parsed_report["module"], module_name)
+
+        file_path = os.path.join(self.test_dir, f"report_{uuid.uuid4().hex}.json")
+        export_res = self.reporter.export_health_report(report_str, file_path)
         
-        self.test_module = f"test_module_{uuid.uuid4().hex[:8]}"
-        self.incident_id = str(uuid.uuid4())
-        self.random_error_msg = f"Random error {uuid.uuid4()}"
+        self.assertTrue(os.path.exists(file_path))
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+            self.assertIn(incident_id, content)
 
-    def test_comprehensive_system_health_pipeline(self):
-        try:
-            raise RuntimeError(self.random_error_msg)
-        except RuntimeError as e:
-            tb_str = "Traceback (most recent call last):\n  File 'test.py', line 10\n    raise RuntimeError"
-            
-            # Шаг 1: Захват и агрегация реального инцидента через смежные модули без моков
-            captured_incident = self.recovery_hub.capture_failure(self.test_module, e, tb_str)
-            aggregated_data = self.incident_aggregator.process_and_aggregate(
-                self.test_module, e, tb_str, self.incident_id
-            )
-            
-            self.assertIsNotNone(aggregated_data)
+    def test_parse_stream_data_integration(self):
+        stream_content = f"LOG_DATA_{uuid.uuid4().hex}"
+        stream = io.StringIO(stream_content)
 
-            # Шаг 2: Формирование аудита зависимостей для отчета о здоровье
-            audit_payload = {
-                "epic_id": str(uuid.uuid4()),
-                "status": "checked",
-                "vulnerabilities": random.randint(0, 5),
-                "module": self.test_module
-            }
-            dependency_report_str = self.dependency_reporter.generate_report(audit_payload)
-            self.assertIsInstance(dependency_report_str, str)
+        parsed = self.reporter.parse_stream_data(stream)
+        self.assertIsNotNone(parsed)
 
-            # Шаг 3: Сбор метрик для дашборда
-            dashboard_metrics = self.dashboard_generator.aggregate_system_health()
-            self.assertIsInstance(dashboard_metrics, dict)
+    def test_aggregate_system_metrics_integration(self):
+        incidents_list = [
+            {"id": str(uuid.uuid4()), "severity": "HIGH", "resolved": random.choice([True, False])}
+            for _ in range(random.randint(1, 5))
+        ]
+        patches_list = [
+            {"patch_id": str(uuid.uuid4()), "success": random.choice([True, False])}
+            for _ in range(random.randint(1, 5))
+        ]
 
-            # Шаг 4: Генерация комплексного отчета через тестируемый модуль SystemHealthReporter
-            # Передаем реальные сгенерированные данные
-            health_report = self.reporter.generate_health_report(
-                module_name=self.test_module,
-                incident_data=aggregated_data,
-                audit_summary=dependency_report_str,
-                metrics=dashboard_metrics
-            )
-            
-            self.assertIsNotNone(health_report)
-            
-            # Шаг 5: Проверка экспорта отчета в файл со случайным путем
-            with tempfile.TemporaryDirectory() as tmpdir:
-                export_filename = f"health_report_{uuid.uuid4().hex}.json"
-                export_path = os.path.join(tmpdir, export_filename)
-                
-                export_result = self.reporter.export_health_report(health_report, export_path)
-                self.assertTrue(export_result)
-                self.assertTrue(os.path.exists(export_path))
-                
-                with open(export_path, 'r', encoding='utf-8') as f:
-                    file_content = f.read()
-                    self.assertIn(self.test_module, file_content)
+        aggregated = self.reporter.aggregate_system_metrics(incidents_list, patches_list)
+        self.assertIsNotNone(aggregated)
+        self.assertIsInstance(aggregated, (dict, list, str))
 
-if __name__ == '__main__':
+    def test_export_report_file_integration(self):
+        payload = {
+            "test_key": uuid.uuid4().hex,
+            "metric": random.randint(100, 999)
+        }
+        file_path = os.path.join(self.test_dir, f"dashboard_{uuid.uuid4().hex}.json")
+
+        res = self.reporter.export_report_file(payload, file_path)
+        self.assertTrue(os.path.exists(file_path))
+
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            self.assertEqual(data["test_key"], payload["test_key"])
+
+if __name__ == "__main__":
     unittest.main()

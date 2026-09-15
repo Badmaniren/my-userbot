@@ -61,7 +61,10 @@ class SystemHealthAggregator:
         return self.collect_and_aggregate(*args, **kwargs)
 
     def process_stream(self, stream, path):
-        stream_bytes = stream.read()
+        if hasattr(stream, "read"):
+            stream_bytes = stream.read()
+        else:
+            stream_bytes = stream
         parsed_data = self.dashboard_gen.parse_stream_data(stream_bytes)
         
         if isinstance(parsed_data, (dict, list)):
@@ -69,8 +72,8 @@ class SystemHealthAggregator:
         else:
             payload_to_write = str(parsed_data) if parsed_data is not None else ""
             
-        result = self.dashboard_gen.export_dashboard(payload_to_write, path)
-        return result
+        self.dashboard_gen.export_dashboard(payload_to_write, path)
+        return parsed_data if isinstance(parsed_data, dict) else (parsed_data or {})
 
     def aggregate_system_metrics(self, incidents_list, patches_list):
         return self.reporter.aggregate_system_metrics(incidents_list, patches_list)

@@ -1,67 +1,141 @@
 import unittest
 from unittest.mock import patch, MagicMock
 import io
-import random
+import json
 import uuid
-import string
-from skills.package_spec_parser import parse_package_spec, PackageSpecParser
+import random
+from skills.package_spec_parser import (
+    PackageSpec,
+    parse_package_spec,
+    PackageSpecParser,
+    PyPIClient
+)
 
 class TestPackageSpecParser(unittest.TestCase):
 
-    def setUp(self):
-        self.random_pkg_name = f"pkg-{uuid.uuid4().hex[:8]}"
-        self.random_version = f"{random.randint(0, 9)}.{random.randint(0, 9)}.{random.randint(0, 9)}"
-        self.random_extra = ''.join(random.choices(string.ascii_lowercase, k=6))
-        self.random_marker = f"python_version < '{random.randint(3, 4)}.{random.randint(0, 9)}'"
+    def test_package_spec_init_and_get(self):
+        rand_name = f"pkg-{uuid.uuid4().hex[:8]}"
+        rand_version = f">={random.randint(1, 3)}.{random.randint(0, 9)}"
+        rand_extra = f"extra-{uuid.uuid4().hex[:6]}"
+        rand_marker = f"python_version < '{random.randint(3, 8)}'"
 
-    def test_parse_simple_spec_randomized(self):
-        spec_string = f"{self.random_pkg_name} >= {self.random_version}"
+        spec = PackageSpec(
+            name=rand_name,
+            version=rand_version,
+            extras=[rand_extra],
+            marker=rand_marker
+        )
+
+        self.assertEqual(spec.name, rand_name)
+        self.assertEqual(spec.version, rand_version)
+        self.assertEqual(spec.extras, [rand_extra])
+        self.assertEqual(spec.marker, rand_marker)
+        self.assertEqual(spec.get("name"), rand_name)
+        self.assertEqual(spec.get("version"), rand_version)
+        self.assertEqual(spec.get("extras"), [rand_extra])
+        self.assertEqual(spec.get("marker"), rand_marker)
+        self.assertIsNone(spec.get("non_existent_key"))
+
+    def test_parse_package_spec_empty(self):
+        self.assertIsNone(parse_package_spec(""))
+        self.assertIsNone(parse_package_spec("   "))
+        self.assertIsNone(parse_package_spec(None))
+
+    @patch("skills.package_spec_parser.Requirement")
+    def test_parse_package_spec_valid(self, mock_requirement_class):
+        rand_name = f"lib-{uuid.uuid4().hex[:6]}"
+        rand_ver_spec = f"=={random.randint(1, 5)}.0"
+        rand_marker_str = f"sys_platform == '{uuid.uuid4().hex[:4]}'"
+        rand_extra_val = f"feat-{uuid.uuid4().hex[:4]}"
+
+        mock_req_instance = MagicMock()
+        mock_req_instance.name = rand_name
+        mock_req_instance.specifier = rand_ver_spec
+        mock_req_instance.marker = rand_marker_str
+        mock_req_instance.extras = {rand_extra_val}
+        mock_requirement_class.return_value = mock_req_instance
+
+        input_str = f"({rand_name} {rand_ver_spec} ; {rand_marker_str})"
+        result = parse_package_spec(input_str)
+
+        mock_requirement_class.assert_called_once_with(f"{rand_name} {rand_ver_spec} ; {rand_marker_str}")
+        self.assertIsInstance(result, PackageSpec)
+        self.assertEqual(result.name, rand_name)
+        self.assertEqual(result.version, str(rand_ver_spec))
+        self.assertEqual(result.marker, str(rand_marker_str))
+        self.assertIn(rand_extra_val, result.extras)
+
+    def test_package_spec_parser_parse(self):
         parser = PackageSpecParser()
-        result = parser.parse(spec_string) if hasattr(parser, 'parse') else parse_package_spec(spec_string)
-        
-        self.assertIsNotNone(result)
-        self.assertEqual(result.get('name') or result.name, self.random_pkg_name)
-        self.assertIn(self.random_version, str(result.get('version') or result.version))
+        rand_name = f"module-{uuid.uuid4().hex[:6]}"
+        with patch("skills.package_spec_parser.Requirement") as mock_req:
+            mock_instance = MagicMock()
+            mock_instance.name = rand_name
+            mock_instance.specifier = ""
+            mock_instance.marker = ""
+            mock_instance.extras = []
+            mock_req.return_value = mock_instance
 
-    def test_parse_spec_with_extras_and_markers(self):
-        complex_spec = f"{self.random_pkg_name}[{self.random_extra}] == {self.random_version}; {self.random_marker}"
-        
+            res = parser.parse(rand_name)
+            self.assertIsInstance(res, PackageSpec)
+            self.assertEqual(res.name, rand_name)
+
+    def test_package_spec_parser_parse_stream(self):
         parser = PackageSpecParser()
-        result = parser.parse(complex_spec) if hasattr(parser, 'parse') else parse_package_spec(complex_spec)
-        
-        self.assertIsNotNone(result)
-        name_val = result.get('name') if isinstance(result, dict) else result.name
-        extras_val = result.get('extras') if isinstance(result, dict) else result.extras
-        marker_val = result.get('marker') if isinstance(result, dict) else result.marker
+        rand_names = [f"dep-{uuid.uuid4().hex[:6]}" for _ in range(3)]
+        stream_lines = [
+            f"   \n",
+            f"{rand_names[0]}\n",
+            f"b'{rand_names[1]}'\n".encode('utf-8'),
+            f"({rand_names[2]})\n"
+        ]
 
-        self.assertEqual(name_val, self.random_pkg_name)
-        self.assertIn(self.random_extra, extras_val)
-        self.assertIn(self.random_marker, str(marker_val))
+        with patch("skills.package_spec_parser.Requirement") as mock_req:
+            def side_effect(arg):
+                m = MagicMock()
+                clean_arg = arg.strip()
+                if clean_arg.startswith('b\''):
+                    clean_arg = clean_arg[2:-1]
+                if clean_arg.startswith('(') and clean_arg.endswith(')'):
+                    clean_arg = clean_arg[1:-1].strip()
+                m.name = clean_arg
+                m.specifier = None
+                m.marker = None
+                m.extras = []
+                return m
+            mock_req.side_effect = side_effect
 
-    def test_parser_with_io_stream_chaos(self):
-        stream_data = f"{self.random_pkg_name}=={self.random_version}\n".encode('utf-8')
-        mock_stream = io.BytesIO(stream_data)
+            results = parser.parse_stream(stream_lines)
+            self.assertEqual(len(results), 3)
+            self.assertEqual(results[0].name, rand_names[0])
+            self.assertEqual(results[1].name, rand_names[1])
+            self.assertEqual(results[2].name, rand_names[2])
 
-        if hasattr(PackageSpecParser, 'parse_stream'):
-            parser = PackageSpecParser()
-            results = parser.parse_stream(mock_stream)
-            self.assertTrue(len(results) > 0)
-            found = any(r.get('name') == self.random_pkg_name for r in results) if isinstance(results[0], dict) else any(r.name == self.random_pkg_name for r in results)
-            self.assertTrue(found)
-        else:
-            line = mock_stream.readline().decode('utf-8').strip()
-            result = parse_package_spec(line)
-            self.assertIsNotNone(result)
+    def test_pypi_client_parse_stream_data_bytes(self):
+        rand_key = uuid.uuid4().hex
+        rand_val = uuid.uuid4().hex
+        payload = json.dumps({rand_key: rand_val}).encode('utf-8')
+        stream = io.BytesIO(payload)
 
-    def test_invalid_spec_raises_or_returns_none(self):
-        garbage_input = uuid.uuid4().hex + '@@@invalid##spec$$$'
-        parser = PackageSpecParser()
-        
-        try:
-            res = parser.parse(garbage_input) if hasattr(parser, 'parse') else parse_package_spec(garbage_input)
-            self.assertTrue(res is None or isinstance(res, dict) or hasattr(res, 'name'))
-        except Exception:
-            pass
+        client = PyPIClient()
+        data = client.parse_stream_data(stream)
+        self.assertIsInstance(data, dict)
+        self.assertEqual(data.get(rand_key), rand_val)
 
-if __name__ == '__main__':
-    unittest.main()
+    def test_pypi_client_parse_stream_data_string(self):
+        rand_key = uuid.uuid4().hex
+        rand_val = uuid.uuid4().hex
+        payload_str = json.dumps({rand_key: rand_val})
+        stream = io.BytesIO(payload_str.encode('utf-8'))
+
+        class StringReaderStream:
+            def __init__(self, content):
+                self.content = content
+            def read(self):
+                return self.content
+
+        custom_stream = StringReaderStream(payload_str)
+        client = PyPIClient()
+        data = client.parse_stream_data(custom_stream)
+        self.assertIsInstance(data, dict)
+        self.assertEqual(data.get(rand_key), rand_val)

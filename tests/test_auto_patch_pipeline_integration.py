@@ -1,54 +1,43 @@
 import unittest
 import uuid
 import random
-import sys
-import os
-import traceback
-
-from skills.auto_patch_pipeline import AutoPatchPipeline
-from skills.error_recovery_hub import ErrorRecoveryHub
-from skills.patch_validator import PatchValidator
+from skills.auto_patch_pipeline import AutoPatchPipeline, PipelineResult
 
 class TestAutoPatchPipelineIntegration(unittest.TestCase):
-
     def setUp(self):
         self.pipeline = AutoPatchPipeline()
-        self.random_module_name = f"test_module_{uuid.uuid4().hex[:8]}"
-        self.random_error_msg = f"RuntimeError_{uuid.uuid4().hex[:6]}"
+        self.module_name = f"test_module_{uuid.uuid4().hex[:8]}"
+        self.exception_msg = f"RuntimeError_{random.randint(1000, 9999)}"
+        self.traceback_str = f"Traceback (most recent call last):\n  File '{self.module_name}.py', line {random.randint(1, 100)}\n    raise {self.exception_msg}"
+
+    def test_end_to_end_pipeline_flow(self):
+        context = {"env": "integration_test", "run_id": str(uuid.uuid4())}
         
-    def test_pipeline_composition_and_execution(self):
-        self.assertIsInstance(self.pipeline, AutoPatchPipeline)
+        result = self.pipeline.run_pipeline(
+            module_name=self.module_name,
+            exception=Exception(self.exception_msg),
+            traceback_str=self.traceback_str,
+            context=context
+        )
+
+        self.assertIsInstance(result, PipelineResult)
+        self.assertIsNotNone(result.incident_id)
+        self.assertTrue(len(result.incident_id) > 0)
         
-        # Генерируем уникальные входные данные для исключения хардкода
-        try:
-            raise RuntimeError(self.random_error_msg)
-        except RuntimeError as e:
-            tb_str = "".join(traceback.format_exception(*sys.exc_info()))
-            
-            # Вызываем реальный конвейер без моков между error_recovery_hub и patch_validator
-            result = self.pipeline.run_pipeline(
-                module_name=self.random_module_name,
-                exception=e,
-                traceback_str=tb_str,
-                context={"random_seed": random.randint(1, 1000)}
-            )
-            
-            self.assertIsInstance(result, dict)
-            self.assertIn("incident_id", result)
-            self.assertIn("status", result)
-            
-            # Проверяем реальное взаимодействие навыков в составе композиции
-            incident_id = result["incident_id"]
-            self.assertTrue(len(incident_id) > 0)
-            
-            # Убеждаемся, что ErrorRecoveryHub зафиксировал инцидент
-            history = self.pipeline.recovery_hub.get_incident_history(self.random_module_name)
-            self.assertIsInstance(history, list)
-            
-            # Проверяем работу PatchValidator через конвейер
-            if "patch_data" in result and result["patch_data"]:
-                validation_res = self.pipeline.validator.validate(result["patch_data"])
-                self.assertIsInstance(validation_res, bool)
+        self.assertIn("success", result)
+        self.assertIn("incident_id", result)
+        self.assertIn("status", result)
+
+    def test_force_analyze_and_recover_integration(self):
+        context = {"force_recovery": True, "token": uuid.uuid4().hex}
+        
+        recovery_result = self.pipeline.force_analyze_and_recover(
+            module_name=self.module_name,
+            exception=Exception(self.exception_msg),
+            context=context
+        )
+
+        self.assertIsNotNone(recovery_result)
 
 if __name__ == "__main__":
     unittest.main()

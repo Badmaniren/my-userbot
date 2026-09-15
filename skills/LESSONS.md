@@ -138,3 +138,6 @@
 ## patch_auto_executor (compose) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main
+
+## auto_patch_pipeline (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

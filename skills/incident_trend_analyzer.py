@@ -25,6 +25,14 @@ class IncidentTrendAnalyzer:
             "trend": "stable"
         }
 
+    def determine_escalation_tier(self, failure_history_count):
+        count = failure_history_count or 0
+        if count >= 10:
+            return "tier_3"
+        elif count >= 5:
+            return "tier_2"
+        return "tier_1"
+
 class RecoveryDashboardGenerator:
     def __init__(self):
         pass

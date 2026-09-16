@@ -20,7 +20,12 @@ class IncidentSeverityEvaluator:
         else:
             return "LOW"
 
-    def evaluate(self, module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
+    def evaluate(self, module_name: str = None, exception: Exception = None, traceback_str: str = None, incident_id: str = None):
+        if isinstance(module_name, (int, float)):
+            # Fallback when single numeric score is passed
+            return module_name
+        if module_name is None:
+            module_name = "default"
         agg_result = self.aggregator.process_and_aggregate(
             module_name, exception, traceback_str, incident_id
         )

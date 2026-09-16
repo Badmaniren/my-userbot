@@ -5,6 +5,23 @@ class IncidentAggregator:
     def __init__(self):
         self.hub = ErrorRecoveryHub()
         self.collector = PatchMetricCollector()
+        self.incidents = {}
+
+    def get_incident_details(self, incident_id):
+        return self.incidents.get(incident_id, {})
+
+    def update_status(self, incident_id, status, **kwargs):
+        if incident_id not in self.incidents:
+            self.incidents[incident_id] = {}
+        self.incidents[incident_id]["status"] = status
+        self.incidents[incident_id].update(kwargs)
+        return self.incidents[incident_id]
+
+    def ingest_raw_stream(self, stream_payload):
+        incident_id = stream_payload.get("stream_id") or stream_payload.get("incident_id")
+        if incident_id:
+            self.incidents[incident_id] = dict(stream_payload)
+        return {"ingested": True, "payload": stream_payload}
 
     def process_and_aggregate(self, module_name, exception, traceback_str, incident_id=None):
         if not incident_id:

@@ -62,7 +62,7 @@ class IncidentSLATracker:
             elapsed = (current_time - created_at).total_seconds()
 
             status = None
-            if elapsed > sla_limit:
+            if elapsed >= sla_limit:
                 status = "BREACHED"
                 if notification_bridge:
                     notification_bridge.notify_sla_breach(incident_id=incident_id, severity=severity)

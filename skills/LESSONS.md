@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-
-## patch_auto_executor (compose) — раундов: 2
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: успешно прошёл тесты и влит в main
+атус: успешно прошёл тесты и влит в main
 
 ## auto_patch_pipeline (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
@@ -315,6 +312,9 @@
 
 ## incident_knowledge_base_searcher (create) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## incident_post_mortem_service (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## incident_post_mortem_service (refactor) — раундов: 1

@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-дов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## system_health_audit_pipeline (compose) — раундов: 1
+pose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## system_health_audit_pipeline (refactor) — раундов: 4
@@ -283,3 +279,7 @@
 ## incident_sla_breach_analyzer (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## incident_sla_breach_predictor (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: успешно прошёл тесты и влит в main

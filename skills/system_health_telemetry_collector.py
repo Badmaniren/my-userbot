@@ -6,6 +6,11 @@ class SystemHealthTelemetryCollector:
     def __init__(self):
         self.aggregator = SystemHealthAggregator()
         self.reporter = SystemHealthReporter()
+        self.collected_data = []
+
+    def collect(self, telemetry_data):
+        self.collected_data.append(telemetry_data)
+        return telemetry_data
 
     def collect_and_aggregate_telemetry(
         self,

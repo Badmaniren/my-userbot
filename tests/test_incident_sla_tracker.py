@@ -146,11 +146,11 @@ class TestIncidentSLATrackerIntegrationSafe(unittest.TestCase):
             warning_threshold_pct=0.5
         )
         
-        created_time = datetime.now() - timedelta(seconds=600)
+        created_time = datetime.now() - timedelta(seconds=1100)
         tracker.register_incident(random_inc_id, severity_level, created_time)
         
         with patch("skills.incident_sla_tracker.datetime") as mock_dt:
-            fixed_now = created_time + timedelta(seconds=600)
+            fixed_now = created_time + timedelta(seconds=1100)
             mock_dt.now.return_value = fixed_now
             mock_dt.fromtimestamp = datetime.fromtimestamp
             

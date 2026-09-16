@@ -5,6 +5,11 @@ class IncidentAggregator:
     def __init__(self):
         self.hub = ErrorRecoveryHub()
         self.collector = PatchMetricCollector()
+        self.incidents = {}
+
+    def register_incident(self, incident_id, data=None):
+        self.incidents[incident_id] = data or {}
+        return self.incidents[incident_id]
 
     def process_and_aggregate(self, module_name, exception, traceback_str, incident_id=None):
         if not incident_id:

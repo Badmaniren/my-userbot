@@ -7,6 +7,18 @@ class SystemHealthAuditPipeline:
         self.telemetry_collector = SystemHealthTelemetryCollector()
         self.aggregator = SystemHealthAggregator()
 
+    def process(self, report_path):
+        import os
+        import json
+        if os.path.exists(report_path):
+            try:
+                with open(report_path, 'r') as f:
+                    data = json.load(f)
+                return {"status": "success", "data": data}
+            except Exception as e:
+                return {"status": "error", "error": str(e)}
+        return {"status": "success", "report_path": report_path}
+
     def run_audit_pipeline(
         self,
         module_name,

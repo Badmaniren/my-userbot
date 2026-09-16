@@ -16,14 +16,15 @@ class IncidentNotificationBridge:
         self.severity_evaluator = severity_evaluator or IncidentSeverityEvaluator()
         self.processed_incidents = {}
 
-    def process_incident(self, incident_data, channel=None, template=None):
+    def process_incident(self, incident_data, channel=None, template=None, severity=None):
         incident_id = incident_data.get("incident_id") or incident_data.get("id")
         
         current_time = time.time()
-        if incident_id in self.processed_incidents:
+        if incident_id and incident_id in self.processed_incidents:
             return False
         
-        self.processed_incidents[incident_id] = current_time
+        if incident_id:
+            self.processed_incidents[incident_id] = current_time
 
         rendered_message = None
         if template and hasattr(self.template_engine, "render"):
@@ -46,8 +47,11 @@ class IncidentNotificationBridge:
     def ingest_stream(self, file_stream, channel=None):
         content = file_stream.read()
         if isinstance(content, bytes):
-            content = content.decode('utf-8')
-        data = json.loads(content)
+            content = content.decode('utf-8', errors='ignore')
+        try:
+            data = json.loads(content)
+        except Exception:
+            data = {"message": content, "raw_content": content}
         return self.process_incident(data, channel=channel)
 
     def dispatch_critical_incident(self, aggregated_incident):

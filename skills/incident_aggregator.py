@@ -5,6 +5,15 @@ class IncidentAggregator:
     def __init__(self):
         self.hub = ErrorRecoveryHub()
         self.collector = PatchMetricCollector()
+        self.storage = {}
+        self.incidents = {}
+
+    def get_incident(self, incident_id):
+        if hasattr(self, "storage") and incident_id in self.storage:
+            return self.storage[incident_id]
+        if hasattr(self, "incidents") and incident_id in self.incidents:
+            return self.incidents[incident_id]
+        return None
 
     def process_and_aggregate(self, module_name, exception, traceback_str, incident_id=None):
         if not incident_id:

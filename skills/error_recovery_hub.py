@@ -11,6 +11,16 @@ class ErrorRecoveryHub:
         self.incidents = {}
         self.history = {}
         self.logs = {}
+        self.logs_storage = {}
+
+    def get_recovery_logs(self, incident_id):
+        if hasattr(self, "logs_storage") and incident_id in self.logs_storage:
+            logs = self.logs_storage[incident_id]
+            return logs if isinstance(logs, list) else [logs]
+        if hasattr(self, "logs") and incident_id in self.logs:
+            logs = self.logs[incident_id]
+            return logs if isinstance(logs, list) else [logs]
+        return []
 
     def capture_failure(self, module_name, exception, traceback_str=None):
         incident_id = str(uuid.uuid4())
@@ -136,3 +146,16 @@ class ErrorRecoveryHub:
             "patch_generated": True,
             "patch_path": str(patch_file_path)
         }
+
+
+def fetch_recovery_logs(incident_id, hub=None):
+    if hub is not None:
+        if hasattr(hub, "get_recovery_logs"):
+            return hub.get_recovery_logs(incident_id)
+        if hasattr(hub, "logs_storage") and incident_id in hub.logs_storage:
+            logs = hub.logs_storage[incident_id]
+            return logs if isinstance(logs, list) else [logs]
+        if hasattr(hub, "logs") and incident_id in hub.logs:
+            logs = hub.logs[incident_id]
+            return logs if isinstance(logs, list) else [logs]
+    return []

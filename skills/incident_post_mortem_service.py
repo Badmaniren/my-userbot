@@ -14,9 +14,19 @@ class IncidentPostMortemService:
         self.report_exporter = RecoveryReportExporter()
 
     def _fetch_incident_metrics(self, incident_id: str) -> Dict[str, Any]:
+        if hasattr(self.incident_aggregator, "aggregate"):
+            res = self.incident_aggregator.aggregate(incident_id)
+            if isinstance(res, dict):
+                return res
         return {}
 
     def _fetch_recovery_logs(self, incident_id: str) -> io.BytesIO:
+        if hasattr(self.error_recovery_hub, "get_logs"):
+            logs = self.error_recovery_hub.get_logs(incident_id)
+            if isinstance(logs, bytes):
+                return io.BytesIO(logs)
+            if isinstance(logs, str):
+                return io.BytesIO(logs.encode('utf-8'))
         return io.BytesIO(b"")
 
     def _parse_recovery_logs(self, log_stream: io.BytesIO) -> List[str]:
@@ -60,7 +70,7 @@ class IncidentPostMortemService:
             if error_code and error_code not in root_cause:
                 root_cause = f"Error code: {error_code}. " + root_cause
             
-            return {
+            report = {
                 "report_id": str(uuid.uuid4()),
                 "incident_id": incident_id,
                 "timeline": [{"event": "incident_started"}, {"event": "recovery_completed"}],
@@ -68,6 +78,9 @@ class IncidentPostMortemService:
                 "metrics_snapshot": metrics_data,
                 "recovery_logs_summary": " ".join(parsed_logs)
             }
+            if hasattr(self.report_exporter, "export"):
+                self.report_exporter.export(report)
+            return report
         else:
             incident_id = incident
             metrics_data = self._fetch_incident_metrics(incident_id)
@@ -75,10 +88,13 @@ class IncidentPostMortemService:
             parsed_logs = self._parse_recovery_logs(logs_stream)
             root_cause = self._evaluate_root_cause(metrics_data, parsed_logs)
             
-            return {
+            report = {
                 "incident_id": incident_id,
                 "timeline": [],
                 "root_cause": root_cause,
                 "metrics_snapshot": metrics_data,
                 "recovery_logs_summary": " ".join(parsed_logs)
             }
+            if hasattr(self.report_exporter, "export"):
+                self.report_exporter.export(report)
+            return report

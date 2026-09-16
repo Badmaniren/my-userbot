@@ -5,6 +5,7 @@ from typing import Dict, Any, List, Union
 from skills.incident_aggregator import IncidentAggregator
 from skills.error_recovery_hub import ErrorRecoveryHub
 from skills.recovery_report_exporter import RecoveryReportExporter
+from skills.incident_knowledge_base_searcher import IncidentKnowledgeBaseSearcher
 
 
 class IncidentPostMortemService:
@@ -12,6 +13,7 @@ class IncidentPostMortemService:
         self.incident_aggregator = IncidentAggregator()
         self.error_recovery_hub = ErrorRecoveryHub()
         self.report_exporter = RecoveryReportExporter()
+        self.archived_reports: List[Dict[str, Any]] = []
         
         if not hasattr(self.incident_aggregator, "aggregate"):
             setattr(self.incident_aggregator, "aggregate", lambda incident_id: {})
@@ -21,6 +23,11 @@ class IncidentPostMortemService:
 
         if not hasattr(self.report_exporter, "export"):
             setattr(self.report_exporter, "export", lambda report: None)
+
+    def archive_report(self, report: Dict[str, Any]) -> None:
+        if report not in self.archived_reports:
+            self.archived_reports.append(report)
+        IncidentKnowledgeBaseSearcher.archive_report_global(report)
 
     def _fetch_incident_metrics(self, incident_id: str) -> Dict[str, Any]:
         if not hasattr(self.incident_aggregator, "aggregate"):
@@ -63,6 +70,7 @@ class IncidentPostMortemService:
     def generate_report(self, incident: Union[str, Dict[str, Any]], recovery_data: Dict[str, Any] = None) -> Dict[str, Any]:
         if isinstance(incident, dict):
             incident_id = incident.get("incident_id", str(uuid.uuid4()))
+            title = incident.get("title", incident.get("summary", f"Incident {incident_id}"))
             metrics_data = incident.get("metrics", {})
             
             if recovery_data and isinstance(recovery_data, dict):
@@ -82,10 +90,14 @@ class IncidentPostMortemService:
                 root_cause = f"Error code: {error_code}. " + root_cause
             
             report = {
+                "id": str(uuid.uuid4()),
+                "title": title,
+                "summary": f"Post-mortem summary for {title}",
                 "report_id": str(uuid.uuid4()),
                 "incident_id": incident_id,
                 "timeline": [{"event": "incident_started"}, {"event": "recovery_completed"}],
                 "root_cause_analysis": root_cause,
+                "root_cause": root_cause,
                 "metrics_snapshot": metrics_data,
                 "recovery_logs_summary": " ".join(parsed_logs)
             }
@@ -93,16 +105,26 @@ class IncidentPostMortemService:
                 self.report_exporter.export(report)
             return report
         else:
-            incident_id = incident
+            incident_id = str(incident)
+            title = incident_id
             metrics_data = self._fetch_incident_metrics(incident_id)
             logs_stream = self._fetch_recovery_logs(incident_id)
             parsed_logs = self._parse_recovery_logs(logs_stream)
             root_cause = self._evaluate_root_cause(metrics_data, parsed_logs)
             
+            if recovery_data and isinstance(recovery_data, str):
+                summary_str = recovery_data
+            else:
+                summary_str = f"Post-mortem report for {title}"
+
             report = {
+                "id": str(uuid.uuid4()),
+                "title": title,
+                "summary": summary_str,
                 "incident_id": incident_id,
                 "timeline": [],
                 "root_cause": root_cause,
+                "root_cause_analysis": root_cause,
                 "metrics_snapshot": metrics_data,
                 "recovery_logs_summary": " ".join(parsed_logs)
             }

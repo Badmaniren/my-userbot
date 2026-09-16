@@ -16,6 +16,13 @@ class IncidentNotificationBridge:
         self.severity_evaluator = severity_evaluator or IncidentSeverityEvaluator()
         self.processed_incidents = {}
 
+    def transform(self, incident_data):
+        if isinstance(incident_data, dict):
+            res = dict(incident_data)
+            res["bridged"] = True
+            return res
+        return {"data": incident_data, "bridged": True}
+
     def process_incident(self, incident_data, channel=None, template=None):
         incident_id = incident_data.get("incident_id") or incident_data.get("id")
         
@@ -83,3 +90,4 @@ class IncidentNotificationBridge:
 
 
 IncidentIncidentNotificationBridge = IncidentNotificationBridge
+incident_notification_bridge = IncidentNotificationBridge

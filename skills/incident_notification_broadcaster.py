@@ -4,9 +4,17 @@ from skills.notification_channel_dispatcher import NotificationChannelDispatcher
 
 
 class IncidentNotificationBroadcaster:
-    def __init__(self, bridge: IncidentNotificationBridge, dispatcher: NotificationChannelDispatcher):
-        self.bridge = bridge
-        self.dispatcher = dispatcher
+    def __init__(self, bridge: IncidentNotificationBridge = None, dispatcher: NotificationChannelDispatcher = None):
+        if isinstance(bridge, NotificationChannelDispatcher) and dispatcher is None:
+            dispatcher = bridge
+            bridge = None
+        self.bridge = bridge if bridge is not None else IncidentNotificationBridge()
+        self.dispatcher = dispatcher if dispatcher is not None else NotificationChannelDispatcher()
+
+    def broadcast(self, payload: dict) -> bool:
+        if self.dispatcher and hasattr(self.dispatcher, "broadcast"):
+            self.dispatcher.broadcast(payload)
+        return True
 
     def broadcast_incident(self, incident_id: str, level: str, message: str, channel: str):
         payload = self.dispatcher.format_payload(level, incident_id, message)
@@ -42,3 +50,6 @@ class IncidentNotificationBroadcaster:
             res = self.bridge.process_incident(payload, channel_name, None)
             results[channel_name] = res
         return results
+
+
+incident_notification_broadcaster = IncidentNotificationBroadcaster

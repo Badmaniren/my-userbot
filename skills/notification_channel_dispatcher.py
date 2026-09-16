@@ -60,3 +60,6 @@ class NotificationChannelDispatcher:
             "incident_id": incident_id,
             "message": message,
         }
+
+
+notification_channel_dispatcher = NotificationChannelDispatcher

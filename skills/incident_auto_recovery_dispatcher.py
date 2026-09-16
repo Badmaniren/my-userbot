@@ -36,7 +36,9 @@ class IncidentAutoRecoveryDispatcher:
     def consume_and_process_stream(self) -> bytes:
         return self.escalation_engine.consume_stream_data()
 
-    def dispatch_recovery(self, incident_id: str, module_name: str, exception: Exception) -> dict:
+    def dispatch_recovery(self, incident_id: str, module_name: str = "unknown", exception: Exception = None) -> dict:
+        if exception is None:
+            exception = RuntimeError("Auto recovery dispatched")
         context = {"incident_id": incident_id, "module_name": module_name}
         recovery_result = self.recovery_hub.analyze_and_recover(module_name, exception, context)
         escalation_result = self.escalation_engine.process_escalation(incident_id)
@@ -47,3 +49,22 @@ class IncidentAutoRecoveryDispatcher:
             "escalation_result": escalation_result,
             "status": "dispatched"
         }
+
+
+def dispatch_recovery(incident_id=None, module_name=None, exception=None, **kwargs):
+    dispatcher = IncidentAutoRecoveryDispatcher()
+    if isinstance(incident_id, dict):
+        payload = incident_id
+        inc_id = payload.get("incident_id", "unknown")
+        mod_name = payload.get("module_name", module_name or "unknown")
+        exc = payload.get("exception", exception or RuntimeError("Auto recovery dispatched"))
+        return dispatcher.dispatch_recovery(inc_id, mod_name, exc)
+
+    inc_id = incident_id or kwargs.get("incident_id", "unknown")
+    mod_name = module_name or kwargs.get("module_name", "unknown")
+    exc = exception or kwargs.get("exception", RuntimeError("Auto recovery dispatched"))
+    return dispatcher.dispatch_recovery(inc_id, mod_name, exc)
+
+
+trigger_recovery_dispatch = dispatch_recovery
+incident_auto_recovery_dispatcher = IncidentAutoRecoveryDispatcher

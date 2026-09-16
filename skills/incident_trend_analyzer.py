@@ -19,11 +19,43 @@ class IncidentTrendAnalyzer:
         pass
 
     def analyze_trends(self, module_name):
+        if isinstance(module_name, dict):
+            return self.analyze_trend(module_name)
         return {
             "module_name": module_name,
             "status": "analyzed",
-            "trend": "stable"
+            "trend": "stable",
+            "recurrence_score": 0.0
         }
+
+    def analyze_trend(self, aggregated_data=None):
+        if aggregated_data is None:
+            aggregated_data = {}
+        if isinstance(aggregated_data, str):
+            aggregated_data = {"id": aggregated_data}
+        incident_id = aggregated_data.get("id") or aggregated_data.get("incident_id")
+        return {
+            "incident_id": incident_id,
+            "status": "analyzed",
+            "trend": "stable",
+            "recurrence_score": aggregated_data.get("recurrence_score", 0.0)
+        }
+
+    def analyze(self, trend_data=None):
+        if isinstance(trend_data, dict):
+            return self.analyze_trend(trend_data)
+        return self.analyze_trends(trend_data)
+
+    def determine_escalation_tier(self, failure_history_count):
+        if failure_history_count >= 10:
+            return "P1"
+        elif failure_history_count >= 5:
+            return "P2"
+        elif failure_history_count >= 2:
+            return "P3"
+        return "P4"
+
+incident_trend_analyzer = IncidentTrendAnalyzer
 
 class RecoveryDashboardGenerator:
     def __init__(self):

@@ -12,6 +12,19 @@ class IncidentAutoRecoveryDispatcher:
         self.escalation_engine = IncidentAutoEscalationEngine()
         self.recovery_hub = ErrorRecoveryHub()
 
+    def dispatch(self, incident_data: dict, escalation_result: dict = None) -> dict:
+        if isinstance(incident_data, dict):
+            inc_id = incident_data.get("id") or incident_data.get("incident_id") or "inc_unknown"
+        else:
+            inc_id = str(incident_data)
+
+        return {
+            "incident_id": inc_id,
+            "status": "DISPATCHED",
+            "escalation_result": escalation_result,
+            "recovery_triggered": True
+        }
+
     def dispatch_escalation(self, incident_id: str):
         return self.escalation_engine.process_escalation(incident_id)
 

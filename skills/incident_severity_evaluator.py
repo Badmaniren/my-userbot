@@ -20,9 +20,20 @@ class IncidentSeverityEvaluator:
         else:
             return "LOW"
 
-    def evaluate(self, module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
+    def evaluate(self, module_name: str = None, exception: Exception = None, traceback_str: str = "", incident_id: str = None):
+        if isinstance(module_name, dict):
+            incident_data = module_name
+            sev = self.calculate_severity_score(incident_data)
+            inc_id = incident_data.get("id") or incident_data.get("incident_id") or "inc_unknown"
+            payload = self.template_engine.generate_notification_payload(sev, inc_id, incident_data)
+            return {
+                "incident_id": inc_id,
+                "severity": sev,
+                "payload": payload
+            }
+
         agg_result = self.aggregator.process_and_aggregate(
-            module_name, exception, traceback_str, incident_id
+            module_name or "unknown", exception or Exception("unknown"), traceback_str, incident_id
         )
         
         severity = self.calculate_severity_score(agg_result)

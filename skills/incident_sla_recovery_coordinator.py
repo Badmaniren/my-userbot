@@ -1,3 +1,4 @@
+import datetime
 from skills.incident_sla_tracker import IncidentSLATracker
 from skills.incident_auto_recovery_dispatcher import IncidentAutoRecoveryDispatcher
 
@@ -56,15 +57,20 @@ class IncidentSLARecoveryCoordinator:
 
     def get_current_time_to_breach(self, incident_id, current_time):
         if hasattr(self.sla_tracker, 'get_time_to_breach'):
-            try:
-                return self.sla_tracker.get_time_to_breach(incident_id, current_time)
-            except AttributeError:
-                import datetime
-                if isinstance(current_time, (int, float)):
-                    dt_current = datetime.datetime.fromtimestamp(current_time, datetime.timezone.utc)
-                else:
-                    dt_current = current_time
-                return self.sla_tracker.get_time_to_breach(incident_id, dt_current)
+            # Нормализуем current_time и отслеживаемое время создания инцидента, 
+            # чтобы избежать TypeError/AttributeError из-за смешения float таймстампов и datetime объектов.
+            incident_data = getattr(self.sla_tracker, 'incidents', {}).get(incident_id)
+            if incident_data and 'created_at' in incident_data:
+                created_at = incident_data['created_at']
+                
+                # Приводим оба к datetime, если возможно, либо к float
+                if isinstance(created_at, datetime.datetime) and isinstance(current_time, (int, float)):
+                    current_time = datetime.datetime.fromtimestamp(current_time, datetime.timezone.utc)
+                elif isinstance(created_at, (int, float)) and isinstance(current_time, datetime.datetime):
+                    created_at = datetime.datetime.fromtimestamp(created_at, datetime.timezone.utc)
+                    incident_data['created_at'] = created_at
+            
+            return self.sla_tracker.get_time_to_breach(incident_id, current_time)
         return 0.0
 
     def coordinate_recovery_for_incident(self, incident_id, module_name, exception):

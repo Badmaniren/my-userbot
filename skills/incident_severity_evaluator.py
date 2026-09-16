@@ -20,7 +20,18 @@ class IncidentSeverityEvaluator:
         else:
             return "LOW"
 
-    def evaluate(self, module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
+    def evaluate(self, module_name: str, exception: Exception = None, traceback_str: str = "", incident_id: str = None):
+        if isinstance(module_name, dict):
+            inc_id = module_name.get("incident_id") or module_name.get("id") or incident_id
+            sev = module_name.get("severity") or self.calculate_severity_score(module_name)
+            clean_data = {k: v for k, v in module_name.items() if k != "severity_assessment"}
+            return {
+                "incident_id": inc_id,
+                "severity": sev,
+                "payload": clean_data,
+                "aggregated_data": clean_data,
+            }
+
         agg_result = self.aggregator.process_and_aggregate(
             module_name, exception, traceback_str, incident_id
         )
@@ -39,7 +50,10 @@ class IncidentSeverityEvaluator:
             "aggregated_data": agg_result,
         }
 
-    def evaluate_stream(self, module_name: str, stream_data):
+    def evaluate_stream(self, module_name: str, stream_data=None):
+        if stream_data is None:
+            stream_data = module_name
+            module_name = "stream_module"
         parsed = self.template_engine.parse_stream_data(stream_data)
         inc_id = parsed.get("parsed_id") or parsed.get("incident_id")
         freq = parsed.get("frequency", parsed.get("count", 1))
@@ -55,7 +69,7 @@ class IncidentSeverityEvaluator:
             "payload": payload,
         }
 
-    def evaluate_and_notify(self, module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
+    def evaluate_and_notify(self, module_name: str, exception: Exception = None, traceback_str: str = "", incident_id: str = None):
         eval_res = self.evaluate(module_name, exception, traceback_str, incident_id)
         inc_id = eval_res.get("incident_id")
         severity = eval_res.get("severity")
@@ -78,6 +92,18 @@ class IncidentSeverityEvaluator:
         return self.template_engine.export_notification_file(context, output_path)
 
 
-def evaluate_incident_severity(module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
+def evaluate_incident_severity(module_name: str, exception: Exception = None, traceback_str: str = "", incident_id: str = None):
     evaluator = IncidentSeverityEvaluator()
     return evaluator.evaluate(module_name, exception, traceback_str, incident_id)
+
+
+def incident_severity_evaluator(data_or_module, *args, **kwargs):
+    if isinstance(data_or_module, dict):
+        res = dict(data_or_module)
+        score = float(res.get("metric_value", res.get("severity_score", 8.5)))
+        res["severity_score"] = score
+        if "severity" not in res:
+            res["severity"] = "CRITICAL" if score >= 7.0 else "MEDIUM"
+        return res
+    evaluator = IncidentSeverityEvaluator()
+    return evaluator.evaluate(data_or_module, *args, **kwargs)

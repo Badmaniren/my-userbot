@@ -41,6 +41,15 @@ class TestIncidentFinancialImpactEvaluatorIntegration(unittest.TestCase):
         expected_loss = expected_hours * 1500.0
         self.assertAlmostEqual(result.get("total_financial_loss"), expected_loss)
 
+    def test_evaluate_with_multi_arg_integration(self):
+        simulated_incident = {"incident_id": self.random_incident_id, "service": "payment"}
+        impact_result = {"downtime_hours": 2.0}
+
+        result = self.evaluator.evaluate(simulated_incident, impact_result)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("incident_id"), self.random_incident_id)
+        self.assertEqual(result.get("total_financial_loss"), 3000.0)
+
     def test_evaluate_missing_data_raises_value_error(self):
         with self.assertRaises(ValueError):
             self.evaluator.evaluate(None)

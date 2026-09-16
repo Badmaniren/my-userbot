@@ -67,6 +67,25 @@ class TestIncidentFinancialImpactEvaluator(unittest.TestCase):
             self.assertEqual(result["incident_id"], self.incident_id)
             self.assertEqual(result["total_financial_loss"], downtime * rate)
 
+    def test_evaluate_with_two_arguments(self):
+        incident_info = {"incident_id": self.incident_id, "module": "auth"}
+        impact_result = {"downtime_hours": 3.0}
+
+        with patch.dict(os.environ, {"BASE_HOURLY_RATE_LOSS": "1000.0"}):
+            result = self.evaluator.evaluate(incident_info, impact_result)
+
+        self.assertEqual(result["incident_id"], self.incident_id)
+        self.assertEqual(result["total_financial_loss"], 3000.0)
+
+    def test_evaluate_with_string_id_and_impact_dict(self):
+        impact_result = {"downtime_hours": 2.5}
+
+        with patch.dict(os.environ, {"BASE_HOURLY_RATE_LOSS": "1000.0"}):
+            result = self.evaluator.evaluate(self.incident_id, impact_result)
+
+        self.assertEqual(result["incident_id"], self.incident_id)
+        self.assertEqual(result["total_financial_loss"], 2500.0)
+
     def test_evaluate_missing_impact_data_raises_value_error(self):
         with patch("skills.incident_financial_impact_evaluator.IncidentImpactAnalyzer") as MockAnalyzer:
             instance = MockAnalyzer.return_value

@@ -3,15 +3,34 @@ import io
 from skills.incident_impact_analyzer import IncidentImpactAnalyzer
 
 class IncidentFinancialImpactEvaluator:
-    def evaluate(self, incident_id_or_impact_data):
+    def evaluate(self, incident_id_or_impact_data, impact_data=None, **kwargs):
         try:
-            if isinstance(incident_id_or_impact_data, dict):
-                impact_data = incident_id_or_impact_data
-                incident_id = impact_data.get("incident_id")
+            incident_id = None
+            if impact_data is not None:
+                if isinstance(incident_id_or_impact_data, dict) and isinstance(impact_data, dict):
+                    combined = dict(incident_id_or_impact_data)
+                    combined.update(impact_data)
+                    impact_data = combined
+                    incident_id = impact_data.get("incident_id")
+                elif isinstance(impact_data, dict):
+                    if isinstance(incident_id_or_impact_data, (str, int)):
+                        incident_id = str(incident_id_or_impact_data)
+                    impact_data = dict(impact_data)
+                    if incident_id and "incident_id" not in impact_data:
+                        impact_data["incident_id"] = incident_id
+                    elif not incident_id:
+                        incident_id = impact_data.get("incident_id")
+                else:
+                    if isinstance(incident_id_or_impact_data, (str, int)):
+                        incident_id = str(incident_id_or_impact_data)
             else:
-                incident_id = incident_id_or_impact_data
-                analyzer = IncidentImpactAnalyzer()
-                impact_data = analyzer.get_impact_data(incident_id)
+                if isinstance(incident_id_or_impact_data, dict):
+                    impact_data = incident_id_or_impact_data
+                    incident_id = impact_data.get("incident_id")
+                else:
+                    incident_id = incident_id_or_impact_data
+                    analyzer = IncidentImpactAnalyzer()
+                    impact_data = analyzer.get_impact_data(incident_id)
 
             if impact_data is None:
                 raise ValueError("Impact data is missing or None")
@@ -55,6 +74,6 @@ class IncidentFinancialImpactEvaluator:
                 raise
             raise ValueError(str(e))
 
-def incident_financial_impact_evaluator(incident_id_or_data):
+def incident_financial_impact_evaluator(incident_id_or_data, impact_data=None, **kwargs):
     evaluator = IncidentFinancialImpactEvaluator()
-    return evaluator.evaluate(incident_id_or_data)
+    return evaluator.evaluate(incident_id_or_data, impact_data=impact_data, **kwargs)

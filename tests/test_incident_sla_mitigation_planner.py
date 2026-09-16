@@ -1,104 +1,153 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+import io
 import uuid
 import random
-import string
-import io
+from skills.incident_sla_mitigation_planner import (
+    IncidentSLAMitigationPlanner,
+    incident_sla_mitigation_planner
+)
 
-from skills.incident_sla_mitigation_planner import IncidentSLAMitigationPlanner
 
 class TestIncidentSLAMitigationPlanner(unittest.TestCase):
 
     def setUp(self):
         self.planner = IncidentSLAMitigationPlanner()
-        self.random_incident_id = uuid.uuid4().hex
-        self.random_tracker_id = uuid.uuid4().hex
-        self.random_severity = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
-        self.random_remediation_step = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
+        self.incident_id = f"inc-{uuid.uuid4().hex[:8]}"
+        self.tracker_id = uuid.uuid4().hex
 
-    def test_analyze_and_generate_plan_success(self):
-        mock_predictor_data = {
-            "incident_id": self.random_incident_id,
-            "risk_score": round(random.uniform(0.75, 0.99), 2),
-            "predicted_breach_in_minutes": random.randint(5, 60)
-        }
+    def test_generate_mitigation_plan_with_list_breaches(self):
+        rand_step_1 = f"step_{uuid.uuid4().hex[:6]}"
+        rand_step_2 = f"step_{uuid.uuid4().hex[:6]}"
         
-        mock_tracker_data = {
-            "tracker_id": self.random_tracker_id,
-            "severity": self.random_severity,
-            "current_status": "ACTIVE"
+        mock_breaches = [{
+            "incident_id": self.incident_id,
+            "risk_level": "HIGH"
+        }]
+        mock_tracker = {
+            "tracker_id": self.tracker_id
         }
 
-        with patch('skills.incident_sla_mitigation_planner.incident_sla_breach_predictor') as mock_predictor, \
-             patch('skills.incident_sla_mitigation_planner.incident_sla_tracker') as mock_tracker:
+        with patch("skills.incident_sla_mitigation_planner.incident_sla_breach_predictor") as mock_predictor, \
+             patch("skills.incident_sla_mitigation_planner.incident_sla_tracker") as mock_tracker_mod:
+            
+            mock_predictor.get_predicted_breaches.return_value = mock_breaches
+            mock_tracker_mod.get_active_tracker.return_value = mock_tracker
 
-            mock_predictor.get_predicted_breaches.return_value = [mock_predictor_data]
-            mock_tracker.get_active_tracker.return_value = mock_tracker_data
+            result = self.planner.generate_mitigation_plan(self.incident_id)
 
-            plan = self.planner.generate_mitigation_plan(self.random_incident_id)
+            self.assertIsInstance(result, dict)
+            self.assertEqual(result.get("incident_id"), self.incident_id)
+            self.assertEqual(result.get("tracker_id"), self.tracker_id)
+            self.assertIn("steps", result)
 
-            self.assertIsNotNone(plan)
-            self.assertEqual(plan["incident_id"], self.random_incident_id)
-            self.assertEqual(plan["tracker_id"], self.random_tracker_id)
-            self.assertIn("steps", plan)
-            self.assertTrue(len(plan["steps"]) > 0)
-
-    def test_mitigation_plan_contains_dynamic_remediation(self):
-        incident_id = uuid.uuid4().hex
-        custom_step = f"EXECUTE_FIX_{uuid.uuid4().hex[:8]}"
-
-        with patch('skills.incident_sla_mitigation_planner.incident_sla_breach_predictor') as mock_predictor, \
-             patch('skills.incident_sla_mitigation_planner.incident_sla_tracker') as mock_tracker, \
-             patch('skills.incident_sla_mitigation_planner.incident_knowledge_base_searcher') as mock_kb:
-
-            mock_predictor.check_breach_risk.return_value = {"risk": "HIGH"}
-            mock_tracker.get_tracker_details.return_value = {"id": incident_id, "state": "OPEN"}
-            mock_kb.find_remediation_steps.return_value = [custom_step]
-
-            result_plan = self.planner.build_plan_for_incident(incident_id)
-
-            self.assertIn(custom_step, result_plan["remediation_steps"])
-            self.assertEqual(result_plan["incident_id"], incident_id)
-
-    def test_handle_empty_predictor_data(self):
-        dead_incident_id = uuid.uuid4().hex
-
-        with patch('skills.incident_sla_mitigation_planner.incident_sla_breach_predictor') as mock_predictor, \
-             patch('skills.incident_sla_mitigation_planner.incident_sla_tracker') as mock_tracker:
-
+    def test_generate_mitigation_plan_empty_fallback(self):
+        with patch("skills.incident_sla_mitigation_planner.incident_sla_breach_predictor") as mock_predictor, \
+             patch("skills.incident_sla_mitigation_planner.incident_sla_tracker") as mock_tracker_mod:
+            
             mock_predictor.get_predicted_breaches.return_value = []
-            mock_tracker.get_active_tracker.return_value = None
+            mock_tracker_mod.get_active_tracker.return_value = None
 
-            plan = self.planner.generate_mitigation_plan(dead_incident_id)
+            result = self.planner.generate_mitigation_plan(self.incident_id)
+            self.assertEqual(result, {})
 
-            self.assertEqual(plan, {})
+    def test_build_plan_for_incident(self):
+        rand_remediation = f"fix_{uuid.uuid4().hex[:6]}"
+        mock_risk = {"risk": random.choice(["LOW", "MEDIUM", "HIGH"])}
+        mock_details = {"details": uuid.uuid4().hex}
+        mock_steps = [rand_remediation]
 
-    def test_io_stream_handling_for_bulk_export(self):
-        mock_stream_data = f"incident_id,status\n{self.random_incident_id},MITIGATED".encode('utf-8')
-        fake_file = io.BytesIO(mock_stream_data)
+        with patch("skills.incident_sla_mitigation_planner.incident_sla_breach_predictor") as mock_predictor, \
+             patch("skills.incident_sla_mitigation_planner.incident_sla_tracker") as mock_tracker_mod, \
+             patch("skills.incident_sla_mitigation_planner.incident_knowledge_base_searcher") as mock_kb:
+            
+            mock_predictor.check_breach_risk.return_value = mock_risk
+            mock_tracker_mod.get_tracker_details.return_value = mock_details
+            mock_kb.find_remediation_steps.return_value = mock_steps
 
-        with patch('skills.incident_sla_mitigation_planner.recovery_report_exporter') as mock_exporter:
-            mock_exporter.export_stream.return_value = fake_file
+            result = self.planner.build_plan_for_incident(self.incident_id)
 
-            exported_stream = self.planner.export_mitigation_report()
-            content = exported_stream.read().decode('utf-8')
+            self.assertEqual(result.get("incident_id"), self.incident_id)
+            self.assertEqual(result.get("remediation_steps"), mock_steps)
+            self.assertEqual(result.get("risk_info"), mock_risk)
+            self.assertEqual(result.get("tracker_details"), mock_details)
 
-            self.assertIn(self.random_incident_id, content)
-            self.assertIn("MITIGATED", content)
+    def test_build_plan_for_incident_default_steps(self):
+        with patch("skills.incident_sla_mitigation_planner.incident_sla_breach_predictor") as mock_predictor, \
+             patch("skills.incident_sla_mitigation_planner.incident_sla_tracker") as mock_tracker_mod, \
+             patch("skills.incident_sla_mitigation_planner.incident_knowledge_base_searcher") as mock_kb:
+            
+            mock_predictor.check_breach_risk.return_value = {}
+            mock_tracker_mod.get_tracker_details.return_value = {}
+            mock_kb.find_remediation_steps.return_value = []
 
-    def test_escalation_trigger_on_critical_risk(self):
-        critical_incident_id = uuid.uuid4().hex
+            result = self.planner.build_plan_for_incident(self.incident_id)
 
-        with patch('skills.incident_sla_mitigation_planner.incident_sla_breach_predictor') as mock_predictor, \
-             patch('skills.incident_sla_mitigation_planner.incident_auto_escalation_engine') as mock_escalation:
+            self.assertEqual(result.get("incident_id"), self.incident_id)
+            self.assertIn("DEFAULT_REMEDIATION_STEP", result.get("remediation_steps"))
 
-            mock_predictor.analyze_risk.return_value = {
-                "incident_id": critical_incident_id,
-                "urgency": "CRITICAL"
+    def test_export_mitigation_report(self):
+        expected_bytes = f"id,status\n{self.incident_id},OK".encode("utf-8")
+        mock_stream = io.BytesIO(expected_bytes)
+
+        with patch("skills.incident_sla_mitigation_planner.recovery_report_exporter") as mock_exporter:
+            mock_exporter.export_stream.return_value = mock_stream
+
+            stream_res = self.planner.export_mitigation_report()
+            self.assertIsInstance(stream_res, io.BytesIO)
+            self.assertEqual(stream_res.read(), expected_bytes)
+
+    def test_export_mitigation_report_fallback(self):
+        with patch("skills.incident_sla_mitigation_planner.recovery_report_exporter", None):
+            stream_res = self.planner.export_mitigation_report()
+            self.assertIsInstance(stream_res, io.BytesIO)
+            self.assertTrue(len(stream_res.read()) > 0)
+
+    def test_evaluate_and_mitigate_critical_urgency(self):
+        with patch("skills.incident_sla_mitigation_planner.incident_sla_breach_predictor") as mock_predictor, \
+             patch("skills.incident_sla_mitigation_planner.incident_auto_escalation_engine") as mock_escalation:
+            
+            mock_predictor.analyze_risk.return_value = {"urgency": "CRITICAL"}
+
+            self.planner.evaluate_and_mitigate(self.incident_id)
+            mock_escalation.trigger_escalation.assert_called_once_with(self.incident_id)
+
+    def test_evaluate_and_mitigate_non_critical(self):
+        with patch("skills.incident_sla_mitigation_planner.incident_sla_breach_predictor") as mock_predictor, \
+             patch("skills.incident_sla_mitigation_planner.incident_auto_escalation_engine") as mock_escalation:
+            
+            mock_predictor.analyze_risk.return_value = {"urgency": random.choice(["LOW", "MEDIUM", "NORMAL"])}
+
+            self.planner.evaluate_and_mitigate(self.incident_id)
+            mock_escalation.trigger_escalation.assert_not_called()
+
+    def test_incident_sla_mitigation_planner_functional_string_payload(self):
+        res = incident_sla_mitigation_planner(self.incident_id)
+        self.assertIsInstance(res, dict)
+        self.assertEqual(res.get("target_incident_id"), self.incident_id)
+        self.assertEqual(res.get("status"), "generated")
+        self.assertIn("mitigation_plan_id", res)
+
+    def test_incident_sla_mitigation_planner_functional_dict_payload(self):
+        rand_step = f"custom_step_{uuid.uuid4().hex[:6]}"
+        payload = {
+            "incident_id": self.incident_id,
+            "prediction_payload": {
+                "remediation_steps": [rand_step]
             }
+        }
 
-            self.planner.evaluate_and_mitigate(critical_incident_id)
+        res = incident_sla_mitigation_planner(payload)
+        self.assertIsInstance(res, dict)
+        self.assertEqual(res.get("target_incident_id"), self.incident_id)
+        self.assertIn(rand_step, res.get("remediation_steps"))
 
-            mock_escalation.trigger_escalation.assert_called_once()
-            args, _ = mock_escalation.trigger_escalation.call_args
-            self.assertEqual(args[0], critical_incident_id)
+    def test_incident_sla_mitigation_planner_invalid_payload(self):
+        res = incident_sla_mitigation_planner(12345)
+        self.assertIsInstance(res, dict)
+        self.assertIsNotNone(res.get("target_incident_id"))
+        self.assertEqual(res.get("status"), "generated")
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -45,6 +45,13 @@ class ErrorRecoveryHub:
     def get_incident_history(self, module_name):
         return self.history.get(module_name, [])
 
+    def get_recovery_history(self, incident_id):
+        if hasattr(self, "storage") and isinstance(self.storage, dict) and incident_id in self.storage:
+            return self.storage[incident_id]
+        if incident_id in self.incidents:
+            return self.incidents[incident_id]
+        return {"incident_id": incident_id, "failed_attempts": 0, "status": "no_history"}
+
     def get_incident_logs(self, incident_id):
         return self.logs.get(incident_id, {"status": "not_found"})
 

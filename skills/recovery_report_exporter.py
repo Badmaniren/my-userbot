@@ -35,3 +35,19 @@ class RecoveryReportExporter:
 
     def export_epic_report_file(self, report_payload, output_path):
         return self.reporter.generate_epic_report(report_payload, output_path)
+
+    def export(self, report_payload, output_path=None):
+        import json
+        import os
+        import tempfile
+
+        if output_path is None:
+            incident_id = report_payload.get("incident_id", "report")
+            out_dir = tempfile.gettempdir()
+            output_path = os.path.join(out_dir, f"post_mortem_{incident_id}.json")
+
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(json.dumps(report_payload, indent=2))
+
+        return output_path

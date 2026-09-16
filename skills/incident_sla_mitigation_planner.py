@@ -2,31 +2,11 @@ import io
 import uuid
 from typing import Dict, Any, List, Optional, Union
 
-# Честные импорты зависимостей, как требуется в тестах
-try:
-    from skills import incident_sla_breach_predictor
-except ImportError:
-    incident_sla_breach_predictor = None
-
-try:
-    from skills import incident_sla_tracker
-except ImportError:
-    incident_sla_tracker = None
-
-try:
-    from skills import incident_knowledge_base_searcher
-except ImportError:
-    incident_knowledge_base_searcher = None
-
-try:
-    from skills import incident_auto_escalation_engine
-except ImportError:
-    incident_auto_escalation_engine = None
-
-try:
-    from skills import recovery_report_exporter
-except ImportError:
-    recovery_report_exporter = None
+from skills import incident_sla_breach_predictor
+from skills import incident_sla_tracker
+from skills import incident_knowledge_base_searcher
+from skills import incident_auto_escalation_engine
+from skills import recovery_report_exporter
 
 
 class IncidentSLAMitigationPlanner:

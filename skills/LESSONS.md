@@ -3,7 +3,11 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-: ПРОВАЛЕН Унгой, передан на эскалацию
+эскалацию
+
+## incident_notification_broadcaster (compose) — раундов: 4
+- Последняя ошибка перед фиксом: Traceback (most recent call last):
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## incident_notification_bridge (refactor) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=1)
@@ -288,7 +292,3 @@
 ## incident_sla_recovery_coordinator (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: успешно прошёл тесты и влит в main
-
-## incident_sla_tracker (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -20,7 +20,28 @@ class IncidentSeverityEvaluator:
         else:
             return "LOW"
 
-    def evaluate(self, module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
+    def evaluate(self, module_name=None, exception=None, traceback_str=None, incident_id=None, **kwargs):
+        if isinstance(module_name, dict):
+            data = dict(module_name)
+            if "severity_assessment" in data:
+                data.pop("severity_assessment", None)
+            severity = (
+                data.get("severity")
+                or data.get("severity_hint")
+                or data.get("raw_severity")
+                or self.calculate_severity_score(data)
+            )
+            inc_id = data.get("incident_id") or incident_id
+            payload = self.template_engine.generate_notification_payload(
+                severity, inc_id, data
+            )
+            return {
+                "incident_id": inc_id,
+                "severity": severity,
+                "payload": payload,
+                "aggregated_data": data,
+            }
+
         agg_result = self.aggregator.process_and_aggregate(
             module_name, exception, traceback_str, incident_id
         )
@@ -78,6 +99,9 @@ class IncidentSeverityEvaluator:
         return self.template_engine.export_notification_file(context, output_path)
 
 
-def evaluate_incident_severity(module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
+def evaluate_incident_severity(module_name=None, exception=None, traceback_str=None, incident_id=None, **kwargs):
     evaluator = IncidentSeverityEvaluator()
-    return evaluator.evaluate(module_name, exception, traceback_str, incident_id)
+    return evaluator.evaluate(module_name, exception, traceback_str, incident_id, **kwargs)
+
+
+incident_severity_evaluator = IncidentSeverityEvaluator

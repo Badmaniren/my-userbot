@@ -2,6 +2,16 @@ from skills.system_health_aggregator import SystemHealthAggregator
 from skills.system_health_reporter import SystemHealthReporter
 
 
+def stream_metrics(*args, **kwargs):
+    return None
+
+
+def collect_telemetry(telemetry_data=None, **kwargs):
+    if telemetry_data is None:
+        telemetry_data = {}
+    return telemetry_data
+
+
 class SystemHealthTelemetryCollector:
     def __init__(self):
         self.aggregator = SystemHealthAggregator()

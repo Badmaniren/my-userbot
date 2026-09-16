@@ -20,7 +20,43 @@ class IncidentSeverityEvaluator:
         else:
             return "LOW"
 
-    def evaluate(self, module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
+    def evaluate(self, module_name=None, exception=None, traceback_str=None, incident_id=None, **kwargs):
+        if isinstance(module_name, dict):
+            data = dict(module_name)
+            data.pop("severity_assessment", None)
+            inc_id = data.get("incident_id") or incident_id or kwargs.get("incident_id") or "INC-0000"
+            sev = data.get("severity") or data.get("raw_severity") or data.get("level") or "MEDIUM"
+            try:
+                payload = self.template_engine.generate_notification_payload(
+                    sev, inc_id, data
+                )
+            except Exception:
+                payload = data
+            return {
+                "incident_id": inc_id,
+                "severity": sev,
+                "payload": payload,
+                "aggregated_data": data,
+            }
+
+        if module_name is None and kwargs:
+            data = dict(kwargs)
+            data.pop("severity_assessment", None)
+            inc_id = data.get("incident_id") or incident_id or "INC-0000"
+            sev = data.get("severity") or data.get("raw_severity") or data.get("level") or "MEDIUM"
+            try:
+                payload = self.template_engine.generate_notification_payload(
+                    sev, inc_id, data
+                )
+            except Exception:
+                payload = data
+            return {
+                "incident_id": inc_id,
+                "severity": sev,
+                "payload": payload,
+                "aggregated_data": data,
+            }
+
         agg_result = self.aggregator.process_and_aggregate(
             module_name, exception, traceback_str, incident_id
         )
@@ -78,6 +114,6 @@ class IncidentSeverityEvaluator:
         return self.template_engine.export_notification_file(context, output_path)
 
 
-def evaluate_incident_severity(module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
+def evaluate_incident_severity(module_name=None, exception=None, traceback_str=None, incident_id=None, **kwargs):
     evaluator = IncidentSeverityEvaluator()
-    return evaluator.evaluate(module_name, exception, traceback_str, incident_id)
+    return evaluator.evaluate(module_name, exception, traceback_str, incident_id, **kwargs)

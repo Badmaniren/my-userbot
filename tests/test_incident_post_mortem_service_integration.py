@@ -1,56 +1,66 @@
 import unittest
 import uuid
 import random
-import io
+import string
 from skills.incident_post_mortem_service import IncidentPostMortemService
-from skills.incident_aggregator import IncidentAggregator
-from skills.error_recovery_hub import ErrorRecoveryHub
-from skills.recovery_report_exporter import RecoveryReportExporter
 
 class TestIncidentPostMortemServiceIntegration(unittest.TestCase):
     def setUp(self):
         self.service = IncidentPostMortemService()
-        self.random_incident_id = f"inc-{uuid.uuid4()}"
-        self.random_error_code = f"ERR-{random.randint(1000, 9999)}"
-        self.random_timeout = random.randint(1, 10)
-        self.random_log_message = f"Error recovery initiated at {uuid.uuid4()} with status failed"
 
-    def test_generate_report_with_dict_input_integration(self):
+    def test_generate_report_from_dict_integration(self):
+        random_incident_id = str(uuid.uuid4())
+        random_error_code = f"ERR_{''.join(random.choices(string.ascii_uppercase + string.digits, k=6))}"
+        random_timeout = random.randint(50, 500)
+        random_memory_mb = random.randint(128, 2048)
+        
+        random_log_line_1 = f"DEBUG: Action initiated - {''.join(random.choices(string.ascii_lowercase, k=8))}"
+        random_log_line_2 = f"ERROR: Connection failed - {''.join(random.choices(string.ascii_lowercase, k=8))}"
+        raw_logs = f"{random_log_line_1}\n{random_log_line_2}".encode("utf-8")
+
         incident_data = {
-            "incident_id": self.random_incident_id,
-            "error_code": self.random_error_code,
+            "incident_id": random_incident_id,
+            "error_code": random_error_code,
             "metrics": {
-                "timeout_count": self.random_timeout,
+                "timeout_count": random_timeout,
+                "memory_leak_mb": random_memory_mb,
                 "memory_leak_detected": True
             }
         }
-        
-        recovery_payload = {
-            "logs": f"{self.random_log_message}\nRecovery action applied successfully."
+        recovery_data = {
+            "logs": raw_logs
         }
 
-        report = self.service.generate_report(incident=incident_data, recovery_data=recovery_payload)
+        report = self.service.generate_report(incident_data, recovery_data)
 
-        self.assertIsInstance(report, dict)
-        self.assertEqual(report.get("incident_id"), self.random_incident_id)
+        self.assertIsNotNone(report)
         self.assertIn("report_id", report)
-        self.assertIn(self.random_error_code, report.get("root_cause_analysis", ""))
-        self.assertIn(self.random_log_message, report.get("recovery_logs_summary", ""))
-        self.assertEqual(report["metrics_snapshot"]["timeout_count"], self.random_timeout)
+        self.assertEqual(report["incident_id"], random_incident_id)
+        self.assertIsInstance(report["timeline"], list)
+        
+        root_cause = report["root_cause_analysis"]
+        self.assertIn(random_error_code, root_cause)
+        self.assertIn("Memory leak detected", root_cause)
+        self.assertIn(f"High timeout count: {random_timeout}", root_cause)
+        self.assertIn(random_log_line_1, root_cause)
+        self.assertIn(random_log_line_2, root_cause)
 
-    def test_generate_report_with_string_id_integration(self):
-        report = self.service.generate_report(incident=self.random_incident_id)
+        self.assertIn(random_log_line_1, report["recovery_logs_summary"])
+        self.assertIn(random_log_line_2, report["recovery_logs_summary"])
+        self.assertEqual(report["metrics_snapshot"]["timeout_count"], random_timeout)
 
-        self.assertIsInstance(report, dict)
-        self.assertEqual(report.get("incident_id"), self.random_incident_id)
+    def test_generate_report_from_id_integration(self):
+        random_incident_id = str(uuid.uuid4())
+
+        report = self.service.generate_report(random_incident_id)
+
+        self.assertIsNotNone(report)
+        self.assertEqual(report["incident_id"], random_incident_id)
         self.assertIn("root_cause", report)
         self.assertIn("metrics_snapshot", report)
         self.assertIn("recovery_logs_summary", report)
-
-    def subtest_real_collaborators_wiring(self):
-        self.assertIsInstance(self.service.incident_aggregator, IncidentAggregator)
-        self.assertIsInstance(self.service.error_recovery_hub, ErrorRecoveryHub)
-        self.assertIsInstance(self.service.report_exporter, RecoveryReportExporter)
+        self.assertIsInstance(report["metrics_snapshot"], dict)
+        self.assertIsInstance(report["recovery_logs_summary"], str)
 
 if __name__ == "__main__":
     unittest.main()

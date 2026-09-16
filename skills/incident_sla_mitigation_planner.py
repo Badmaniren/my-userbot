@@ -87,21 +87,31 @@ class IncidentSLAMitigationPlanner:
                 incident_auto_escalation_engine.trigger_escalation(incident_id)
 
 
-def incident_sla_mitigation_planner(payload: Union[str, Dict[str, Any]]) -> Dict[str, Any]:
+def incident_sla_mitigation_planner(*args, **kwargs) -> Dict[str, Any]:
     """
     Интеграционная точка входа, вызываемая в интеграционном тесте.
     Принимает payload с данными инцидента, предсказателя и трекера.
     Возвращает словарь с планом митигации.
     """
-    if isinstance(payload, str):
-        incident_id = payload
+    if len(args) == 2 and isinstance(args[0], str):
+        incident_id = args[0]
         target_incident_id = incident_id
-    elif isinstance(payload, dict):
+        payload = args[1] if isinstance(args[1], dict) else {}
+    elif len(args) == 1:
+        payload = args[0]
+        if isinstance(payload, str):
+            incident_id = payload
+            target_incident_id = incident_id
+        elif isinstance(payload, dict):
+            incident_id = payload.get("incident_id", f"inc-{uuid.uuid4()}")
+            target_incident_id = payload.get("incident_id", incident_id)
+        else:
+            incident_id = f"inc-{uuid.uuid4()}"
+            target_incident_id = incident_id
+    else:
+        payload = kwargs
         incident_id = payload.get("incident_id", f"inc-{uuid.uuid4()}")
         target_incident_id = payload.get("incident_id", incident_id)
-    else:
-        incident_id = f"inc-{uuid.uuid4()}"
-        target_incident_id = incident_id
 
     remediation_steps = ["Analyze logs", "Scale resources", "Apply hotfix"]
 

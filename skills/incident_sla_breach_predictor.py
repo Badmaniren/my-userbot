@@ -54,7 +54,17 @@ class IncidentSLABreachPredictor:
         return incident_auto_escalation_engine.trigger_escalation(incident_id)
 
 
-def incident_sla_breach_predictor(payload):
+def incident_sla_breach_predictor(*args, **kwargs):
+    if len(args) == 2 and isinstance(args[0], str) and isinstance(args[1], dict):
+        incident_id, tracker_metrics = args[0], args[1]
+        payload = {"incident_id": incident_id, "sla_data": tracker_metrics}
+    elif len(args) == 1 and isinstance(args[0], dict):
+        payload = args[0]
+    elif len(args) == 1 and isinstance(args[0], str):
+        payload = {"incident_id": args[0]}
+    else:
+        payload = kwargs
+
     incident_id = payload.get("incident_id")
     sla_data = payload.get("sla_data", {})
     trend_data = payload.get("trend_data", {})

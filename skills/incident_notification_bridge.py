@@ -83,3 +83,11 @@ class IncidentNotificationBridge:
 
 
 IncidentIncidentNotificationBridge = IncidentNotificationBridge
+
+
+def incident_notification_bridge(payload_or_dispatcher=None, *args, **kwargs):
+    if isinstance(payload_or_dispatcher, dict):
+        bridge = IncidentNotificationBridge()
+        success = bridge.process_incident(payload_or_dispatcher)
+        return {"success": success, "payload": payload_or_dispatcher}
+    return IncidentNotificationBridge(payload_or_dispatcher, *args, **kwargs)

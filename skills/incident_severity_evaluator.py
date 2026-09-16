@@ -81,3 +81,13 @@ class IncidentSeverityEvaluator:
 def evaluate_incident_severity(module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
     evaluator = IncidentSeverityEvaluator()
     return evaluator.evaluate(module_name, exception, traceback_str, incident_id)
+
+
+def incident_severity_evaluator(payload_or_module=None, *args, **kwargs):
+    if isinstance(payload_or_module, dict):
+        evaluator = IncidentSeverityEvaluator()
+        severity = payload_or_module.get("severity") or evaluator.calculate_severity_score(payload_or_module)
+        return {"severity": severity, "payload": payload_or_module, "incident_id": payload_or_module.get("id")}
+    if payload_or_module is not None and args:
+        return evaluate_incident_severity(payload_or_module, *args, **kwargs)
+    return IncidentSeverityEvaluator()

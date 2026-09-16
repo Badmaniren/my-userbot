@@ -88,8 +88,14 @@ def track_incident_sla(sla_input: Dict[str, Any]) -> Dict[str, Any]:
     data = aggregated_data.get("data", {})
     timestamp = data.get("timestamp")
     
-    if timestamp:
-        created_at = datetime.fromtimestamp(timestamp)
+    if timestamp is None:
+        timestamp = aggregated_data.get("timestamp")
+
+    if timestamp is not None:
+        try:
+            created_at = datetime.fromtimestamp(timestamp)
+        except (ValueError, TypeError, OverflowError):
+            created_at = datetime.now()
     else:
         created_at = datetime.now()
         

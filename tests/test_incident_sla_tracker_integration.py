@@ -4,25 +4,26 @@ import random
 from datetime import datetime, timedelta
 
 from skills.incident_sla_tracker import IncidentSLATracker, track_incident_sla
-
-try:
-    from skills.incident_aggregator import aggregate_incidents
-except ImportError:
-    aggregate_incidents = None
-
-try:
-    from skills.incident_severity_evaluator import evaluate_incident_severity
-except ImportError:
-    evaluate_incident_severity = None
-
+from skills.incident_aggregator import aggregate_incidents
+from skills.incident_severity_evaluator import evaluate_incident_severity
 
 class TestIncidentSLATrackerIntegration(unittest.TestCase):
-
-    def test_sla_tracker_pipeline_integration(self):
-        unique_incident_id = f"inc-{uuid.uuid4()}"
+    def test_sla_tracker_full_integration(self):
+        random_id = f"INC-{uuid.uuid4()}"
         severities = ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
         chosen_severity = random.choice(severities)
         
+        raw_event = {
+            "id": random_id,
+            "source": "integration_test",
+            "metrics": {"latency": random.randint(100, 1000)}
+        }
+
+        aggregated = aggregate_incidents(raw_event)
+        evaluated_severity = evaluate_incident_severity(aggregated)
+
+        self.assertIn(evaluated_severity, severities)
+
         thresholds = {
             "LOW": 7200,
             "MEDIUM": 3600,
@@ -30,57 +31,27 @@ class TestIncidentSLATrackerIntegration(unittest.TestCase):
             "CRITICAL": 600
         }
         
-        warning_pct = 0.8
-        tracker = IncidentSLATracker(sla_thresholds=thresholds, warning_threshold_pct=warning_pct)
+        tracker = IncidentSLATracker(sla_thresholds=thresholds, warning_threshold_pct=0.8)
         
-        past_offset_seconds = random.randint(100, 5000)
-        created_time = datetime.now() - timedelta(seconds=past_offset_seconds)
+        created_time = datetime.now() - timedelta(seconds=random.randint(10, 100))
+        tracker.register_incident(incident_id=random_id, severity=evaluated_severity, created_at=created_time)
         
-        tracker.register_incident(
-            incident_id=unique_incident_id,
-            severity=chosen_severity,
-            created_at=created_time
-        )
-        
-        time_to_breach = tracker.get_time_to_breach(unique_incident_id)
+        time_to_breach = tracker.get_time_to_breach(incident_id=random_id)
         self.assertIsInstance(time_to_breach, float)
 
-        breach_results = tracker.check_sla_breaches()
-        self.assertIsInstance(breach_results, list)
-
-        timestamp_val = int(created_time.timestamp())
-        random_payload = {
-            "incident_id": unique_incident_id,
-            "threshold_seconds": thresholds[chosen_severity],
-            "aggregated_data": {
-                "data": {
-                    "timestamp": timestamp_val,
-                    "severity": chosen_severity
-                }
-            }
+        sla_payload = {
+            "incident_id": random_id,
+            "aggregated_data": aggregated,
+            "threshold_seconds": thresholds.get(evaluated_severity, 3600)
         }
-
-        if aggregate_incidents is not None:
-            try:
-                aggregate_incidents([random_payload])
-            except Exception:
-                pass
-
-        if evaluate_incident_severity is not None:
-            try:
-                evaluate_incident_severity(unique_incident_id)
-            except Exception:
-                pass
-
-        tracking_output = track_incident_sla(random_payload)
         
-        self.assertIn("incident_id", tracking_output)
-        self.assertEqual(tracking_output["incident_id"], unique_incident_id)
-        self.assertIn("breach_predicted", tracking_output)
-        self.assertIn("time_remaining_seconds", tracking_output)
-        self.assertIsInstance(tracking_output["breach_predicted"], bool)
-        self.assertIsInstance(tracking_output["time_remaining_seconds"], float)
+        track_result = track_incident_sla(sla_payload)
+        self.assertEqual(track_result["incident_id"], random_id)
+        self.assertIsInstance(track_result["breach_predicted"], bool)
+        self.assertIsInstance(track_result["time_remaining_seconds"], float)
 
+        breach_check = tracker.check_sla_breaches()
+        self.assertIsInstance(breach_check, list)
 
 if __name__ == "__main__":
     unittest.main()

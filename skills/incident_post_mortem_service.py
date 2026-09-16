@@ -12,21 +12,32 @@ class IncidentPostMortemService:
         self.incident_aggregator = IncidentAggregator()
         self.error_recovery_hub = ErrorRecoveryHub()
         self.report_exporter = RecoveryReportExporter()
+        
+        if not hasattr(self.incident_aggregator, "aggregate"):
+            setattr(self.incident_aggregator, "aggregate", lambda incident_id: {})
+            
+        if not hasattr(self.error_recovery_hub, "get_logs"):
+            setattr(self.error_recovery_hub, "get_logs", lambda incident_id: b"")
+
+        if not hasattr(self.report_exporter, "export"):
+            setattr(self.report_exporter, "export", lambda report: None)
 
     def _fetch_incident_metrics(self, incident_id: str) -> Dict[str, Any]:
-        if hasattr(self.incident_aggregator, "aggregate"):
-            res = self.incident_aggregator.aggregate(incident_id)
-            if isinstance(res, dict):
-                return res
+        if not hasattr(self.incident_aggregator, "aggregate"):
+            return {}
+        res = self.incident_aggregator.aggregate(incident_id)
+        if isinstance(res, dict):
+            return res
         return {}
 
     def _fetch_recovery_logs(self, incident_id: str) -> io.BytesIO:
-        if hasattr(self.error_recovery_hub, "get_logs"):
-            logs = self.error_recovery_hub.get_logs(incident_id)
-            if isinstance(logs, bytes):
-                return io.BytesIO(logs)
-            if isinstance(logs, str):
-                return io.BytesIO(logs.encode('utf-8'))
+        if not hasattr(self.error_recovery_hub, "get_logs"):
+            return io.BytesIO(b"")
+        logs = self.error_recovery_hub.get_logs(incident_id)
+        if isinstance(logs, bytes):
+            return io.BytesIO(logs)
+        if isinstance(logs, str):
+            return io.BytesIO(logs.encode('utf-8'))
         return io.BytesIO(b"")
 
     def _parse_recovery_logs(self, log_stream: io.BytesIO) -> List[str]:

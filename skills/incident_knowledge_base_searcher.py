@@ -1,4 +1,7 @@
-import requests
+try:
+    import requests
+except ImportError:
+    requests = None
 from typing import Dict, Any, Generator, List, Union
 
 

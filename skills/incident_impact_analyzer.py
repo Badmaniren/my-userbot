@@ -1,7 +1,10 @@
 import sys
 import io
 import json
-import requests
+try:
+    import requests
+except ImportError:
+    requests = None
 from skills.incident_aggregator import IncidentAggregator
 from skills.error_recovery_hub import ErrorRecoveryHub
 

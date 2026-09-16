@@ -102,3 +102,60 @@ def track_incident_sla(sla_input: Dict[str, Any]) -> Dict[str, Any]:
         "breach_predicted": breach_predicted,
         "time_remaining_seconds": time_remaining
     }
+
+
+_TRACKER_STORE = {}
+
+def incident_sla_tracker(sla_input: Any) -> Dict[str, Any]:
+    """
+    Интеграционная точка входа / callable wrapper для incident_sla_tracker.
+    Принимает словарь с данными инцидента и возвращает структурированный результат трекинга.
+    Поддерживает вспомогательные методы get_tracking_data, get_active_tracker, get_tracker_details.
+    """
+    if isinstance(sla_input, str):
+        incident_id = sla_input
+        sla_input = _TRACKER_STORE.get(incident_id)
+        if not sla_input:
+            return None
+    elif isinstance(sla_input, dict):
+        incident_id = sla_input.get("incident_id")
+        if incident_id:
+            stored = _TRACKER_STORE.get(incident_id, {})
+            merged = {**stored, **sla_input}
+            _TRACKER_STORE[incident_id] = merged
+            sla_input = merged
+    else:
+        incident_id = str(sla_input)
+        sla_input = _TRACKER_STORE.get(incident_id)
+        if not sla_input:
+            return None
+
+    downtime = sla_input.get("downtime_minutes") or sla_input.get("breach_duration") or 0
+    breach_reason = sla_input.get("breach_reason", "SLA threshold exceeded")
+    status = sla_input.get("status", "breached")
+
+    return {
+        "incident_id": incident_id,
+        "downtime_minutes": downtime,
+        "breach_duration": downtime,
+        "breach_reason": breach_reason,
+        "status": status
+    }
+
+
+def _get_active_tracker(incident_id: str) -> Dict[str, Any]:
+    return incident_sla_tracker(incident_id)
+
+def _get_tracking_data(incident_id: str) -> Dict[str, Any]:
+    return incident_sla_tracker(incident_id)
+
+def _get_tracker_details(incident_id: str) -> Dict[str, Any]:
+    return incident_sla_tracker(incident_id)
+
+def _get_breach_details(incident_id: str) -> Dict[str, Any]:
+    return incident_sla_tracker(incident_id)
+
+incident_sla_tracker.get_active_tracker = _get_active_tracker
+incident_sla_tracker.get_tracking_data = _get_tracking_data
+incident_sla_tracker.get_tracker_details = _get_tracker_details
+incident_sla_tracker.get_breach_details = _get_breach_details

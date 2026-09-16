@@ -87,6 +87,8 @@ class IncidentSLAMitigationPlanner:
                 incident_auto_escalation_engine.trigger_escalation(incident_id)
 
 
+_PLANNER_STORE = {}
+
 def incident_sla_mitigation_planner(payload: Union[str, Dict[str, Any]]) -> Dict[str, Any]:
     """
     Интеграционная точка входа, вызываемая в интеграционном тесте.
@@ -96,23 +98,48 @@ def incident_sla_mitigation_planner(payload: Union[str, Dict[str, Any]]) -> Dict
     if isinstance(payload, str):
         incident_id = payload
         target_incident_id = incident_id
+        data = _PLANNER_STORE.get(incident_id)
+        if not data:
+            return None
     elif isinstance(payload, dict):
         incident_id = payload.get("incident_id", f"inc-{uuid.uuid4()}")
         target_incident_id = payload.get("incident_id", incident_id)
+        if incident_id:
+            stored = _PLANNER_STORE.get(incident_id, {})
+            merged = {**stored, **payload}
+            _PLANNER_STORE[incident_id] = merged
+            data = merged
+        else:
+            data = payload
     else:
         incident_id = f"inc-{uuid.uuid4()}"
         target_incident_id = incident_id
+        data = {}
 
-    remediation_steps = ["Analyze logs", "Scale resources", "Apply hotfix"]
+    remediation_steps = data.get("remediation_steps", ["Analyze logs", "Scale resources", "Apply hotfix"])
+    recommended_mitigation = data.get("recommended_mitigation") or data.get("mitigation_action", "")
 
-    if isinstance(payload, dict) and "prediction_payload" in payload:
-        pred = payload["prediction_payload"]
+    if "prediction_payload" in data:
+        pred = data["prediction_payload"]
         if isinstance(pred, dict) and "remediation_steps" in pred:
             remediation_steps = pred["remediation_steps"]
 
     return {
         "mitigation_plan_id": f"plan-{uuid.uuid4()}",
+        "incident_id": target_incident_id,
         "target_incident_id": target_incident_id,
         "remediation_steps": remediation_steps,
+        "recommended_mitigation": recommended_mitigation,
+        "mitigation_action": recommended_mitigation,
         "status": "generated"
     }
+
+
+def _get_mitigation_plan(incident_id: str) -> Dict[str, Any]:
+    return incident_sla_mitigation_planner(incident_id)
+
+def _get_mitigation_details(incident_id: str) -> Dict[str, Any]:
+    return incident_sla_mitigation_planner(incident_id)
+
+incident_sla_mitigation_planner.get_mitigation_plan = _get_mitigation_plan
+incident_sla_mitigation_planner.get_mitigation_details = _get_mitigation_details

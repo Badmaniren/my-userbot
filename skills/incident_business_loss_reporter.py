@@ -22,7 +22,10 @@ class IncidentBusinessLossReporter:
         else:
             fin_data = {}
 
-        impact_data = self.impact_analyzer.analyze(incident_id) if self.impact_analyzer else {}
+        try:
+            impact_data = self.impact_analyzer.analyze(incident_id) if self.impact_analyzer else {}
+        except AttributeError:
+            impact_data = self.impact_analyzer.analyze({"incident_id": incident_id}) if self.impact_analyzer else {}
 
         total_loss = fin_data.get("total_loss") if isinstance(fin_data, dict) else fin_data
 

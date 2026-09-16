@@ -25,6 +25,18 @@ class IncidentTrendAnalyzer:
             "trend": "stable"
         }
 
+    def analyze(self, incident_data=None):
+        if isinstance(incident_data, dict):
+            module_name = incident_data.get("module_name", "unknown")
+        else:
+            module_name = str(incident_data)
+        res = self.analyze_trends(module_name)
+        res["incident_data"] = incident_data
+        return res
+
+
+incident_trend_analyzer = IncidentTrendAnalyzer()
+
 class RecoveryDashboardGenerator:
     def __init__(self):
         pass

@@ -93,3 +93,13 @@ class SystemHealthAggregator:
 
     def parse_reporter_stream(self, stream):
         return self.reporter.parse_stream_data(stream)
+
+    def collect(self, source_id=None, load_factor=None, telemetry_data=None):
+        return {
+            "source_id": source_id or "default",
+            "load_factor": load_factor or 0.0,
+            "telemetry_data": telemetry_data or {}
+        }
+
+
+system_health_aggregator = SystemHealthAggregator()

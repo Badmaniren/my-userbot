@@ -20,7 +20,16 @@ class IncidentSeverityEvaluator:
         else:
             return "LOW"
 
-    def evaluate(self, module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
+    def evaluate(self, module_name=None, exception=None, traceback_str=None, incident_id=None):
+        if isinstance(module_name, dict):
+            data = module_name
+            sev_score = self.calculate_severity_score(data)
+            return {
+                "score": sev_score,
+                "severity": sev_score,
+                "level": sev_score
+            }
+
         agg_result = self.aggregator.process_and_aggregate(
             module_name, exception, traceback_str, incident_id
         )
@@ -81,3 +90,6 @@ class IncidentSeverityEvaluator:
 def evaluate_incident_severity(module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
     evaluator = IncidentSeverityEvaluator()
     return evaluator.evaluate(module_name, exception, traceback_str, incident_id)
+
+
+incident_severity_evaluator = IncidentSeverityEvaluator()

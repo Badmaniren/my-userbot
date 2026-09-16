@@ -1,9 +1,5 @@
 # Текущий эпик Унги
 
-## Анализ влияния и бизнес-метрик инцидентов
+## SLA Compliance and Recovery Optimization
 
-- incident_impact_analyzer: Запуск нового эпика для оценки ущерба и влияния инцидентов на бизнес-процессы
-- incident_financial_impact_evaluator: Создаем честный модуль для расчета финансовых потерь, интегрирующийся с incident_impact_analyzer для продолжения текущего эпика.
-- incident_business_loss_reporter: Завершаем эпик созданием честного и рабочего модуля для отчетности по бизнес-потерям инцидентов без использования фиктивных заглушек.  ✅ ЭПИК ЗАВЕРШЁН
-
-Нет активного эпика — можно предложить новый.
+- incident_sla_tracker: Establishing the core tracking mechanism to measure incident resolution performance against business-critical SLA targets.

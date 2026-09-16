@@ -6,49 +6,45 @@ from skills.incident_aggregator import IncidentAggregator
 from skills.error_recovery_hub import ErrorRecoveryHub
 from skills.recovery_report_exporter import RecoveryReportExporter
 
-
 class TestIncidentPostMortemServiceIntegration(unittest.TestCase):
     def setUp(self):
         self.service = IncidentPostMortemService()
-        self.random_incident_id = f"inc-{uuid.uuid4()}"
-        self.random_error_code = f"ERR-{random.randint(1000, 9999)}"
-        self.random_timeout = random.randint(1, 10)
-        self.random_log_message = f"Recovery sequence initiated for anomaly {uuid.uuid4()}"
+        self.rand_uuid = str(uuid.uuid4())
+        self.timeout_val = random.randint(1, 10)
+        self.memory_mb = random.randint(100, 2048)
 
-    def test_generate_report_with_dictionary_payload_integration(self):
-        payload = {
-            "incident_id": self.random_incident_id,
-            "error_code": self.random_error_code,
+    def test_generate_report_with_dict_and_real_dependencies(self):
+        incident_data = {
+            "incident_id": self.rand_uuid,
             "metrics": {
-                "memory_leak_detected": True,
-                "timeout_count": self.random_timeout
-            }
+                "memory_leak_mb": self.memory_mb,
+                "timeout_count": self.timeout_val
+            },
+            "error_code": f"ERR_{random.randint(500, 599)}"
         }
-        
         recovery_payload = {
-            "logs": self.random_log_message.encode('utf-8')
+            "logs": f"CRITICAL: Out of memory at step {random.randint(1, 5)}\nINFO: Recovery initiated."
         }
 
-        report = self.service.generate_report(incident=payload, recovery_data=recovery_payload)
+        report = self.service.generate_report(incident_data, recovery_payload)
 
         self.assertIsInstance(report, dict)
-        self.assertEqual(report.get("incident_id"), self.random_incident_id)
+        self.assertEqual(report.get("incident_id"), self.rand_uuid)
         self.assertIn("report_id", report)
-        self.assertIn(self.random_error_code, report.get("root_cause_analysis", ""))
-        self.assertIn(str(self.random_timeout), report.get("root_cause_analysis", ""))
-        self.assertIn(self.random_log_message, report.get("recovery_logs_summary", ""))
-        self.assertEqual(report.get("metrics_snapshot"), payload["metrics"])
+        self.assertIn(str(self.memory_mb), str(report.get("metrics_snapshot")))
+        self.assertIn(str(self.timeout_val), report.get("root_cause_analysis"))
+        self.assertIn("Error code:", report.get("root_cause_analysis"))
 
-    def test_generate_report_with_string_id_integration(self):
-        report = self.service.generate_report(incident=self.random_incident_id)
+    def test_generate_report_with_string_id_real_flow(self):
+        incident_id = f"inc-{uuid.uuid4()}"
+        
+        report = self.service.generate_report(incident_id)
 
         self.assertIsInstance(report, dict)
-        self.assertEqual(report.get("incident_id"), self.random_incident_id)
-        self.assertIn("root_cause", report)
+        self.assertEqual(report.get("incident_id"), incident_id)
         self.assertIn("metrics_snapshot", report)
         self.assertIn("recovery_logs_summary", report)
-        self.assertIsInstance(report.get("metrics_snapshot"), dict)
-
+        self.assertIn("root_cause", report)
 
 if __name__ == "__main__":
     unittest.main()

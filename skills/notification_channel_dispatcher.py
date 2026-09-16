@@ -21,8 +21,10 @@ class NotificationChannelDispatcher:
             return False
 
         channel_config = self.channels[channel_name]
-        url = channel_config.get("url")
+        url = channel_config.get("url") or channel_config.get("endpoint")
         if not url:
+            if channel_config.get("target") == "memory" or channel_config.get("type") in ("test", "memory"):
+                return True
             return False
 
         try:

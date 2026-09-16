@@ -50,6 +50,17 @@ class IncidentNotificationBridge:
         data = json.loads(content)
         return self.process_incident(data, channel=channel)
 
+    def persist_incident(self, incident_data: dict):
+        incident_id = incident_data.get("incident_id") or incident_data.get("id")
+        if self.storage_dir and incident_id:
+            os.makedirs(self.storage_dir, exist_ok=True)
+            file_path = os.path.join(self.storage_dir, f"{incident_id}.json")
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(incident_data, f)
+        if incident_id:
+            self.processed_incidents[incident_id] = time.time()
+        return True
+
     def dispatch_critical_incident(self, aggregated_incident):
         incident_id = aggregated_incident.get("id") or aggregated_incident.get("incident_id")
         

@@ -20,7 +20,44 @@ class IncidentSeverityEvaluator:
         else:
             return "LOW"
 
-    def evaluate(self, module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
+    def evaluate(self, module_name=None, exception=None, traceback_str=None, incident_id=None, **kwargs):
+        if isinstance(module_name, dict):
+            payload = dict(module_name)
+            payload.pop("severity_assessment", None)
+            impact_score = payload.get("impact_score", 0)
+            error_code = payload.get("error_code")
+            count = payload.get("count", 0)
+            if impact_score >= 60:
+                severity = "CRITICAL"
+            elif impact_score >= 20:
+                severity = "HIGH"
+            elif impact_score >= 5:
+                severity = "MEDIUM"
+            else:
+                severity = self.calculate_severity_score(payload)
+            return {
+                "severity": severity,
+                "incident_id": payload.get("incident_id") or payload.get("id"),
+                "payload": payload
+            }
+
+        impact_score = kwargs.get("impact_score")
+        if impact_score is not None or kwargs.get("error_code") is not None:
+            imp = impact_score or 0
+            if imp >= 60:
+                severity = "CRITICAL"
+            elif imp >= 20:
+                severity = "HIGH"
+            elif imp >= 5:
+                severity = "MEDIUM"
+            else:
+                severity = "LOW"
+            return {
+                "severity": severity,
+                "error_code": kwargs.get("error_code"),
+                "impact_score": imp
+            }
+
         agg_result = self.aggregator.process_and_aggregate(
             module_name, exception, traceback_str, incident_id
         )

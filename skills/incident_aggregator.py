@@ -6,6 +6,14 @@ class IncidentAggregator:
         self.hub = ErrorRecoveryHub()
         self.collector = PatchMetricCollector()
 
+    def collect(self, incident_id=None, component=None, severity=None, **kwargs):
+        return {
+            "incident_id": incident_id,
+            "component": component,
+            "severity": severity,
+            **kwargs
+        }
+
     def process_and_aggregate(self, module_name, exception, traceback_str, incident_id=None):
         if not incident_id:
             incident_id = self.hub.capture_failure(module_name, exception, traceback_str)

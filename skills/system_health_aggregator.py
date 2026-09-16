@@ -7,6 +7,9 @@ class SystemHealthAggregator:
         self.reporter = SystemHealthReporter()
         self.dashboard_gen = RecoveryDashboardGenerator()
 
+    def aggregate(self, system_id=None, **kwargs):
+        return self.collect_and_aggregate(**kwargs)
+
     def collect_and_aggregate(
         self,
         module_name=None,

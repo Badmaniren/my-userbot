@@ -1,6 +1,6 @@
 import os
 import io
-from skills.incident_impact_analyzer import IncidentImpactAnalyzer, incident_impact_analyzer
+from skills.incident_impact_analyzer import IncidentImpactAnalyzer
 
 class IncidentFinancialImpactEvaluator:
     def evaluate(self, incident_id_or_impact_data):

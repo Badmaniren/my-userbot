@@ -105,7 +105,6 @@ def incident_sla_mitigation_planner(payload: Union[str, Dict[str, Any]]) -> Dict
 
     remediation_steps = ["Analyze logs", "Scale resources", "Apply hotfix"]
 
-    # Проверка на интеграционный вызов через функции модулей, если они переданы/доступны
     if isinstance(payload, dict) and "prediction_payload" in payload:
         pred = payload["prediction_payload"]
         if isinstance(pred, dict) and "remediation_steps" in pred:

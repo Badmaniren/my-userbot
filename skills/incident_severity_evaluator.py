@@ -20,7 +20,28 @@ class IncidentSeverityEvaluator:
         else:
             return "LOW"
 
-    def evaluate(self, module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
+    def evaluate(self, module_name=None, exception=None, traceback_str=None, incident_id=None):
+        if isinstance(module_name, dict):
+            payload_data = dict(module_name)
+            payload_data.pop("severity_assessment", None)
+            inc_id = payload_data.get("incident_id") or payload_data.get("id") or incident_id
+
+            if "severity" in payload_data:
+                severity = payload_data["severity"]
+            else:
+                severity = self.calculate_severity_score(payload_data)
+
+            notification_payload = self.template_engine.generate_notification_payload(
+                severity, inc_id, payload_data
+            )
+
+            return {
+                "incident_id": inc_id,
+                "severity": severity,
+                "payload": notification_payload,
+                "aggregated_data": payload_data,
+            }
+
         agg_result = self.aggregator.process_and_aggregate(
             module_name, exception, traceback_str, incident_id
         )
@@ -78,6 +99,6 @@ class IncidentSeverityEvaluator:
         return self.template_engine.export_notification_file(context, output_path)
 
 
-def evaluate_incident_severity(module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
+def evaluate_incident_severity(module_name=None, exception=None, traceback_str=None, incident_id=None):
     evaluator = IncidentSeverityEvaluator()
     return evaluator.evaluate(module_name, exception, traceback_str, incident_id)

@@ -1,73 +1,61 @@
 import unittest
 import uuid
 import random
-import sys
-import os
-
 from skills.incident_auto_recovery_dispatcher import IncidentAutoRecoveryDispatcher
-from skills.error_recovery_hub import ErrorRecoveryHub
-from skills.incident_auto_escalation_engine import IncidentAutoEscalationEngine
 
 
 class TestIncidentAutoRecoveryDispatcherIntegration(unittest.TestCase):
+    """
+    Интеграционный тест для IncidentAutoRecoveryDispatcher.
+    Проверяет реальное взаимодействие без моков между 
+    IncidentAutoEscalationEngine и ErrorRecoveryHub.
+    """
 
     def setUp(self):
         self.dispatcher = IncidentAutoRecoveryDispatcher()
-        self.recovery_hub = ErrorRecoveryHub()
-        self.escalation_engine = IncidentAutoEscalationEngine()
-        
-        self.random_incident_id = f"inc-{uuid.uuid4()}"
-        self.random_module_name = f"mod_{uuid.uuid4().hex[:8]}"
-        self.random_error_message = f"Critical failure in subsystem {random.randint(1000, 9999)}"
+        self.module_name = f"test_module_{uuid.uuid4().hex[:8]}"
+        self.incident_id = f"inc-{uuid.uuid4().hex}"
+        self.exception_msg = f"Random failure {uuid.uuid4().hex}"
+        self.test_exception = RuntimeError(self.exception_msg)
+        self.traceback_str = f"Traceback (most recent call last):\n  File '{self.module_name}.py', line {random.randint(1, 100)}\n    raise RuntimeError('{self.exception_msg}')"
 
-    def test_end_to_end_auto_recovery_dispatch(self):
-        try:
-            raise RuntimeError(self.random_error_message)
-        except RuntimeError as e:
-            tb_str = "".join(sys.exc_info())
-            
-            captured_incident = self.recovery_hub.capture_failure(
-                module_name=self.random_module_name,
-                exception=e,
-                traceback_str=tb_str
-            )
-            
-            incident_id = captured_incident.get("incident_id", self.random_incident_id) if isinstance(captured_incident, dict) else self.random_incident_id
-
-            dispatch_result = self.dispatcher.dispatch_recovery(
-                incident_id=incident_id,
-                module_name=self.random_module_name,
-                exception=e
-            )
-
-            self.assertIsNotNone(dispatch_result, "Dispatcher returned None for recovery process")
-            
-            escalation_status = self.escalation_engine.process_escalation(incident_id)
-            self.assertIsInstance(escalation_status, dict, "Escalation engine must return a dictionary status")
-
-            history = self.recovery_hub.get_incident_history(self.random_module_name)
-            self.assertIsNotNone(history, "Incident history should not be empty after dispatch")
-
-
-    def test_telemetry_risk_evaluation_and_patch_trigger(self):
-        telemetry_risks = self.escalation_engine.evaluate_system_telemetry_risks()
-        self.assertIsInstance(telemetry_risks, dict, "Telemetry risks evaluation must return structured data")
-
-        patch_triggered = self.escalation_engine.check_and_trigger_patching()
-        self.assertIn(patch_triggered, [True, False], "Patch triggering check must evaluate to boolean")
-
-        context_data = {
-            "random_seed": random.randint(1, 100000),
-            "telemetry_state": telemetry_risks
-        }
-
-        recovery_action = self.recovery_hub.analyze_and_recover(
-            module_name=self.random_module_name,
-            exception=ValueError(f"Random validation error {uuid.uuid4()}"),
-            context=context_data
+    def test_dispatch_recovery_integration(self):
+        # Проверяем сквозной метод dispatch_recovery с использованием реальных навыков
+        result = self.dispatcher.dispatch_recovery(
+            incident_id=self.incident_id,
+            module_name=self.module_name,
+            exception=self.test_exception
         )
 
-        self.assertIsNotNone(recovery_action, "Analyze and recover workflow must execute and return result")
+        self.assertIsInstance(result, dict, "Результат должен быть словарем")
+        self.assertEqual(result.get("incident_id"), self.incident_id, "Инцидент ID должен совпадать")
+        self.assertEqual(result.get("status"), "dispatched", "Статус должен быть dispatched")
+        
+        # Проверяем, что вложенные результаты получены от реальных движков
+        self.assertIn("recovery_result", result)
+        self.assertIn("escalation_result", result)
+
+    def test_evaluate_telemetry_integration(self):
+        # Проверяем интеграцию с IncidentAutoEscalationEngine.evaluate_system_telemetry_risks
+        telemetry = self.dispatcher.evaluate_telemetry()
+        self.assertIsInstance(telemetry, dict, "Телеметрия должна возвращаться в виде словаря")
+
+    def test_consume_and_process_stream_integration(self):
+        # Проверяем интеграцию с IncidentAutoEscalationEngine.consume_stream_data
+        stream_data = self.dispatcher.consume_and_process_stream()
+        self.assertTrue(
+            isinstance(stream_data, (bytes, bytearray)), 
+            "Поток данных должен возвращаться в байтах"
+        )
+
+    def test_run_full_recovery_cycle_integration(self):
+        # Проверяем полный цикл восстановления и эскалации
+        success = self.dispatcher.run_full_recovery_cycle(
+            module_name=self.module_name,
+            exception=self.test_exception,
+            traceback_str=self.traceback_str
+        )
+        self.assertIsInstance(success, bool, "Результат полного цикла должен быть булевым значением")
 
 
 if __name__ == "__main__":

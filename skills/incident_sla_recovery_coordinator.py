@@ -57,7 +57,6 @@ class IncidentSLARecoveryCoordinator:
 
     def get_current_time_to_breach(self, incident_id, current_time):
         if hasattr(self.sla_tracker, 'get_time_to_breach'):
-            # Аккуратно приводим типы к datetime, чтобы (current_time - created_at).total_seconds() в трекере не падал
             if isinstance(current_time, (int, float)):
                 current_time_dt = datetime.datetime.fromtimestamp(current_time, datetime.timezone.utc)
             else:

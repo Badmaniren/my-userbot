@@ -116,3 +116,7 @@ def incident_sla_mitigation_planner(payload: Union[str, Dict[str, Any]]) -> Dict
         "remediation_steps": remediation_steps,
         "status": "generated"
     }
+
+
+plan_incident_mitigation = incident_sla_mitigation_planner
+plan_incident_sla_mitigation = incident_sla_mitigation_planner

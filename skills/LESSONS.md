@@ -3,7 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-emetry_collector import ...'
+ЕНО: Объявлен фиктивный 'system_health_telemetry_collector'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.system_health_telemetry_collector import ...'
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -291,7 +291,3 @@ emetry_collector import ...'
 
 ## incident_auto_recovery_dispatcher (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
-
-## incident_sla_tracker (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

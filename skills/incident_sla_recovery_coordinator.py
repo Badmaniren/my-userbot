@@ -28,11 +28,18 @@ class IncidentSLARecoveryCoordinator:
             module_name = incident.get('module_name')
             severity = incident.get('severity')
             
-            dispatch_res = self.recovery_dispatcher.dispatch_recovery(
-                incident_id=incident_id,
-                module_name=module_name,
-                severity=severity
-            )
+            try:
+                dispatch_res = self.recovery_dispatcher.dispatch_recovery(
+                    incident_id=incident_id,
+                    module_name=module_name,
+                    severity=severity
+                )
+            except TypeError:
+                dispatch_res = self.recovery_dispatcher.dispatch_recovery(
+                    incident_id=incident_id,
+                    module_name=module_name
+                )
+
             if dispatch_res is not None:
                 results.append(dispatch_res)
             else:

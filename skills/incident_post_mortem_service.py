@@ -109,3 +109,18 @@ class IncidentPostMortemService:
             if hasattr(self.report_exporter, "export"):
                 self.report_exporter.export(report)
             return report
+
+    def import_historical_data(self, data_batch: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        imported_reports = []
+        for incident in data_batch:
+            report = self.generate_report(incident)
+            imported_reports.append(report)
+        return imported_reports
+
+    def export_summary_analytics(self, incidents: List[Union[str, Dict[str, Any]]]) -> Dict[str, Any]:
+        total_incidents = len(incidents)
+        reports = [self.generate_report(inc) for inc in incidents]
+        return {
+            "total_incidents": total_incidents,
+            "reports_summary": reports
+        }

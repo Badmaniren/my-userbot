@@ -36,7 +36,11 @@ class IncidentAggregator:
         }
 
 
-def aggregate_incidents(module_name_or_incidents, exception=None, traceback_str=None):
+def aggregate_incidents(module_name=None, exception=None, traceback_str=None, **kwargs):
+    module_name_or_incidents = module_name
+    if module_name_or_incidents is None and kwargs:
+        module_name_or_incidents = kwargs.get("incidents") or kwargs.get("data")
+
     if isinstance(module_name_or_incidents, (list, tuple)):
         return {
             "incidents": module_name_or_incidents,
@@ -46,7 +50,7 @@ def aggregate_incidents(module_name_or_incidents, exception=None, traceback_str=
     if isinstance(module_name_or_incidents, dict):
         return module_name_or_incidents
 
-    module_name = str(module_name_or_incidents)
+    module_name = str(module_name_or_incidents) if module_name_or_incidents is not None else "unknown_module"
     exc = exception if exception is not None else Exception("Unknown error")
     tb_str = traceback_str or ""
 

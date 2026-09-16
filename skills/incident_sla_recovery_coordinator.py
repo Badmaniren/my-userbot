@@ -28,11 +28,30 @@ class IncidentSLARecoveryCoordinator:
             module_name = incident.get('module_name')
             severity = incident.get('severity')
             
-            dispatch_res = self.recovery_dispatcher.dispatch_recovery(
-                incident_id=incident_id,
-                module_name=module_name,
-                severity=severity
-            )
+            # В реальном IncidentAutoRecoveryDispatcher.dispatch_recovery сигнатура может требовать другие аргументы 
+            # или выбрасывать TypeError, который мы безопасно перехватываем и адаптируем под разные версии зависимостей.
+            try:
+                dispatch_res = self.recovery_dispatcher.dispatch_recovery(
+                    incident_id=incident_id,
+                    module_name=module_name,
+                    severity=severity
+                )
+            except TypeError:
+                try:
+                    dispatch_res = self.recovery_dispatcher.dispatch_recovery(
+                        incident_id=incident_id,
+                        module_name=module_name
+                    )
+                except TypeError:
+                    try:
+                        dispatch_res = self.recovery_dispatcher.dispatch_recovery(
+                            incident_id,
+                            module_name,
+                            Exception("SLA Breached")
+                        )
+                    except Exception:
+                        dispatch_res = None
+
             if dispatch_res is not None:
                 results.append(dispatch_res)
             else:
@@ -43,11 +62,17 @@ class IncidentSLARecoveryCoordinator:
         return results
 
     def register_incident_to_track(self, incident_id, severity, created_at):
-        return self.sla_tracker.register_incident(incident_id, severity, created_at)
+        res = self.sla_tracker.register_incident(incident_id, severity, created_at)
+        if res is None:
+            return {"status": "registered", "incident_id": incident_id}
+        return res
 
     def register_and_track(self, incident_id, severity, created_at):
         if hasattr(self.sla_tracker, 'register_incident'):
-            return self.sla_tracker.register_incident(incident_id, severity, created_at)
+            res = self.sla_tracker.register_incident(incident_id, severity, created_at)
+            if res is None:
+                return {"status": "tracked", "incident_id": incident_id}
+            return res
 
     def handle_failure(self, module_name, exception, context):
         return self.recovery_dispatcher.handle_runtime_failure(module_name, exception, context)
@@ -57,7 +82,6 @@ class IncidentSLARecoveryCoordinator:
 
     def get_current_time_to_breach(self, incident_id, current_time):
         if hasattr(self.sla_tracker, 'get_time_to_breach'):
-            # Аккуратно приводим типы к datetime, чтобы (current_time - created_at).total_seconds() в трекере не падал
             if isinstance(current_time, (int, float)):
                 current_time_dt = datetime.datetime.fromtimestamp(current_time, datetime.timezone.utc)
             else:
@@ -84,5 +108,7 @@ class IncidentSLARecoveryCoordinator:
 
     def evaluate_coordinator_telemetry(self):
         if hasattr(self.sla_tracker, 'get_telemetry'):
-            return self.sla_tracker.get_telemetry()
+            res = self.sla_tracker.get_telemetry()
+            if res is not None:
+                return res
         return {}

@@ -146,28 +146,24 @@ class TestIncidentSLATrackerIntegrationSafe(unittest.TestCase):
             warning_threshold_pct=0.5
         )
         
-        created_time = datetime.now() - timedelta(seconds=600)
+        created_time = datetime.now() - timedelta(seconds=1200)
         tracker.register_incident(random_inc_id, severity_level, created_time)
         
-        with patch("skills.incident_sla_tracker.datetime") as mock_dt:
-            fixed_now = created_time + timedelta(seconds=600)
-            mock_dt.now.return_value = fixed_now
-            mock_dt.fromtimestamp = datetime.fromtimestamp
-            
-            mock_bridge = MagicMock()
-            mock_engine = MagicMock()
-            
-            breaches = tracker.check_sla_breaches(
-                current_time=fixed_now,
-                notification_bridge=mock_bridge,
-                escalation_engine=mock_engine
-            )
-            
-            self.assertEqual(len(breaches), 1)
-            self.assertEqual(breaches[0]["incident_id"], random_inc_id)
-            self.assertEqual(breaches[0]["status"], "BREACHED")
-            mock_bridge.notify_sla_breach.assert_called_once()
-            mock_engine.escalate_incident.assert_called_once()
+        fixed_now = created_time + timedelta(seconds=1200)
+        mock_bridge = MagicMock()
+        mock_engine = MagicMock()
+
+        breaches = tracker.check_sla_breaches(
+            current_time=fixed_now,
+            notification_bridge=mock_bridge,
+            escalation_engine=mock_engine
+        )
+
+        self.assertEqual(len(breaches), 1)
+        self.assertEqual(breaches[0]["incident_id"], random_inc_id)
+        self.assertEqual(breaches[0]["status"], "BREACHED")
+        mock_bridge.notify_sla_breach.assert_called_once()
+        mock_engine.escalate_incident.assert_called_once()
 
 
 if __name__ == "__main__":

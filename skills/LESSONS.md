@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ter (compose) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## incident_notification_broadcaster (compose) — раундов: 4
+on_broadcaster (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -296,3 +292,7 @@ ter (compose) — раундов: 4
 
 ## incident_sla_breach_predictor (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## incident_sla_mitigation_planner (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

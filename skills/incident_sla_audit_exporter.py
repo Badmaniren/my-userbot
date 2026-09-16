@@ -14,52 +14,31 @@ class IncidentSLAAuditExporter:
     from incident_sla_tracker and incident_sla_mitigation_planner.
     """
 
-    def __init__(
-        self,
-        sla_thresholds: Optional[Dict[str, Any]] = None,
-        warning_threshold_pct: float = 80.0,
-        tracker: Optional[Any] = None,
-        planner: Optional[Any] = None,
-    ) -> None:
-        if tracker is not None:
-            self.tracker = tracker
-        else:
-            if sla_thresholds is None:
-                sla_thresholds = {"P1": 4, "P2": 8, "P3": 24, "P4": 48}
-            self.tracker = incident_sla_tracker.IncidentSLATracker(
-                sla_thresholds=sla_thresholds, warning_threshold_pct=warning_threshold_pct
-            )
-
-        if planner is not None:
-            self.planner = planner
-        else:
-            self.planner = incident_sla_mitigation_planner.IncidentSLAMitigationPlanner()
+    def __init__(self, sla_thresholds: Optional[Dict[str, Any]] = None, warning_threshold_pct: float = 80.0) -> None:
+        if sla_thresholds is None:
+            sla_thresholds = {"P1": 4, "P2": 8, "P3": 24, "P4": 48}
+        self.tracker = incident_sla_tracker.IncidentSLATracker(sla_thresholds=sla_thresholds, warning_threshold_pct=warning_threshold_pct)
+        self.planner = incident_sla_mitigation_planner.IncidentSLAMitigationPlanner()
 
     def _get_incident_sla_record(self, incident_id: str) -> Optional[Dict[str, Any]]:
         """Helper to safely fetch SLA record supporting different method names on tracker."""
         if hasattr(self.tracker, "get_incident_sla_record"):
-            res = self.tracker.get_incident_sla_record(incident_id)
-            if res is not None:
-                return res
-        if hasattr(self.tracker, "get_record"):
-            res = self.tracker.get_record(incident_id)
-            if res is not None:
-                return res
-        if hasattr(self.tracker, "records") and incident_id in self.tracker.records:
-            return self.tracker.records[incident_id]
+            return self.tracker.get_incident_sla_record(incident_id)
+        elif hasattr(self.tracker, "get_record"):
+            return self.tracker.get_record(incident_id)
+        elif hasattr(self.tracker, "track_sla"):
+            # Fallback or check internal storage if available
+            if hasattr(self.tracker, "records") and incident_id in self.tracker.records:
+                return self.tracker.records[incident_id]
         return None
 
     def _get_mitigation_details(self, incident_id: str) -> Optional[Dict[str, Any]]:
         """Helper to safely fetch mitigation details supporting different method names on planner."""
         if hasattr(self.planner, "get_mitigation_details"):
-            res = self.planner.get_mitigation_details(incident_id)
-            if res is not None:
-                return res
-        if hasattr(self.planner, "get_plan"):
-            res = self.planner.get_plan(incident_id)
-            if res is not None:
-                return res
-        if hasattr(self.planner, "plans") and incident_id in self.planner.plans:
+            return self.planner.get_mitigation_details(incident_id)
+        elif hasattr(self.planner, "get_plan"):
+            return self.planner.get_plan(incident_id)
+        elif hasattr(self.planner, "plans") and incident_id in self.planner.plans:
             return self.planner.plans[incident_id]
         return None
 

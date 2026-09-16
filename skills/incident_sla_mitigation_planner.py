@@ -16,27 +16,6 @@ class IncidentSLAMitigationPlanner:
     Поддерживает как юнит-тестовые интерфейсы, так и интеграционный функциональный вызов.
     """
 
-    plans: Dict[str, Any] = {}
-
-    def create_plan(
-        self, incident_id: str, strategy: Optional[str] = None, **kwargs
-    ) -> Dict[str, Any]:
-        plan = {
-            "incident_id": incident_id,
-            "strategy": strategy,
-            "mitigation_plan": strategy,
-            "priority": kwargs.get("priority", "HIGH"),
-            **kwargs,
-        }
-        self.plans[incident_id] = plan
-        return plan
-
-    def get_mitigation_details(self, incident_id: str) -> Optional[Dict[str, Any]]:
-        return self.plans.get(incident_id)
-
-    def get_plan(self, incident_id: str) -> Optional[Dict[str, Any]]:
-        return self.plans.get(incident_id)
-
     def generate_mitigation_plan(self, incident_id: str) -> Dict[str, Any]:
         breaches = []
         if incident_sla_breach_predictor and hasattr(incident_sla_breach_predictor, "get_predicted_breaches"):

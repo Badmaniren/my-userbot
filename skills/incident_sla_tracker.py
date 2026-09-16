@@ -10,38 +10,10 @@ incident_notification_bridge = None
 incident_auto_escalation_engine = None
 
 class IncidentSLATracker:
-    records: Dict[str, Any] = {}
-
-    def __init__(
-        self,
-        sla_thresholds: Optional[Dict[str, int]] = None,
-        warning_threshold_pct: float = 0.8,
-    ):
-        if sla_thresholds is None:
-            sla_thresholds = {"LOW": 7200, "MEDIUM": 3600, "HIGH": 1800, "CRITICAL": 600, "P1": 4, "P2": 8, "P3": 24, "P4": 48}
+    def __init__(self, sla_thresholds: Dict[str, int], warning_threshold_pct: float):
         self.sla_thresholds = sla_thresholds
         self.warning_threshold_pct = warning_threshold_pct
         self.incidents = {}
-
-    def track_sla(
-        self, incident_id: str, limit_hours: Optional[float] = None, **kwargs
-    ) -> Dict[str, Any]:
-        record = {
-            "incident_id": incident_id,
-            "limit_hours": limit_hours,
-            "sla_status": "COMPLIANT",
-            "status": "COMPLIANT",
-            "compliance_score": 100.0,
-            **kwargs,
-        }
-        self.records[incident_id] = record
-        return record
-
-    def get_incident_sla_record(self, incident_id: str) -> Optional[Dict[str, Any]]:
-        return self.records.get(incident_id)
-
-    def get_record(self, incident_id: str) -> Optional[Dict[str, Any]]:
-        return self.records.get(incident_id)
 
     def register_incident(self, incident_id: str, severity: str, created_at: datetime) -> None:
         self.incidents[incident_id] = {

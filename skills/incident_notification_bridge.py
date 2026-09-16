@@ -44,10 +44,16 @@ class IncidentNotificationBridge:
         return {"status_code": 200}
 
     def ingest_stream(self, file_stream, channel=None):
-        content = file_stream.read()
+        if hasattr(file_stream, "read"):
+            content = file_stream.read()
+        else:
+            content = file_stream
         if isinstance(content, bytes):
-            content = content.decode('utf-8')
-        data = json.loads(content)
+            content = content.decode('utf-8', errors='ignore')
+        try:
+            data = json.loads(content)
+        except Exception:
+            data = {"raw_stream": content}
         return self.process_incident(data, channel=channel)
 
     def dispatch_critical_incident(self, aggregated_incident):

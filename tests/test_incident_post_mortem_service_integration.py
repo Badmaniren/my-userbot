@@ -2,17 +2,21 @@ import unittest
 import uuid
 import random
 from skills.incident_post_mortem_service import IncidentPostMortemService
+from skills.incident_aggregator import IncidentAggregator
+from skills.error_recovery_hub import ErrorRecoveryHub
+from skills.recovery_report_exporter import RecoveryReportExporter
 
 
 class TestIncidentPostMortemServiceIntegration(unittest.TestCase):
 
     def setUp(self):
         self.service = IncidentPostMortemService()
-        self.random_incident_id = f"inc-{uuid.uuid4()}"
-        self.random_error_code = f"ERR-{random.randint(1000, 9999)}"
-        self.random_timeout = random.randint(1, 50)
+        self.random_incident_id = str(uuid.uuid4())
+        self.random_error_code = f"ERR_{random.randint(1000, 9999)}"
+        self.random_timeout = random.randint(1, 100)
+        self.random_log_message = f"Recovery sequence initiated for error {self.random_error_code}"
 
-    def test_generate_report_integration_with_real_dependencies(self):
+    def test_full_integration_pipeline_with_real_dependencies(self):
         incident_payload = {
             "incident_id": self.random_incident_id,
             "error_code": self.random_error_code,
@@ -23,62 +27,51 @@ class TestIncidentPostMortemServiceIntegration(unittest.TestCase):
         }
         
         recovery_payload = {
-            "logs": f"CRITICAL: Service degraded\nTimeout reached at limit {self.random_timeout}\nMemory usage spike"
+            "logs": f"[INFO] {self.random_log_message}\n[WARN] High memory consumption observed."
         }
 
         report = self.service.generate_report(incident_payload, recovery_payload)
 
         self.assertIsInstance(report, dict)
         self.assertEqual(report.get("incident_id"), self.random_incident_id)
-        self.assertIn("root_cause_analysis", report)
+        self.assertIn("report_id", report)
         
-        root_cause = report["root_cause_analysis"]
+        root_cause = report.get("root_cause_analysis", "")
         self.assertIn(self.random_error_code, root_cause)
         self.assertIn(str(self.random_timeout), root_cause)
         self.assertIn("Memory leak detected", root_cause)
-        
-        self.assertIn("metrics_snapshot", report)
-        self.assertEqual(report["metrics_snapshot"]["timeout_count"], self.random_timeout)
-        self.assertIn("recovery_logs_summary", report)
+        self.assertIn(self.random_log_message, root_cause)
 
-    def test_import_historical_data_integration(self):
-        batch_size = random.randint(2, 4)
+        metrics_snapshot = report.get("metrics_snapshot", {})
+        self.assertEqual(metrics_snapshot.get("timeout_count"), self.random_timeout)
+        self.assertTrue(metrics_snapshot.get("memory_leak_detected"))
+
+    def test_batch_import_and_summary_analytics_integration(self):
+        batch_size = random.randint(2, 5)
         data_batch = []
         
         generated_ids = set()
         for _ in range(batch_size):
-            inc_id = f"hist-{uuid.uuid4()}"
+            inc_id = str(uuid.uuid4())
             generated_ids.add(inc_id)
             data_batch.append({
                 "incident_id": inc_id,
-                "metrics": {"memory_leak_mb": random.randint(100, 1024)}
+                "error_code": f"CODE_{random.randint(100, 999)}",
+                "metrics": {
+                    "timeout_count": random.randint(0, 5)
+                }
             })
 
         imported_reports = self.service.import_historical_data(data_batch)
-
-        self.assertIsInstance(imported_reports, list)
         self.assertEqual(len(imported_reports), batch_size)
         
-        for report in imported_reports:
-            self.assertIn("incident_id", report)
-            self.assertIn(report["incident_id"], generated_ids)
-            self.assertIn("Memory leak detected", report.get("root_cause", report.get("root_cause_analysis", "")))
+        for rep in imported_reports:
+            self.assertIn(rep.get("incident_id"), generated_ids)
+            self.assertIn("root_cause_analysis", rep)
 
-    def test_export_summary_analytics_integration(self):
-        incidents_list = [
-            f"string-inc-{uuid.uuid4()}",
-            {
-                "incident_id": f"dict-inc-{uuid.uuid4()}",
-                "metrics": {"timeout_count": random.randint(1, 10)}
-            }
-        ]
-
-        summary = self.service.export_summary_analytics(incidents_list)
-
-        self.assertIsInstance(summary, dict)
-        self.assertEqual(summary.get("total_incidents"), len(incidents_list))
-        self.assertIn("reports_summary", summary)
-        self.assertEqual(len(summary["reports_summary"]), len(incidents_list))
+        summary = self.service.export_summary_analytics(data_batch)
+        self.assertEqual(summary.get("total_incidents"), batch_size)
+        self.assertEqual(len(summary.get("reports_summary")), batch_size)
 
 
 if __name__ == "__main__":

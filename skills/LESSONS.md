@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ешно прошёл тесты и влит в main
-
-## system_telemetry_collector (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1)
+а перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## system_telemetry_collector (create) — раундов: 4
@@ -309,6 +306,9 @@
 
 ## incident_knowledge_base_searcher (create) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## incident_post_mortem_service (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## incident_post_mortem_service (refactor) — раундов: 1

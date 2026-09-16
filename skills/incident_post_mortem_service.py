@@ -9,7 +9,9 @@ from skills.recovery_report_exporter import RecoveryReportExporter
 
 class IncidentPostMortemService:
     def __init__(self):
-        pass
+        self.incident_aggregator = IncidentAggregator()
+        self.error_recovery_hub = ErrorRecoveryHub()
+        self.report_exporter = RecoveryReportExporter()
 
     def _fetch_incident_metrics(self, incident_id: str) -> Dict[str, Any]:
         return {}
@@ -43,12 +45,20 @@ class IncidentPostMortemService:
             metrics_data = incident.get("metrics", {})
             
             if recovery_data and isinstance(recovery_data, dict):
-                logs_stream = io.BytesIO(str(recovery_data.get("logs", "")).encode('utf-8'))
+                logs_raw = recovery_data.get("logs", "")
+                if isinstance(logs_raw, bytes):
+                    logs_stream = io.BytesIO(logs_raw)
+                else:
+                    logs_stream = io.BytesIO(str(logs_raw).encode('utf-8'))
             else:
                 logs_stream = io.BytesIO(b"")
                 
             parsed_logs = self._parse_recovery_logs(logs_stream)
             root_cause = self._evaluate_root_cause(metrics_data, parsed_logs)
+            
+            error_code = incident.get("error_code")
+            if error_code and error_code not in root_cause:
+                root_cause = f"Error code: {error_code}. " + root_cause
             
             return {
                 "report_id": str(uuid.uuid4()),

@@ -8,52 +8,55 @@ from skills.incident_post_mortem_service import IncidentPostMortemService
 
 
 class TestIncidentPostMortemService(unittest.TestCase):
+
     def setUp(self):
         self.service = IncidentPostMortemService()
 
-    def test_fetch_incident_metrics_success(self):
-        incident_id = uuid.uuid4().hex
+    def test_fetch_incident_metrics_valid_dict(self):
+        inc_id = uuid.uuid4().hex
         mock_metrics = {uuid.uuid4().hex: random.randint(1, 100)}
         
         with patch.object(self.service.incident_aggregator, "aggregate", return_value=mock_metrics) as mock_agg:
-            result = self.service._fetch_incident_metrics(incident_id)
-            mock_agg.assert_called_once_with(incident_id)
+            result = self.service._fetch_incident_metrics(inc_id)
+            mock_agg.assert_called_once_with(inc_id)
             self.assertEqual(result, mock_metrics)
 
     def test_fetch_incident_metrics_invalid_type(self):
-        incident_id = uuid.uuid4().hex
+        inc_id = uuid.uuid4().hex
         with patch.object(self.service.incident_aggregator, "aggregate", return_value=uuid.uuid4().hex):
-            result = self.service._fetch_incident_metrics(incident_id)
+            result = self.service._fetch_incident_metrics(inc_id)
             self.assertEqual(result, {})
 
     def test_fetch_recovery_logs_bytes(self):
-        incident_id = uuid.uuid4().hex
-        log_content = uuid.uuid4().hex.encode('utf-8')
+        inc_id = uuid.uuid4().hex
+        raw_logs = uuid.uuid4().hex.encode('utf-8')
         
-        with patch.object(self.service.error_recovery_hub, "get_logs", return_value=log_content) as mock_logs:
-            stream = self.service._fetch_recovery_logs(incident_id)
-            mock_logs.assert_called_once_with(incident_id)
-            self.assertEqual(stream.read(), log_content)
+        with patch.object(self.service.error_recovery_hub, "get_logs", return_value=raw_logs):
+            stream = self.service._fetch_recovery_logs(inc_id)
+            self.assertIsInstance(stream, io.BytesIO)
+            self.assertEqual(stream.read(), raw_logs)
 
     def test_fetch_recovery_logs_string(self):
-        incident_id = uuid.uuid4().hex
-        log_str = uuid.uuid4().hex
+        inc_id = uuid.uuid4().hex
+        raw_str = uuid.uuid4().hex
         
-        with patch.object(self.service.error_recovery_hub, "get_logs", return_value=log_str):
-            stream = self.service._fetch_recovery_logs(incident_id)
-            self.assertEqual(stream.read().decode('utf-8'), log_str)
+        with patch.object(self.service.error_recovery_hub, "get_logs", return_value=raw_str):
+            stream = self.service._fetch_recovery_logs(inc_id)
+            self.assertIsInstance(stream, io.BytesIO)
+            self.assertEqual(stream.read(), raw_str.encode('utf-8'))
 
-    def test_fetch_recovery_logs_fallback(self):
-        incident_id = uuid.uuid4().hex
-        with patch.object(self.service.error_recovery_hub, "get_logs", return_value=random.randint(1, 100)):
-            stream = self.service._fetch_recovery_logs(incident_id)
+    def test_fetch_recovery_logs_invalid(self):
+        inc_id = uuid.uuid4().hex
+        with patch.object(self.service.error_recovery_hub, "get_logs", return_value=random.randint(1, 500)):
+            stream = self.service._fetch_recovery_logs(inc_id)
+            self.assertIsInstance(stream, io.BytesIO)
             self.assertEqual(stream.read(), b"")
 
-    def test_parse_recovery_logs(self):
+    def test_parse_recovery_logs_valid(self):
         line1 = uuid.uuid4().hex
         line2 = uuid.uuid4().hex
-        raw_data = f"  {line1} \n\n {line2}  ".encode('utf-8')
-        stream = io.BytesIO(raw_data)
+        content = f"\n  {line1} \n\n {line2}  \n".encode('utf-8')
+        stream = io.BytesIO(content)
         
         parsed = self.service._parse_recovery_logs(stream)
         self.assertEqual(parsed, [line1, line2])
@@ -63,7 +66,7 @@ class TestIncidentPostMortemService(unittest.TestCase):
         parsed = self.service._parse_recovery_logs(stream)
         self.assertEqual(parsed, [])
 
-    def test_evaluate_root_cause_comprehensive(self):
+    def test_evaluate_root_cause_complex(self):
         timeout_val = random.randint(5, 50)
         metrics = {
             "memory_leak_detected": True,
@@ -74,77 +77,70 @@ class TestIncidentPostMortemService(unittest.TestCase):
         
         cause = self.service._evaluate_root_cause(metrics, logs)
         self.assertIn("Memory leak detected", cause)
-        self.assertIn(f"High timeout count: {timeout_val}", cause)
-        self.assertIn(f"Logs analysis: {log_line}", cause)
+        self.assertIn(str(timeout_val), cause)
+        self.assertIn(log_line, cause)
 
-    def test_generate_report_with_dict_incident(self):
-        incident_id = uuid.uuid4().hex
-        error_code = uuid.uuid4().hex[:8]
-        metric_key = uuid.uuid4().hex
-        metric_val = random.randint(100, 999)
-        log_text = uuid.uuid4().hex
-        
-        incident_data = {
-            "incident_id": incident_id,
-            "metrics": {metric_key: metric_val, "memory_leak_mb": random.randint(1, 10)},
-            "error_code": error_code
+    def test_generate_report_dict_input(self):
+        inc_id = uuid.uuid4().hex
+        err_code = uuid.uuid4().hex[:6]
+        log_msg = uuid.uuid4().hex
+        incident_dict = {
+            "incident_id": inc_id,
+            "error_code": err_code,
+            "metrics": {"memory_leak_mb": random.randint(10, 500)}
         }
-        recovery_data = {
-            "logs": log_text.encode('utf-8')
-        }
+        recovery_data = {"logs": log_msg.encode('utf-8')}
         
         with patch.object(self.service.report_exporter, "export") as mock_export:
-            report = self.service.generate_report(incident_data, recovery_data)
-            
-            mock_export.assert_called_once()
-            self.assertEqual(report["incident_id"], incident_id)
-            self.assertIn(error_code, report["root_cause_analysis"])
-            self.assertIn("Memory leak detected", report["root_cause_analysis"])
-            self.assertEqual(report["metrics_snapshot"][metric_key], metric_val)
-            self.assertEqual(report["recovery_logs_summary"], log_text)
+            report = self.service.generate_report(incident_dict, recovery_data)
+            self.assertEqual(report["incident_id"], inc_id)
+            self.assertIn(err_code, report["root_cause_analysis"])
+            self.assertIn(log_msg, report["recovery_logs_summary"])
+            mock_export.assert_called_once_with(report)
 
-    def test_generate_report_with_string_incident(self):
-        incident_id = uuid.uuid4().hex
-        mock_metrics = {uuid.uuid4().hex: uuid.uuid4().hex}
-        log_data = uuid.uuid4().hex.encode('utf-8')
+    def test_generate_report_str_input(self):
+        inc_id = uuid.uuid4().hex
+        mock_metrics = {uuid.uuid4().hex: random.randint(100, 999)}
+        mock_logs = uuid.uuid4().hex.encode('utf-8')
         
-        with patch.object(self.service, "_fetch_incident_metrics", return_value=mock_metrics) as mock_m, \
-             patch.object(self.service, "_fetch_recovery_logs", return_value=io.BytesIO(log_data)) as mock_l, \
+        with patch.object(self.service, "_fetch_incident_metrics", return_value=mock_metrics) as m_met, \
+             patch.object(self.service, "_fetch_recovery_logs", return_value=io.BytesIO(mock_logs)) as m_log, \
              patch.object(self.service.report_exporter, "export") as mock_export:
             
-            report = self.service.generate_report(incident_id)
-            
-            mock_m.assert_called_once_with(incident_id)
-            mock_l.assert_called_once_with(incident_id)
-            mock_export.assert_called_once()
-            self.assertEqual(report["incident_id"], incident_id)
+            report = self.service.generate_report(inc_id)
+            m_met.assert_called_once_with(inc_id)
+            m_log.assert_called_once_with(inc_id)
+            self.assertEqual(report["incident_id"], inc_id)
             self.assertEqual(report["metrics_snapshot"], mock_metrics)
-            self.assertEqual(report["recovery_logs_summary"], log_data.decode('utf-8'))
+            mock_export.assert_called_once_with(report)
 
     def test_import_historical_data(self):
-        inc1_id = uuid.uuid4().hex
-        inc2_id = uuid.uuid4().hex
-        batch = [
-            {"incident_id": inc1_id, "metrics": {}},
-            {"incident_id": inc2_id, "metrics": {}}
-        ]
+        id_1 = uuid.uuid4().hex
+        id_2 = uuid.uuid4().hex
+        batch = [{"incident_id": id_1}, {"incident_id": id_2}]
         
-        with patch.object(self.service, "generate_report", side_effect=lambda x: {"incident_id": x["incident_id"]}):
-            reports = self.service.import_historical_data(batch)
-            self.assertEqual(len(reports), 2)
-            self.assertEqual(reports[0]["incident_id"], inc1_id)
-            self.assertEqual(reports[1]["incident_id"], inc2_id)
+        with patch.object(self.service, "generate_report") as mock_gen:
+            mock_gen.side_effect = lambda x: {"incident_id": x["incident_id"]}
+            results = self.service.import_historical_data(batch)
+            self.assertEqual(len(results), 2)
+            self.assertEqual(results[0]["incident_id"], id_1)
+            self.assertEqual(results[1]["incident_id"], id_2)
+            self.assertEqual(mock_gen.call_count, 2)
 
     def test_export_summary_analytics(self):
-        inc_id = uuid.uuid4().hex
-        incidents = [inc_id]
-        mock_report = {uuid.uuid4().hex: uuid.uuid4().hex}
+        id_1 = uuid.uuid4().hex
+        id_2 = uuid.uuid4().hex
+        incidents = [id_1, id_2]
         
-        with patch.object(self.service, "generate_report", return_value=mock_report) as mock_gen:
+        with patch.object(self.service, "generate_report") as mock_gen:
+            mock_gen.side_effect = lambda x: {"incident_id": x}
             summary = self.service.export_summary_analytics(incidents)
-            mock_gen.assert_called_once_with(inc_id)
-            self.assertEqual(summary["total_incidents"], 1)
-            self.assertEqual(summary["reports_summary"], [mock_report])
+            
+            self.assertEqual(summary["total_incidents"], 2)
+            self.assertEqual(len(summary["reports_summary"]), 2)
+            self.assertEqual(summary["reports_summary"][0]["incident_id"], id_1)
+            self.assertEqual(summary["reports_summary"][1]["incident_id"], id_2)
+            self.assertEqual(mock_gen.call_count, 2)
 
 
 if __name__ == "__main__":

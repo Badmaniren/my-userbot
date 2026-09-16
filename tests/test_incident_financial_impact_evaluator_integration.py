@@ -1,49 +1,53 @@
 import unittest
 import uuid
-import random
-from skills.incident_impact_analyzer import incident_impact_analyzer
-from skills.incident_financial_impact_evaluator import incident_financial_impact_evaluator
+import os
+from skills.incident_financial_impact_evaluator import IncidentFinancialImpactEvaluator, incident_financial_impact_evaluator
+from skills.incident_impact_analyzer import IncidentImpactAnalyzer
 
 class TestIncidentFinancialImpactEvaluatorIntegration(unittest.TestCase):
-    def test_evaluate_financial_impact_real_flow(self):
-        random_incident_id = f"inc-{uuid.uuid4()}"
-        random_downtime_minutes = random.randint(10, 1440)
-        random_affected_users = random.randint(100, 50000)
-        
-        raw_impact_data = {
-            "incident_id": random_incident_id,
-            "downtime_minutes": random_downtime_minutes,
-            "affected_users": random_affected_users,
-            "severity": random.choice(["HIGH", "CRITICAL", "MEDIUM"])
-        }
-        
-        analyzed_impact = incident_impact_analyzer(raw_impact_data)
-        
-        self.assertIsInstance(analyzed_impact, dict)
-        self.assertIn("incident_id", analyzed_impact)
-        
-        financial_evaluation = incident_financial_impact_evaluator(analyzed_impact)
-        
-        self.assertIsInstance(financial_evaluation, dict)
-        self.assertEqual(financial_evaluation.get("incident_id"), random_incident_id)
-        self.assertIn("estimated_loss_usd", financial_evaluation)
-        self.assertGreaterEqual(financial_evaluation["estimated_loss_usd"], 0.0)
+    def setUp(self):
+        self.evaluator = IncidentFinancialImpactEvaluator()
+        self.analyzer = IncidentImpactAnalyzer()
+        self.random_incident_id = f"inc-{uuid.uuid4()}"
+        os.environ["BASE_HOURLY_RATE_LOSS"] = "1500.0"
 
-    def test_evaluate_financial_impact_error_handling(self):
-        invalid_input = {
-            "incident_id": f"err-{uuid.uuid4()}",
-            "downtime_minutes": "invalid_number",
-            "affected_users": -999
+    def test_evaluate_with_real_impact_data_dict(self):
+        random_downtime = float(uuid.uuid4().int % 10) + 1.5
+        impact_data = {
+            "incident_id": self.random_incident_id,
+            "downtime_hours": random_downtime
         }
         
-        try:
-            result = incident_financial_impact_evaluator(invalid_input)
-            self.assertTrue(
-                isinstance(result, dict) and (result.get("error") or result.get("estimated_loss_usd") == 0.0),
-                "Module must gracefully handle invalid data and return an error or zero loss."
-            )
-        except Exception as e:
-            self.assertIsInstance(e, (ValueError, TypeError, KeyError))
+        result = self.evaluator.evaluate(impact_data)
+        
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("incident_id"), self.random_incident_id)
+        expected_loss = random_downtime * 1500.0
+        self.assertEqual(result.get("total_financial_loss"), expected_loss)
+        self.assertEqual(result.get("estimated_loss_usd"), expected_loss)
+
+    def test_evaluate_with_downtime_minutes(self):
+        random_minutes = float(uuid.uuid4().int % 120) + 30.0
+        impact_data = {
+            "incident_id": self.random_incident_id,
+            "downtime_minutes": random_minutes
+        }
+        
+        result = incident_financial_impact_evaluator(impact_data)
+        
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("incident_id"), self.random_incident_id)
+        expected_hours = random_minutes / 60.0
+        expected_loss = expected_hours * 1500.0
+        self.assertAlmostEqual(result.get("total_financial_loss"), expected_loss)
+
+    def test_evaluate_missing_data_raises_value_error(self):
+        with self.assertRaises(ValueError):
+            self.evaluator.evaluate(None)
+
+    def test_evaluate_invalid_type_raises_value_error(self):
+        with self.assertRaises(ValueError):
+            self.evaluator.evaluate(123456789)
 
 if __name__ == "__main__":
     unittest.main()

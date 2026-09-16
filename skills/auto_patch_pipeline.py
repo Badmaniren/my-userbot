@@ -82,3 +82,10 @@ class AutoPatchPipeline:
 
     def force_analyze_and_recover(self, module_name, exception, context):
         return self.error_recovery_hub.analyze_and_recover(module_name, exception, context)
+
+
+def auto_patch_pipeline(*args, **kwargs):
+    pipeline = AutoPatchPipeline()
+    if args or kwargs:
+        return pipeline.run_pipeline(*args, **kwargs)
+    return pipeline

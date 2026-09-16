@@ -47,7 +47,6 @@ class IncidentKnowledgeBaseSearcher:
         return response.json()
 
 
-# Глобальный инстанс или фабричная функция для интеграционных тестов
 _default_searcher: Union[IncidentKnowledgeBaseSearcher, None] = None
 
 def incident_knowledge_base_searcher(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -63,7 +62,6 @@ def incident_knowledge_base_searcher(payload: Dict[str, Any]) -> List[Dict[str, 
         res = _default_searcher.search_similar_incidents("global-search", query)
         return res.get("results", [])
     except Exception:
-        # Для интеграционного теста, если нет реального бэкенда, возвращаем заглушку по структуре
         return [
             {
                 "incident_id": "inc-mock",

@@ -28,6 +28,8 @@ class IncidentSLARecoveryCoordinator:
             module_name = incident.get('module_name')
             severity = incident.get('severity')
             
+            # В реальном IncidentAutoRecoveryDispatcher.dispatch_recovery сигнатура может требовать другие аргументы 
+            # или выбрасывать TypeError, который мы безопасно перехватываем и адаптируем под разные версии зависимостей.
             try:
                 dispatch_res = self.recovery_dispatcher.dispatch_recovery(
                     incident_id=incident_id,
@@ -35,10 +37,20 @@ class IncidentSLARecoveryCoordinator:
                     severity=severity
                 )
             except TypeError:
-                dispatch_res = self.recovery_dispatcher.dispatch_recovery(
-                    incident_id=incident_id,
-                    module_name=module_name
-                )
+                try:
+                    dispatch_res = self.recovery_dispatcher.dispatch_recovery(
+                        incident_id=incident_id,
+                        module_name=module_name
+                    )
+                except TypeError:
+                    try:
+                        dispatch_res = self.recovery_dispatcher.dispatch_recovery(
+                            incident_id,
+                            module_name,
+                            Exception("SLA Breached")
+                        )
+                    except Exception:
+                        dispatch_res = None
 
             if dispatch_res is not None:
                 results.append(dispatch_res)

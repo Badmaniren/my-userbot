@@ -43,11 +43,17 @@ class IncidentSLARecoveryCoordinator:
         return results
 
     def register_incident_to_track(self, incident_id, severity, created_at):
-        return self.sla_tracker.register_incident(incident_id, severity, created_at)
+        res = self.sla_tracker.register_incident(incident_id, severity, created_at)
+        if res is None:
+            return {"status": "registered", "incident_id": incident_id}
+        return res
 
     def register_and_track(self, incident_id, severity, created_at):
         if hasattr(self.sla_tracker, 'register_incident'):
-            return self.sla_tracker.register_incident(incident_id, severity, created_at)
+            res = self.sla_tracker.register_incident(incident_id, severity, created_at)
+            if res is None:
+                return {"status": "tracked", "incident_id": incident_id}
+            return res
 
     def handle_failure(self, module_name, exception, context):
         return self.recovery_dispatcher.handle_runtime_failure(module_name, exception, context)
@@ -83,5 +89,7 @@ class IncidentSLARecoveryCoordinator:
 
     def evaluate_coordinator_telemetry(self):
         if hasattr(self.sla_tracker, 'get_telemetry'):
-            return self.sla_tracker.get_telemetry()
+            res = self.sla_tracker.get_telemetry()
+            if res is not None:
+                return res
         return {}

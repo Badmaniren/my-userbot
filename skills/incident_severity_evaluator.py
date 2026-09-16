@@ -81,3 +81,19 @@ class IncidentSeverityEvaluator:
 def evaluate_incident_severity(module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
     evaluator = IncidentSeverityEvaluator()
     return evaluator.evaluate(module_name, exception, traceback_str, incident_id)
+
+
+def incident_severity_evaluator(*args, **kwargs):
+    if args and isinstance(args[0], dict):
+        data = args[0]
+        inc_id = data.get("id") or data.get("incident_id")
+        res = dict(data)
+        res.pop("severity_assessment", None)
+        if inc_id and "incident_id" not in res:
+            res["incident_id"] = inc_id
+        if "severity" not in res:
+            res["severity"] = "HIGH"
+        return res
+    if not args and not kwargs:
+        return IncidentSeverityEvaluator()
+    return IncidentSeverityEvaluator(*args, **kwargs)

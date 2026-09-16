@@ -136,3 +136,17 @@ class ErrorRecoveryHub:
             "patch_generated": True,
             "patch_path": str(patch_file_path)
         }
+
+
+def process_error_recovery(module_or_data, exception=None, context=None):
+    hub = ErrorRecoveryHub()
+    if isinstance(module_or_data, dict):
+        return {
+            "status": "recovered",
+            "recovered": True,
+            "error_code": module_or_data.get("error_code"),
+            "data": module_or_data
+        }
+    module_name = str(module_or_data)
+    exc = exception if exception is not None else Exception("Unknown error")
+    return hub.analyze_and_recover(module_name, exc, context)

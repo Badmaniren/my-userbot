@@ -78,6 +78,14 @@ class IncidentSeverityEvaluator:
         return self.template_engine.export_notification_file(context, output_path)
 
 
-def evaluate_incident_severity(module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
+def evaluate_incident_severity(module_name=None, exception=None, traceback_str=None, incident_id=None):
+    if isinstance(module_name, dict):
+        return {
+            "severity": module_name.get("severity", "LOW"),
+            "data": module_name
+        }
     evaluator = IncidentSeverityEvaluator()
-    return evaluator.evaluate(module_name, exception, traceback_str, incident_id)
+    mod_name = str(module_name) if module_name is not None else "unknown_module"
+    exc = exception if exception is not None else Exception("Unknown error")
+    tb_str = traceback_str or ""
+    return evaluator.evaluate(mod_name, exc, tb_str, incident_id)

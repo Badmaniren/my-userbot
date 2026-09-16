@@ -10,15 +10,10 @@ from skills import (
 
 class IncidentSLABreachPredictor:
     def forecast_breach(self, incident_id):
-        # Проверка на наличие метода у трекера (для поддержки интеграционных тестов/заглушек)
         if hasattr(incident_sla_tracker, "get_tracking_data"):
             sla_data = incident_sla_tracker.get_tracking_data(incident_id)
         elif callable(incident_sla_tracker):
-            # Если incident_sla_tracker это функция (как в интеграционном тесте)
-            try:
-                sla_data = incident_sla_tracker({"incident_id": incident_id})
-            except Exception:
-                sla_data = None
+            sla_data = incident_sla_tracker({"incident_id": incident_id})
         else:
             sla_data = None
             
@@ -28,10 +23,7 @@ class IncidentSLABreachPredictor:
         if hasattr(incident_trend_analyzer, "analyze"):
             trend_data = incident_trend_analyzer.analyze()
         elif callable(incident_trend_analyzer):
-            try:
-                trend_data = incident_trend_analyzer({"incident_id": incident_id})
-            except Exception:
-                trend_data = {}
+            trend_data = incident_trend_analyzer({"incident_id": incident_id})
         else:
             trend_data = {}
         

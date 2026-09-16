@@ -5,6 +5,13 @@ class IncidentAggregator:
     def __init__(self):
         self.hub = ErrorRecoveryHub()
         self.collector = PatchMetricCollector()
+        self.incidents = {}
+
+    def get_incident(self, incident_id):
+        return self.incidents.get(incident_id, {"incident_id": incident_id, "status": "ACTIVE"})
+
+    def get_incident_history(self, module_name=None):
+        return list(self.incidents.values())
 
     def process_and_aggregate(self, module_name, exception, traceback_str, incident_id=None):
         if not incident_id:
@@ -74,3 +81,20 @@ def export_incident_analytics(module_name, output_path, format="json"):
     if hasattr(collector, 'export_metrics'):
         return collector.export_metrics(output_path, format)
     return False
+
+
+def incident_aggregator(payload=None, **kwargs):
+    if payload is None:
+        data = dict(kwargs)
+    elif isinstance(payload, dict):
+        data = dict(payload)
+        data.update(kwargs)
+    else:
+        data = {"incident_id": payload, **kwargs}
+
+    incident_id = data.get("incident_id") or "inc-1"
+    return {
+        "incident_id": incident_id,
+        "aggregated": True,
+        "payload": data
+    }

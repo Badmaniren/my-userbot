@@ -57,3 +57,6 @@ class RecoveryDashboardGenerator:
         else:
             content = str(stream_bytes)
         return json.loads(content)
+
+
+incident_trend_analyzer = IncidentTrendAnalyzer

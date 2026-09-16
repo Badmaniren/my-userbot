@@ -74,3 +74,6 @@ def export_incident_analytics(module_name, output_path, format="json"):
     if hasattr(collector, 'export_metrics'):
         return collector.export_metrics(output_path, format)
     return False
+
+
+incident_aggregator = IncidentAggregator

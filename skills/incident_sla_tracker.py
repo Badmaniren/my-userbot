@@ -4,6 +4,8 @@ from typing import Dict, Any, Optional
 # Честные импорты зависимостей без фальшивых заглушек
 from skills.incident_aggregator import aggregate_incidents
 from skills.incident_severity_evaluator import evaluate_incident_severity
+from skills.incident_sla_mitigation_planner import plan_incident_mitigation
+from skills.incident_auto_recovery_dispatcher import dispatch_auto_recovery
 
 # Определение атрибутов для интеграции с моками из юнит-тестов
 incident_notification_bridge = None
@@ -13,7 +15,7 @@ class IncidentSLATracker:
     def __init__(self, sla_thresholds: Dict[str, int], warning_threshold_pct: float):
         self.sla_thresholds = sla_thresholds
         self.warning_threshold_pct = warning_threshold_pct
-        self.incidents = {}
+        self.incidents: Dict[str, Dict[str, Any]] = {}
 
     def register_incident(self, incident_id: str, severity: str, created_at: datetime) -> None:
         self.incidents[incident_id] = {
@@ -36,7 +38,7 @@ class IncidentSLATracker:
         sla_limit = self.sla_thresholds.get(severity, 3600)
         elapsed = (current_time - created_at).total_seconds()
         
-        return sla_limit - elapsed
+        return float(sla_limit - elapsed)
 
     def update_incident_status(self, incident_id: str, status: str, updated_at: Optional[datetime] = None) -> None:
         if incident_id in self.incidents:
@@ -81,20 +83,26 @@ class IncidentSLATracker:
 
 
 def track_incident_sla(sla_input: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(sla_input, dict):
+        sla_input = {}
+
     incident_id = sla_input.get("incident_id")
-    aggregated_data = sla_input.get("aggregated_data", {})
+    aggregated_data = sla_input.get("aggregated_data") or {}
     threshold = sla_input.get("threshold_seconds", 3600)
     
-    data = aggregated_data.get("data", {})
-    timestamp = data.get("timestamp")
+    data = aggregated_data.get("data") if isinstance(aggregated_data, dict) else {}
+    timestamp = data.get("timestamp") if isinstance(data, dict) else None
     
-    if timestamp:
-        created_at = datetime.fromtimestamp(timestamp)
+    if timestamp is not None:
+        try:
+            created_at = datetime.fromtimestamp(float(timestamp))
+        except (ValueError, TypeError, OverflowError):
+            created_at = datetime.now()
     else:
         created_at = datetime.now()
         
     elapsed = (datetime.now() - created_at).total_seconds()
-    time_remaining = threshold - elapsed
+    time_remaining = float(threshold - elapsed)
     breach_predicted = time_remaining < 0
 
     return {
@@ -102,3 +110,6 @@ def track_incident_sla(sla_input: Dict[str, Any]) -> Dict[str, Any]:
         "breach_predicted": breach_predicted,
         "time_remaining_seconds": time_remaining
     }
+
+
+incident_sla_tracker = track_incident_sla

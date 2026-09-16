@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-передан на эскалацию
-
-## system_health_visualizer (create) — раундов: 4
-- Античит поймал: ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'system_health_telemetry_collector'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.system_health_telemetry_collector import ...'
+ЕНО: Объявлен фиктивный 'system_health_telemetry_collector'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.system_health_telemetry_collector import ...'
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -291,3 +288,6 @@
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: ----------------------------------------------------------------------
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## incident_auto_recovery_dispatcher (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

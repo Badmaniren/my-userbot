@@ -7,3 +7,4 @@
 - incident_sla_mitigation_planner: Extends incident_sla_breach_predictor and incident_sla_tracker by creating actionable mitigation plans to actually prevent SLA violations.
 - incident_auto_recovery_dispatcher: Builds upon incident_sla_mitigation_planner to automatically execute recovery actions, closing the loop on proactive SLA preservation.
 - incident_sla_recovery_coordinator: Объединяет трекер SLA и автоматический диспетчер восстановления в единый контур для снижения числа нарушений соглашений об уровне обслуживания.
+- incident_sla_recovery_coordinator: Объединяет метрики SLA и анализатор влияния для завершения контура аудита и оптимизации восстановления.

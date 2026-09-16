@@ -1,124 +1,130 @@
 import unittest
 from unittest.mock import patch, MagicMock
+import os
+import json
 import uuid
 import random
-import string
 import io
-
-from skills.incident_auto_escalation_engine import IncidentAutoEscalationEngine
+from skills.incident_auto_escalation_engine import IncidentAutoEscalationEngine, auto_escalate_incident
 
 class TestIncidentAutoEscalationEngine(unittest.TestCase):
 
     def setUp(self):
         self.engine = IncidentAutoEscalationEngine()
+        self.incident_id = uuid.uuid4().hex
+        self.workspace_dir = os.path.join("/tmp", uuid.uuid4().hex)
+        os.makedirs(self.workspace_dir, exist_ok=True)
 
-    def test_evaluate_and_escalate_incident_success(self):
-        inc_id = str(uuid.uuid4())
-        sev_score = random.randint(1, 100)
-        channel_name = ''.join(random.choices(string.ascii_lowercase, k=10))
-        webhook_url = f"https://{ ''.join(random.choices(string.ascii_lowercase, k=8)) }.com/webhook"
+    def tearDown(self):
+        if os.path.exists(self.workspace_dir):
+            for f in os.listdir(self.workspace_dir):
+                file_path = os.path.join(self.workspace_dir, f)
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+            os.rmdir(self.workspace_dir)
 
-        mock_evaluator = MagicMock()
-        mock_evaluator.evaluate.return_value = sev_score
-
-        mock_aggregator = MagicMock()
-        mock_aggregator.get_incident.return_value = {
-            "id": inc_id,
-            "payload": ''.join(random.choices(string.ascii_letters, k=25))
-        }
-
-        mock_dispatcher = MagicMock()
-        mock_dispatcher.dispatch.return_value = channel_name
-
-        mock_broadcaster = MagicMock()
-        mock_broadcaster.broadcast.return_value = True
-
-        with patch('skills.incident_auto_escalation_engine.incident_severity_evaluator', mock_evaluator), \
-             patch('skills.incident_auto_escalation_engine.incident_aggregator', mock_aggregator), \
-             patch('skills.incident_auto_escalation_engine.notification_channel_dispatcher', mock_dispatcher), \
-             patch('skills.incident_auto_escalation_engine.incident_notification_broadcaster', mock_broadcaster):
-
-            result = self.engine.process_escalation(inc_id)
-
-            mock_aggregator.get_incident.assert_called_once_with(inc_id)
-            mock_evaluator.evaluate.assert_called_once()
-            mock_dispatcher.dispatch.assert_called_once()
-            mock_broadcaster.broadcast.assert_called_once()
+    def test_process_escalation_skipped(self):
+        with patch("skills.incident_auto_escalation_engine.incident_aggregator") as mock_aggregator, \
+             patch("skills.incident_auto_escalation_engine.incident_severity_evaluator") as mock_evaluator:
             
-            self.assertIn("escalated_to", result)
-            self.assertEqual(result["incident_id"], inc_id)
-            self.assertEqual(result["severity"], sev_score)
-            self.assertEqual(result["channel"], channel_name)
+            rand_incident = {"id": self.incident_id, "data": uuid.uuid4().hex}
+            mock_aggregator.get_incident.return_value = rand_incident
+            mock_evaluator.evaluate.return_value = 0
 
-    def test_process_escalation_low_severity_ignored(self):
-        inc_id = str(uuid.uuid4())
-        low_sev = random.randint(-50, 0)
-
-        mock_evaluator = MagicMock()
-        mock_evaluator.evaluate.return_value = low_sev
-
-        mock_aggregator = MagicMock()
-        mock_aggregator.get_incident.return_value = {
-            "id": inc_id,
-            "payload": ''.join(random.choices(string.ascii_letters, k=15))
-        }
-
-        with patch('skills.incident_auto_escalation_engine.incident_severity_evaluator', mock_evaluator), \
-             patch('skills.incident_auto_escalation_engine.incident_aggregator', mock_aggregator):
-
-            result = self.engine.process_escalation(inc_id)
+            result = self.engine.process_escalation(self.incident_id)
 
             self.assertTrue(result.get("skipped"))
-            self.assertEqual(result["incident_id"], inc_id)
-            self.assertEqual(result["severity"], low_sev)
+            self.assertEqual(result.get("incident_id"), self.incident_id)
+            self.assertEqual(result.get("severity"), 0)
 
-    def test_telemetry_and_trend_analysis_integration(self):
-        metric_key = ''.join(random.choices(string.ascii_lowercase, k=8))
-        metric_val = random.uniform(10.0, 99.9)
+    def test_process_escalation_active(self):
+        with patch("skills.incident_auto_escalation_engine.incident_aggregator") as mock_aggregator, \
+             patch("skills.incident_auto_escalation_engine.incident_severity_evaluator") as mock_evaluator, \
+             patch("skills.incident_auto_escalation_engine.notification_channel_dispatcher") as mock_dispatcher, \
+             patch("skills.incident_auto_escalation_engine.incident_notification_broadcaster") as mock_broadcaster:
+            
+            rand_incident = {"id": self.incident_id, "details": uuid.uuid4().hex}
+            rand_severity = random.randint(1, 100)
+            rand_channel = uuid.uuid4().hex
+            
+            mock_aggregator.get_incident.return_value = rand_incident
+            mock_evaluator.evaluate.return_value = rand_severity
+            mock_dispatcher.dispatch.return_value = rand_channel
+            mock_broadcaster.broadcast.return_value = True
 
-        mock_telemetry = MagicMock()
-        mock_telemetry.collect.return_value = {metric_key: metric_val}
+            result = self.engine.process_escalation(self.incident_id)
 
-        mock_trend_analyzer = MagicMock()
-        mock_trend_analyzer.analyze.return_value = {"trend": "increasing", "confidence": 0.95}
+            self.assertFalse(result.get("skipped", False))
+            self.assertEqual(result.get("incident_id"), self.incident_id)
+            self.assertEqual(result.get("severity"), rand_severity)
+            self.assertEqual(result.get("escalated_to"), rand_channel)
+            self.assertEqual(result.get("channel"), rand_channel)
+            self.assertTrue(result.get("broadcast_success"))
 
-        with patch('skills.incident_auto_escalation_engine.system_health_telemetry_collector', mock_telemetry), \
-             patch('skills.incident_auto_escalation_engine.incident_trend_analyzer', mock_trend_analyzer):
+    def test_evaluate_system_telemetry_risks(self):
+        with patch("skills.incident_auto_escalation_engine.system_health_telemetry_collector") as mock_collector, \
+             patch("skills.incident_auto_escalation_engine.incident_trend_analyzer") as mock_analyzer:
+            
+            metric_key = uuid.uuid4().hex
+            metric_val = random.randint(10, 1000)
+            telemetry_payload = {metric_key: metric_val}
+            
+            expected_report = {"trend": uuid.uuid4().hex, "status": uuid.uuid4().hex}
+
+            mock_collector.collect.return_value = telemetry_payload
+            mock_analyzer.analyze.return_value = expected_report
 
             report = self.engine.evaluate_system_telemetry_risks()
 
-            mock_telemetry.collect.assert_called_once()
-            mock_trend_analyzer.analyze.assert_called_once()
-            self.assertIn("trend", report)
-            self.assertEqual(report["risk_metric"], metric_val)
+            self.assertEqual(report.get("risk_metric"), metric_val)
+            self.assertEqual(report.get("trend"), expected_report["trend"])
 
-    def test_auto_patch_trigger_on_vulnerability(self):
-        vuln_id = f"CVE-{random.randint(2000, 2024)}-{random.randint(1000, 9999)}"
-        package_name = ''.join(random.choices(string.ascii_lowercase, k=6))
+    def test_check_and_trigger_patching_true(self):
+        with patch("skills.incident_auto_escalation_engine.vulnerability_scanner") as mock_scanner, \
+             patch("skills.incident_auto_escalation_engine.auto_patch_pipeline") as mock_pipeline:
+            
+            vuln_list = [uuid.uuid4().hex, uuid.uuid4().hex]
+            mock_scanner.scan.return_value = vuln_list
+            mock_pipeline.auto_patch_pipeline.return_value = True
 
-        mock_scanner = MagicMock()
-        mock_scanner.scan.return_value = [{"vulnerability_id": vuln_id, "package": package_name}]
+            res = self.engine.check_and_trigger_patching()
+            self.assertTrue(res)
+            mock_pipeline.auto_patch_pipeline.assert_called_once_with(vuln_list)
 
-        mock_pipeline = MagicMock()
-        mock_pipeline.auto_patch_pipeline.return_value = True
+    def test_check_and_trigger_patching_false(self):
+        with patch("skills.incident_auto_escalation_engine.vulnerability_scanner") as mock_scanner, \
+             patch("skills.incident_auto_escalation_engine.auto_patch_pipeline") as mock_pipeline:
+            
+            mock_scanner.scan.return_value = []
 
-        with patch('skills.incident_auto_escalation_engine.vulnerability_scanner', mock_scanner), \
-             patch('skills.incident_auto_escalation_engine.auto_patch_pipeline', mock_pipeline):
+            res = self.engine.check_and_trigger_patching()
+            self.assertFalse(res)
+            mock_pipeline.auto_patch_pipeline.assert_not_called()
 
-            triggered = self.engine.check_and_trigger_patching()
+    def test_consume_stream_data(self):
+        with patch("skills.incident_auto_escalation_engine.incident_aggregator") as mock_aggregator:
+            rand_bytes = uuid.uuid4().hex.encode('utf-8')
+            mock_stream = io.BytesIO(rand_bytes)
+            mock_aggregator.stream_raw_data.return_value = mock_stream
 
-            mock_scanner.scan.assert_called_once()
-            mock_pipeline.auto_patch_pipeline.assert_called_once()
-            self.assertTrue(triggered)
+            data = self.engine.consume_stream_data()
+            self.assertEqual(data, rand_bytes)
 
-    def test_stream_incident_payload_reading(self):
-        random_bytes = bytes(''.join(random.choices(string.printable, k=64)), 'utf-8')
-        mock_stream = io.BytesIO(random_bytes)
+    def test_auto_escalate_incident_standalone(self):
+        severity = random.randint(1, 10)
+        res = auto_escalate_incident(self.incident_id, severity, self.workspace_dir)
 
-        mock_aggregator = MagicMock()
-        mock_aggregator.stream_raw_data.return_value = mock_stream
+        self.assertEqual(res.get("escalated_incident_id"), self.incident_id)
+        self.assertEqual(res.get("status"), "SUCCESS")
+        self.assertEqual(res.get("severity"), severity)
 
-        with patch('skills.incident_auto_escalation_engine.incident_aggregator', mock_aggregator):
-            consumed_data = self.engine.consume_stream_data()
-            self.assertEqual(consumed_data, random_bytes)
-            mock_aggregator.stream_raw_data.assert_called_once()
+        expected_file = os.path.join(self.workspace_dir, f"escalated_{self.incident_id}.json")
+        self.assertTrue(os.path.exists(expected_file))
+
+        with open(expected_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            self.assertEqual(data.get("escalated_incident_id"), self.incident_id)
+            self.assertEqual(data.get("severity"), severity)
+
+if __name__ == "__main__":
+    unittest.main()

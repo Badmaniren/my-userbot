@@ -22,9 +22,9 @@ class IncidentSeverityEvaluator:
 
     def evaluate(self, module_name, exception=None, traceback_str=None, incident_id=None):
         if isinstance(module_name, dict):
-            payload = module_name
+            payload = dict(module_name)
             payload.pop("severity_assessment", None)
-            inc_id = payload.get("incident_id")
+            inc_id = payload.get("incident_id") or payload.get("id")
             severity = self.calculate_severity_score(payload)
             notif_payload = self.template_engine.generate_notification_payload(
                 severity, inc_id, payload

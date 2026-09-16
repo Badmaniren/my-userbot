@@ -19,6 +19,9 @@ class IncidentPostMortemService:
         if not hasattr(self.error_recovery_hub, "get_logs"):
             setattr(self.error_recovery_hub, "get_logs", lambda incident_id: b"")
 
+        if not hasattr(self.report_exporter, "export"):
+            setattr(self.report_exporter, "export", lambda report: None)
+
     def _fetch_incident_metrics(self, incident_id: str) -> Dict[str, Any]:
         if not hasattr(self.incident_aggregator, "aggregate"):
             return {}

@@ -2,130 +2,113 @@ import unittest
 from unittest.mock import patch, MagicMock
 import uuid
 import random
-import string
 import io
 import sys
-import types
-
-# Инквизиторский анти-обход: Создаем заглушки модулей до импорта тестируемого файла, 
-# чтобы гарантировать наличие композиции, если модуль еще не оформлен физически.
-def _setup_mock_modules():
-    sys.modules['skills.incident_auto_escalation_engine'] = types.ModuleType('incident_auto_escalation_engine')
-    sys.modules['skills.error_recovery_hub'] = types.ModuleType('error_recovery_hub')
-
-_setup_mock_modules()
 
 from skills.incident_auto_recovery_dispatcher import IncidentAutoRecoveryDispatcher
 
 class TestIncidentAutoRecoveryDispatcher(unittest.TestCase):
-    
+
     def setUp(self):
-        self.module_name = f"module_{uuid.uuid4().hex[:8]}"
-        self.incident_id = f"inc-{uuid.uuid4().hex}"
-        self.severity = random.choice(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'])
-        self.workspace_dir = f"/var/workspace/{uuid.uuid4().hex}"
-        self.traceback_str = f"Traceback (most recent call last):\n  File \"{uuid.uuid4().hex}.py\", line {random.randint(1, 100)}, in <module>\n    raise RuntimeError('{uuid.uuid4().hex}')"
-        self.exception_msg = f"Error_{uuid.uuid4().hex}"
-        
-    def test_dispatcher_composition_and_escalation(self):
-        expected_escalation_result = {
-            "incident_id": self.incident_id,
-            "status": "escalated",
-            "severity": self.severity,
-            "token": uuid.uuid4().hex
-        }
-        
-        with patch("skills.incident_auto_recovery_dispatcher.IncidentAutoEscalationEngine") as MockEscalationEngine, \
-             patch("skills.incident_auto_recovery_dispatcher.ErrorRecoveryHub") as MockRecoveryHub:
-            
-            mock_engine_instance = MockEscalationEngine.return_value
-            mock_engine_instance.process_escalation.return_value = expected_escalation_result
-            
-            dispatcher = IncidentAutoRecoveryDispatcher()
-            result = dispatcher.dispatch_escalation(self.incident_id)
-            
-            mock_engine_instance.process_escalation.assert_called_once_with(self.incident_id)
-            self.assertEqual(result, expected_escalation_result)
+        self.dispatcher = IncidentAutoRecoveryDispatcher()
+        self.rand_incident_id = uuid.uuid4().hex
+        self.rand_module_name = f"mod_{uuid.uuid4().hex[:8]}"
+        self.rand_traceback = f"Traceback (most recent call last):\n  File \"{self.rand_module_name}.py\", line {random.randint(1, 100)}\n    raise RuntimeError(\"{uuid.uuid4().hex}\")"
+        self.rand_exception = RuntimeError(uuid.uuid4().hex)
 
-    def test_dispatcher_error_recovery_flow(self):
-        exc = Exception(self.exception_msg)
-        expected_recovery_analysis = {
-            "incident_id": self.incident_id,
-            "analyzed": True,
-            "action": "patch_generated",
-            "signature": uuid.uuid4().hex
-        }
-        
-        with patch("skills.incident_auto_recovery_dispatcher.IncidentAutoEscalationEngine") as MockEscalationEngine, \
-             patch("skills.incident_auto_recovery_dispatcher.ErrorRecoveryHub") as MockRecoveryHub:
-            
-            mock_hub_instance = MockRecoveryHub.return_value
-            mock_hub_instance.analyze_and_recover.return_value = expected_recovery_analysis
-            
-            dispatcher = IncidentAutoRecoveryDispatcher()
-            context = {"workspace": self.workspace_dir, "run_id": uuid.uuid4().hex}
-            result = dispatcher.handle_runtime_failure(self.module_name, exc, context)
-            
-            mock_hub_instance.analyze_and_recover.assert_called_once_with(self.module_name, exc, context)
-            self.assertEqual(result, expected_recovery_analysis)
+    def test_init_composition(self):
+        self.assertIsNotNone(self.dispatcher.escalation_engine)
+        self.assertIsNotNone(self.dispatcher.recovery_hub)
 
-    def test_end_to_end_auto_recovery_pipeline(self):
-        exc = RuntimeError(self.exception_msg)
-        patch_payload = {"patch_id": uuid.uuid4().hex, "diff": f"diff --git a/{uuid.uuid4().hex}"}
-        
-        with patch("skills.incident_auto_recovery_dispatcher.IncidentAutoEscalationEngine") as MockEscalationEngine, \
-             patch("skills.incident_auto_recovery_dispatcher.ErrorRecoveryHub") as MockRecoveryHub:
-            
-            mock_engine = MockEscalationEngine.return_value
-            mock_engine.check_and_trigger_patching.return_value = True
-            
-            mock_hub = MockRecoveryHub.return_value
-            mock_hub.capture_failure.return_value = self.incident_id
-            mock_hub.generate_patch.return_value = patch_payload
-            mock_hub.deploy_and_verify.return_value = True
-            
-            dispatcher = IncidentAutoRecoveryDispatcher()
-            success = dispatcher.run_full_recovery_cycle(self.module_name, exc, self.traceback_str)
-            
-            self.assertTrue(success)
-            mock_hub.capture_failure.assert_called_once_with(self.module_name, exc, self.traceback_str)
-            mock_hub.generate_patch.assert_called_once_with(self.incident_id)
-            mock_hub.deploy_and_verify.assert_called_once_with(self.incident_id, patch_payload)
+    def test_dispatch_escalation(self):
+        expected_result = {"status": "escalated", "id": self.rand_incident_id}
+        with patch.object(self.dispatcher.escalation_engine, 'process_escalation', return_value=expected_result) as mock_process:
+            result = self.dispatcher.dispatch_escalation(self.rand_incident_id)
+            mock_process.assert_called_once_with(self.rand_incident_id)
+            self.assertEqual(result, expected_result)
 
-    def test_telemetry_risk_evaluation_integration(self):
-        risk_telemetry_data = {
-            "risk_level": random.choice(["HIGH", "CRITICAL"]),
-            "anomaly_code": random.randint(1000, 9999),
-            "subsystem": uuid.uuid4().hex
-        }
-        
-        with patch("skills.incident_auto_recovery_dispatcher.IncidentAutoEscalationEngine") as MockEscalationEngine, \
-             patch("skills.incident_auto_recovery_dispatcher.ErrorRecoveryHub") as MockRecoveryHub:
-            
-            mock_engine = MockEscalationEngine.return_value
-            mock_engine.evaluate_system_telemetry_risks.return_value = risk_telemetry_data
-            
-            dispatcher = IncidentAutoRecoveryDispatcher()
-            telemetry_report = dispatcher.evaluate_telemetry()
-            
-            mock_engine.evaluate_system_telemetry_risks.assert_called_once()
-            self.assertEqual(telemetry_report, risk_telemetry_data)
-            self.assertIn("anomaly_code", telemetry_report)
+    def test_handle_runtime_failure(self):
+        context = {"meta": uuid.uuid4().hex}
+        expected_result = {"recovered": True, "incident": self.rand_incident_id}
+        with patch.object(self.dispatcher.recovery_hub, 'analyze_and_recover', return_value=expected_result) as mock_analyze:
+            result = self.dispatcher.handle_runtime_failure(self.rand_module_name, self.rand_exception, context)
+            mock_analyze.assert_called_once_with(self.rand_module_name, self.rand_exception, context)
+            self.assertEqual(result, expected_result)
 
-    def test_stream_consumption_and_dispatch(self):
-        random_bytes = f"STREAM_CHUNK_{uuid.uuid4().hex}".encode('utf-8')
-        
-        with patch("skills.incident_auto_recovery_dispatcher.IncidentAutoEscalationEngine") as MockEscalationEngine, \
-             patch("skills.incident_auto_recovery_dispatcher.ErrorRecoveryHub") as MockRecoveryHub:
+    def test_run_full_recovery_cycle_success(self):
+        patch_payload = {"patch_code": uuid.uuid4().hex}
+        with patch.object(self.dispatcher.recovery_hub, 'capture_failure', return_value=self.rand_incident_id) as mock_capture, \
+             patch.object(self.dispatcher.escalation_engine, 'check_and_trigger_patching', return_value=True) as mock_check, \
+             patch.object(self.dispatcher.recovery_hub, 'generate_patch', return_value=patch_payload) as mock_gen, \
+             patch.object(self.dispatcher.recovery_hub, 'deploy_and_verify', return_value=True) as mock_deploy:
+
+            result = self.dispatcher.run_full_recovery_cycle(self.rand_module_name, self.rand_exception, self.rand_traceback)
             
-            mock_engine = MockEscalationEngine.return_value
-            mock_engine.consume_stream_data.return_value = random_bytes
+            mock_capture.assert_called_once_with(self.rand_module_name, self.rand_exception, self.rand_traceback)
+            mock_check.assert_called_once()
+            mock_gen.assert_called_once_with(self.rand_incident_id)
+            mock_deploy.assert_called_once_with(self.rand_incident_id, patch_payload)
+            self.assertTrue(result)
+
+    def test_run_full_recovery_cycle_dict_incident_id(self):
+        incident_dict = {"incident_id": self.rand_incident_id}
+        patch_payload = {"patch_code": uuid.uuid4().hex}
+        with patch.object(self.dispatcher.recovery_hub, 'capture_failure', return_value=incident_dict) as mock_capture, \
+             patch.object(self.dispatcher.escalation_engine, 'check_and_trigger_patching', return_value=True) as mock_check, \
+             patch.object(self.dispatcher.recovery_hub, 'generate_patch', return_value=patch_payload) as mock_gen, \
+             patch.object(self.dispatcher.recovery_hub, 'deploy_and_verify', return_value=True) as mock_deploy:
+
+            result = self.dispatcher.run_full_recovery_cycle(self.rand_module_name, self.rand_exception, self.rand_traceback)
             
-            dispatcher = IncidentAutoRecoveryDispatcher()
-            stream_result = dispatcher.consume_and_process_stream()
+            mock_gen.assert_called_once_with(self.rand_incident_id)
+            self.assertTrue(result)
+
+    def test_run_full_recovery_cycle_no_patch(self):
+        with patch.object(self.dispatcher.recovery_hub, 'capture_failure', return_value=self.rand_incident_id) as mock_capture, \
+             patch.object(self.dispatcher.escalation_engine, 'check_and_trigger_patching', return_value=False) as mock_check, \
+             patch.object(self.dispatcher.recovery_hub, 'generate_patch') as mock_gen:
+
+            result = self.dispatcher.run_full_recovery_cycle(self.rand_module_name, self.rand_exception, self.rand_traceback)
             
-            mock_engine.consume_stream_data.assert_called_once()
-            self.assertEqual(stream_result, random_bytes)
+            mock_capture.assert_called_once_with(self.rand_module_name, self.rand_exception, self.rand_traceback)
+            mock_check.assert_called_once()
+            mock_gen.assert_not_called()
+            self.assertFalse(result)
+
+    def test_evaluate_telemetry(self):
+        telemetry_data = {"risk_level": random.choice(["low", "medium", "high"]), "score": random.random()}
+        with patch.object(self.dispatcher.escalation_engine, 'evaluate_system_telemetry_risks', return_value=telemetry_data) as mock_eval:
+            result = self.dispatcher.evaluate_telemetry()
+            mock_eval.assert_called_once()
+            self.assertEqual(result, telemetry_data)
+
+    def test_consume_and_process_stream(self):
+        stream_bytes = uuid.uuid4().hex.encode('utf-8')
+        with patch.object(self.dispatcher.escalation_engine, 'consume_stream_data', return_value=stream_bytes) as mock_consume:
+            result = self.dispatcher.consume_and_process_stream()
+            mock_consume.assert_called_once()
+            self.assertEqual(result, stream_bytes)
+
+    def test_dispatch_recovery(self):
+        rec_res = {"recovered": True, "detail": uuid.uuid4().hex}
+        esc_res = {"escalated": False, "reason": uuid.uuid4().hex}
+
+        with patch.object(self.dispatcher.recovery_hub, 'analyze_and_recover', return_value=rec_res) as mock_rec, \
+             patch.object(self.dispatcher.escalation_engine, 'process_escalation', return_value=esc_res) as mock_esc:
+
+            result = self.dispatcher.dispatch_recovery(self.rand_incident_id, self.rand_module_name, self.rand_exception)
+
+            mock_rec.assert_called_once_with(
+                self.rand_module_name, 
+                self.rand_exception, 
+                {"incident_id": self.rand_incident_id, "module_name": self.rand_module_name}
+            )
+            mock_esc.assert_called_once_with(self.rand_incident_id)
+
+            self.assertEqual(result["incident_id"], self.rand_incident_id)
+            self.assertEqual(result["recovery_result"], rec_res)
+            self.assertEqual(result["escalation_result"], esc_res)
+            self.assertEqual(result["status"], "dispatched")
 
 if __name__ == '__main__':
     unittest.main()

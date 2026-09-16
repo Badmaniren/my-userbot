@@ -6,6 +6,10 @@ class NotificationWebhookBroadcaster:
         self.dispatcher = NotificationChannelDispatcher()
         self.template_engine = NotificationTemplateEngine()
 
+    def post(self, payload_data, channel_name="webhook"):
+        payload = payload_data if isinstance(payload_data, dict) else {"payload": payload_data}
+        return self.dispatch_to_webhook(channel_name, payload)
+
     def broadcast_incident(self, severity, incident_id, raw_data, template_name):
         payload = self.template_engine.generate_notification_payload(severity, incident_id, raw_data)
         rendered_text = self.template_engine.render_text(payload, template_name)

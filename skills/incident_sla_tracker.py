@@ -102,3 +102,30 @@ def track_incident_sla(sla_input: Dict[str, Any]) -> Dict[str, Any]:
         "breach_predicted": breach_predicted,
         "time_remaining_seconds": time_remaining
     }
+
+
+def incident_sla_tracker(sla_input=None, warning_threshold_pct=0.8, **kwargs):
+    if isinstance(sla_input, dict) and ("incident_id" in sla_input or "threshold_seconds" in sla_input or "action" in sla_input):
+        return track_incident_sla(sla_input)
+    if isinstance(sla_input, dict) and any(k in ("LOW", "MEDIUM", "HIGH", "CRITICAL") for k in sla_input.keys()):
+        return IncidentSLATracker(sla_thresholds=sla_input, warning_threshold_pct=warning_threshold_pct)
+    if kwargs.get("sla_thresholds"):
+        return IncidentSLATracker(
+            sla_thresholds=kwargs.get("sla_thresholds"),
+            warning_threshold_pct=kwargs.get("warning_threshold_pct", warning_threshold_pct)
+        )
+    if isinstance(sla_input, dict):
+        return track_incident_sla(sla_input)
+    return IncidentSLATracker(
+        sla_thresholds={"LOW": 7200, "MEDIUM": 3600, "HIGH": 1800, "CRITICAL": 600},
+        warning_threshold_pct=warning_threshold_pct
+    )
+
+
+def _check_status(data=None):
+    if isinstance(data, dict):
+        return track_incident_sla(data)
+    return {}
+
+
+incident_sla_tracker.check_status = _check_status

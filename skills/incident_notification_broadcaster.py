@@ -8,6 +8,20 @@ class IncidentNotificationBroadcaster:
         self.bridge = bridge
         self.dispatcher = dispatcher
 
+    def broadcast(self, incident_id=None, threshold=None, recipient=None, channel=None, **kwargs):
+        payload = {
+            "incident_id": incident_id,
+            "threshold": threshold,
+            "recipient": recipient,
+            "channel": channel,
+        }
+        if channel and self.dispatcher and channel in getattr(self.dispatcher, "channels", {}):
+            res = self.dispatcher.dispatch(channel, payload)
+            return {"status": "dispatched" if res else "failed", "result": res}
+        if self.bridge:
+            self.bridge.process_incident(payload, channel=channel)
+        return {"status": "dispatched"}
+
     def broadcast_incident(self, incident_id: str, level: str, message: str, channel: str):
         payload = self.dispatcher.format_payload(level, incident_id, message)
         broadcast_result = self.dispatcher.broadcast(payload)

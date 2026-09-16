@@ -67,6 +67,9 @@ class NotificationTemplateEngine:
         self.templates[template_string] = template_string
         return template_string
 
+    def render(self, template_name: str, context: Dict[str, Any], format: str = "text") -> str:
+        return self.render_template(template_name, context, format=format)
+
     def render_template(self, template_name: str, context: Dict[str, Any], format: str = "text") -> str:
         # Шаблон по умолчанию для интеграционных тестов
         if template_name == "incident_notification":

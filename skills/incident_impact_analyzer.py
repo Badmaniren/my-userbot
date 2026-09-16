@@ -1,7 +1,11 @@
 import sys
 import io
 import json
-import requests
+try:
+    import requests
+except ImportError:
+    requests = None
+
 from skills.incident_aggregator import IncidentAggregator
 from skills.error_recovery_hub import ErrorRecoveryHub
 
@@ -11,11 +15,14 @@ class IncidentImpactAnalyzer:
         pass
 
     def analyze_financial_impact(self, incident_id: str) -> dict:
-        url = f"http://localhost/incidents/{incident_id}/metrics"
-        try:
-            response = requests.get(url)
-            data = response.json()
-        except Exception:
+        if requests is not None:
+            url = f"http://localhost/incidents/{incident_id}/metrics"
+            try:
+                response = requests.get(url)
+                data = response.json()
+            except Exception:
+                data = {"downtime_minutes": 0, "cost_per_minute": 0.0}
+        else:
             data = {"downtime_minutes": 0, "cost_per_minute": 0.0}
             
         downtime_minutes = data.get("downtime_minutes", 0)
@@ -83,7 +90,9 @@ class IncidentImpactAnalyzer:
         return float(financial_loss * operational_degradation)
 
     def analyze(self, data: dict) -> dict:
-        incident = data.get("incident", {})
+        incident = data.get("incident")
+        if not isinstance(incident, dict):
+            incident = data if isinstance(data, dict) else {}
         incident_id = incident.get("incident_id", "")
         downtime = incident.get("downtime_minutes", 0)
         error_rate = incident.get("error_rate", 0.0)
@@ -94,8 +103,24 @@ class IncidentImpactAnalyzer:
         return {
             "incident_id": incident_id,
             "financial_loss": financial_loss,
-            "operational_impact_score": operational_score
+            "operational_impact_score": operational_score,
+            "downtime_minutes": downtime,
+            "affected_users": incident.get("affected_users", 0),
+            "severity": incident.get("severity", "MEDIUM")
         }
+
+
+def incident_impact_analyzer(data=None, **kwargs):
+    analyzer = IncidentImpactAnalyzer()
+    if data is None and not kwargs:
+        return analyzer
+    if data is None:
+        data = kwargs
+    if isinstance(data, dict):
+        return analyzer.analyze(data)
+    if isinstance(data, str):
+        return analyzer.analyze({"incident_id": data})
+    return analyzer
 
 
 if not hasattr(IncidentAggregator, "aggregate"):

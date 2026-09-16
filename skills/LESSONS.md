@@ -3,7 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-НО: Объявлен фиктивный 'auto_patch_pipeline'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.auto_patch_pipeline import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'auto_patch_pipeline'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.auto_patch_pipeline import ...'
+'from skills.auto_patch_pipeline import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'auto_patch_pipeline'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.auto_patch_pipeline import ...'
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## patch_auto_executor (compose) — раундов: 4
@@ -308,6 +308,9 @@
 
 ## incident_post_mortem_service (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: успешно прошёл тесты и влит в main
+
+## incident_post_mortem_service (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## incident_post_mortem_service (refactor) — раундов: 1

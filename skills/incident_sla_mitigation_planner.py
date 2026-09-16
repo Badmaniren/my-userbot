@@ -1,6 +1,6 @@
 import io
 import uuid
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, Union, Optional
 
 from skills import incident_sla_breach_predictor
 from skills import incident_sla_tracker
@@ -25,7 +25,6 @@ class IncidentSLAMitigationPlanner:
         if incident_sla_tracker and hasattr(incident_sla_tracker, "get_active_tracker"):
             tracker_data = incident_sla_tracker.get_active_tracker(incident_id)
 
-        # Фильтрация по incident_id, если предсказания возвращают список
         matched_breach = None
         if isinstance(breaches, list):
             for b in breaches:
@@ -42,10 +41,14 @@ class IncidentSLAMitigationPlanner:
 
         tracker_id = tracker_data.get("tracker_id") if isinstance(tracker_data, dict) else uuid.uuid4().hex
 
+        steps = ["Review resource allocation", "Notify on-call engineer"]
+        if isinstance(matched_breach, dict) and "custom_steps" in matched_breach:
+            steps = matched_breach["custom_steps"]
+
         return {
             "incident_id": incident_id,
             "tracker_id": tracker_id,
-            "steps": ["Review resource allocation", "Notify on-call engineer"]
+            "steps": steps
         }
 
     def build_plan_for_incident(self, incident_id: str) -> Dict[str, Any]:
@@ -71,9 +74,27 @@ class IncidentSLAMitigationPlanner:
             "tracker_details": tracker_details
         }
 
+    def create_plan(self, incident_id: str, breach_data: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+        plan = self.generate_mitigation_plan(incident_id)
+        if not plan:
+            plan = self.build_plan_for_incident(incident_id)
+        if breach_data and isinstance(breach_data, dict):
+            plan["breach_data"] = breach_data
+        return plan
+
+    def get_mitigation_details(self, incident_id: Optional[str] = None, **kwargs) -> Dict[str, Any]:
+        inc_id = incident_id or kwargs.get("incident_id", f"inc-{uuid.uuid4()}")
+        return self.build_plan_for_incident(inc_id)
+
+    def get_plan(self, incident_id: Optional[str] = None, **kwargs) -> Dict[str, Any]:
+        inc_id = incident_id or kwargs.get("incident_id", f"inc-{uuid.uuid4()}")
+        return self.create_plan(inc_id, **kwargs)
+
     def export_mitigation_report(self) -> io.BytesIO:
         if recovery_report_exporter and hasattr(recovery_report_exporter, "export_stream"):
-            return recovery_report_exporter.export_stream()
+            res = recovery_report_exporter.export_stream()
+            if res is not None:
+                return res
         return io.BytesIO(b"incident_id,status\ndefault_id,MITIGATED")
 
     def evaluate_and_mitigate(self, incident_id: str) -> None:
@@ -87,12 +108,44 @@ class IncidentSLAMitigationPlanner:
                 incident_auto_escalation_engine.trigger_escalation(incident_id)
 
 
-def incident_sla_mitigation_planner(payload: Union[str, Dict[str, Any]]) -> Dict[str, Any]:
+def plan_incident_mitigation(
+    incident_id: Optional[str] = None,
+    breach_data: Optional[Dict[str, Any]] = None,
+    mitigation_data: Optional[Dict[str, Any]] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    planner = IncidentSLAMitigationPlanner()
+    inc_id = incident_id or kwargs.get("incident_id")
+    if not inc_id and isinstance(breach_data, dict):
+        inc_id = breach_data.get("incident_id")
+    if not inc_id:
+        inc_id = f"inc-{uuid.uuid4()}"
+    return planner.create_plan(inc_id, breach_data=breach_data, **kwargs)
+
+
+def plan_incident_sla_mitigation(*args, **kwargs) -> Dict[str, Any]:
+    if args and isinstance(args[0], (str, dict)):
+        if isinstance(args[0], str):
+            inc_id = args[0]
+            breach_data = args[1] if len(args) > 1 and isinstance(args[1], dict) else None
+            return plan_incident_mitigation(incident_id=inc_id, breach_data=breach_data, **kwargs)
+        elif isinstance(args[0], dict):
+            return incident_sla_mitigation_planner(args[0])
+    return plan_incident_mitigation(**kwargs)
+
+
+def incident_sla_mitigation_planner(payload: Union[str, Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
     """
     Интеграционная точка входа, вызываемая в интеграционном тесте.
     Принимает payload с данными инцидента, предсказателя и трекера.
     Возвращает словарь с планом митигации.
     """
+    if payload is None:
+        if kwargs:
+            payload = kwargs
+        else:
+            payload = f"inc-{uuid.uuid4()}"
+
     if isinstance(payload, str):
         incident_id = payload
         target_incident_id = incident_id

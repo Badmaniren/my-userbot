@@ -34,9 +34,10 @@ class IncidentSLABreachPredictor:
             time_remaining = (sla_data.get("sla_limit_seconds", 300) - sla_data.get("current_elapsed_seconds", 0)) / 60.0
 
         priority = sla_data.get("priority", "LOW")
+        status = sla_data.get("status", "")
         
         breach_predicted = False
-        if risk_score > 0.5 or risk_score > 1.0 or (priority in ["HIGH", "CRITICAL"] and time_remaining < 180) or time_remaining < 1:
+        if status == "BREACHED" or risk_score > 0.5 or risk_score > 1.0 or (priority in ["HIGH", "CRITICAL"] and time_remaining < 180) or time_remaining < 1:
             breach_predicted = True
 
         result = {
@@ -60,8 +61,9 @@ def incident_sla_breach_predictor(payload):
     
     time_remaining = sla_data.get("sla_limit_seconds", 300) - sla_data.get("current_elapsed_seconds", 0)
     risk_score = trend_data.get("risk_factor", trend_data.get("risk_score", 0.0))
+    status = sla_data.get("status", "")
     
-    breach_predicted = risk_score > 1.0 or risk_score > 0.5 or time_remaining < 60
+    breach_predicted = status == "BREACHED" or risk_score > 1.0 or risk_score > 0.5 or time_remaining < 60
     
     return {
         "breach_predicted": bool(breach_predicted),

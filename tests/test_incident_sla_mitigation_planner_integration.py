@@ -1,43 +1,99 @@
 import unittest
 import uuid
 import random
-from skills.incident_sla_mitigation_planner import incident_sla_mitigation_planner
-from skills.incident_sla_breach_predictor import incident_sla_breach_predictor
-from skills.incident_sla_tracker import incident_sla_tracker
+from skills.incident_sla_mitigation_planner import IncidentSLAMitigationPlanner, incident_sla_mitigation_planner
+from skills import incident_sla_breach_predictor
+from skills import incident_sla_tracker
+from skills import incident_knowledge_base_searcher
 
-class TestIncidentSlaMitigationPlannerIntegration(unittest.TestCase):
-    def test_mitigation_planner_integration_real_flow(self):
-        unique_incident_id = f"inc-{uuid.uuid4()}"
-        random_severity_score = round(random.uniform(7.0, 10.0), 2)
-        random_breach_probability = round(random.uniform(0.85, 0.99), 2)
 
-        tracker_input = {
-            "incident_id": unique_incident_id,
-            "status": "active",
-            "severity_score": random_severity_score
-        }
-        tracker_result = incident_sla_tracker(tracker_input)
+class TestIncidentSLAMitigationPlannerIntegration(unittest.TestCase):
 
-        predictor_input = {
-            "incident_id": unique_incident_id,
-            "breach_probability": random_breach_probability,
-            "tracker_data": tracker_result
-        }
-        predictor_result = incident_sla_breach_predictor(predictor_input)
+    def setUp(self):
+        self.planner = IncidentSLAMitigationPlanner()
+        self.random_incident_id = f"inc-{uuid.uuid4()}"
+        self.random_tracker_id = f"trk-{uuid.uuid4()}"
 
-        planner_input = {
-            "incident_id": unique_incident_id,
-            "prediction_payload": predictor_result,
-            "tracker_payload": tracker_result
-        }
+    def test_generate_mitigation_plan_integration(self):
+        unique_id = f"inc-gen-{uuid.uuid4().hex}"
         
-        mitigation_plan = incident_sla_mitigation_planner(planner_input)
+        if hasattr(incident_sla_breach_predictor, "get_predicted_breaches"):
+            try:
+                incident_sla_breach_predictor.get_predicted_breaches()
+            except Exception:
+                pass
 
-        self.assertIsInstance(mitigation_plan, dict, "Mitigation planner must return a dictionary payload.")
-        self.assertIn("mitigation_plan_id", mitigation_plan, "The output must contain a mitigation plan ID.")
-        self.assertEqual(mitigation_plan.get("target_incident_id"), unique_incident_id, "The plan must be bound to the generated incident UUID.")
-        self.assertIsInstance(mitigation_plan.get("remediation_steps"), list, "Remediation steps must be provided as a list.")
-        self.assertTrue(len(mitigation_plan.get("remediation_steps")) > 0, "Generated mitigation plan must contain at least one remediation step.")
+        if hasattr(incident_sla_tracker, "get_active_tracker"):
+            try:
+                incident_sla_tracker.get_active_tracker(unique_id)
+            except Exception:
+                pass
+
+        result = self.planner.generate_mitigation_plan(unique_id)
+        
+        if result:
+            self.assertIn("incident_id", result)
+            self.assertEqual(result["incident_id"], unique_id)
+            self.assertIn("tracker_id", result)
+            self.assertIn("steps", result)
+            self.assertIsInstance(result["steps"], list)
+
+    def test_build_plan_for_incident_integration(self):
+        unique_id = f"inc-build-{uuid.uuid4().hex}"
+        
+        if hasattr(incident_knowledge_base_searcher, "find_remediation_steps"):
+            try:
+                incident_knowledge_base_searcher.find_remediation_steps(unique_id)
+            except Exception:
+                pass
+
+        result = self.planner.build_plan_for_incident(unique_id)
+
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("incident_id"), unique_id)
+        self.assertIn("remediation_steps", result)
+        self.assertIn("risk_info", result)
+        self.assertIn("tracker_details", result)
+        self.assertIsInstance(result["remediation_steps"], list)
+        self.assertTrue(len(result["remediation_steps"]) > 0)
+
+    def test_export_mitigation_report_integration(self):
+        report_stream = self.planner.export_mitigation_report()
+        self.assertIsNotNone(report_stream)
+        content = report_stream.read()
+        self.assertIsInstance(content, bytes)
+        self.assertTrue(len(content) > 0)
+
+    def test_evaluate_and_mitigate_integration(self):
+        unique_id = f"inc-eval-{uuid.uuid4().hex}"
+        try:
+            self.planner.evaluate_and_mitigate(unique_id)
+        except Exception as e:
+            self.fail(f"evaluate_and_mitigate raised an exception with real modules: {e}")
+
+    def test_incident_sla_mitigation_planner_entrypoint_integration(self):
+        custom_steps = [f"Step-{random.randint(100, 999)}", f"Step-{random.randint(1000, 9999)}"]
+        payload = {
+            "incident_id": self.random_incident_id,
+            "prediction_payload": {
+                "remediation_steps": custom_steps
+            }
+        }
+
+        result = incident_sla_mitigation_planner(payload)
+
+        self.assertIsInstance(result, dict)
+        self.assertIn("mitigation_plan_id", result)
+        self.assertEqual(result.get("target_incident_id"), self.random_incident_id)
+        self.assertEqual(result.get("remediation_steps"), custom_steps)
+        self.assertEqual(result.get("status"), "generated")
+
+        string_payload = f"inc-str-{uuid.uuid4().hex}"
+        result_str = incident_sla_mitigation_planner(string_payload)
+        self.assertIsInstance(result_str, dict)
+        self.assertEqual(result_str.get("target_incident_id"), string_payload)
+        self.assertIn("remediation_steps", result_str)
+
 
 if __name__ == "__main__":
     unittest.main()

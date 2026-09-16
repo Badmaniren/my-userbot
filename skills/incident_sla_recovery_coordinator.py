@@ -57,20 +57,21 @@ class IncidentSLARecoveryCoordinator:
 
     def get_current_time_to_breach(self, incident_id, current_time):
         if hasattr(self.sla_tracker, 'get_time_to_breach'):
-            # Нормализуем current_time и отслеживаемое время создания инцидента, 
-            # чтобы избежать TypeError/AttributeError из-за смешения float таймстампов и datetime объектов.
+            # Аккуратно приводим типы к datetime, чтобы (current_time - created_at).total_seconds() в трекере не падал
+            if isinstance(current_time, (int, float)):
+                current_time_dt = datetime.datetime.fromtimestamp(current_time, datetime.timezone.utc)
+            else:
+                current_time_dt = current_time
+
             incident_data = getattr(self.sla_tracker, 'incidents', {}).get(incident_id)
             if incident_data and 'created_at' in incident_data:
                 created_at = incident_data['created_at']
-                
-                # Приводим оба к datetime, если возможно, либо к float
-                if isinstance(created_at, datetime.datetime) and isinstance(current_time, (int, float)):
-                    current_time = datetime.datetime.fromtimestamp(current_time, datetime.timezone.utc)
-                elif isinstance(created_at, (int, float)) and isinstance(current_time, datetime.datetime):
-                    created_at = datetime.datetime.fromtimestamp(created_at, datetime.timezone.utc)
-                    incident_data['created_at'] = created_at
-            
-            return self.sla_tracker.get_time_to_breach(incident_id, current_time)
+                if isinstance(created_at, (int, float)):
+                    incident_data['created_at'] = datetime.datetime.fromtimestamp(created_at, datetime.timezone.utc)
+                elif isinstance(created_at, datetime.datetime) and created_at.tzinfo is None:
+                    incident_data['created_at'] = created_at.replace(tzinfo=datetime.timezone.utc)
+
+            return self.sla_tracker.get_time_to_breach(incident_id, current_time_dt)
         return 0.0
 
     def coordinate_recovery_for_incident(self, incident_id, module_name, exception):

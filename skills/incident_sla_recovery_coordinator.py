@@ -56,7 +56,15 @@ class IncidentSLARecoveryCoordinator:
 
     def get_current_time_to_breach(self, incident_id, current_time):
         if hasattr(self.sla_tracker, 'get_time_to_breach'):
-            return self.sla_tracker.get_time_to_breach(incident_id, current_time)
+            try:
+                return self.sla_tracker.get_time_to_breach(incident_id, current_time)
+            except AttributeError:
+                import datetime
+                if isinstance(current_time, (int, float)):
+                    dt_current = datetime.datetime.fromtimestamp(current_time, datetime.timezone.utc)
+                else:
+                    dt_current = current_time
+                return self.sla_tracker.get_time_to_breach(incident_id, dt_current)
         return 0.0
 
     def coordinate_recovery_for_incident(self, incident_id, module_name, exception):

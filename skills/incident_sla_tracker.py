@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union
 
 # Честные импорты зависимостей без фальшивых заглушек
 from skills.incident_aggregator import aggregate_incidents
@@ -80,25 +80,52 @@ class IncidentSLATracker:
         return results
 
 
-def track_incident_sla(sla_input: Dict[str, Any]) -> Dict[str, Any]:
-    incident_id = sla_input.get("incident_id")
-    aggregated_data = sla_input.get("aggregated_data", {})
-    threshold = sla_input.get("threshold_seconds", 3600)
-    
-    data = aggregated_data.get("data", {})
-    timestamp = data.get("timestamp")
-    
-    if timestamp:
-        created_at = datetime.fromtimestamp(timestamp)
-    else:
-        created_at = datetime.now()
-        
-    elapsed = (datetime.now() - created_at).total_seconds()
-    time_remaining = threshold - elapsed
+def track_incident_sla(
+    sla_input: Union[Dict[str, Any], str, None] = None,
+    incident_id: Optional[str] = None,
+    threshold_minutes: Optional[float] = None,
+    elapsed_minutes: Optional[float] = None,
+    threshold_seconds: Optional[float] = None,
+    elapsed_seconds: Optional[float] = None,
+    **kwargs: Any
+) -> Dict[str, Any]:
+    target_id = incident_id
+
+    if isinstance(sla_input, str):
+        target_id = sla_input
+    elif isinstance(sla_input, dict):
+        if not target_id:
+            target_id = sla_input.get("incident_id")
+        if threshold_minutes is None and "threshold_minutes" in sla_input:
+            threshold_minutes = sla_input["threshold_minutes"]
+        if elapsed_minutes is None and "elapsed_minutes" in sla_input:
+            elapsed_minutes = sla_input["elapsed_minutes"]
+        if threshold_seconds is None and "threshold_seconds" in sla_input:
+            threshold_seconds = sla_input["threshold_seconds"]
+        if elapsed_seconds is None and "elapsed_seconds" in sla_input:
+            elapsed_seconds = sla_input["elapsed_seconds"]
+        if "aggregated_data" in sla_input:
+            agg = sla_input["aggregated_data"]
+            data = agg.get("data", {}) if isinstance(agg, dict) else {}
+            ts = data.get("timestamp")
+            if ts:
+                created_at = datetime.fromtimestamp(ts)
+                elapsed_seconds = (datetime.now() - created_at).total_seconds()
+
+    if threshold_seconds is None:
+        threshold_seconds = (threshold_minutes * 60.0) if threshold_minutes is not None else 3600.0
+    if elapsed_seconds is None:
+        elapsed_seconds = (elapsed_minutes * 60.0) if elapsed_minutes is not None else 0.0
+
+    time_remaining = threshold_seconds - elapsed_seconds
+    breach_detected = elapsed_seconds > threshold_seconds
     breach_predicted = time_remaining < 0
 
     return {
-        "incident_id": incident_id,
+        "incident_id": target_id,
+        "breach_detected": breach_detected,
         "breach_predicted": breach_predicted,
-        "time_remaining_seconds": time_remaining
+        "time_remaining_seconds": time_remaining,
+        "elapsed_seconds": elapsed_seconds,
+        "threshold_seconds": threshold_seconds
     }

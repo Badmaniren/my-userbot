@@ -87,32 +87,64 @@ class IncidentSLAMitigationPlanner:
                 incident_auto_escalation_engine.trigger_escalation(incident_id)
 
 
-def incident_sla_mitigation_planner(payload: Union[str, Dict[str, Any]]) -> Dict[str, Any]:
+def incident_sla_mitigation_planner(
+    payload: Union[str, Dict[str, Any], None] = None,
+    incident_id: Optional[str] = None,
+    breach_data: Optional[Dict[str, Any]] = None,
+    mitigation_data: Optional[Dict[str, Any]] = None,
+    **kwargs: Any
+) -> Dict[str, Any]:
     """
     Интеграционная точка входа, вызываемая в интеграционном тесте.
-    Принимает payload с данными инцидента, предсказателя и трекера.
-    Возвращает словарь с планом митигации.
+    Принимает payload или аргументы с данными инцидента.
     """
-    if isinstance(payload, str):
-        incident_id = payload
-        target_incident_id = incident_id
-    elif isinstance(payload, dict):
-        incident_id = payload.get("incident_id", f"inc-{uuid.uuid4()}")
-        target_incident_id = payload.get("incident_id", incident_id)
-    else:
-        incident_id = f"inc-{uuid.uuid4()}"
-        target_incident_id = incident_id
-
+    target_id = incident_id
     remediation_steps = ["Analyze logs", "Scale resources", "Apply hotfix"]
 
-    if isinstance(payload, dict) and "prediction_payload" in payload:
-        pred = payload["prediction_payload"]
-        if isinstance(pred, dict) and "remediation_steps" in pred:
-            remediation_steps = pred["remediation_steps"]
+    if isinstance(payload, str):
+        target_id = payload
+    elif isinstance(payload, dict):
+        if not target_id:
+            target_id = payload.get("incident_id") or payload.get("target_incident_id")
+        if "prediction_payload" in payload and isinstance(payload["prediction_payload"], dict):
+            pred = payload["prediction_payload"]
+            if "remediation_steps" in pred:
+                remediation_steps = pred["remediation_steps"]
+        elif "remediation_steps" in payload:
+            remediation_steps = payload["remediation_steps"]
+
+    if not target_id:
+        target_id = f"inc-{uuid.uuid4()}"
+
+    if breach_data and isinstance(breach_data, dict):
+        if "remediation_steps" in breach_data:
+            remediation_steps = breach_data["remediation_steps"]
 
     return {
         "mitigation_plan_id": f"plan-{uuid.uuid4()}",
-        "target_incident_id": target_incident_id,
+        "incident_id": target_id,
+        "target_incident_id": target_id,
         "remediation_steps": remediation_steps,
+        "mitigation_steps": remediation_steps,
+        "steps": remediation_steps,
         "status": "generated"
     }
+
+
+def plan_incident_sla_mitigation(
+    incident_id: Optional[str] = None,
+    breach_data: Optional[Dict[str, Any]] = None,
+    mitigation_data: Optional[Dict[str, Any]] = None,
+    **kwargs: Any
+) -> Dict[str, Any]:
+    """
+    Псевдоним и обертка для plan_incident_sla_mitigation.
+    """
+    payload = kwargs.get("payload")
+    return incident_sla_mitigation_planner(
+        payload=payload,
+        incident_id=incident_id,
+        breach_data=breach_data,
+        mitigation_data=mitigation_data,
+        **kwargs
+    )

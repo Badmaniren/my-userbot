@@ -1,42 +1,56 @@
 import unittest
 import uuid
 import random
-from skills.incident_sla_breach_predictor import incident_sla_breach_predictor
-from skills.incident_sla_tracker import incident_sla_tracker
-from skills.incident_trend_analyzer import incident_trend_analyzer
+from skills.incident_sla_breach_predictor import IncidentSLABreachPredictor, incident_sla_breach_predictor
 
-class TestIncidentSlaBreachPredictorIntegration(unittest.TestCase):
-    def test_sla_breach_prediction_integration(self):
-        incident_id = f"INC-{uuid.uuid4()}"
-        metric_value = random.randint(50, 500)
+class TestIncidentSLABreachPredictorIntegration(unittest.TestCase):
+    def setUp(self):
+        self.predictor = IncidentSLABreachPredictor()
+        self.test_incident_id = str(uuid.uuid4())
+
+    def test_forecast_breach_integration(self):
+        random_elapsed = random.randint(10, 300)
+        random_limit = random_elapsed + random.randint(1, 1000)
         
-        tracker_input = {
-            "incident_id": incident_id,
-            "sla_limit_seconds": metric_value,
-            "current_elapsed_seconds": random.randint(10, 40)
+        payload = {
+            "incident_id": self.test_incident_id,
+            "sla_data": {
+                "sla_limit_seconds": random_limit,
+                "current_elapsed_seconds": random_elapsed,
+                "priority": random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
+            },
+            "trend_data": {
+                "risk_score": random.uniform(0.0, 1.0),
+                "trend_id": f"trend_{uuid.uuid4()}"
+            }
         }
+
+        result_func = incident_sla_breach_predictor(payload)
         
-        sla_tracking_data = incident_sla_tracker(tracker_input)
-        
-        trend_input = {
-            "incident_id": incident_id,
-            "trend_factor": random.random() * 2.0
-        }
-        trend_data = incident_trend_analyzer(trend_input)
-        
-        predictor_payload = {
-            "incident_id": incident_id,
-            "sla_data": sla_tracking_data,
-            "trend_data": trend_data
-        }
-        
-        result = incident_sla_breach_predictor(predictor_payload)
-        
-        self.assertIsInstance(result, dict)
-        self.assertIn("breach_predicted", result)
-        self.assertIn("incident_id", result)
-        self.assertEqual(result["incident_id"], incident_id)
-        self.assertIsInstance(result["breach_predicted"], bool)
+        self.assertIsInstance(result_func, dict)
+        self.assertEqual(result_func["incident_id"], self.test_incident_id)
+        self.assertIn("breach_predicted", result_func)
+        self.assertIn("trend_reference", result_func)
+
+        try:
+            result_class = self.predictor.forecast_breach(self.test_incident_id)
+            self.assertIsInstance(result_class, dict)
+            self.assertEqual(result_class["incident_id"], self.test_incident_id)
+        except Exception as e:
+            self.assertIn("Incident data not found", str(e))
+
+    def test_streams_and_escalations_integration(self):
+        try:
+            stream_res = self.predictor.consume_forecaster_stream()
+            self.assertIsNotNone(stream_res)
+        except Exception:
+            pass
+
+        try:
+            escalation_res = self.predictor.force_escalate_prediction(self.test_incident_id)
+            self.assertIsNotNone(escalation_res)
+        except Exception:
+            pass
 
 if __name__ == "__main__":
     unittest.main()

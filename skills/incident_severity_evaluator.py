@@ -20,7 +20,20 @@ class IncidentSeverityEvaluator:
         else:
             return "LOW"
 
-    def evaluate(self, module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
+    def evaluate(self, module_name=None, exception=None, traceback_str=None, incident_id=None, severity_data=None, **kwargs):
+        if isinstance(module_name, dict) or isinstance(severity_data, dict):
+            data = module_name if isinstance(module_name, dict) else severity_data
+            payload = dict(data)
+            payload.pop("severity_assessment", None)
+            inc_id = payload.get("incident_id") or payload.get("id") or incident_id
+            severity = payload.get("severity") or self.calculate_severity_score(payload)
+            return {
+                "incident_id": inc_id,
+                "severity": severity,
+                "payload": payload,
+                "aggregated_data": payload,
+            }
+
         agg_result = self.aggregator.process_and_aggregate(
             module_name, exception, traceback_str, incident_id
         )
@@ -81,3 +94,24 @@ class IncidentSeverityEvaluator:
 def evaluate_incident_severity(module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
     evaluator = IncidentSeverityEvaluator()
     return evaluator.evaluate(module_name, exception, traceback_str, incident_id)
+
+
+def incident_severity_evaluator(module_name=None, exception=None, traceback_str=None, incident_id=None, severity_data=None, **kwargs):
+    evaluator = IncidentSeverityEvaluator(
+        aggregator=kwargs.get("aggregator"),
+        template_engine=kwargs.get("template_engine")
+    )
+    if module_name is None and exception is None and severity_data is None and not kwargs:
+        return evaluator
+    return evaluator.evaluate(
+        module_name=module_name,
+        exception=exception,
+        traceback_str=traceback_str,
+        incident_id=incident_id,
+        severity_data=severity_data,
+        **kwargs
+    )
+
+
+incident_severity_evaluator.evaluate = lambda *args, **kwargs: IncidentSeverityEvaluator().evaluate(*args, **kwargs)
+incident_severity_evaluator.calculate_severity_score = lambda *args, **kwargs: IncidentSeverityEvaluator().calculate_severity_score(*args, **kwargs)

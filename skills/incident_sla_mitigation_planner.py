@@ -25,7 +25,6 @@ class IncidentSLAMitigationPlanner:
         if incident_sla_tracker and hasattr(incident_sla_tracker, "get_active_tracker"):
             tracker_data = incident_sla_tracker.get_active_tracker(incident_id)
 
-        # Фильтрация по incident_id, если предсказания возвращают список
         matched_breach = None
         if isinstance(breaches, list):
             for b in breaches:
@@ -87,32 +86,37 @@ class IncidentSLAMitigationPlanner:
                 incident_auto_escalation_engine.trigger_escalation(incident_id)
 
 
-def incident_sla_mitigation_planner(payload: Union[str, Dict[str, Any]]) -> Dict[str, Any]:
+def incident_sla_mitigation_planner(payload=None, mitigation_data=None, **kwargs) -> Dict[str, Any]:
     """
     Интеграционная точка входа, вызываемая в интеграционном тесте.
-    Принимает payload с данными инцидента, предсказателя и трекера.
+    Принимает payload или mitigation_data с данными инцидента, предсказателя и трекера.
     Возвращает словарь с планом митигации.
     """
-    if isinstance(payload, str):
-        incident_id = payload
+    data = payload if payload is not None else (mitigation_data if mitigation_data is not None else kwargs)
+    if isinstance(data, str):
+        incident_id = data
         target_incident_id = incident_id
-    elif isinstance(payload, dict):
-        incident_id = payload.get("incident_id", f"inc-{uuid.uuid4()}")
-        target_incident_id = payload.get("incident_id", incident_id)
+        remediation_steps = ["Analyze logs", "Scale resources", "Apply hotfix"]
+    elif isinstance(data, dict):
+        incident_id = data.get("incident_id", f"inc-{uuid.uuid4()}")
+        target_incident_id = data.get("incident_id", incident_id)
+        if "steps" in data:
+            remediation_steps = data["steps"]
+        elif "prediction_payload" in data and isinstance(data["prediction_payload"], dict) and "remediation_steps" in data["prediction_payload"]:
+            remediation_steps = data["prediction_payload"]["remediation_steps"]
+        elif "remediation_steps" in data:
+            remediation_steps = data["remediation_steps"]
+        else:
+            remediation_steps = ["Analyze logs", "Scale resources", "Apply hotfix"]
     else:
         incident_id = f"inc-{uuid.uuid4()}"
         target_incident_id = incident_id
-
-    remediation_steps = ["Analyze logs", "Scale resources", "Apply hotfix"]
-
-    if isinstance(payload, dict) and "prediction_payload" in payload:
-        pred = payload["prediction_payload"]
-        if isinstance(pred, dict) and "remediation_steps" in pred:
-            remediation_steps = pred["remediation_steps"]
+        remediation_steps = ["Analyze logs", "Scale resources", "Apply hotfix"]
 
     return {
         "mitigation_plan_id": f"plan-{uuid.uuid4()}",
         "target_incident_id": target_incident_id,
         "remediation_steps": remediation_steps,
+        "steps": remediation_steps,
         "status": "generated"
     }

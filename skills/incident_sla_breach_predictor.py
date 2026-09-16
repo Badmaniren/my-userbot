@@ -54,13 +54,17 @@ class IncidentSLABreachPredictor:
         return incident_auto_escalation_engine.trigger_escalation(incident_id)
 
 
-def incident_sla_breach_predictor(payload):
-    incident_id = payload.get("incident_id")
-    sla_data = payload.get("sla_data", {})
-    trend_data = payload.get("trend_data", {})
+def incident_sla_breach_predictor(payload=None, breach_data=None, **kwargs):
+    data = payload if payload is not None else (breach_data if breach_data is not None else kwargs)
+    if not isinstance(data, dict):
+        data = {}
+    incident_id = data.get("incident_id")
+    sla_data = data.get("sla_data", {})
+    trend_data = data.get("trend_data", {})
+    risk_factor = data.get("risk_factor", 0.0)
     
     time_remaining = sla_data.get("sla_limit_seconds", 300) - sla_data.get("current_elapsed_seconds", 0)
-    risk_score = trend_data.get("risk_factor", trend_data.get("risk_score", 0.0))
+    risk_score = trend_data.get("risk_factor", trend_data.get("risk_score", risk_factor))
     status = sla_data.get("status", "")
     
     breach_predicted = status == "BREACHED" or risk_score > 1.0 or risk_score > 0.5 or time_remaining < 60

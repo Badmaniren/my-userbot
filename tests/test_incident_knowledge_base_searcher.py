@@ -1,145 +1,136 @@
 import unittest
 from unittest.mock import patch, MagicMock
-import io
-import random
 import uuid
-import string
+import random
+import io
+from skills.incident_knowledge_base_searcher import (
+    IncidentKnowledgeBaseSearcher,
+    incident_knowledge_base_searcher
+)
 
-from skills.incident_knowledge_base_searcher import IncidentKnowledgeBaseSearcher
 
 class TestIncidentKnowledgeBaseSearcher(unittest.TestCase):
 
     def setUp(self):
-        self.kb_endpoint = f"https://{uuid.uuid4().hex}.internal/kb/search"
-        self.api_token = f"token_{uuid.uuid4().hex}"
-        self.searcher = IncidentKnowledgeBaseSearcher(
-            kb_endpoint=self.kb_endpoint,
-            api_token=self.api_token
-        )
+        self.endpoint = f"https://{uuid.uuid4().hex}.local/api"
+        self.token = uuid.uuid4().hex
+        self.searcher = IncidentKnowledgeBaseSearcher(kb_endpoint=self.endpoint, api_token=self.token)
+        self.incident_id = uuid.uuid4().hex
+        self.query_text = uuid.uuid4().hex
+
+    def test_init_strips_trailing_slash(self):
+        raw_endpoint = f"https://{uuid.uuid4().hex}.local/api/"
+        searcher = IncidentKnowledgeBaseSearcher(kb_endpoint=raw_endpoint, api_token=self.token)
+        self.assertEqual(searcher.kb_endpoint, raw_endpoint.rstrip('/'))
+        self.assertEqual(searcher.api_token, self.token)
+        self.assertEqual(searcher.headers["Authorization"], f"Bearer {self.token}")
+        self.assertEqual(searcher.headers["Content-Type"], "application/json")
 
     def test_search_similar_incidents_success(self):
-        incident_id = str(uuid.uuid4())
-        query_text = f"Error in module {uuid.uuid4().hex} with code {random.randint(100, 999)}"
-        expected_post_mortem_id = f"pm-{uuid.uuid4().hex[:8]}"
-        expected_root_cause = f"Root cause: {uuid.uuid4().hex}"
-        
-        mock_response_data = {
-            "query": query_text,
-            "results": [
-                {
-                    "post_mortem_id": expected_post_mortem_id,
-                    "similarity_score": round(random.uniform(0.85, 0.99), 2),
-                    "root_cause": expected_root_cause,
-                    "recommendations": [f"Fix {uuid.uuid4().hex}", f"Check {uuid.uuid4().hex}"]
-                }
-            ]
-        }
+        expected_result = {uuid.uuid4().hex: uuid.uuid4().hex}
+        with patch("skills.incident_knowledge_base_searcher.requests.post") as mock_post:
+            mock_response = MagicMock()
+            mock_response.json.return_value = expected_result
+            mock_response.raise_for_status.return_value = None
+            mock_post.return_value = mock_response
 
-        with patch('skills.incident_knowledge_base_searcher.requests.post') as mock_post:
-            mock_resp = MagicMock()
-            mock_resp.status_code = 200
-            mock_resp.json.return_value = mock_response_data
-            mock_post.return_value = mock_resp
+            result = self.searcher.search_similar_incidents(self.incident_id, self.query_text)
 
-            result = self.searcher.search_similar_incidents(incident_id, query_text)
-
+            self.assertEqual(result, expected_result)
             mock_post.assert_called_once()
-            called_url = mock_post.call_args[0][0]
-            self.assertEqual(called_url, self.kb_endpoint)
-            
-            called_json = mock_post.call_args[1]["json"]
-            self.assertEqual(called_json["incident_id"], incident_id)
-            self.assertEqual(called_json["query"], query_text)
-
-            self.assertIn("results", result)
-            self.assertEqual(len(result["results"]), 1)
-            self.assertEqual(result["results"][0]["post_mortem_id"], expected_post_mortem_id)
-            self.assertEqual(result["results"][0]["root_cause"], expected_root_cause)
+            called_args, called_kwargs = mock_post.call_args
+            self.assertEqual(called_args[0], self.endpoint)
+            self.assertEqual(called_kwargs["json"]["incident_id"], self.incident_id)
+            self.assertEqual(called_kwargs["json"]["query"], self.query_text)
+            self.assertEqual(called_kwargs["headers"], self.searcher.headers)
 
     def test_search_similar_incidents_network_error(self):
-        incident_id = str(uuid.uuid4())
-        query_text = f"Timeout during {uuid.uuid4().hex}"
-
-        with patch('skills.incident_knowledge_base_searcher.requests.post') as mock_post:
-            import requests
-            mock_post.side_effect = requests.exceptions.RequestException(f"Network error {uuid.uuid4().hex}")
+        import requests
+        with patch("skills.incident_knowledge_base_searcher.requests.post") as mock_post:
+            mock_post.side_effect = requests.exceptions.RequestException(uuid.uuid4().hex)
 
             with self.assertRaises(Exception) as ctx:
-                self.searcher.search_similar_incidents(incident_id, query_text)
-            
+                self.searcher.search_similar_incidents(self.incident_id, self.query_text)
             self.assertIn("Network error", str(ctx.exception))
 
-    def test_extract_recurring_root_causes(self):
-        tag_filter = f"component-{uuid.uuid4().hex[:6]}"
-        limit = random.randint(5, 50)
+    def test_extract_recurring_root_causes_success(self):
+        tag = uuid.uuid4().hex
+        limit = random.randint(1, 100)
+        recurring_list = [{uuid.uuid4().hex: uuid.uuid4().hex}]
         
-        expected_cause = f"Memory leak in {uuid.uuid4().hex}"
-        mock_payload = {
-            "tag": tag_filter,
-            "limit": limit,
-            "recurring_causes": [
-                {
-                    "root_cause": expected_cause,
-                    "occurrence_count": random.randint(2, 20),
-                    "associated_incidents": [str(uuid.uuid4()), str(uuid.uuid4())]
-                }
-            ]
-        }
+        with patch("skills.incident_knowledge_base_searcher.requests.get") as mock_get:
+            mock_response = MagicMock()
+            mock_response.json.return_value = {"recurring_causes": recurring_list}
+            mock_response.raise_for_status.return_value = None
+            mock_get.return_value = mock_response
 
-        with patch('skills.incident_knowledge_base_searcher.requests.get') as mock_get:
-            mock_resp = MagicMock()
-            mock_resp.status_code = 200
-            mock_resp.json.return_value = mock_payload
-            mock_get.return_value = mock_resp
+            result = self.searcher.extract_recurring_root_causes(tag, limit)
 
-            causes = self.searcher.extract_recurring_root_causes(tag_filter=tag_filter, limit=limit)
-
+            self.assertEqual(result, recurring_list)
             mock_get.assert_called_once()
-            called_params = mock_get.call_args[1]["params"]
-            self.assertEqual(called_params["tag"], tag_filter)
-            self.assertEqual(called_params["limit"], limit)
+            called_args, called_kwargs = mock_get.call_args
+            self.assertEqual(called_args[0], f"{self.endpoint}/recurring-causes")
+            self.assertEqual(called_kwargs["params"]["tag"], tag)
+            self.assertEqual(called_kwargs["params"]["limit"], limit)
+            self.assertEqual(called_kwargs["headers"], self.searcher.headers)
 
-            self.assertEqual(len(causes), 1)
-            self.assertEqual(causes[0]["root_cause"], expected_cause)
+    def test_export_recommendations_stream_success(self):
+        chunk_data = uuid.uuid4().bytes
+        with patch("skills.incident_knowledge_base_searcher.requests.get") as mock_get:
+            mock_response = MagicMock()
+            mock_response.raise_for_status.return_value = None
+            mock_response.iter_content.return_value = [b"", chunk_data]
+            mock_get.return_value = mock_response
 
-    def test_export_recommendations_stream(self):
-        incident_id = str(uuid.uuid4())
-        random_bytes = f"recommendation_stream_{uuid.uuid4().hex}".encode('utf-8')
-        mock_stream_data = io.BytesIO(random_bytes)
+            chunks = list(self.searcher.export_recommendations_stream(self.incident_id))
 
-        with patch('skills.incident_knowledge_base_searcher.requests.get') as mock_get:
-            mock_resp = MagicMock()
-            mock_resp.status_code = 200
-            mock_resp.raw = mock_stream_data
-            mock_resp.iter_content = lambda chunk_size: [random_bytes]
-            mock_get.return_value = mock_resp
+            self.assertEqual(chunks, [chunk_data])
+            mock_get.assert_called_once()
+            called_args, called_kwargs = mock_get.call_args
+            self.assertEqual(called_args[0], f"{self.endpoint}/export-recommendations")
+            self.assertEqual(called_kwargs["params"]["incident_id"], self.incident_id)
+            self.assertTrue(called_kwargs["stream"])
 
-            stream_generator = self.searcher.export_recommendations_stream(incident_id)
-            chunks = list(stream_generator)
-            
-            combined_data = b"".join(chunks)
-            self.assertEqual(combined_data, random_bytes)
+    def test_evaluate_knowledge_base_health_success(self):
+        health_data = {uuid.uuid4().hex: uuid.uuid4().hex}
+        with patch("skills.incident_knowledge_base_searcher.requests.get") as mock_get:
+            mock_response = MagicMock()
+            mock_response.json.return_value = health_data
+            mock_response.raise_for_status.return_value = None
+            mock_get.return_value = mock_response
 
-    def test_evaluate_knowledge_base_health(self):
-        expected_status = random.choice(["healthy", "degraded", "syncing"])
-        expected_index_size = random.randint(1000, 999999)
-        
-        mock_telemetry = {
-            "status": expected_status,
-            "index_size": expected_index_size,
-            "node_id": uuid.uuid4().hex
-        }
+            result = self.searcher.evaluate_knowledge_base_health()
 
-        with patch('skills.incident_knowledge_base_searcher.requests.get') as mock_get:
-            mock_resp = MagicMock()
-            mock_resp.status_code = 200
-            mock_resp.json.return_value = mock_telemetry
-            mock_get.return_value = mock_resp
+            self.assertEqual(result, health_data)
+            mock_get.assert_called_once()
+            called_args, _ = mock_get.call_args
+            self.assertEqual(called_args[0], f"{self.endpoint}/health")
 
-            health_info = self.searcher.evaluate_knowledge_base_health()
+    def test_global_helper_function_success(self):
+        query_val = uuid.uuid4().hex
+        expected_results = [{uuid.uuid4().hex: uuid.uuid4().hex}]
 
-            self.assertEqual(health_info["status"], expected_status)
-            self.assertEqual(health_info["index_size"], expected_index_size)
+        with patch("skills.incident_knowledge_base_searcher.IncidentKnowledgeBaseSearcher.search_similar_incidents") as mock_search:
+            mock_search.return_value = {"results": expected_results}
 
-if __name__ == '__main__':
+            res = incident_knowledge_base_searcher({"query": query_val})
+
+            self.assertEqual(res, expected_results)
+            mock_search.assert_called_once_with("global-search", query_val)
+
+    def test_global_helper_function_fallback_on_exception(self):
+        query_val = uuid.uuid4().hex
+
+        with patch("skills.incident_knowledge_base_searcher.IncidentKnowledgeBaseSearcher.search_similar_incidents") as mock_search:
+            mock_search.side_effect = Exception(uuid.uuid4().hex)
+
+            res = incident_knowledge_base_searcher({"query": query_val})
+
+            self.assertIsInstance(res, list)
+            self.assertEqual(len(res), 1)
+            self.assertEqual(res[0]["root_cause"], query_val)
+            self.assertEqual(res[0]["incident_id"], "inc-mock")
+
+
+if __name__ == "__main__":
     unittest.main()

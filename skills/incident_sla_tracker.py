@@ -11,9 +11,12 @@ incident_auto_escalation_engine = None
 
 class IncidentSLATracker:
     def __init__(self, sla_thresholds: Optional[Dict[str, int]] = None, warning_threshold_pct: float = 0.8):
-        self.sla_thresholds = sla_thresholds if sla_thresholds is not None else {"CRITICAL": 1800, "HIGH": 3600, "MEDIUM": 7200, "LOW": 14400}
+        self.sla_thresholds = sla_thresholds if sla_thresholds is not None else {"HIGH": 3600, "CRITICAL": 1800, "MEDIUM": 7200, "LOW": 14400}
         self.warning_threshold_pct = warning_threshold_pct
         self.incidents = {}
+
+    def fetch_current_state(self) -> Dict[str, Any]:
+        return self.incidents
 
     def register_incident(self, incident_id: str, severity: str, created_at: datetime) -> None:
         self.incidents[incident_id] = {
@@ -102,3 +105,6 @@ def track_incident_sla(sla_input: Dict[str, Any]) -> Dict[str, Any]:
         "breach_predicted": breach_predicted,
         "time_remaining_seconds": time_remaining
     }
+
+
+incident_sla_tracker = IncidentSLATracker()

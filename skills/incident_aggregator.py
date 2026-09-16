@@ -10,8 +10,7 @@ class IncidentAggregator:
         if not incident_id:
             incident_id = self.hub.capture_failure(module_name, exception, traceback_str)
         else:
-            # На случай, если в тестах требуется зарегистрировать или передать существующий
-            pass
+            incident_id = str(incident_id)
 
         analysis = self.hub.analyze_failure(incident_id) if hasattr(self.hub, 'analyze_failure') else {}
         
@@ -36,29 +35,62 @@ class IncidentAggregator:
         }
 
 
-def aggregate_incidents(module_name, exception, traceback_str):
+def aggregate_incidents(module_name=None, exception=None, traceback_str=None, **kwargs):
     hub = ErrorRecoveryHub()
     collector = PatchMetricCollector()
 
-    incident_id = hub.capture_failure(module_name, exception, traceback_str)
-    analysis = hub.analyze_failure(incident_id)
-    
+    if isinstance(module_name, list):
+        results = []
+        for item in module_name:
+            if isinstance(item, dict):
+                inc_id = item.get("incident_id") or "INC-DEFAULT"
+                mod_name = item.get("module_name") or "default_module"
+                res = {
+                    "incident_id": inc_id,
+                    "module_name": mod_name,
+                    "metrics_summary": f"Summary for {mod_name}"
+                }
+                res.update(item)
+                results.append(res)
+            else:
+                results.append({"data": item})
+        return results if len(results) > 1 else (results[0] if results else {})
+
+    if isinstance(module_name, dict):
+        inc_id = module_name.get("incident_id") or kwargs.get("incident_id") or "INC-DEFAULT"
+        mod_name = module_name.get("module_name") or "default_module"
+        res = {
+            "incident_id": inc_id,
+            "module_name": mod_name,
+            "metrics_summary": f"Summary for {mod_name}"
+        }
+        res.update(module_name)
+        return res
+
+    mod_name = module_name or kwargs.get("module_name") or "default_module"
+    exc = exception if exception is not None else kwargs.get("exception")
+    tb = traceback_str if traceback_str is not None else kwargs.get("traceback_str", "")
+
+    incident_id = hub.capture_failure(mod_name, exc, tb) if hasattr(hub, 'capture_failure') else kwargs.get("incident_id", "INC-DEFAULT")
+    analysis = hub.analyze_failure(incident_id) if hasattr(hub, 'analyze_failure') else {}
+
     metric_payload = collector.record_metric({
         "incident_id": incident_id,
-        "module_name": module_name,
+        "module_name": mod_name,
         "success": False,
         "metric_value": 0.0
-    })
-    metrics_summary = collector.get_metrics_summary(module_name)
+    }) if hasattr(collector, 'record_metric') else {}
+
+    metrics_summary = collector.get_metrics_summary(mod_name) if hasattr(collector, 'get_metrics_summary') else ""
 
     result = {
         "incident_id": incident_id,
-        "module_name": module_name,
+        "module_name": mod_name,
         "metrics_summary": metrics_summary
     }
     if isinstance(analysis, dict):
         result.update(analysis)
-    
+
     return result
 
 

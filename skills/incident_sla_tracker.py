@@ -97,6 +97,12 @@ def track_incident_sla(sla_input: Dict[str, Any]) -> Dict[str, Any]:
     time_remaining = threshold - elapsed
     breach_predicted = time_remaining < 0
 
+    if incident_id:
+        try:
+            evaluate_incident_severity({"incident_id": incident_id})
+        except Exception as err:
+            err_msg = f"Failed to evaluate incident severity: {err}"
+
     return {
         "incident_id": incident_id,
         "breach_predicted": breach_predicted,

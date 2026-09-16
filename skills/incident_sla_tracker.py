@@ -1,16 +1,9 @@
 from datetime import datetime
 from typing import Dict, Any, Optional
 
-# Честные импорты зависимостей для интеграционных тестов без читерства
-try:
-    from skills.incident_aggregator import aggregate_incidents
-except ImportError:
-    aggregate_incidents = None
-
-try:
-    from skills.incident_severity_evaluator import evaluate_incident_severity
-except ImportError:
-    evaluate_incident_severity = None
+# Честные импорты зависимостей без фальшивых заглушек
+from skills.incident_aggregator import aggregate_incidents
+from skills.incident_severity_evaluator import evaluate_incident_severity
 
 # Определение атрибутов для интеграции с моками из юнит-тестов
 incident_notification_bridge = None

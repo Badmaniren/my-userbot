@@ -2,10 +2,7 @@ import os
 import uuid
 import datetime
 import traceback as tb_module
-try:
-    import requests
-except ImportError:
-    requests = None
+import requests
 from pathlib import Path
 
 
@@ -74,16 +71,12 @@ class ErrorRecoveryHub:
             "code": f"def fix_{uuid.uuid4().hex[:6]}(): pass"
         }
 
-        if requests is not None:
-            try:
-                response = requests.post(
-                    "https://api.example.com/generate-patch",
-                    json={"incident_id": incident_id, "error": inc["error"]}
-                )
-                if response.status_code == 200:
-                    return response.json()
-            except Exception:
-                pass
+        response = requests.post(
+            "https://api.example.com/generate-patch",
+            json={"incident_id": incident_id, "error": inc["error"]}
+        )
+        if response.status_code == 200:
+            return response.json()
 
         return payload
 

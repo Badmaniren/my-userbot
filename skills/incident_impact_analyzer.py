@@ -1,10 +1,7 @@
 import sys
 import io
 import json
-try:
-    import requests
-except ImportError:
-    requests = None
+import requests
 from skills.incident_aggregator import IncidentAggregator
 from skills.error_recovery_hub import ErrorRecoveryHub
 
@@ -15,13 +12,11 @@ class IncidentImpactAnalyzer:
 
     def analyze_financial_impact(self, incident_id: str) -> dict:
         url = f"http://localhost/incidents/{incident_id}/metrics"
-        data = {"downtime_minutes": 0, "cost_per_minute": 0.0}
-        if requests is not None:
-            try:
-                response = requests.get(url)
-                data = response.json()
-            except Exception:
-                pass
+        try:
+            response = requests.get(url)
+            data = response.json()
+        except Exception:
+            data = {"downtime_minutes": 0, "cost_per_minute": 0.0}
             
         downtime_minutes = data.get("downtime_minutes", 0)
         cost_per_minute = data.get("cost_per_minute", 0.0)
@@ -116,12 +111,3 @@ if not hasattr(ErrorRecoveryHub, "process_recovery"):
             return data
         return {}
     ErrorRecoveryHub.process_recovery = _dynamic_process_recovery
-
-
-def incident_impact_analyzer(data=None):
-    analyzer = IncidentImpactAnalyzer()
-    if data is None:
-        return analyzer
-    if isinstance(data, dict):
-        return analyzer.analyze(data)
-    return analyzer

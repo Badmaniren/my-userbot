@@ -20,22 +20,7 @@ class IncidentSeverityEvaluator:
         else:
             return "LOW"
 
-    def evaluate(self, module_name, exception=None, traceback_str=None, incident_id=None):
-        if isinstance(module_name, dict):
-            payload = dict(module_name)
-            payload.pop("severity_assessment", None)
-            inc_id = payload.get("incident_id") or payload.get("id")
-            severity = self.calculate_severity_score(payload)
-            notif_payload = self.template_engine.generate_notification_payload(
-                severity, inc_id, payload
-            )
-            return {
-                "incident_id": inc_id,
-                "severity": severity,
-                "payload": notif_payload,
-                "aggregated_data": payload,
-            }
-
+    def evaluate(self, module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
         agg_result = self.aggregator.process_and_aggregate(
             module_name, exception, traceback_str, incident_id
         )
@@ -96,15 +81,3 @@ class IncidentSeverityEvaluator:
 def evaluate_incident_severity(module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
     evaluator = IncidentSeverityEvaluator()
     return evaluator.evaluate(module_name, exception, traceback_str, incident_id)
-
-
-def incident_severity_evaluator(*args, **kwargs):
-    evaluator = IncidentSeverityEvaluator()
-    if args or kwargs:
-        if args and isinstance(args[0], dict):
-            return evaluator.evaluate(args[0])
-        return evaluator.evaluate(*args, **kwargs)
-    return evaluator
-
-
-incident_severity_evaluator.evaluate = lambda *args, **kwargs: IncidentSeverityEvaluator().evaluate(*args, **kwargs)

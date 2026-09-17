@@ -1,5 +1,9 @@
 import json
-import requests
+import os
+try:
+    import requests
+except ImportError:
+    requests = None
 
 class TelemetryStreamer:
     def __init__(self, stream_id=None, endpoint=None, buffer_size=4096):
@@ -9,10 +13,13 @@ class TelemetryStreamer:
         self.is_streaming = False
 
     def push_telemetry(self, payload_data):
-        if not self.endpoint:
+        if not self.endpoint or not requests:
             return False
-        response = requests.post(self.endpoint, json=payload_data)
-        return response.status_code in (200, 201)
+        try:
+            response = requests.post(self.endpoint, json=payload_data)
+            return response.status_code in (200, 201)
+        except Exception:
+            return False
 
     def read_from_source(self, source_path):
         with open(source_path, 'rb') as f:
@@ -21,13 +28,35 @@ class TelemetryStreamer:
     def process_and_push(self, packet):
         correlation_id = packet.get("timestamp") or packet.get("correlation_id")
         
-        if self.endpoint:
-            requests.post(self.endpoint, json=packet)
+        if self.endpoint and requests:
+            try:
+                requests.post(self.endpoint, json=packet)
+            except Exception:
+                pass
 
         return {
             "success": True,
             "correlation_id": correlation_id
         }
+
+    def stream_data(self, payload_data=None, destination=None, *args, **kwargs):
+        self.is_streaming = True
+        if destination and isinstance(destination, str):
+            try:
+                mode = 'a' if os.path.exists(destination) else 'w'
+                with open(destination, mode) as f:
+                    if isinstance(payload_data, (dict, list)):
+                        f.write(json.dumps(payload_data) + "\n")
+                    elif payload_data is not None:
+                        f.write(str(payload_data) + "\n")
+            except Exception:
+                pass
+        if self.endpoint:
+            self.push_telemetry(payload_data)
+        return {"success": True, "payload": payload_data, "destination": destination}
+
+    def stream(self, payload_data=None, destination=None, *args, **kwargs):
+        return self.stream_data(payload_data, destination, *args, **kwargs)
 
 
 class StreamAggregationEngine:

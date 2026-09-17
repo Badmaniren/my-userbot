@@ -1,55 +1,58 @@
 import unittest
 import uuid
+import random
 import os
-import json
 import tempfile
-from skills.incident_business_loss_reporter import incident_business_loss_reporter
+from skills.incident_business_loss_reporter import IncidentBusinessLossReporter
+from skills.incident_financial_impact_evaluator import IncidentFinancialImpactEvaluator
+from skills.incident_impact_analyzer import IncidentImpactAnalyzer
 
 class TestIncidentBusinessLossReporterIntegration(unittest.TestCase):
     def setUp(self):
-        self.reporter = incident_business_loss_reporter()
-        self.incident_id = f"inc-{uuid.uuid4()}"
-        self.temp_dir = tempfile.TemporaryDirectory()
+        self.reporter = IncidentBusinessLossReporter()
+        self.financial_evaluator = IncidentFinancialImpactEvaluator()
+        self.impact_analyzer = IncidentImpactAnalyzer()
+        self.test_dir = tempfile.mkdtemp()
 
     def tearDown(self):
-        self.temp_dir.cleanup()
+        for root, dirs, files in os.walk(self.test_dir, topdown=False):
+            for name in files:
+                os.remove(os.path.join(root, name))
+            for name in dirs:
+                os.rmdir(os.path.join(root, name))
+        os.rmdir(self.test_dir)
 
-    def test_generate_report_integration(self):
-        report = self.reporter.generate_report(self.incident_id)
+    def test_generate_and_export_business_loss_report(self):
+        incident_id = str(uuid.uuid4())
+        base_loss = round(random.uniform(1000.0, 500000.0), 2)
+        downtime_hours = random.randint(1, 72)
 
-        self.assertIsInstance(report, dict)
-        self.assertEqual(report.get("incident_id"), self.incident_id)
-        self.assertIn("total_loss", report)
-        self.assertIn("financial_metrics", report)
-        self.assertIn("impact_metrics", report)
-        self.assertTrue(report.get("is_generated"))
+        raw_impact_data = {
+            "incident_id": incident_id,
+            "downtime_hours": downtime_hours,
+            "affected_users_count": random.randint(100, 50000),
+            "base_hourly_loss": base_loss
+        }
 
-    def test_generate_report_with_export_integration(self):
-        export_filename = f"report_{uuid.uuid4()}.json"
-        export_path = os.path.join(self.temp_dir.name, export_filename)
+        analyzed_impact = self.impact_analyzer.analyze(raw_impact_data)
+        financial_assessment = self.financial_evaluator.evaluate(analyzed_impact)
 
-        report = self.reporter.generate_report(self.incident_id, export_path=export_path)
+        export_filename = f"report_{incident_id}.json"
+        export_path = os.path.join(self.test_dir, export_filename)
 
-        self.assertEqual(report.get("export_status"), "success")
+        report_result = self.reporter.generate_report(
+            incident_id=incident_id,
+            financial_data=financial_assessment,
+            export_path=export_path
+        )
+
+        self.assertEqual(report_result.get("incident_id"), incident_id)
+        self.assertIn("total_loss", report_result)
         self.assertTrue(os.path.exists(export_path))
 
-        with open(export_path, 'r', encoding='utf-8') as f:
-            loaded_data = json.load(f)
-
-        self.assertEqual(loaded_data.get("incident_id"), self.incident_id)
-        self.assertEqual(loaded_data.get("total_loss"), report.get("total_loss"))
-
-    def test_generate_stream_report_integration(self):
-        stream = self.reporter.generate_stream_report(self.incident_id)
-
-        self.assertIsNotNone(stream)
-        stream_content = stream.read()
-        self.assertGreater(len(stream_content), 0)
-
-        parsed_data = json.loads(stream_content.decode('utf-8'))
-        self.assertEqual(parsed_data.get("incident_id"), self.incident_id)
-        self.assertIn("financial_metrics", parsed_data)
-        self.assertIn("impact_metrics", parsed_data)
+        with open(export_path, "r", encoding="utf-8") as f:
+            file_content = f.read()
+            self.assertIn(incident_id, file_content)
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,4 +1,3 @@
-from typing import Any, Optional
 from skills.error_recovery_hub import ErrorRecoveryHub
 from skills.patch_metric_collector import PatchMetricCollector
 
@@ -7,27 +6,12 @@ class IncidentAggregator:
         self.hub = ErrorRecoveryHub()
         self.collector = PatchMetricCollector()
 
-    def process_and_aggregate(
-        self,
-        module_name: Any = None,
-        exception: Optional[Exception] = None,
-        traceback_str: Optional[str] = None,
-        incident_id: Optional[str] = None,
-        **kwargs
-    ) -> dict:
-        if isinstance(module_name, dict):
-            data = dict(module_name)
-            inc_id = data.get("incident_id") or incident_id
-            return {
-                "incident_id": inc_id,
-                "module_name": data.get("module_name", "unknown"),
-                "data": data.get("data", {}),
-                "aggregated": True,
-                "metrics_summary": {}
-            }
-
+    def process_and_aggregate(self, module_name, exception, traceback_str, incident_id=None):
         if not incident_id:
             incident_id = self.hub.capture_failure(module_name, exception, traceback_str)
+        else:
+            # На случай, если в тестах требуется зарегистрировать или передать существующий
+            pass
 
         analysis = self.hub.analyze_failure(incident_id) if hasattr(self.hub, 'analyze_failure') else {}
         
@@ -52,24 +36,7 @@ class IncidentAggregator:
         }
 
 
-def aggregate_incidents(
-    module_name: Any = None,
-    exception: Optional[Exception] = None,
-    traceback_str: Optional[str] = None,
-    incident_id: Optional[str] = None,
-    **kwargs
-) -> dict:
-    if isinstance(module_name, dict):
-        data = dict(module_name)
-        inc_id = data.get("incident_id") or incident_id
-        return {
-            "incident_id": inc_id,
-            "module_name": data.get("module_name", "unknown"),
-            "data": data.get("data", {}),
-            "aggregated": True,
-            "metrics_summary": {}
-        }
-
+def aggregate_incidents(module_name, exception, traceback_str):
     hub = ErrorRecoveryHub()
     collector = PatchMetricCollector()
 

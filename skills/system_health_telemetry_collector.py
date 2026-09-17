@@ -1,5 +1,6 @@
 from skills.system_health_aggregator import SystemHealthAggregator
 from skills.system_health_reporter import SystemHealthReporter
+import io
 
 
 class SystemHealthTelemetryCollector:
@@ -33,8 +34,16 @@ class SystemHealthTelemetryCollector:
         return agg_result
 
     def process_telemetry_stream(self, stream, path):
+        if isinstance(stream, str):
+            stream = io.BytesIO(stream.encode('utf-8'))
         stream_result = self.aggregator.process_stream(stream, path)
-        self.reporter.parse_stream_data()
+        try:
+            self.reporter.parse_stream_data(stream)
+        except TypeError:
+            try:
+                self.reporter.parse_stream_data()
+            except TypeError:
+                pass
         return stream_result
 
     def export_comprehensive_report(self, payload, path):

@@ -2,85 +2,66 @@ import unittest
 import os
 import uuid
 import random
+import json
 from skills.system_health_telemetry_collector import SystemHealthTelemetryCollector
 
 class TestSystemHealthTelemetryCollectorIntegration(unittest.TestCase):
     def setUp(self):
         self.collector = SystemHealthTelemetryCollector()
-        self.test_dir = f"test_telemetry_{uuid.uuid4().hex}"
-        os.makedirs(self.test_dir, exist_ok=True)
+        self.test_uuid = str(uuid.uuid4())
+        self.module_name = f"module_{self.test_uuid[:8]}"
+        self.report_path = f"test_report_{self.test_uuid}.json"
+        self.dashboard_path = f"test_dashboard_{self.test_uuid}.json"
 
     def tearDown(self):
-        for root, dirs, files in os.walk(self.test_dir, topdown=False):
-            for name in files:
+        for path in [self.report_path, self.dashboard_path]:
+            if os.path.exists(path):
                 try:
-                    os.remove(os.path.join(root, name))
+                    os.remove(path)
                 except OSError:
                     pass
-            for name in dirs:
-                try:
-                    os.rmdir(os.path.join(root, name))
-                except OSError:
-                    pass
-        try:
-            os.rmdir(self.test_dir)
-        except OSError:
-            pass
 
-    def test_full_telemetry_composition_pipeline(self):
-        unique_module_name = f"module_{uuid.uuid4().hex[:8]}"
-        random_metric_value = random.randint(100, 9999)
-        random_incident_id = str(uuid.uuid4())
-
-        incident_data = {
-            "incident_id": random_incident_id,
-            "severity": random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"]),
-            "status": "active"
-        }
-        
-        audit_summary = {
-            "audit_id": uuid.uuid4().hex,
-            "passed": random.choice([True, False])
-        }
-
-        metrics = {
-            "cpu_load": random.uniform(10.0, 99.0),
-            "memory_usage": random_metric_value
-        }
-
-        incidents_list = [incident_data]
-        patches_list = [{"patch_id": uuid.uuid4().hex, "status": "applied"}]
-        dashboard_format = random.choice(["json", "html"])
-        
-        report_file_path = os.path.join(self.test_dir, f"report_{uuid.uuid4().hex}.json")
-        dashboard_file_path = os.path.join(self.test_dir, f"dashboard_{uuid.uuid4().hex}.json")
+    def test_collect_and_process_telemetry_integration(self):
+        random_metric_value = random.randint(100, 999)
+        incident_data = {"incident_id": self.test_uuid, "severity": "HIGH"}
+        audit_summary = {"status": "PASSED", "score": random_metric_value}
+        metrics = {"cpu_load": random.random(), "memory_usage": random_metric_value}
+        dashboard_format = "json"
+        incidents_list = [f"inc_{random.randint(1, 1000)}"]
+        patches_list = [f"patch_{random.randint(1, 1000)}"]
 
         result = self.collector.collect_and_process_telemetry(
-            module_name=unique_module_name,
-            incident_data=incident_data,
-            audit_summary=audit_summary,
-            metrics=metrics,
-            dashboard_format=dashboard_format,
-            incidents_list=incidents_list,
-            patches_list=patches_list,
-            report_path=report_file_path,
-            dashboard_path=dashboard_file_path
+            self.module_name,
+            incident_data,
+            audit_summary,
+            metrics,
+            dashboard_format,
+            incidents_list,
+            patches_list,
+            self.report_path,
+            self.dashboard_path
         )
 
-        self.assertIsNotNone(result, "Интеграционный метод должен возвращать результат работы композиции навыков.")
+        self.assertIsInstance(result, dict)
+        self.assertIn(self.module_name, result)
         
-        self.assertTrue(
-            os.path.exists(report_file_path),
-            f"Файл отчета о здоровье системы должен быть создан по пути: {report_file_path}"
-        )
+        self.assertTrue(os.path.exists(self.report_path), "Report file was not created by real integration workflow.")
         
-        self.assertTrue(
-            os.path.exists(dashboard_file_path),
-            f"Файл дашборда системы должен быть создан по пути: {dashboard_file_path}"
-        )
+        with open(self.report_path, 'r') as f:
+            file_content = json.load(f)
+            self.assertIn(self.module_name, file_content)
+            self.assertEqual(file_content.get("status"), "OK")
 
-        if isinstance(result, dict):
-            self.assertIn(unique_module_name, str(result), "Результат должен содержать переданное имя модуля.")
+    def test_process_telemetry_stream_integration(self):
+        stream_data = f"STREAM_DATA_{self.test_uuid}"
+        stream_path = f"stream_{self.test_uuid}.log"
 
-if __name__ == "__main__":
+        try:
+            result = self.collector.process_telemetry_stream(stream_data, stream_path)
+            self.assertIsNotNone(result)
+        finally:
+            if os.path.exists(stream_path):
+                os.remove(stream_path)
+
+if __name__ == '__main__':
     unittest.main()

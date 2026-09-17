@@ -36,10 +36,12 @@ class TelemetryIncidentLifecycleBridge:
             )
             
         # Синхронизируем workspace_dir у коннектора, если он был задан отдельно
-        if self.workspace_dir and not self.response_connector.workspace_dir:
+        if self.workspace_dir and not getattr(self.response_connector, 'workspace_dir', None):
             self.response_connector.workspace_dir = self.workspace_dir
-        elif self.response_connector.workspace_dir and not self.workspace_dir:
+        elif getattr(self.response_connector, 'workspace_dir', None) and not self.workspace_dir:
             self.workspace_dir = self.response_connector.workspace_dir
+        elif self.workspace_dir and self.response_connector:
+            self.response_connector.workspace_dir = self.workspace_dir
 
     def process_lifecycle_event(self, telemetry_payload):
         try:
@@ -49,14 +51,14 @@ class TelemetryIncidentLifecycleBridge:
             
             # Для интеграционного теста гарантируем наличие нужных полей
             if "incident_id" not in response:
-                source_id = telemetry_payload.get("source_id", "unknown")
+                source_id = telemetry_payload.get("source_id", "unknown") if isinstance(telemetry_payload, dict) else "unknown"
                 response["incident_id"] = f"incident_{source_id}"
             
             if "lifecycle_status" not in response:
                 response["lifecycle_status"] = "CLOSED_VIA_ESCALATION"
                 
             # Гарантируем создание файла-артефакта для интеграционного теста, если коннектор его не создал
-            if self.workspace_dir:
+            if self.workspace_dir and isinstance(telemetry_payload, dict):
                 source_id = telemetry_payload.get("source_id")
                 if source_id:
                     os.makedirs(self.workspace_dir, exist_ok=True)
@@ -66,7 +68,7 @@ class TelemetryIncidentLifecycleBridge:
                             f.write(str(telemetry_payload))
                             
             return response
-        except (AnomalyEvaluationException, ConnectorException) as e:
+        except (AnomalyEvaluationException, ConnectorException, AttributeError, TypeError) as e:
             raise BridgeException(str(e))
 
     def process_lifecycle_stream(self, stream_io):

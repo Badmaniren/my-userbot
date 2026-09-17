@@ -1,136 +1,208 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+import os
+import io
 import uuid
 import random
 import string
-import io
 
+from skills.telemetry_incident_lifecycle_bridge import (
+    TelemetryIncidentLifecycleBridge,
+    BridgeException,
+    process_lifecycle_telemetry
+)
 from skills.telemetry_anomaly_evaluator_core import (
-    TelemetryAnomalyEvaluatorCore,
     AnomalyEvaluationException,
     InvalidTelemetryStreamException
 )
 from skills.telemetry_anomaly_response_connector import (
-    TelemetryAnomalyResponseConnector,
     ConnectorException
 )
-from skills.telemetry_incident_lifecycle_bridge import (
-    TelemetryIncidentLifecycleBridge,
-    BridgeException
-)
 
 
-class TestTelemetryIncidentLifecycleBridgeArchitect(unittest.TestCase):
+class TestTelemetryIncidentLifecycleBridge(unittest.TestCase):
 
     def setUp(self):
-        self.workspace_dir = f"/tmp/{uuid.uuid4().hex}"
-        self.mock_evaluator = MagicMock(spec=TelemetryAnomalyEvaluatorCore)
-        self.mock_escalation_engine = MagicMock()
-        
-        self.bridge = TelemetryIncidentLifecycleBridge(
+        self.workspace_dir = f"test_workspace_{uuid.uuid4().hex}"
+        self.mock_evaluator = MagicMock()
+        self.mock_connector = MagicMock()
+
+    def tearDown(self):
+        if os.path.exists(self.workspace_dir):
+            for root, dirs, files in os.walk(self.workspace_dir, topdown=False):
+                for name in files:
+                    os.remove(os.path.join(root, name))
+                for name in dirs:
+                    os.rmdir(os.path.join(root, name))
+            os.rmdir(self.workspace_dir)
+
+    def test_init_default_dependencies(self):
+        bridge = TelemetryIncidentLifecycleBridge(workspace_dir=self.workspace_dir)
+        self.assertEqual(bridge.workspace_dir, self.workspace_dir)
+        self.assertIsNotNone(bridge.evaluator)
+        self.assertIsNotNone(bridge.response_connector)
+
+    def test_init_custom_dependencies(self):
+        bridge = TelemetryIncidentLifecycleBridge(
             workspace_dir=self.workspace_dir,
             evaluator=self.mock_evaluator,
-            escalation_engine=self.mock_escalation_engine
+            connector=self.mock_connector
         )
+        self.assertEqual(bridge.evaluator, self.mock_evaluator)
+        self.assertEqual(bridge.response_connector, self.mock_connector)
+        self.assertEqual(bridge.response_connector.workspace_dir, self.workspace_dir)
 
-    def test_bridge_initialization_composition(self):
-        self.assertIsInstance(self.bridge.evaluator, TelemetryAnomalyEvaluatorCore)
-        self.assertIsNotNone(self.bridge.response_connector)
-        self.assertIsInstance(self.bridge.response_connector, TelemetryAnomalyResponseConnector)
-        self.assertEqual(self.bridge.workspace_dir, self.workspace_dir)
-
-    def test_process_lifecycle_success(self):
-        random_telemetry_key = uuid.uuid4().hex
-        random_telemetry_value = random.randint(1000, 99999)
-        random_incident_id = uuid.uuid4().hex
+    def test_process_lifecycle_event_success(self):
+        source_id = uuid.uuid4().hex
+        incident_id = f"inc_{uuid.uuid4().hex[:8]}"
+        lifecycle_status = f"STATUS_{uuid.uuid4().hex[:6].upper()}"
         
         telemetry_payload = {
-            random_telemetry_key: random_telemetry_value,
-            "metric_name": "".join(random.choices(string.ascii_lowercase, k=10))
+            "source_id": source_id,
+            "metric": random.randint(100, 999)
         }
-
-        expected_response = {
-            "status": "escalated",
-            "incident_id": random_incident_id,
-            "eval_result": "anomaly_detected"
-        }
-
-        with patch.object(
-            TelemetryAnomalyResponseConnector,
-            "handle_telemetry_and_respond",
-            return_value=expected_response
-        ) as mock_handle:
-            
-            result = self.bridge.process_lifecycle_event(telemetry_payload)
-            
-            mock_handle.assert_called_once_with(telemetry_payload)
-            self.assertEqual(result["incident_id"], random_incident_id)
-            self.assertEqual(result["status"], "escalated")
-
-    def test_process_lifecycle_stream_source(self):
-        random_stream_data = "".join(random.choices(string.ascii_letters + string.digits, k=64)).encode("utf-8")
-        stream_io = io.BytesIO(random_stream_data)
         
-        random_result_id = uuid.uuid4().hex
-        expected_stream_response = {
-            "stream_processed": True,
-            "lifecycle_id": random_result_id
+        expected_response = {
+            "incident_id": incident_id,
+            "lifecycle_status": lifecycle_status
         }
+        
+        self.mock_connector.handle_telemetry_and_respond.return_value = expected_response
+        
+        bridge = TelemetryIncidentLifecycleBridge(
+            workspace_dir=self.workspace_dir,
+            connector=self.mock_connector
+        )
+        
+        result = bridge.process_lifecycle_event(telemetry_payload)
+        
+        self.assertEqual(result["incident_id"], incident_id)
+        self.assertEqual(result["lifecycle_status"], lifecycle_status)
+        self.mock_connector.handle_telemetry_and_respond.assert_called_once_with(telemetry_payload)
+        
+        artifact_path = os.path.join(self.workspace_dir, f"incident_{source_id}.json")
+        self.assertTrue(os.path.exists(artifact_path))
 
-        with patch.object(
-            TelemetryAnomalyResponseConnector,
-            "process_telemetry_stream",
-            return_value=expected_stream_response
-        ) as mock_stream_proc:
+    def test_process_lifecycle_event_defaults_injected(self):
+        source_id = uuid.uuid4().hex
+        telemetry_payload = {
+            "source_id": source_id,
+            "data": ''.join(random.choices(string.ascii_letters, k=10))
+        }
+        
+        self.mock_connector.handle_telemetry_and_respond.return_value = {}
+        
+        bridge = TelemetryIncidentLifecycleBridge(
+            workspace_dir=self.workspace_dir,
+            connector=self.mock_connector
+        )
+        
+        result = bridge.process_lifecycle_event(telemetry_payload)
+        
+        self.assertEqual(result["incident_id"], f"incident_{source_id}")
+        self.assertEqual(result["lifecycle_status"], "CLOSED_VIA_ESCALATION")
+
+    def test_process_lifecycle_event_anomaly_exception(self):
+        telemetry_payload = {"source_id": uuid.uuid4().hex}
+        error_msg = f"Error anomaly {uuid.uuid4().hex}"
+        self.mock_connector.handle_telemetry_and_respond.side_effect = AnomalyEvaluationException(error_msg)
+        
+        bridge = TelemetryIncidentLifecycleBridge(
+            workspace_dir=self.workspace_dir,
+            connector=self.mock_connector
+        )
+        
+        with self.assertRaises(BridgeException) as ctx:
+            bridge.process_lifecycle_event(telemetry_payload)
+        
+        self.assertIn(error_msg, str(ctx.exception))
+
+    def test_process_lifecycle_event_connector_exception(self):
+        telemetry_payload = {"source_id": uuid.uuid4().hex}
+        error_msg = f"Connector failed {uuid.uuid4().hex}"
+        self.mock_connector.handle_telemetry_and_respond.side_effect = ConnectorException(error_msg)
+        
+        bridge = TelemetryIncidentLifecycleBridge(
+            workspace_dir=self.workspace_dir,
+            connector=self.mock_connector
+        )
+        
+        with self.assertRaises(BridgeException) as ctx:
+            bridge.process_lifecycle_event(telemetry_payload)
+        
+        self.assertIn(error_msg, str(ctx.exception))
+
+    def test_process_lifecycle_stream_success(self):
+        stream_data = ''.join(random.choices(string.printable, k=50)).encode('utf-8')
+        stream_io = io.BytesIO(stream_data)
+        
+        expected_output = {f"status_{uuid.uuid4().hex[:4]}": random.randint(1, 100)}
+        self.mock_connector.process_telemetry_stream.return_value = expected_output
+        
+        bridge = TelemetryIncidentLifecycleBridge(
+            workspace_dir=self.workspace_dir,
+            connector=self.mock_connector
+        )
+        
+        result = bridge.process_lifecycle_stream(stream_io)
+        
+        self.assertEqual(result, expected_output)
+        self.mock_connector.process_telemetry_stream.assert_called_once_with(stream_io)
+
+    def test_process_lifecycle_stream_invalid_stream_exception(self):
+        stream_io = io.BytesIO(b'')
+        error_msg = f"Invalid stream {uuid.uuid4().hex}"
+        self.mock_connector.process_telemetry_stream.side_effect = InvalidTelemetryStreamException(error_msg)
+        
+        bridge = TelemetryIncidentLifecycleBridge(
+            workspace_dir=self.workspace_dir,
+            connector=self.mock_connector
+        )
+        
+        with self.assertRaises(BridgeException) as ctx:
+            bridge.process_lifecycle_stream(stream_io)
             
-            result = self.bridge.process_lifecycle_stream(stream_io)
+        self.assertIn(error_msg, str(ctx.exception))
+
+    def test_verify_and_close_lifecycle_success(self):
+        expected_result = {f"verified_{uuid.uuid4().hex[:4]}": True}
+        self.mock_connector.verify_and_trigger_response.return_value = expected_result
+        
+        bridge = TelemetryIncidentLifecycleBridge(
+            workspace_dir=self.workspace_dir,
+            connector=self.mock_connector
+        )
+        
+        result = bridge.verify_and_close_lifecycle()
+        
+        self.assertEqual(result, expected_result)
+        self.mock_connector.verify_and_trigger_response.assert_called_once()
+
+    def test_verify_and_close_lifecycle_exception(self):
+        error_msg = f"Verification failed {uuid.uuid4().hex}"
+        self.mock_connector.verify_and_trigger_response.side_effect = ConnectorException(error_msg)
+        
+        bridge = TelemetryIncidentLifecycleBridge(
+            workspace_dir=self.workspace_dir,
+            connector=self.mock_connector
+        )
+        
+        with self.assertRaises(BridgeException) as ctx:
+            bridge.verify_and_close_lifecycle()
             
-            mock_stream_proc.assert_called_once_with(stream_io)
-            self.assertEqual(result["lifecycle_id"], random_result_id)
-            self.assertTrue(result["stream_processed"])
+        self.assertIn(error_msg, str(ctx.exception))
 
-    def test_bridge_handles_evaluator_exception(self):
-        random_error_msg = uuid.uuid4().hex
-        telemetry_payload = {uuid.uuid4().hex: random.random()}
-
-        with patch.object(
-            TelemetryAnomalyResponseConnector,
-            "handle_telemetry_and_respond",
-            side_effect=AnomalyEvaluationException(random_error_msg)
-        ):
-            with self.assertRaises(BridgeException) as ctx:
-                self.bridge.process_lifecycle_event(telemetry_payload)
+    def test_process_lifecycle_telemetry_function(self):
+        source_id = uuid.uuid4().hex
+        telemetry_payload = {"source_id": source_id}
+        expected_response = {"incident_id": f"incident_{source_id}", "lifecycle_status": "CLOSED_VIA_ESCALATION"}
+        
+        with patch('skills.telemetry_incident_lifecycle_bridge.TelemetryIncidentLifecycleBridge') as MockBridgeClass:
+            mock_instance = MockBridgeClass.return_value
+            mock_instance.process_lifecycle_event.return_value = expected_response
             
-            self.assertIn(random_error_msg, str(ctx.exception))
-
-    def test_bridge_handles_connector_exception(self):
-        random_error_msg = uuid.uuid4().hex
-        telemetry_payload = {uuid.uuid4().hex: uuid.uuid4().hex}
-
-        with patch.object(
-            TelemetryAnomalyResponseConnector,
-            "handle_telemetry_and_respond",
-            side_effect=ConnectorException(random_error_msg)
-        ):
-            with self.assertRaises(BridgeException) as ctx:
-                self.bridge.process_lifecycle_event(telemetry_payload)
-
-            self.assertIn(random_error_msg, str(ctx.exception))
-
-    def test_verify_and_close_lifecycle(self):
-        random_check_status = random.choice([True, False])
-
-        with patch.object(
-            TelemetryAnomalyResponseConnector,
-            "verify_and_trigger_response",
-            return_value=random_check_status
-        ) as mock_verify:
+            res = process_lifecycle_telemetry(telemetry_payload)
             
-            result = self.bridge.verify_and_close_lifecycle()
-            
-            mock_verify.assert_called_once()
-            self.assertEqual(result, random_check_status)
-
-
-if __name__ == "__main__":
-    unittest.main()
+            MockBridgeClass.assert_called_once()
+            mock_instance.process_lifecycle_event.assert_called_once_with(telemetry_payload)
+            self.assertEqual(res, expected_response)

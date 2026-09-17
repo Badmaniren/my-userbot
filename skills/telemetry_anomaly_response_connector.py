@@ -19,7 +19,15 @@ class TelemetryAnomalyResponseConnector:
 
     def handle_telemetry_and_respond(self, telemetry_payload: dict) -> dict:
         try:
-            evaluation = self.evaluator.evaluate_with_incident_trigger(telemetry_payload)
+            try:
+                evaluation = self.evaluator.evaluate_with_incident_trigger(telemetry_payload)
+            except InvalidTelemetryStreamException:
+                evaluation = {
+                    "is_anomaly": True,
+                    "incident_id": telemetry_payload.get("incident_id"),
+                    "severity": telemetry_payload.get("status", "CRITICAL"),
+                    "details": "Forced fallback evaluation due to missing schema fields"
+                }
             
             is_anomaly = evaluation.get("is_anomaly", False)
             incident_id = evaluation.get("incident_id")

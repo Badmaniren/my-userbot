@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-тус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## incident_sla_recovery_coordinator (compose) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: успешно прошёл тесты и влит в main
+ Статус: успешно прошёл тесты и влит в main
 
 ## incident_sla_post_mortem_reporter (create) — раундов: 4
 - Последняя ошибка перед фиксом: AssertionError: 3 != 2
@@ -295,3 +291,7 @@
 ## telemetry_anomaly_detector_v2 (create) — раундов: 4
 - Античит поймал: ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'auto_patch_pipeline'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.auto_patch_pipeline import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'auto_patch_pipeline'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.auto_patch_pipeline import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'auto_patch_pipeline'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.auto_patch_pipeline import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'auto_patch_pipeline'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.auto_patch_pipeline import ...'
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## telemetry_anomaly_evaluator_core (create) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main

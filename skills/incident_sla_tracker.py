@@ -74,21 +74,32 @@ class IncidentSLATracker:
         return results
 
 
-def track_incident_sla(sla_input: Dict[str, Any]) -> Dict[str, Any]:
-    incident_id = sla_input.get("incident_id")
-    aggregated_data = sla_input.get("aggregated_data", {})
-    threshold = sla_input.get("threshold_seconds", 3600)
+def track_incident_sla(sla_input: Any = None, **kwargs: Any) -> Dict[str, Any]:
+    if isinstance(sla_input, dict):
+        kwargs.update(sla_input)
     
-    data = aggregated_data.get("data", {})
+    incident_id = kwargs.get("incident_id")
+    sla_limit = kwargs.get("sla_limit") or kwargs.get("sla_limit_hours") or 3600
+    aggregated_data = kwargs.get("aggregated_data", {})
+
+    data = aggregated_data.get("data", {}) if isinstance(aggregated_data, dict) else {}
     timestamp = data.get("timestamp")
     
     created_at = datetime.fromtimestamp(timestamp) if timestamp else datetime.now()
-        
     elapsed = (datetime.now() - created_at).total_seconds()
-    time_remaining = threshold - elapsed
+    time_remaining = sla_limit - elapsed
     
     return {
         "incident_id": incident_id,
+        "sla_limit": sla_limit,
         "breach_predicted": time_remaining < 0,
-        "time_remaining_seconds": float(time_remaining)
+        "time_remaining_seconds": float(time_remaining),
+        "status": "TRACKED"
     }
+
+
+def incident_sla_tracker(sla_input: Any = None, **kwargs: Any) -> Dict[str, Any]:
+    return track_incident_sla(sla_input, **kwargs)
+
+
+IncidentSlaTracker = IncidentSLATracker

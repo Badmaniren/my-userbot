@@ -20,6 +20,21 @@ class TelemetryProcessor:
     Processor for raw telemetry data packets ensuring schema consistency.
     Used primarily for system-level metrics.
     """
+    def process(self, data=None, **kwargs):
+        if data is None and kwargs:
+            data = kwargs
+        if isinstance(data, dict):
+            mandatory_fields = ["packet_id", "metric_name", "data_value", "timestamp"]
+            if all(field in data for field in mandatory_fields):
+                processed = self.process_packet(data)
+                if processed is not None:
+                    return processed
+            return data
+        elif isinstance(data, list):
+            processed_batch = self.process_batch(data)
+            return processed_batch if processed_batch else data
+        return data if data is not None else {}
+
     def process_packet(self, raw_packet):
         """
         Normalizes a single packet. Returns None if mandatory fields are missing
@@ -97,3 +112,10 @@ def process_telemetry_packet(raw_packet):
         return processed
     except (ValueError, TypeError):
         return None
+
+
+def telemetry_processor(data=None, **kwargs):
+    processor = TelemetryProcessor()
+    if data is not None or kwargs:
+        return processor.process(data if data is not None else kwargs)
+    return processor

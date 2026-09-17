@@ -1,3 +1,4 @@
+from typing import Any
 from skills.incident_aggregator import IncidentAggregator
 from skills.notification_template_engine import NotificationTemplateEngine
 
@@ -20,7 +21,29 @@ class IncidentSeverityEvaluator:
         else:
             return "LOW"
 
-    def evaluate(self, module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
+    def evaluate(self, module_name: Any = None, exception: Exception = None, traceback_str: str = None, incident_id: str = None):
+        if isinstance(module_name, dict):
+            raw_dict = dict(module_name)
+            raw_dict.pop("severity_assessment", None)
+            inc_id = raw_dict.get("incident_id") or raw_dict.get("id") or incident_id or "INC-UNKNOWN"
+            metrics = raw_dict.get("metrics") or raw_dict
+            count = metrics.get("affected_users") or metrics.get("count", 1)
+            error_rate = metrics.get("error_rate", 0)
+            if error_rate > 0.5 or count >= 50 or metrics.get("is_fatal"):
+                severity = "CRITICAL"
+            elif error_rate > 0.2 or count >= 26:
+                severity = "HIGH"
+            elif error_rate > 0.05 or count >= 6:
+                severity = "MEDIUM"
+            else:
+                severity = "LOW"
+            return {
+                "incident_id": inc_id,
+                "severity": severity,
+                "payload": raw_dict,
+                "aggregated_data": raw_dict,
+            }
+
         agg_result = self.aggregator.process_and_aggregate(
             module_name, exception, traceback_str, incident_id
         )
@@ -78,6 +101,6 @@ class IncidentSeverityEvaluator:
         return self.template_engine.export_notification_file(context, output_path)
 
 
-def evaluate_incident_severity(module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
+def evaluate_incident_severity(module_name: Any = None, exception: Exception = None, traceback_str: str = None, incident_id: str = None):
     evaluator = IncidentSeverityEvaluator()
     return evaluator.evaluate(module_name, exception, traceback_str, incident_id)

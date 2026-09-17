@@ -90,3 +90,9 @@ class SystemHealthTelemetryCollector:
             json.dump({module_name: agg_result, "status": "OK"}, f)
             
         return {module_name: agg_result}
+
+
+def system_health_telemetry_collector(data=None, **kwargs):
+    if data is None and kwargs:
+        data = kwargs
+    return data if data is not None else {}

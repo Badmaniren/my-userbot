@@ -33,6 +33,8 @@ GEMINI_LOCK = threading.Lock()
 
 MANUAL_TASK_QUEUE = []
 HANDLED_JULES_COMMENTS = deque(maxlen=2000)
+
+# Больше не полагаемся на ОЗУ для защиты от спама, но оставим кэш для скорости
 PINGED_DIRTY_PRS = set()
 
 # 2. СЕРВЕР ЖИЗНИ ДЛЯ RENDER
@@ -160,8 +162,8 @@ def run_telegram_listener():
     )
 
     while True:
-        url = f"https://api.telegram.org/bot{TG_TOKEN}/getUpdates"
         try:
+            url = f"https://api.telegram.org/bot{TG_TOKEN}/getUpdates"
             r = requests.get(url, params={"offset": offset, "timeout": 20}, timeout=25)
             if r.status_code == 200:
                 data = r.json()
@@ -294,7 +296,7 @@ def run_telegram_listener():
                     elif text:
                         send_tg("🤷 Не знаю такой команды.\n" + HELP_TEXT)
         except Exception as e:
-            print(f"[!] Ошибка основного цикла TG-лиссенера: {e}")
+            print(f"[!] Глобальная ошибка в TG-лиссенере (цикл выжил): {e}")
             time.sleep(5)
         time.sleep(1)
 
@@ -364,6 +366,20 @@ def get_viable_models(key: str) -> list:
     except Exception as e:
         print(f"[!] Ошибка получения списка моделей: {e}")
     return []
+
+# НАДЕЖНЫЙ ПАРСИНГ JSON БЕЗ ЖАДНЫХ РЕГУЛЯРОК
+def extract_json_robust(raw: str) -> dict:
+    try:
+        start = raw.find('{')
+        end = raw.rfind('}')
+        if start != -1 and end != -1:
+            clean_str = raw[start:end+1]
+            return json.loads(clean_str)
+    except json.JSONDecodeError as e:
+        print(f"[!] Ошибка декодирования JSON: {e}. Сырая строка: {raw[:100]}...")
+    except Exception as e:
+        print(f"[!] Непредвиденная ошибка при парсинге: {e}")
+    return {}
 
 def strip_markdown(text: str) -> str:
     cleaned = re.sub(r'^```[a-zA-Z]*\n', '', text.strip(), flags=re.MULTILINE)
@@ -608,7 +624,7 @@ def reactivate_stuck_jules_issues() -> int:
                 requests.delete(del_url, headers=API_HEADERS, timeout=10)
             except Exception as e:
                 print(f"[!] Ошибка снятия лейбла: {e}")
-                pass
+            pass
         if add_jules_label(number):
             reactivated += 1
     return reactivated
@@ -689,7 +705,8 @@ def refresh_stuck_prs() -> tuple:
                 continue
             pr_data = d.json()
             state = pr_data.get("mergeable_state")
-        except Exception:
+        except Exception as e:
+            print(f"[!] Ошибка проверки состояния PR #{number}: {e}")
             continue
 
         if state == "behind":
@@ -698,23 +715,32 @@ def refresh_stuck_prs() -> tuple:
                 r = requests.put(update_url, headers=API_HEADERS, timeout=10)
                 if r.status_code in [200, 202]:
                     refreshed += 1
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[!] Ошибка обновления ветки PR #{number}: {e}")
         elif state == "dirty":
             dirty_urls.append(pr_data.get("html_url", f"#{number}"))
             
-            if number not in PINGED_DIRTY_PRS:
-                comments_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues/{number}/comments")
-                payload = {
-                    "body": "@jules This PR has merge conflicts (likely in `LESSONS.md`). Please use your terminal access to pull `main`, resolve the conflicts by fully accepting the `main` branch version for `skills/LESSONS.md` and `skills/EPIC.md`, and push the fix."
-                }
-                try:
+            # Избегаем спама, даже если ОЗУ сбросилась - читаем комменты
+            comments_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues/{number}/comments")
+            try:
+                c_res = requests.get(comments_url, headers=API_HEADERS, timeout=10)
+                already_pinged = False
+                if c_res.status_code == 200:
+                    for c in c_res.json():
+                        if "This PR has merge conflicts" in c.get("body", ""):
+                            already_pinged = True
+                            break
+                
+                if not already_pinged:
+                    payload = {
+                        "body": "@jules This PR has merge conflicts (likely in `LESSONS.md`). Please use your terminal access to pull `main`, resolve the conflicts by fully accepting the `main` branch version for `skills/LESSONS.md` and `skills/EPIC.md`, and push the fix."
+                    }
                     p_res = requests.post(comments_url, headers=API_HEADERS, json=payload, timeout=10)
                     if p_res.status_code in [200, 201]:
                         PINGED_DIRTY_PRS.add(number)
                         pinged_jules_count += 1
-                except Exception as e:
-                    print(f"[!] Ошибка при пинке Jules в PR #{number}: {e}")
+            except Exception as e:
+                print(f"[!] Ошибка при пинке Jules в PR #{number}: {e}")
 
     return refreshed, dirty_urls, pinged_jules_count
 
@@ -745,7 +771,8 @@ def cleanup_orphan_branches() -> int:
             commit_date = datetime.strptime(commit_date_str, "%Y-%m-%dT%H:%M:%SZ")
             if (datetime.utcnow() - commit_date).total_seconds() < 86400:
                 continue
-        except Exception:
+        except Exception as e:
+            print(f"[!] Ошибка проверки коммита ветки {name}: {e}")
             continue
 
         del_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{name}")
@@ -755,7 +782,6 @@ def cleanup_orphan_branches() -> int:
                 deleted += 1
         except Exception as e:
             print(f"[!] Сбой при удалении ветки {name}: {e}")
-            pass
     return deleted
 
 # ЯДЕРНАЯ ОПЦИЯ (ВАЙП)
@@ -814,7 +840,8 @@ def find_duplicate_skill_clusters() -> dict:
         if r.status_code != 200:
             return {}
         files = [f["name"] for f in r.json() if f["name"].endswith(".py") and f["name"] != "__init__.py"]
-    except Exception:
+    except Exception as e:
+        print(f"[!] Ошибка сканирования skills: {e}")
         return {}
 
     clusters = {}
@@ -830,7 +857,8 @@ def get_all_skill_sources() -> dict:
         if r.status_code != 200:
             return {}
         files = [f["name"] for f in r.json() if f["name"].endswith(".py") and f["name"] != "__init__.py"]
-    except Exception:
+    except Exception as e:
+        print(f"[!] Ошибка получения списка skills: {e}")
         return {}
 
     sources = {}
@@ -952,8 +980,8 @@ def execute_cleanup_plan(files_to_delete: list) -> int:
                 )
                 if del_res.status_code in [200, 201]:
                     deleted += 1
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[!] Ошибка при удалении {path}: {e}")
     return deleted
 
 # 6. АНТИЧИТ
@@ -1036,7 +1064,8 @@ def get_skills_manifest(force_refresh: bool = False) -> dict:
         if dir_res.status_code != 200:
             return _MANIFEST_CACHE["data"]
         listing = dir_res.json()
-    except Exception:
+    except Exception as e:
+        print(f"[!] Ошибка загрузки манифеста: {e}")
         return _MANIFEST_CACHE["data"]
 
     py_files = [f for f in listing if f["name"].endswith(".py") and f["name"] != "__init__.py"]
@@ -1238,11 +1267,23 @@ def dream_action(manifest: dict, lessons: str, epic: str, manual_prompt: str = "
             "}"
         )
 
-    raw = ask_gemini(prompt, json_mode=True)
+    raw = ask_gemini(prompt, json_mode=False)
+    data = extract_json_robust(raw)
+    
+    if not data:
+        print("[!] Ошибка парсинга Стратега, fallback")
+        return {
+            "action": "create",
+            "module_name": f"extractor_tool_{int(time.time())}",
+            "description": "Модуль извлечения метаданных из разметки",
+            "class_or_func": "parse_meta(html: str) -> dict",
+            "composed_of": [],
+            "epic_status": "none",
+            "epic_title": "",
+            "epic_step_note": ""
+        }
+
     try:
-        json_match = re.search(r'\{.*\}', raw, re.DOTALL)
-        clean_raw = json_match.group(0) if json_match else raw
-        data = json.loads(clean_raw)
         mod = re.sub(r'[^a-zA-Z0-9_]', '', data.get("module_name", "").lower())
         if not mod:
             raise ValueError("Empty module name")
@@ -1278,16 +1319,14 @@ def dream_action(manifest: dict, lessons: str, epic: str, manual_prompt: str = "
             data["epic_status"] = "none"
         return data
     except Exception as e:
-        print(f"[!] Ошибка парсинга Стратега: {e}, fallback")
+        print(f"[!] Сбой валидации ответа Стратега: {e}")
         return {
             "action": "create",
             "module_name": f"extractor_tool_{int(time.time())}",
-            "description": "Модуль извлечения метаданных из разметки",
-            "class_or_func": "parse_meta(html: str) -> dict",
+            "description": "Фолбэк модуль",
+            "class_or_func": "dummy()",
             "composed_of": [],
-            "epic_status": "none",
-            "epic_title": "",
-            "epic_step_note": ""
+            "epic_status": "none"
         }
 
 def _compose_context(task: dict) -> str:
@@ -1428,7 +1467,8 @@ def delete_repo_file(path: str, message: str, branch: str = "main") -> bool:
             timeout=10
         )
         return res.status_code in [200, 204]
-    except Exception:
+    except Exception as e:
+        print(f"[!] Ошибка удаления файла {path}: {e}")
         return False
 
 def find_poisoning_import_error(error_text: str) -> str:
@@ -1449,7 +1489,8 @@ def check_main_health() -> tuple:
             return True, "", None
         run_id = runs[0].get("id")
         return False, extract_clean_test_traceback(run_id), run_id
-    except Exception:
+    except Exception as e:
+        print(f"[!] Ошибка проверки здоровья main: {e}")
         return True, "", None
 
 def bulk_quarantine_orphaned_tests() -> list:
@@ -1459,7 +1500,8 @@ def bulk_quarantine_orphaned_tests() -> list:
         if r.status_code != 200:
             return []
         test_files = [f["name"] for f in r.json() if f["name"].startswith("test_") and f["name"].endswith(".py")]
-    except Exception:
+    except Exception as e:
+        print(f"[!] Ошибка получения списка тестов для карантина: {e}")
         return []
 
     manifest = get_skills_manifest()
@@ -1523,8 +1565,8 @@ def is_jules_working_on(mod_name: str) -> bool:
             else:
                 return False
 
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[!] Ошибка проверки статуса Jules: {e}")
     return False
 
 def run_evolution_cycle():
@@ -1709,7 +1751,6 @@ def run_evolution_cycle():
 
         issue_url = escalate_to_github_issue(mod_name, decision.get('description', ''), last_error, branch)
 
-        # Вытаскиваем полезные строки без мусора, чтобы не было пустых блоков в Телеге
         clean_lines = [l for l in (last_error or "Неизвестная ошибка").splitlines() if l.strip() and not l.startswith("---") and not l.startswith("===") and "Ran " not in l and "FAILED" not in l]
         err_snippet = clean_lines[:10] if clean_lines else ["Неизвестная ошибка"]
         escaped_err = html.escape("\n".join(err_snippet))

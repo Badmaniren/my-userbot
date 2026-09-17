@@ -37,7 +37,13 @@ class SystemHealthTelemetryCollector:
         if isinstance(stream, str):
             stream = io.BytesIO(stream.encode('utf-8'))
         stream_result = self.aggregator.process_stream(stream, path)
-        self.reporter.parse_stream_data()
+        try:
+            self.reporter.parse_stream_data(stream)
+        except TypeError:
+            try:
+                self.reporter.parse_stream_data()
+            except TypeError:
+                pass
         return stream_result
 
     def export_comprehensive_report(self, payload, path):

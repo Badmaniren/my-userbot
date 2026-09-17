@@ -11,3 +11,4 @@
 - incident_sla_breach_predictor: Рефакторинг предиктора нарушений SLA стабилизирует контур проактивного предотвращения сбоев и закрывает технический долг.
 - incident_auto_recovery_dispatcher: Рефакторинг incident_auto_recovery_dispatcher закрепляет надежность автоматических действий по предотвращению и устранению нарушений SLA.
 - incident_sla_mitigation_planner: Рефакторинг incident_sla_mitigation_planner закрывает накопленный технический долг и завершает формирование контура проактивного предотвращения нарушений SLA.
+- incident_sla_tracker: Stabilizing the foundational incident_sla_tracker is critical to resolve the recurring CI failures and ensure the entire SLA optimization loop functions correctly.

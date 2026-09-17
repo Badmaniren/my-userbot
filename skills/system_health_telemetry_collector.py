@@ -74,8 +74,14 @@ class SystemHealthTelemetryCollector:
 
         self.export_comprehensive_report(agg_result, dashboard_path)
         
-        import json
-        with open(report_path, 'w') as f:
-            json.dump({module_name: agg_result, "status": "OK"}, f)
+        import json, os
+        try:
+            dir_name = os.path.dirname(os.path.abspath(report_path))
+            if dir_name and not os.path.exists(dir_name):
+                os.makedirs(dir_name, exist_ok=True)
+            with open(report_path, 'w') as f:
+                json.dump({module_name: agg_result, "status": "OK"}, f)
+        except OSError:
+            pass
             
         return {module_name: agg_result}

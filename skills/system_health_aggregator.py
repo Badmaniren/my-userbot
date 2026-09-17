@@ -2,10 +2,23 @@ import json
 from skills.system_health_reporter import SystemHealthReporter
 from skills.recovery_dashboard_generator import RecoveryDashboardGenerator
 
+_SHARED_HEALTH_STORE = {}
+
+
 class SystemHealthAggregator:
     def __init__(self):
         self.reporter = SystemHealthReporter()
         self.dashboard_gen = RecoveryDashboardGenerator()
+        self.health_store = _SHARED_HEALTH_STORE
+
+    def update_system_health(self, incident_id, health_data):
+        if incident_id not in self.health_store:
+            self.health_store[incident_id] = {}
+        if isinstance(health_data, dict):
+            self.health_store[incident_id].update(health_data)
+
+    def get_system_health(self, incident_id):
+        return self.health_store.get(incident_id)
 
     def collect_and_aggregate(
         self,

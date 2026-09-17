@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-mortem_service (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## extractor_tool_1789544538 (create) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
+спешно прошёл тесты и влит в main
 
 ## incident_knowledge_base_searcher (create) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=1)
@@ -305,6 +301,10 @@ mortem_service (refactor) — раундов: 1
 
 ## incident_sla_tracker (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## incident_sla_tracker (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## incident_sla_tracker (refactor) — раундов: 4

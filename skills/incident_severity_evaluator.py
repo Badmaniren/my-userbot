@@ -1,3 +1,4 @@
+from typing import Any, Optional
 from skills.incident_aggregator import IncidentAggregator
 from skills.notification_template_engine import NotificationTemplateEngine
 
@@ -20,7 +21,36 @@ class IncidentSeverityEvaluator:
         else:
             return "LOW"
 
-    def evaluate(self, module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
+    def evaluate(self, module_name: Any = None, exception: Optional[Exception] = None, traceback_str: Optional[str] = None, incident_id: Optional[str] = None):
+        if isinstance(module_name, dict):
+            data = dict(module_name)
+            data.pop("severity_assessment", None)
+            inc_id = data.get("incident_id") or data.get("id") or incident_id
+            if "severity" in data:
+                return {
+                    "incident_id": inc_id,
+                    "severity": data["severity"],
+                    "payload": data,
+                    "aggregated_data": data,
+                }
+            mod_name = data.get("module_name") or data.get("module") or "unknown"
+            exc = data.get("exception") or data.get("error")
+            tb = data.get("traceback_str") or data.get("traceback") or ""
+            agg_result = self.aggregator.process_and_aggregate(
+                mod_name, exc, tb, inc_id
+            )
+            severity = self.calculate_severity_score(agg_result)
+            inc_id = agg_result.get("incident_id") or inc_id
+            payload = self.template_engine.generate_notification_payload(
+                severity, inc_id, agg_result
+            )
+            return {
+                "incident_id": inc_id,
+                "severity": severity,
+                "payload": payload,
+                "aggregated_data": agg_result,
+            }
+
         agg_result = self.aggregator.process_and_aggregate(
             module_name, exception, traceback_str, incident_id
         )
@@ -78,6 +108,6 @@ class IncidentSeverityEvaluator:
         return self.template_engine.export_notification_file(context, output_path)
 
 
-def evaluate_incident_severity(module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
+def evaluate_incident_severity(module_name: Any = None, exception: Optional[Exception] = None, traceback_str: Optional[str] = None, incident_id: Optional[str] = None):
     evaluator = IncidentSeverityEvaluator()
     return evaluator.evaluate(module_name, exception, traceback_str, incident_id)

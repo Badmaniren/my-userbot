@@ -82,10 +82,12 @@ def track_incident_sla(sla_input: Dict[str, Any]) -> Dict[str, Any]:
     data = aggregated_data.get("data", {})
     timestamp = data.get("timestamp")
     
-    created_at = datetime.fromtimestamp(timestamp) if timestamp else datetime.now()
-        
-    elapsed = (datetime.now() - created_at).total_seconds()
-    time_remaining = threshold - elapsed
+    if timestamp is not None:
+        created_at = datetime.fromtimestamp(timestamp)
+        elapsed = (datetime.now() - created_at).total_seconds()
+        time_remaining = threshold - elapsed
+    else:
+        time_remaining = float(threshold)
     
     return {
         "incident_id": incident_id,

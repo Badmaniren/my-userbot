@@ -1,13 +1,14 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 import uuid
 import random
-import string
 import io
+import os
 
 from skills.telemetry_anomaly_audit_bridge import (
     TelemetryAnomalyAuditBridge,
-    AnomalyAuditBridgeException
+    AnomalyAuditBridgeException,
+    AuditBridgeException
 )
 
 
@@ -15,96 +16,183 @@ class TestTelemetryAnomalyAuditBridge(unittest.TestCase):
 
     def setUp(self):
         self.workspace_dir = f"/tmp/{uuid.uuid4().hex}"
-        self.bridge = TelemetryAnomalyAuditBridge(workspace_dir=self.workspace_dir)
+        self.lifecycle_bridge = MagicMock()
+        self.audit_reporter = MagicMock()
 
-    def test_initialization_and_dependencies(self):
-        self.assertEqual(self.bridge.workspace_dir, self.workspace_dir)
-        self.assertIsNotNone(self.bridge.lifecycle_bridge)
-        self.assertIsNotNone(self.bridge.audit_reporter)
+        self.bridge = TelemetryAnomalyAuditBridge(
+            workspace_dir=self.workspace_dir,
+            lifecycle_bridge=self.lifecycle_bridge,
+            audit_reporter=self.audit_reporter
+        )
 
-    @patch('skills.telemetry_anomaly_audit_bridge.TelemetryIncidentLifecycleBridge')
-    @patch('skills.telemetry_anomaly_audit_bridge.DependencyAuditReporter')
-    def test_audit_health_after_incident_success(self, mock_reporter_cls, mock_lifecycle_cls):
-        mock_lifecycle_instance = mock_lifecycle_cls.return_value
-        mock_reporter_instance = mock_reporter_cls.return_value
-
-        rand_telemetry_id = uuid.uuid4().hex
-        rand_audit_report_content = f"REPORT-{uuid.uuid4().hex}"
+    def test_audit_health_after_incident_success(self):
+        rand_incident_id = uuid.uuid4().hex
         rand_epic_id = uuid.uuid4().hex
-        rand_stream_name = f"stream_{uuid.uuid4().hex}"
+        rand_stream = uuid.uuid4().hex
+        rand_report = uuid.uuid4().hex
 
-        mock_lifecycle_instance.verify_and_close_lifecycle.return_value = True
-        mock_reporter_instance.generate_report.return_value = rand_audit_report_content
-        mock_reporter_instance.finalize_epic.return_value = True
+        telemetry_payload = {"incident_id": rand_incident_id}
 
-        bridge = TelemetryAnomalyAuditBridge(workspace_dir=self.workspace_dir)
-        
-        telemetry_payload = {
-            "incident_id": rand_telemetry_id,
-            "metric": random.choice(["cpu_load", "memory_leak", "latency_spike"]),
-            "value": random.uniform(50.0, 100.0)
-        }
+        self.lifecycle_bridge.verify_and_close_lifecycle.return_value = True
+        self.audit_reporter.generate_report.return_value = rand_report
+        self.audit_reporter.finalize_epic.return_value = True
 
-        result = bridge.audit_health_after_incident(telemetry_payload, epic_id=rand_epic_id, stream=rand_stream_name)
+        result = self.bridge.audit_health_after_incident(
+            telemetry_payload=telemetry_payload,
+            epic_id=rand_epic_id,
+            stream=rand_stream
+        )
 
         self.assertTrue(result["lifecycle_closed"])
-        self.assertEqual(result["audit_report"], rand_audit_report_content)
+        self.assertEqual(result["audit_report"], rand_report)
         self.assertTrue(result["epic_finalized"])
-        self.assertEqual(result["incident_id"], rand_telemetry_id)
+        self.assertEqual(result["incident_id"], rand_incident_id)
 
-        mock_lifecycle_instance.process_lifecycle_event.assert_called_once_with(telemetry_payload)
-        mock_lifecycle_instance.verify_and_close_lifecycle.assert_called_once()
-        mock_reporter_instance.generate_report.assert_called_once()
-        mock_reporter_instance.finalize_epic.assert_called_once_with(rand_epic_id, rand_stream_name)
+        self.lifecycle_bridge.process_lifecycle_event.assert_called_once_with(telemetry_payload)
+        self.lifecycle_bridge.verify_and_close_lifecycle.assert_called_once()
+        self.audit_reporter.generate_report.assert_called_once()
+        self.audit_reporter.finalize_epic.assert_called_once_with(rand_epic_id, rand_stream)
 
-    @patch('skills.telemetry_anomaly_audit_bridge.TelemetryIncidentLifecycleBridge')
-    def test_audit_health_lifecycle_failure(self, mock_lifecycle_cls):
-        mock_lifecycle_instance = mock_lifecycle_cls.return_value
-        mock_lifecycle_instance.verify_and_close_lifecycle.return_value = False
+    def test_audit_health_after_incident_without_verify_method(self):
+        rand_incident_id = uuid.uuid4().hex
+        telemetry_payload = {"incident_id": rand_incident_id}
+        
+        del self.lifecycle_bridge.verify_and_close_lifecycle
+        rand_report = uuid.uuid4().hex
+        self.audit_reporter.generate_report.return_value = rand_report
 
-        rand_telemetry_id = uuid.uuid4().hex
-        bridge = TelemetryAnomalyAuditBridge(workspace_dir=self.workspace_dir)
+        result = self.bridge.audit_health_after_incident(telemetry_payload=telemetry_payload)
 
-        telemetry_payload = {
-            "incident_id": rand_telemetry_id,
-            "status": "unresolved"
-        }
+        self.assertTrue(result["lifecycle_closed"])
+        self.assertEqual(result["audit_report"], rand_report)
+        self.assertFalse(result["epic_finalized"])
+        self.assertEqual(result["incident_id"], rand_incident_id)
 
-        with self.assertRaises(AnomalyAuditBridgeException):
-            bridge.audit_health_after_incident(telemetry_payload)
+    def test_audit_health_after_incident_verification_failure(self):
+        rand_incident_id = uuid.uuid4().hex
+        telemetry_payload = {"incident_id": rand_incident_id}
 
-    @patch('skills.telemetry_anomaly_audit_bridge.TelemetryIncidentLifecycleBridge')
-    @patch('skills.telemetry_anomaly_audit_bridge.DependencyAuditReporter')
-    def test_process_audit_stream_handler(self, mock_reporter_cls, mock_lifecycle_cls):
-        mock_lifecycle_instance = mock_lifecycle_cls.return_value
-        mock_reporter_instance = mock_reporter_cls.return_value
+        self.lifecycle_bridge.verify_and_close_lifecycle.return_value = False
 
-        rand_stream_data = f"telemetry_data_{uuid.uuid4().hex}\n".encode('utf-8')
+        result = self.bridge.audit_health_after_incident(telemetry_payload=telemetry_payload)
+
+        self.assertFalse(result["lifecycle_closed"])
+
+    def test_audit_health_after_incident_exception_handling(self):
+        rand_incident_id = uuid.uuid4().hex
+        telemetry_payload = {"incident_id": rand_incident_id}
+
+        rand_error_msg = uuid.uuid4().hex
+        self.lifecycle_bridge.process_lifecycle_event.side_effect = Exception(rand_error_msg)
+
+        with self.assertRaises(AnomalyAuditBridgeException) as ctx:
+            self.bridge.audit_health_after_incident(telemetry_payload=telemetry_payload)
+
+        self.assertIn(rand_error_msg, str(ctx.exception))
+
+    def test_process_audit_stream_success(self):
+        rand_stream_data = f"stream_data_{uuid.uuid4().hex}".encode('utf-8')
         stream_io = io.BytesIO(rand_stream_data)
 
         rand_epic_id = uuid.uuid4().hex
-        rand_format = random.choice(["json", "xml", "pdf", "csv"])
-        rand_summary_result = f"summary_{uuid.uuid4().hex}"
+        rand_format = uuid.uuid4().hex
+        rand_summary = uuid.uuid4().hex
 
-        mock_lifecycle_instance.process_lifecycle_stream.return_value = True
-        mock_reporter_instance.export_summary.return_value = rand_summary_result
+        self.audit_reporter.export_summary.return_value = rand_summary
 
-        bridge = TelemetryAnomalyAuditBridge(workspace_dir=self.workspace_dir)
-        summary = bridge.process_audit_stream(stream_io, epic_id=rand_epic_id, export_format=rand_format)
+        result = self.bridge.process_audit_stream(
+            stream_io=stream_io,
+            epic_id=rand_epic_id,
+            export_format=rand_format
+        )
 
-        self.assertEqual(summary, rand_summary_result)
-        mock_lifecycle_instance.process_lifecycle_stream.assert_called_once_with(stream_io)
-        mock_reporter_instance.export_summary.assert_called_once()
+        self.assertEqual(result, rand_summary)
+        self.lifecycle_bridge.process_lifecycle_stream.assert_called_once_with(stream_io)
+        self.audit_reporter.export_summary.assert_called_once()
 
-    @patch('skills.telemetry_anomaly_audit_bridge.DependencyAuditReporter')
-    def test_generate_epic_health_export_malformed(self, mock_reporter_cls):
-        mock_reporter_instance = mock_reporter_cls.return_value
-        mock_reporter_instance.generate_epic_report.side_effect = Exception("Export failure")
+    def test_process_audit_stream_exception(self):
+        stream_io = io.BytesIO(b"")
+        rand_error_msg = uuid.uuid4().hex
+        self.lifecycle_bridge.process_lifecycle_stream.side_effect = Exception(rand_error_msg)
 
-        rand_output_path = f"/var/reports/{uuid.uuid4().hex}.json"
-        rand_payload = {"audit_id": uuid.uuid4().hex, "score": random.randint(1, 100)}
+        with self.assertRaises(AnomalyAuditBridgeException) as ctx:
+            self.bridge.process_audit_stream(stream_io=stream_io)
 
-        bridge = TelemetryAnomalyAuditBridge(workspace_dir=self.workspace_dir)
+        self.assertIn(rand_error_msg, str(ctx.exception))
 
-        with self.assertRaises(AnomalyAuditBridgeException):
-            bridge.generate_epic_health_export(rand_payload, rand_output_path)
+    def test_generate_epic_health_export_success(self):
+        rand_payload = {"key": uuid.uuid4().hex}
+        rand_output_path = f"/tmp/{uuid.uuid4().hex}.json"
+        rand_return_value = uuid.uuid4().hex
+
+        self.audit_reporter.generate_epic_report.return_value = rand_return_value
+
+        result = self.bridge.generate_epic_health_export(rand_payload, rand_output_path)
+
+        self.assertEqual(result, rand_return_value)
+        self.audit_reporter.generate_epic_report.assert_called_once_with(rand_payload, rand_output_path)
+
+    def test_generate_epic_health_export_exception(self):
+        rand_payload = {}
+        rand_output_path = f"/tmp/{uuid.uuid4().hex}"
+        rand_error_msg = uuid.uuid4().hex
+
+        self.audit_reporter.generate_epic_report.side_effect = Exception(rand_error_msg)
+
+        with self.assertRaises(AnomalyAuditBridgeException) as ctx:
+            self.bridge.generate_epic_health_export(rand_payload, rand_output_path)
+
+        self.assertIn(rand_error_msg, str(ctx.exception))
+
+    def test_process_anomaly_and_audit_with_typeerror_fallback(self):
+        rand_incident_id = uuid.uuid4().hex
+        telemetry_payload = {"incident_id": rand_incident_id}
+        audit_data = {"audit": uuid.uuid4().hex}
+        rand_report = uuid.uuid4().hex
+
+        self.audit_reporter.generate_report.side_effect = TypeError("Unexpected argument")
+
+        # Модифицируем мок, чтобы вторая попытка (без аргументов) сработала успешно
+        # Так как generate_report вызывается дважды или один раз с ошибкой и ловлей внутри:
+        # В коде:
+        # try: audit_report = self.audit_reporter.generate_report(audit_data)
+        # except TypeError: audit_report = self.audit_reporter.generate_report()
+
+        # Настроим side_effect так: первый вызов падает с TypeError, второй возвращает rand_report
+        self.audit_reporter.generate_report.side_effect = [TypeError("mismatch"), rand_report]
+
+        result = self.bridge.process_anomaly_and_audit(telemetry_payload, audit_data)
+
+        self.assertEqual(result["audit_report"], rand_report)
+        self.assertEqual(result["lifecycle_status"], "PROCESSED")
+        self.assertEqual(result["incident_id"], rand_incident_id)
+        self.lifecycle_bridge.process_lifecycle_event.assert_called_once_with(telemetry_payload)
+
+    def test_process_anomaly_and_audit_without_generate_report_method(self):
+        rand_incident_id = uuid.uuid4().hex
+        telemetry_payload = {"incident_id": rand_incident_id}
+        audit_data = f"audit_str_{uuid.uuid4().hex}"
+
+        del self.audit_reporter.generate_report
+
+        result = self.bridge.process_anomaly_and_audit(telemetry_payload, audit_data)
+
+        self.assertEqual(result["audit_report"], str(audit_data))
+        self.assertEqual(result["lifecycle_status"], "PROCESSED")
+        self.assertEqual(result["incident_id"], rand_incident_id)
+
+    def test_process_anomaly_and_audit_exception_raises_audit_bridge_exception(self):
+        telemetry_payload = {"incident_id": uuid.uuid4().hex}
+        audit_data = {}
+        rand_error_msg = uuid.uuid4().hex
+
+        self.lifecycle_bridge.process_lifecycle_event.side_effect = Exception(rand_error_msg)
+
+        with self.assertRaises(AuditBridgeException) as ctx:
+            self.bridge.process_anomaly_and_audit(telemetry_payload, audit_data)
+
+        self.assertIn(rand_error_msg, str(ctx.exception))
+
+
+if __name__ == "__main__":
+    unittest.main()

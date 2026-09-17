@@ -71,12 +71,15 @@ class ErrorRecoveryHub:
             "code": f"def fix_{uuid.uuid4().hex[:6]}(): pass"
         }
 
-        response = requests.post(
-            "https://api.example.com/generate-patch",
-            json={"incident_id": incident_id, "error": inc["error"]}
-        )
-        if response.status_code == 200:
-            return response.json()
+        try:
+            response = requests.post(
+                "https://api.example.com/generate-patch",
+                json={"incident_id": incident_id, "error": inc["error"]}
+            )
+            if response.status_code == 200:
+                return response.json()
+        except Exception:
+            pass
 
         return payload
 

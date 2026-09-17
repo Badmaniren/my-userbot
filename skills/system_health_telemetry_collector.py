@@ -79,3 +79,83 @@ class SystemHealthTelemetryCollector:
             json.dump({module_name: agg_result, "status": "OK"}, f)
             
         return {module_name: agg_result}
+
+
+_default_collector_instance = None
+
+
+def get_telemetry_collector():
+    global _default_collector_instance
+    if _default_collector_instance is None:
+        _default_collector_instance = SystemHealthTelemetryCollector()
+    return _default_collector_instance
+
+
+def system_health_telemetry_collector(session_id=None, stream_mode="realtime", payload=None, **kwargs):
+    collector = get_telemetry_collector()
+    if isinstance(payload, dict):
+        data = dict(payload)
+    else:
+        data = dict(kwargs)
+    if session_id is not None:
+        data["session_id"] = session_id
+    data["stream_mode"] = stream_mode
+    data["status"] = data.get("status", "nominal")
+
+    module_name = data.get("module_name", "system_telemetry_streamer")
+    try:
+        agg = collector.aggregator.collect_and_aggregate(
+            module_name,
+            data.get("incident_data", {}),
+            data.get("audit_summary", {}),
+            data.get("metrics", {}),
+            data.get("dashboard_format", "json"),
+            data.get("incidents_list", []),
+            data.get("patches_list", [])
+        )
+        if isinstance(agg, dict):
+            for k, v in agg.items():
+                if k not in data:
+                    data[k] = v
+    except Exception:
+        pass
+
+    return data
+
+
+def _collect(payload=None, **kwargs):
+    collector = get_telemetry_collector()
+    if isinstance(payload, dict):
+        data = dict(payload)
+    else:
+        data = dict(kwargs)
+    module_name = data.get("module_name", "system_telemetry_streamer")
+    try:
+        agg = collector.aggregator.collect_and_aggregate(
+            module_name,
+            data.get("incident_data", {}),
+            data.get("audit_summary", {}),
+            data.get("metrics", {}),
+            data.get("dashboard_format", "json"),
+            data.get("incidents_list", []),
+            data.get("patches_list", [])
+        )
+        if isinstance(agg, dict):
+            for k, v in agg.items():
+                if k not in data:
+                    data[k] = v
+    except Exception:
+        pass
+    data.setdefault("status", "nominal")
+    return data
+
+
+system_health_telemetry_collector.collect = _collect
+
+
+def collect_telemetry(telemetry_data=None, **kwargs):
+    return _collect(payload=telemetry_data, **kwargs)
+
+
+def stream_metrics(*args, **kwargs):
+    return _collect(*args, **kwargs)

@@ -57,6 +57,9 @@ class SystemHealthAggregator:
             'dashboard': dashboard
         }
 
+    def aggregate(self, system_id=None, **kwargs):
+        return self.collect_and_aggregate(module_name=system_id, **kwargs)
+
     def aggregate_and_report(self, *args, **kwargs):
         return self.collect_and_aggregate(*args, **kwargs)
 
@@ -93,3 +96,15 @@ class SystemHealthAggregator:
 
     def parse_reporter_stream(self, stream):
         return self.reporter.parse_stream_data(stream)
+
+
+def system_health_aggregator(data=None, **kwargs):
+    aggregator = SystemHealthAggregator()
+    if data is None and not kwargs:
+        return aggregator
+    if isinstance(data, dict):
+        merged = {**data, **kwargs}
+        return aggregator.collect_and_aggregate(**merged)
+    if data is not None:
+        return aggregator.collect_and_aggregate(data, **kwargs)
+    return aggregator.collect_and_aggregate(**kwargs)

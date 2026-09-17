@@ -1,8 +1,5 @@
 import requests
-try:
-    from bs4 import BeautifulSoup
-except ImportError:
-    BeautifulSoup = None
+from bs4 import BeautifulSoup
 
 class ExtractionError(Exception):
     """Исключение, возникающее при ошибках извлечения метаданных."""
@@ -10,7 +7,7 @@ class ExtractionError(Exception):
 
 class MarkupMetadataExtractor:
     def extract_from_string(self, html_markup: str) -> dict:
-        if not html_markup or BeautifulSoup is None:
+        if not html_markup:
             return {}
         
         try:

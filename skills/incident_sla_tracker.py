@@ -10,6 +10,10 @@ incident_notification_bridge = None
 incident_auto_escalation_engine = None
 
 class IncidentSLATracker:
+    """
+    Core tracker for managing incident SLA thresholds, active tracking,
+    and warning/breach detection across telemetry loops.
+    """
     def __init__(self, sla_thresholds: Dict[str, int], warning_threshold_pct: float):
         self.sla_thresholds = sla_thresholds
         self.warning_threshold_pct = warning_threshold_pct

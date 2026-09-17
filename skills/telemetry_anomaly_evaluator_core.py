@@ -16,7 +16,12 @@ class TelemetryAnomalyEvaluatorCore:
         return data
 
     def _read_stream_bytes(self, stream):
-        return stream.read()
+        if hasattr(stream, "read"):
+            content = stream.read()
+            if isinstance(content, io.BytesIO):
+                return content.getvalue()
+            return content
+        return stream
 
     def evaluate(self, telemetry_data):
         if not all(k in telemetry_data for k in ("stream_id", "metric", "value", "threshold")):
@@ -37,6 +42,17 @@ class TelemetryAnomalyEvaluatorCore:
 
     def evaluate_stream_source(self, stream_io):
         content = self._read_stream_bytes(stream_io)
+        if isinstance(content, io.BytesIO):
+            content = content.getvalue()
+        elif isinstance(content, io.BufferedReader):
+            content = content.read()
+        elif isinstance(content, str):
+            content = content.encode('utf-8')
+        elif not isinstance(content, (bytes, bytearray)):
+            try:
+                content = bytes(content)
+            except Exception:
+                content = str(content).encode('utf-8')
         return {
             "processed_bytes_hash": hashlib.sha256(content).hexdigest()
         }

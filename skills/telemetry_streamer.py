@@ -54,9 +54,9 @@ class PipelineConnector:
                 response = requests.post(self.pipeline_url, json=payload)
                 if response.status_code in (200, 201):
                     return True
-            except requests.RequestException:
+            except (requests.RequestException, Exception):
                 if attempts >= retries:
-                    raise
+                    return False
             attempts += 1
         return False
 

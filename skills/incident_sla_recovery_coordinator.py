@@ -28,8 +28,6 @@ class IncidentSLARecoveryCoordinator:
             module_name = incident.get('module_name')
             severity = incident.get('severity')
             
-            # В реальном IncidentAutoRecoveryDispatcher.dispatch_recovery сигнатура может требовать другие аргументы 
-            # или выбрасывать TypeError, который мы безопасно перехватываем и адаптируем под разные версии зависимостей.
             try:
                 dispatch_res = self.recovery_dispatcher.dispatch_recovery(
                     incident_id=incident_id,

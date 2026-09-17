@@ -101,6 +101,7 @@ def set_tg_commands():
         {"command": "quarantine", "description": "🧟 Массово вычистить тесты-сироты с main"},
         {"command": "audit", "description": "🔎 Найти реально сломанные цепочки импортов"},
         {"command": "cleanup", "description": "🧹 Найти и удалить дубли навыков"},
+        {"command": "purge", "description": "🗑 Закрыть все застрявшие тикеты Jules (спам)"},
         {"command": "nuke", "description": "☢️ Сжечь все скиллы к хуям (полный вайп)"},
         {"command": "help", "description": "❓ Список команд"},
     ]
@@ -119,11 +120,31 @@ HELP_TEXT = (
     "🧟 <code>/quarantine</code> — сразу вычистить тесты-сироты с main\n"
     "🔎 <code>/audit</code> — найти реально сломанные цепочки импортов между навыками\n"
     "🧹 <code>/cleanup</code> — найти дубли навыков и предложить удаление\n"
+    "🗑 <code>/purge</code> — закрыть весь спам из тикетов Jules\n"
     "☢️ <code>/nuke</code> — стереть память и удалить все навыки, чтобы начать с нуля\n"
     "❓ <code>/help</code> — это сообщение\n"
     "━━━━━━━━━━━━━━━━━━━\n"
     "<i>Кнопки внизу экрана дублируют команды — жми, а не печатай.</i>"
 )
+
+def purge_spam_issues() -> int:
+    url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues")
+    closed_count = 0
+    try:
+        res = requests.get(url, headers=API_HEADERS, params={"state": "open", "per_page": 100}, timeout=10)
+        if res.status_code == 200:
+            for issue in res.json():
+                if "pull_request" in issue:
+                    continue
+                if issue.get("title", "").startswith("Jules Task:"):
+                    num = issue.get("number")
+                    patch_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues/{num}")
+                    r = requests.patch(patch_url, headers=API_HEADERS, json={"state": "closed"}, timeout=10)
+                    if r.status_code == 200:
+                        closed_count += 1
+    except Exception as e:
+        print(f"[!] Ошибка очистки тикетов: {e}")
+    return closed_count
 
 def run_telegram_listener():
     if not TG_TOKEN or not TG_ADMIN_ID:
@@ -191,7 +212,7 @@ def run_telegram_listener():
                     msg = update.get("message", {})
                     chat_id = str(msg.get("chat", {}).get("id", ""))
                     text = msg.get("text", "").strip()
-                    text = re.sub(r'^[📊🔁⚙️❓☢️]\s*', '', text)
+                    text = re.sub(r'^[📊🔁⚙️❓☢️🗑]\s*', '', text)
 
                     if chat_id != TG_ADMIN_ID:
                         continue
@@ -200,6 +221,10 @@ def run_telegram_listener():
                         send_tg(HELP_TEXT, keyboard=True)
                     elif text.startswith("/help"):
                         send_tg(HELP_TEXT)
+                    elif text.startswith("/purge"):
+                        send_tg("🗑 <b>Очистка спама Jules</b>\nЗакрываю мертвые тикеты, подожди...")
+                        count = purge_spam_issues()
+                        send_tg(f"✅ Успешно закрыто мусорных тикетов: <b>{count}</b>.")
                     elif text.startswith("/nuke"):
                         send_tg("☢️ <b>ПРОТОКОЛ СУДНОГО ДНЯ ЗАПУЩЕН</b>\nВыжигаю все навыки и тесты, стираю память...")
                         count = nuke_everything()
@@ -591,7 +616,7 @@ def reactivate_stuck_jules_issues() -> int:
 def run_jules_babysitter():
     print("[+] Демон-нянька для Jules запущен.")
     while True:
-        time.sleep(180)
+        time.sleep(300)
         url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues")
         try:
             res = requests.get(url, headers=API_HEADERS, params={"state": "open", "per_page": 50}, timeout=10)
@@ -603,6 +628,14 @@ def run_jules_babysitter():
             for issue in issues:
                 num = issue.get("number")
                 if not num:
+                    continue
+
+                # ЖНЕЦ: Если тикет висит больше 3 часов - закрываем его, Жуля сдох
+                created_at = datetime.strptime(issue["created_at"], "%Y-%m-%dT%H:%M:%SZ")
+                if (datetime.utcnow() - created_at).total_seconds() > 10800:
+                    print(f"[*] Тикет #{num} протух (висит > 3 часов). Закрываю спам.")
+                    patch_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues/{num}")
+                    requests.patch(patch_url, headers=API_HEADERS, json={"state": "closed"}, timeout=10)
                     continue
 
                 c_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues/{num}/comments")
@@ -949,7 +982,6 @@ def inspect_code_for_cheating(code: str, existing_skills: list, target_module: s
                     "АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! "
                     "Обработай ошибку предсказуемо или пробрось наружу через raise."
                 )
-        # ЖЕСТКАЯ БЛОКИРОВКА try...except ImportError ДЛЯ ЗАГЛУШЕК
         if isinstance(node, ast.Try):
             for handler in node.handlers:
                 if handler.type and getattr(handler.type, 'id', '') == 'ImportError':
@@ -1474,7 +1506,7 @@ def heal_main_if_poisoned() -> bool:
 def is_jules_working_on(mod_name: str) -> bool:
     url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues")
     try:
-        res = requests.get(url, headers=API_HEADERS, params={"state": "open", "per_page": 30}, timeout=10)
+        res = requests.get(url, headers=API_HEADERS, params={"state": "open", "per_page": 100}, timeout=10)
         if res.status_code != 200:
             return False
 
@@ -1484,25 +1516,12 @@ def is_jules_working_on(mod_name: str) -> bool:
             if not issue.get("title", "").startswith(f"Jules Task: исправить сбой модуля {mod_name}"):
                 continue
 
-            num = issue.get("number")
-            c_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues/{num}/comments")
-            c_res = requests.get(c_url, headers=API_HEADERS, timeout=10)
-            if c_res.status_code != 200:
+            updated_at_str = issue.get("updated_at") or issue.get("created_at")
+            updated_at = datetime.strptime(updated_at_str, "%Y-%m-%dT%H:%M:%SZ")
+            if (datetime.utcnow() - updated_at).total_seconds() < 7200:
                 return True
-
-            comments = c_res.json()
-            comments_text = " ".join([c.get("body", "").lower() for c in comments])
-
-            if "ready for a review" in comments_text or "a pr has been created" in comments_text:
+            else:
                 return False
-
-            if "jules has failed" in comments_text:
-                return False
-
-            if "is on it" in comments_text:
-                created_at = datetime.strptime(issue["created_at"], "%Y-%m-%dT%H:%M:%SZ")
-                if (datetime.utcnow() - created_at).total_seconds() < 10800:
-                    return True
 
     except Exception:
         pass

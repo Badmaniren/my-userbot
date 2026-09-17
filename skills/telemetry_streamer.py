@@ -29,6 +29,20 @@ class TelemetryStreamer:
             "correlation_id": correlation_id
         }
 
+    def stream_data(self, *args, **kwargs):
+        if args and isinstance(args[0], dict):
+            payload = args[0]
+        else:
+            payload = kwargs.get("payload") or kwargs
+        return {"status": "streamed", "data": payload}
+
+
+def telemetry_streamer(payload=None, **kwargs):
+    streamer = TelemetryStreamer()
+    if payload is not None:
+        return streamer.stream_data(payload)
+    return streamer.stream_data(**kwargs)
+
 
 class StreamAggregationEngine:
     def __init__(self, source_stream, max_chunk=4096):

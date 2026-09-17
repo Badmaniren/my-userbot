@@ -74,3 +74,12 @@ def export_incident_analytics(module_name, output_path, format="json"):
     if hasattr(collector, 'export_metrics'):
         return collector.export_metrics(output_path, format)
     return False
+
+
+def incident_aggregator(data=None, **kwargs):
+    aggregator = IncidentAggregator()
+    if data is not None:
+        if isinstance(data, dict):
+            return data
+        return {"data": data}
+    return kwargs

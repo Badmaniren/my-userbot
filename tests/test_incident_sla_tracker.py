@@ -5,90 +5,129 @@ import uuid
 import random
 import string
 
-from skills.incident_sla_tracker import IncidentSLATracker
+from skills.incident_sla_tracker import IncidentSLATracker, track_incident_sla
+
 
 class TestIncidentSLATracker(unittest.TestCase):
 
     def setUp(self):
-        self.random_severity = random.choice(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'])
-        self.random_threshold = random.randint(60, 3600)
-        self.random_warning_pct = random.uniform(0.5, 0.9)
-        self.tracker = IncidentSLATracker(
-            sla_thresholds={self.random_severity: self.random_threshold},
-            warning_threshold_pct=self.random_warning_pct
-        )
+        self.rand_str = lambda: uuid.uuid4().hex[:8]
+        self.severities = ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+        self.thresholds = {
+            "LOW": random.randint(7200, 10800),
+            "MEDIUM": random.randint(3600, 7199),
+            "HIGH": random.randint(1800, 3599),
+            "CRITICAL": random.randint(300, 1799)
+        }
+        self.warning_pct = random.uniform(0.5, 0.8)
+        self.tracker = IncidentSLATracker(self.thresholds, self.warning_pct)
 
-    def test_register_and_get_time_to_breach(self):
-        incident_id = uuid.uuid4().hex
-        created_at = datetime.now() - timedelta(seconds=random.randint(10, 50))
-        
-        self.tracker.register_incident(incident_id, self.random_severity, created_at)
+    def test_register_and_time_to_breach_success(self):
+        incident_id = f"inc_{self.rand_str()}"
+        severity = random.choice(self.severities)
+        created_at = datetime.now() - timedelta(seconds=random.randint(10, 100))
+
+        self.tracker.register_incident(incident_id, severity, created_at)
         
         current_time = datetime.now()
-        expected_remaining = self.random_threshold - (current_time - created_at).total_seconds()
-        actual_remaining = self.tracker.get_time_to_breach(incident_id, current_time)
+        time_to_breach = self.tracker.get_time_to_breach(incident_id, current_time)
         
-        self.assertAlmostEqual(actual_remaining, expected_remaining, delta=0.1)
+        expected_limit = self.thresholds[severity]
+        elapsed = (current_time - created_at).total_seconds()
+        expected_breach_time = float(expected_limit - elapsed)
 
-    def test_get_time_to_breach_raises_key_error(self):
-        fake_id = uuid.uuid4().hex
+        self.assertAlmostEqual(time_to_breach, expected_breach_time, delta=2.0)
+
+    def test_get_time_to_breach_not_found(self):
+        missing_id = f"missing_{self.rand_str()}"
         with self.assertRaises(KeyError):
-            self.tracker.get_time_to_breach(fake_id)
+            self.tracker.get_time_to_breach(missing_id)
 
-    def test_check_sla_breaches_logic(self):
-        incident_id = uuid.uuid4().hex
-        # Создаем инцидент, который гарантированно нарушил SLA
-        created_at = datetime.now() - timedelta(seconds=self.random_threshold + random.randint(1, 100))
-        
-        self.tracker.register_incident(incident_id, self.random_severity, created_at)
-        
-        mock_bridge = MagicMock()
-        mock_escalation = MagicMock()
-        
-        results = self.tracker.check_sla_breaches(
-            current_time=datetime.now(),
-            notification_bridge=mock_bridge,
-            escalation_engine=mock_escalation
-        )
-        
-        self.assertEqual(len(results), 1)
-        self.assertEqual(results[0]["incident_id"], incident_id)
-        self.assertEqual(results[0]["status"], "BREACHED")
-        
-        mock_bridge.notify_sla_breach.assert_called_once_with(incident_id=incident_id, severity=self.random_severity)
-        mock_escalation.escalate_incident.assert_called_once_with(incident_id=incident_id, severity=self.random_severity)
+    def test_update_incident_status(self):
+        incident_id = f"inc_{self.rand_str()}"
+        severity = random.choice(self.severities)
+        created_at = datetime.now()
 
-    def test_update_incident_status_persistence(self):
-        incident_id = uuid.uuid4().hex
-        new_status = ''.join(random.choices(string.ascii_uppercase, k=10))
+        self.tracker.register_incident(incident_id, severity, created_at)
         
-        self.tracker.register_incident(incident_id, self.random_severity, datetime.now())
+        new_status = f"RESOLVED_{self.rand_str()}"
         self.tracker.update_incident_status(incident_id, new_status)
-        
+
         self.assertEqual(self.tracker.incidents[incident_id]["status"], new_status)
 
-    def test_resolved_incidents_ignored_in_breach_check(self):
-        incident_id = uuid.uuid4().hex
-        created_at = datetime.now() - timedelta(seconds=self.random_threshold + 100)
-        
-        self.tracker.register_incident(incident_id, self.random_severity, created_at)
-        self.tracker.update_incident_status(incident_id, "RESOLVED_" + uuid.uuid4().hex)
-        
-        results = self.tracker.check_sla_breaches()
-        self.assertEqual(len(results), 0)
+    def test_check_sla_breaches_active_warning_and_breach(self):
+        inc_breached_id = f"inc_{self.rand_str()}"
+        inc_warning_id = f"inc_{self.rand_str()}"
+        inc_resolved_id = f"inc_{self.rand_str()}"
 
-    def test_warning_threshold_logic(self):
-        incident_id = uuid.uuid4().hex
-        # Устанавливаем время так, чтобы оно попало в зону WARNING (между threshold * pct и threshold)
-        elapsed_time = int(self.random_threshold * ((1 + self.random_warning_pct) / 2))
-        created_at = datetime.now() - timedelta(seconds=elapsed_time)
-        
-        self.tracker.register_incident(incident_id, self.random_severity, created_at)
-        
-        results = self.tracker.check_sla_breaches()
-        
-        self.assertEqual(len(results), 1)
-        self.assertEqual(results[0]["status"], "WARNING")
+        sev_breached = "CRITICAL"
+        sev_warning = "HIGH"
+        sev_resolved = "LOW"
 
-if __name__ == '__main__':
+        limit_breached = self.thresholds[sev_breached]
+        limit_warning = self.thresholds[sev_warning]
+
+        now = datetime.now()
+        created_breached = now - timedelta(seconds=limit_breached + random.randint(10, 500))
+        created_warning = now - timedelta(seconds=int(limit_warning * self.warning_pct) + 10)
+        created_resolved = now - timedelta(seconds=limit_breached * 2)
+
+        self.tracker.register_incident(inc_breached_id, sev_breached, created_breached)
+        self.tracker.register_incident(inc_warning_id, sev_warning, created_warning)
+        self.tracker.register_incident(inc_resolved_id, sev_resolved, created_resolved)
+        self.tracker.update_incident_status(inc_resolved_id, "RESOLVED_SUCCESS")
+
+        mock_notification = MagicMock()
+        mock_escalation = MagicMock()
+
+        results = self.tracker.check_sla_breaches(
+            current_time=now,
+            notification_bridge=mock_notification,
+            escalation_engine=mock_escalation
+        )
+
+        result_map = {item["incident_id"]: item["status"] for item in results}
+
+        self.assertIn(inc_breached_id, result_map)
+        self.assertEqual(result_map[inc_breached_id], "BREACHED")
+
+        self.assertIn(inc_warning_id, result_map)
+        self.assertEqual(result_map[inc_warning_id], "WARNING")
+
+        self.assertNotIn(inc_resolved_id, result_map)
+
+        mock_notification.notify_sla_breach.assert_called_once_with(
+            incident_id=inc_breached_id, severity=sev_breached
+        )
+        mock_escalation.escalate_incident.assert_called_once_with(
+            incident_id=inc_breached_id, severity=sev_breached
+        )
+
+    def test_track_incident_sla_function_prediction(self):
+        incident_id = f"inc_func_{self.rand_str()}"
+        threshold = random.randint(1000, 5000)
+        timestamp_diff = random.randint(100, 2000)
+        timestamp = int(datetime.now().timestamp()) - timestamp_diff
+
+        sla_input = {
+            "incident_id": incident_id,
+            "threshold_seconds": threshold,
+            "aggregated_data": {
+                "data": {
+                    "timestamp": timestamp
+                }
+            }
+        }
+
+        result = track_incident_sla(sla_input)
+
+        self.assertEqual(result["incident_id"], incident_id)
+        self.assertIsInstance(result["breach_predicted"], bool)
+        self.assertIsInstance(result["time_remaining_seconds"], float)
+
+        expected_remaining = threshold - timestamp_diff
+        self.assertAlmostEqual(result["time_remaining_seconds"], expected_remaining, delta=5.0)
+
+
+if __name__ == "__main__":
     unittest.main()

@@ -103,3 +103,8 @@ class PatchValidator:
             res = self.verify_patch(code)
             return res.get("passed", False)
         return False
+
+
+def patch_validator(payload=None, **kwargs):
+    from skills.patch_vulnerability_bridge import patch_validator as pv
+    return pv(payload, **kwargs)

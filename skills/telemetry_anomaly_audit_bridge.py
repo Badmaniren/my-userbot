@@ -74,7 +74,13 @@ class TelemetryAnomalyAuditBridge:
             # Проводим стандартный жизненный цикл для интеграционного теста
             self.lifecycle_bridge.process_lifecycle_event(telemetry_payload)
             
-            audit_report = self.audit_reporter.generate_report() if hasattr(self.audit_reporter, 'generate_report') else str(audit_data)
+            if hasattr(self.audit_reporter, 'generate_report'):
+                try:
+                    audit_report = self.audit_reporter.generate_report(audit_data)
+                except TypeError:
+                    audit_report = self.audit_reporter.generate_report()
+            else:
+                audit_report = str(audit_data)
             
             return {
                 "audit_report": audit_report,

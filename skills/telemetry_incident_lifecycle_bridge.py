@@ -36,10 +36,12 @@ class TelemetryIncidentLifecycleBridge:
             )
             
         # Синхронизируем workspace_dir у коннектора, если он был задан отдельно
-        if self.workspace_dir and not self.response_connector.workspace_dir:
+        if self.workspace_dir and not getattr(self.response_connector, 'workspace_dir', None):
             self.response_connector.workspace_dir = self.workspace_dir
-        elif self.response_connector.workspace_dir and not self.workspace_dir:
+        elif getattr(self.response_connector, 'workspace_dir', None) and not self.workspace_dir:
             self.workspace_dir = self.response_connector.workspace_dir
+        elif self.workspace_dir and self.response_connector:
+            self.response_connector.workspace_dir = self.workspace_dir
 
     def process_lifecycle_event(self, telemetry_payload):
         try:

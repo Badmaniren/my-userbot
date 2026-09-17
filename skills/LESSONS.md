@@ -3,7 +3,12 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-st_mortem_service (refactor) — раундов: 1
+но прошёл тесты и влит в main
+
+## incident_post_mortem_service (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## incident_post_mortem_service (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## incident_post_mortem_service (refactor) — раундов: 1
@@ -303,8 +308,4 @@ st_mortem_service (refactor) — раундов: 1
 
 ## incident_sla_tracker (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## incident_sla_tracker (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

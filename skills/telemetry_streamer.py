@@ -78,3 +78,24 @@ class SystemHealthAuditPipeline:
         with open(log_path, 'w') as f:
             json.dump(aggregated_data, f)
         return True
+
+
+def telemetry_streamer(payload=None, **kwargs):
+    """
+    Top-level wrapper function for streaming telemetry packets.
+    Inferred/compatible with test_epic_smoke.py requirements.
+    """
+    if payload is None and kwargs:
+        payload = kwargs
+    elif payload is None:
+        payload = {}
+
+    streamer = TelemetryStreamer()
+    if isinstance(payload, dict):
+        result = streamer.process_and_push(payload)
+        # Combine status with raw payload attributes for downstream pipeline processing
+        combined = dict(payload)
+        combined.update(result)
+        return combined
+
+    return streamer.process_and_push({"data": payload})

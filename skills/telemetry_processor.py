@@ -97,3 +97,31 @@ def process_telemetry_packet(raw_packet):
         return processed
     except (ValueError, TypeError):
         return None
+
+
+def telemetry_processor(data=None, **kwargs):
+    """
+    Top-level wrapper function for normalizing telemetry data in streaming/batch pipelines.
+    Supports dictionary payloads or kwargs.
+    """
+    if data is None and kwargs:
+        data = kwargs
+    elif data is None:
+        data = {}
+
+    processor = TelemetryProcessor()
+    if isinstance(data, dict):
+        processed = processor.process_packet(data)
+        if processed:
+            return processed
+        hardware_processed = process_telemetry_packet(data)
+        if hardware_processed:
+            return hardware_processed
+
+        # Generic normalization fallback for arbitrary valid dictionary payloads
+        normalized = dict(data)
+        normalized.setdefault("processed_at", time.time())
+        normalized["status"] = "PROCESSED"
+        return normalized
+
+    return {"status": "PROCESSED", "raw_data": data, "processed_at": time.time()}

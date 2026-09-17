@@ -29,6 +29,17 @@ class TelemetryStreamer:
             "correlation_id": correlation_id
         }
 
+    def stream_data(self, *args, **kwargs):
+        if not self.endpoint:
+            return None
+        try:
+            response = requests.get(self.endpoint)
+            if response.status_code == 200:
+                return response.text
+        except Exception:
+            pass
+        return None
+
 
 class StreamAggregationEngine:
     def __init__(self, source_stream, max_chunk=4096):

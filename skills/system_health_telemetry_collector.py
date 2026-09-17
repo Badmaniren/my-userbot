@@ -1,11 +1,14 @@
+import io
 from skills.system_health_aggregator import SystemHealthAggregator
 from skills.system_health_reporter import SystemHealthReporter
+from skills.telemetry_streamer import TelemetryStreamer
 
 
 class SystemHealthTelemetryCollector:
     def __init__(self):
         self.aggregator = SystemHealthAggregator()
         self.reporter = SystemHealthReporter()
+        self.streamer = TelemetryStreamer()
 
     def collect_and_aggregate_telemetry(
         self,
@@ -34,7 +37,10 @@ class SystemHealthTelemetryCollector:
 
     def process_telemetry_stream(self, stream, path):
         stream_result = self.aggregator.process_stream(stream, path)
-        self.reporter.parse_stream_data()
+        try:
+            self.reporter.parse_stream_data(stream)
+        except TypeError:
+            self.reporter.parse_stream_data()
         return stream_result
 
     def export_comprehensive_report(self, payload, path):

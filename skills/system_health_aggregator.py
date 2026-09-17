@@ -61,7 +61,15 @@ class SystemHealthAggregator:
         return self.collect_and_aggregate(*args, **kwargs)
 
     def process_stream(self, stream, path):
-        stream_bytes = stream.read()
+        if hasattr(stream, 'read'):
+            stream_bytes = stream.read()
+        elif isinstance(stream, bytes):
+            stream_bytes = stream
+        elif isinstance(stream, str):
+            stream_bytes = stream.encode('utf-8')
+        else:
+            stream_bytes = str(stream).encode('utf-8')
+
         parsed_data = self.dashboard_gen.parse_stream_data(stream_bytes)
         
         if isinstance(parsed_data, (dict, list)):

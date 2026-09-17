@@ -93,3 +93,11 @@ class SystemHealthAggregator:
 
     def parse_reporter_stream(self, stream):
         return self.reporter.parse_stream_data(stream)
+
+
+def system_health_aggregator(data=None, **kwargs):
+    if data is None:
+        data = kwargs
+    if isinstance(data, dict):
+        return data
+    return data

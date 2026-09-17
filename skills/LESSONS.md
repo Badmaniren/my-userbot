@@ -3,7 +3,15 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ов: 4
+следняя ошибка перед фиксом: raise AttributeError(
+- Статус: успешно прошёл тесты и влит в main
+
+## incident_post_mortem_generator (create) — раундов: 4
+- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## incident_post_mortem_generator (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -294,9 +302,4 @@
 
 ## incident_sla_tracker (refactor) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## incident_sla_tracker (refactor) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); АНТИЧИТ: Запрещено создавать классы-заглушки внутри `except ImportError:`! Импортируй честно, пусть падает, если модуля нет.
-- Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/unittest/loader.py", line 419, in _find_test_path
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -83,3 +83,17 @@ class IncidentNotificationBridge:
 
 
 IncidentIncidentNotificationBridge = IncidentNotificationBridge
+
+
+def notify_sla_breach(incident_id=None, severity="HIGH", **kwargs):
+    if isinstance(incident_id, dict):
+        data = incident_id
+    else:
+        data = {"incident_id": incident_id, "severity": severity, **kwargs}
+    bridge = IncidentNotificationBridge()
+    bridge.process_incident(data)
+    return {
+        "status": "NOTIFIED",
+        "incident_id": data.get("incident_id"),
+        "severity": data.get("severity"),
+    }

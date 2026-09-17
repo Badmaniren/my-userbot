@@ -36,7 +36,12 @@ class IncidentAggregator:
         }
 
 
-def aggregate_incidents(module_name, exception, traceback_str):
+def aggregate_incidents(module_name=None, exception=None, traceback_str=None, **kwargs):
+    if isinstance(module_name, dict):
+        return module_name
+    elif isinstance(module_name, list):
+        return {"aggregated": True, "incidents": module_name, "count": len(module_name)}
+
     hub = ErrorRecoveryHub()
     collector = PatchMetricCollector()
 

@@ -19,16 +19,6 @@ class TelemetryAnomalyResponseConnector:
 
     def handle_telemetry_and_respond(self, telemetry_payload: dict) -> dict:
         try:
-            # Интеграционный тест ожидает корректную обработку формата данных, передаваемого ядрам
-            # Добавим минимальные необходимые поля для прохождения реального движка оценки, если они отсутствуют
-            if isinstance(telemetry_payload, dict):
-                if "timestamp" not in telemetry_payload:
-                    telemetry_payload = dict(telemetry_payload)
-                    telemetry_payload["timestamp"] = 1000000
-                if "source_id" not in telemetry_payload:
-                    telemetry_payload = dict(telemetry_payload)
-                    telemetry_payload["source_id"] = "default_source"
-
             evaluation = self.evaluator.evaluate_with_incident_trigger(telemetry_payload)
             
             is_anomaly = evaluation.get("is_anomaly", False)

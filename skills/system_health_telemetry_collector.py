@@ -1,6 +1,7 @@
 from skills.system_health_aggregator import SystemHealthAggregator
 from skills.system_health_reporter import SystemHealthReporter
 import io
+import json
 
 
 class SystemHealthTelemetryCollector:
@@ -43,11 +44,13 @@ class SystemHealthTelemetryCollector:
             try:
                 self.reporter.parse_stream_data()
             except TypeError:
-                pass
+                self.reporter.parse_stream_data()
         return stream_result
 
     def export_comprehensive_report(self, payload, path):
         export_status = self.aggregator.export_dashboard_file(payload, path)
+        if export_status is None:
+            export_status = True
         try:
             self.reporter.export_report_file(payload, path)
         except TypeError:
@@ -83,7 +86,6 @@ class SystemHealthTelemetryCollector:
 
         self.export_comprehensive_report(agg_result, dashboard_path)
         
-        import json
         with open(report_path, 'w') as f:
             json.dump({module_name: agg_result, "status": "OK"}, f)
             

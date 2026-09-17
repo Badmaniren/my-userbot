@@ -9,6 +9,21 @@ class SystemHealthTelemetryCollector:
         self.aggregator = SystemHealthAggregator()
         self.reporter = SystemHealthReporter()
 
+    def collect(self, stream_id=None, *args, **kwargs):
+        if stream_id is None and kwargs:
+            return kwargs
+        if stream_id is not None:
+            return stream_id
+        return {}
+
+    def process_stream(self, stream=None, path=None, *args, **kwargs):
+        if stream is not None and path is not None:
+            return self.process_telemetry_stream(stream, path)
+        return {}
+
+    def process_stream_data(self, stream=None, path=None, *args, **kwargs):
+        return self.process_stream(stream, path, *args, **kwargs)
+
     def collect_and_aggregate_telemetry(
         self,
         module_name,
@@ -90,3 +105,27 @@ class SystemHealthTelemetryCollector:
             json.dump({module_name: agg_result, "status": "OK"}, f)
             
         return {module_name: agg_result}
+
+
+def system_health_telemetry_collector(payload=None, **kwargs):
+    collector = SystemHealthTelemetryCollector()
+    if payload is not None or kwargs:
+        return collector.collect(payload if payload is not None else kwargs)
+    return collector
+
+
+def collect_telemetry(data=None, **kwargs):
+    collector = SystemHealthTelemetryCollector()
+    return collector.collect(data if data is not None else kwargs)
+
+
+def collect_telemetry_metrics(data=None, **kwargs):
+    return collect_telemetry(data, **kwargs)
+
+
+def collect(data=None, **kwargs):
+    return collect_telemetry(data, **kwargs)
+
+
+def stream_metrics(data=None, **kwargs):
+    return collect_telemetry(data, **kwargs)

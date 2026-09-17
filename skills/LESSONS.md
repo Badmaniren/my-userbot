@@ -3,12 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-create) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
-- Последняя ошибка перед фиксом: ^^^^^^^^^^^^^
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## incident_sla_audit_exporter (create) — раундов: 4
+ate) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: FAILED (failures=3, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
@@ -296,3 +291,7 @@ create) — раундов: 4
 ## telemetry_processor (create) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main
+
+## telemetry_health_pipeline (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAIL: test_gateway_stream_parsing_with_random_bytes (tests.test_telemetry_health_pipeline.TestTelemetryHealthPipeline.test_gateway_stream_parsing_with_random_bytes)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

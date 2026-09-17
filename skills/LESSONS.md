@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ncident_sla_warning_dispatcher (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## incident_sla_breach_analyzer (create) — раундов: 4
+ent_sla_breach_analyzer (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -294,4 +290,8 @@ ncident_sla_warning_dispatcher (create) — раундов: 4
 
 ## incident_sla_health_sync (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## system_health_telemetry_collector (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

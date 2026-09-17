@@ -1,3 +1,4 @@
+import io
 from skills.system_health_aggregator import SystemHealthAggregator
 from skills.system_health_reporter import SystemHealthReporter
 
@@ -6,6 +7,10 @@ class SystemHealthTelemetryCollector:
     def __init__(self):
         self.aggregator = SystemHealthAggregator()
         self.reporter = SystemHealthReporter()
+
+    def collect(self, stream_id=None, *args, **kwargs):
+        data = f"telemetry_data_{stream_id}".encode("utf-8") if stream_id else b"telemetry_data"
+        return io.BytesIO(data)
 
     def collect_and_aggregate_telemetry(
         self,
@@ -79,3 +84,25 @@ class SystemHealthTelemetryCollector:
             json.dump({module_name: agg_result, "status": "OK"}, f)
             
         return {module_name: agg_result}
+
+
+def collect_telemetry(telemetry_data=None, *args, **kwargs):
+    if isinstance(telemetry_data, dict):
+        return telemetry_data
+    collector = SystemHealthTelemetryCollector()
+    return collector.collect(telemetry_data, *args, **kwargs)
+
+
+def collect_telemetry_metrics(telemetry_data=None, *args, **kwargs):
+    return collect_telemetry(telemetry_data, *args, **kwargs)
+
+
+def stream_metrics(*args, **kwargs):
+    collector = SystemHealthTelemetryCollector()
+    return collector.collect(*args, **kwargs)
+
+
+def system_health_telemetry_collector(payload=None, **kwargs):
+    if isinstance(payload, dict):
+        return payload
+    return SystemHealthTelemetryCollector()

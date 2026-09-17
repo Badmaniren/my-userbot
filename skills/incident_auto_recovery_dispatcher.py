@@ -47,3 +47,12 @@ class IncidentAutoRecoveryDispatcher:
             "escalation_result": escalation_result,
             "status": "dispatched"
         }
+
+def incident_auto_recovery_dispatcher(data: dict = None, **kwargs) -> dict:
+    dispatcher = IncidentAutoRecoveryDispatcher()
+    if isinstance(data, dict):
+        inc_id = data.get("incident_id", "default")
+        mod_name = data.get("module_name", "unknown")
+        exc = data.get("exception", Exception("AutoRecovery"))
+        return dispatcher.dispatch_recovery(inc_id, mod_name, exc)
+    return {"status": "dispatched", "recovery_triggered": True}

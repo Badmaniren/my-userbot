@@ -1,5 +1,8 @@
 import json
-import requests
+try:
+    import requests
+except ImportError:
+    requests = None
 
 
 class NotificationChannelDispatcher:
@@ -25,6 +28,8 @@ class NotificationChannelDispatcher:
         if not url:
             return False
 
+        if requests is None:
+            return False
         try:
             response = requests.post(url, json=payload)
             return response.status_code == 200

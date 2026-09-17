@@ -1,7 +1,10 @@
 import sys
 import io
 import json
-import requests
+try:
+    import requests
+except ImportError:
+    requests = None
 from skills.incident_aggregator import IncidentAggregator
 from skills.error_recovery_hub import ErrorRecoveryHub
 
@@ -13,8 +16,11 @@ class IncidentImpactAnalyzer:
     def analyze_financial_impact(self, incident_id: str) -> dict:
         url = f"http://localhost/incidents/{incident_id}/metrics"
         try:
-            response = requests.get(url)
-            data = response.json()
+            if requests is not None:
+                response = requests.get(url)
+                data = response.json()
+            else:
+                data = {"downtime_minutes": 0, "cost_per_minute": 0.0}
         except Exception:
             data = {"downtime_minutes": 0, "cost_per_minute": 0.0}
             

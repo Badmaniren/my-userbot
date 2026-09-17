@@ -49,3 +49,10 @@ class IncidentBusinessLossReporter:
             raise ValueError("Unsupported format")
         report_id = report.get("report_id", uuid.uuid4().hex)
         return f"export_{report_id}.{format_type}"
+
+def incident_business_loss_reporter(incident_id=None, financial_data=None, export_path=None, **kwargs):
+    reporter = IncidentBusinessLossReporter()
+    if incident_id is not None or financial_data is not None:
+        inc_id = incident_id or "default"
+        return reporter.generate_report(inc_id, financial_data=financial_data, export_path=export_path)
+    return reporter

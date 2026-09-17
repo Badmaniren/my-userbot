@@ -6,7 +6,10 @@ class IncidentAggregator:
     Handles registration of anomalies detected during telemetry processing.
     """
     def register_incident(self, incident_data):
-        # Placeholder for incident registration logic
+        """
+        Placeholder for incident registration logic.
+        In production, this would send data to a monitoring service or database.
+        """
         pass
 
 # Instance available for patching in unit tests
@@ -19,7 +22,8 @@ class TelemetryProcessor:
     """
     def process_packet(self, raw_packet):
         """
-        Normalizes a single packet. Returns None if mandatory fields are missing.
+        Normalizes a single packet. Returns None if mandatory fields are missing
+        or if data types are incompatible.
         """
         mandatory_fields = ["packet_id", "metric_name", "data_value", "timestamp"]
         if not all(field in raw_packet for field in mandatory_fields):
@@ -47,7 +51,7 @@ class TelemetryProcessor:
     def process_and_dispatch(self, raw_packet):
         """
         Processes a packet and dispatches it to the incident aggregator if 
-        values exceed the anomaly threshold.
+        values exceed the anomaly threshold (> 1000.0).
         """
         processed = self.process_packet(raw_packet)
         if processed:
@@ -86,7 +90,7 @@ def process_telemetry_packet(raw_packet):
         }
         
         # Preserve session metadata for the streaming pipeline
-        metadata = raw_packet.get("metadata", {})
+        metadata = raw_packet.get("metadata")
         if isinstance(metadata, dict) and "session" in metadata:
             processed["origin_session"] = metadata["session"]
             

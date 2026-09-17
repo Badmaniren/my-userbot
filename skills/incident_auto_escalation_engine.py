@@ -101,3 +101,17 @@ def auto_escalate_incident(incident_id: str, severity: int, workspace_dir: str) 
         json.dump(escalation_result, f)
         
     return escalation_result
+
+
+def escalate_incident(incident_id=None, severity="HIGH", **kwargs):
+    if isinstance(incident_id, dict):
+        data = incident_id
+        inc_id = data.get("incident_id") or data.get("id", "unknown")
+    else:
+        inc_id = str(incident_id or "")
+    engine = IncidentAutoEscalationEngine()
+    return engine.process_escalation(inc_id)
+
+
+def trigger_escalation(incident_id=None, **kwargs):
+    return escalate_incident(incident_id=incident_id, **kwargs)

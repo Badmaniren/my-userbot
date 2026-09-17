@@ -9,6 +9,27 @@ from skills import (
 )
 
 class IncidentSLABreachPredictor:
+    def predict_breach(self, incident_context):
+        if isinstance(incident_context, str):
+            incident_id = incident_context
+            incident_context = {"incident_id": incident_id}
+        else:
+            incident_id = incident_context.get("incident_id", "INC-UNKNOWN")
+
+        elapsed = incident_context.get("elapsed_time_minutes", 0)
+        limit = incident_context.get("sla_limit_minutes", 60)
+        time_remaining = limit - elapsed
+
+        severity = incident_context.get("severity", "MEDIUM")
+        breach_predicted = time_remaining <= 15 or severity in ["HIGH", "CRITICAL"] and time_remaining <= 20
+
+        return {
+            "incident_id": incident_id,
+            "breach_predicted": breach_predicted,
+            "time_remaining_minutes": time_remaining,
+            "risk_level": "HIGH" if breach_predicted else "LOW"
+        }
+
     def forecast_breach(self, incident_id):
         if hasattr(incident_sla_tracker, "get_tracking_data"):
             sla_data = incident_sla_tracker.get_tracking_data(incident_id)

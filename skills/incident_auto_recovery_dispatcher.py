@@ -8,6 +8,24 @@ class IncidentAutoRecoveryDispatcher:
     для автоматического запуска процедур ликвидации сбоев.
     """
 
+    def dispatch(self, incident_context: dict, mitigation_plan: dict = None) -> dict:
+        if isinstance(incident_context, str):
+            incident_id = incident_context
+        elif isinstance(incident_context, dict):
+            incident_id = incident_context.get("incident_id", "INC-UNKNOWN")
+        else:
+            incident_id = "INC-UNKNOWN"
+
+        escalation_result = self.dispatch_escalation(incident_id)
+
+        return {
+            "incident_id": incident_id,
+            "status": "DISPATCHED",
+            "recovery_triggered": True,
+            "escalation_result": escalation_result,
+            "mitigation_plan": mitigation_plan
+        }
+
     def __init__(self):
         self.escalation_engine = IncidentAutoEscalationEngine()
         self.recovery_hub = ErrorRecoveryHub()

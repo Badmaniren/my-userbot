@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## incident_sla_tracker (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
+ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## incident_sla_breach_predictor (refactor) — раундов: 1
@@ -288,4 +284,7 @@
 
 ## telemetry_anomaly_response_connector (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## telemetry_anomaly_response_connector (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

@@ -3,7 +3,8 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-Последняя ошибка перед фиксом: Ran 329 tests in 1.131s
+: Объявлен фиктивный 'incident_severity_evaluator'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.incident_severity_evaluator import ...'
+- Последняя ошибка перед фиксом: Ran 329 tests in 1.131s
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## incident_sla_audit_report_exporter (create) — раундов: 4
@@ -290,8 +291,4 @@
 
 ## system_health_telemetry_collector (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## system_health_telemetry_collector (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: ^^^^^^^^^^^^^^^^^^^^
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -3,16 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-auto_escalation_engine (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## incident_auto_escalation_engine (create) — раундов: 4
-- Последняя ошибка перед фиксом: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-- Статус: успешно прошёл тесты и влит в main
-
-## incident_auto_recovery_dispatcher (compose) — раундов: 3
-- Последняя ошибка перед фиксом: raise AttributeError(
+следняя ошибка перед фиксом: raise AttributeError(
 - Статус: успешно прошёл тесты и влит в main
 
 ## incident_post_mortem_generator (create) — раундов: 4
@@ -306,5 +297,9 @@ auto_escalation_engine (create) — раундов: 4
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## incident_sla_violation_analyzer (create) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## incident_sla_tracker (refactor) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

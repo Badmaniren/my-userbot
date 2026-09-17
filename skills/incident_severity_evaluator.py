@@ -20,9 +20,30 @@ class IncidentSeverityEvaluator:
         else:
             return "LOW"
 
-    def evaluate(self, module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
+    def evaluate(self, module_name=None, exception=None, traceback_str=None, incident_id=None, **kwargs):
+        if isinstance(module_name, dict):
+            input_dict = dict(module_name)
+            input_dict.pop("severity_assessment", None)
+            inc_id = input_dict.get("incident_id") or incident_id
+            severity = input_dict.get("severity_hint") or self.calculate_severity_score(input_dict)
+            payload = self.template_engine.generate_notification_payload(
+                severity, inc_id, input_dict
+            )
+            res = {
+                "incident_id": inc_id,
+                "severity": severity,
+                "payload": payload,
+                "aggregated_data": input_dict.get("aggregated_metrics", input_dict),
+            }
+            res.update(input_dict)
+            return res
+
+        mod_name = module_name or kwargs.get("module_name", "unknown_module")
+        exc = exception or kwargs.get("exception", Exception("Incident"))
+        tb_str = traceback_str or kwargs.get("traceback_str", "")
+
         agg_result = self.aggregator.process_and_aggregate(
-            module_name, exception, traceback_str, incident_id
+            mod_name, exc, tb_str, incident_id
         )
         
         severity = self.calculate_severity_score(agg_result)
@@ -78,6 +99,6 @@ class IncidentSeverityEvaluator:
         return self.template_engine.export_notification_file(context, output_path)
 
 
-def evaluate_incident_severity(module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
+def evaluate_incident_severity(module_name=None, exception=None, traceback_str=None, incident_id=None, **kwargs):
     evaluator = IncidentSeverityEvaluator()
-    return evaluator.evaluate(module_name, exception, traceback_str, incident_id)
+    return evaluator.evaluate(module_name, exception, traceback_str, incident_id, **kwargs)

@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-едняя ошибка перед фиксом: FAILED (failures=1)
-- Статус: успешно прошёл тесты и влит в main
-
-## incident_sla_mitigation_planner (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1)
+Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main
 
 ## incident_sla_compliance_auditor (create) — раундов: 4
@@ -284,4 +280,8 @@
 ## telemetry_incident_lifecycle_bridge (refactor) — раундов: 3
 - Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## telemetry_anomaly_audit_bridge (compose) — раундов: 2
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main

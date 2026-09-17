@@ -3,3 +3,4 @@
 ## Real-time Telemetry Pipeline
 
 - telemetry_streamer: Establishing a stable, non-mocked telemetry ingestion point to feed the existing system_health_telemetry_collector and incident_impact_analyzer.
+- telemetry_processor: Introduces a processing layer to clean raw data from telemetry_streamer before it reaches the health collector, simplifying the data ingestion flow.

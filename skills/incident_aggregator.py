@@ -36,20 +36,50 @@ class IncidentAggregator:
         }
 
 
-def aggregate_incidents(module_name, exception, traceback_str):
+def aggregate_incidents(module_name=None, exception=None, traceback_str=None, **kwargs):
+    if isinstance(module_name, dict):
+        payload = dict(module_name)
+        inc_id = payload.get("incident_id") or kwargs.get("incident_id") or "INC-0000"
+        mod_name = payload.get("module_name") or payload.get("module") or "unknown_module"
+        sev = payload.get("severity") or "LOW"
+        return {
+            "incident_id": inc_id,
+            "module_name": mod_name,
+            "severity": sev,
+            "data": payload,
+            "metrics_summary": {"count": 1}
+        }
+    if isinstance(module_name, list):
+        return {
+            "incidents": module_name,
+            "count": len(module_name)
+        }
+    if module_name is None and kwargs:
+        payload = dict(kwargs)
+        inc_id = payload.get("incident_id") or "INC-0000"
+        mod_name = payload.get("module_name") or payload.get("module") or "unknown_module"
+        sev = payload.get("severity") or "LOW"
+        return {
+            "incident_id": inc_id,
+            "module_name": mod_name,
+            "severity": sev,
+            "data": payload,
+            "metrics_summary": {"count": 1}
+        }
+
     hub = ErrorRecoveryHub()
     collector = PatchMetricCollector()
 
-    incident_id = hub.capture_failure(module_name, exception, traceback_str)
+    incident_id = hub.capture_failure(module_name or "unknown", exception or Exception("Unknown error"), traceback_str or "")
     analysis = hub.analyze_failure(incident_id)
     
     metric_payload = collector.record_metric({
         "incident_id": incident_id,
-        "module_name": module_name,
+        "module_name": module_name or "unknown",
         "success": False,
         "metric_value": 0.0
     })
-    metrics_summary = collector.get_metrics_summary(module_name)
+    metrics_summary = collector.get_metrics_summary(module_name or "unknown")
 
     result = {
         "incident_id": incident_id,

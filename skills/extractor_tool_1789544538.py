@@ -1,12 +1,5 @@
-try:
-    import requests
-except ImportError:
-    requests = None
-
-try:
-    from bs4 import BeautifulSoup
-except ImportError:
-    BeautifulSoup = None
+import requests
+from bs4 import BeautifulSoup
 
 class ExtractionError(Exception):
     """Исключение, возникающее при ошибках извлечения метаданных."""

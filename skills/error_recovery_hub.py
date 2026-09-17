@@ -2,10 +2,7 @@ import os
 import uuid
 import datetime
 import traceback as tb_module
-try:
-    import requests
-except ImportError:
-    requests = None
+import requests
 from pathlib import Path
 
 

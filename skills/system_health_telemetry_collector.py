@@ -79,3 +79,17 @@ class SystemHealthTelemetryCollector:
             json.dump({module_name: agg_result, "status": "OK"}, f)
             
         return {module_name: agg_result}
+
+
+def collect_telemetry(telemetry_data=None, **kwargs):
+    if telemetry_data is None:
+        telemetry_data = {}
+    return telemetry_data
+
+
+def system_health_telemetry_collector(data=None, **kwargs):
+    if data is None:
+        data = kwargs
+    if isinstance(data, dict):
+        return data
+    return data

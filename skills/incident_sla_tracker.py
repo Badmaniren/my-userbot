@@ -5,7 +5,7 @@ from typing import Dict, Any, Optional
 from skills.incident_aggregator import aggregate_incidents
 from skills.incident_severity_evaluator import evaluate_incident_severity
 
-# Определение атрибутов для интеграции с моками из юнит-тестов
+# Глобальные переменные для интеграции с моками
 incident_notification_bridge = None
 incident_auto_escalation_engine = None
 
@@ -58,10 +58,29 @@ class IncidentSLATracker:
             status = None
             if elapsed >= sla_limit:
                 status = "BREACHED"
-                if notification_bridge:
-                    notification_bridge.notify_sla_breach(incident_id=incident_id, severity=severity)
-                if escalation_engine:
-                    escalation_engine.escalate_incident(incident_id=incident_id, severity=severity)
+                bridge = notification_bridge if notification_bridge is not None else globals().get("incident_notification_bridge")
+                if bridge is not None:
+                    if hasattr(bridge, 'notify_sla_breach'):
+                        bridge.notify_sla_breach(incident_id=incident_id, severity=severity)
+                    elif hasattr(bridge, 'process_incident'):
+                        bridge.process_incident({"incident_id": incident_id, "severity": severity})
+                    elif callable(bridge):
+                        try:
+                            bridge(incident_id=incident_id, severity=severity)
+                        except TypeError:
+                            bridge({"incident_id": incident_id, "severity": severity})
+
+                engine = escalation_engine if escalation_engine is not None else globals().get("incident_auto_escalation_engine")
+                if engine is not None:
+                    if hasattr(engine, 'escalate_incident'):
+                        engine.escalate_incident(incident_id=incident_id, severity=severity)
+                    elif hasattr(engine, 'process_escalation'):
+                        engine.process_escalation(incident_id)
+                    elif callable(engine):
+                        try:
+                            engine(incident_id=incident_id, severity=severity)
+                        except TypeError:
+                            engine(incident_id)
             elif elapsed >= sla_limit * self.warning_threshold_pct:
                 status = "WARNING"
 

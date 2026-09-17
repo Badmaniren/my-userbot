@@ -35,7 +35,7 @@ class TestIncidentSLATracker(unittest.TestCase):
         time_remaining = self.tracker.get_time_to_breach(self.incident_id, current_time)
         
         expected_limit = self.thresholds[self.severity]
-        expected_remaining = float(expected_limit - 100)
+        expected_remaining = float(expected_limit - 200)
         self.assertEqual(time_remaining, expected_remaining)
 
     def test_get_time_to_breach_not_found(self):

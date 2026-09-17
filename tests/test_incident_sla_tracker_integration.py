@@ -97,4 +97,9 @@ class TestIncidentSLATrackerIntegration(unittest.TestCase):
         self.assertFalse(result["breach_predicted"])
         self.assertGreater(result["time_remaining_seconds"], 0.0)
 
-        past_timestamp = time.time() - (threshold_
+        past_timestamp = time.time() - (threshold_seconds + 500)
+        sla_payload["aggregated_data"]["data"]["timestamp"] = past_timestamp
+        result_breached = track_incident_sla(sla_payload)
+
+        self.assertTrue(result_breached["breach_predicted"])
+        self.assertLess(result_breached["time_remaining_seconds"], 0.0)

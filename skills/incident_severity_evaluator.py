@@ -1,3 +1,5 @@
+import uuid
+from typing import Any, Optional
 from skills.incident_aggregator import IncidentAggregator
 from skills.notification_template_engine import NotificationTemplateEngine
 
@@ -8,6 +10,8 @@ class IncidentSeverityEvaluator:
         self.template_engine = template_engine if template_engine is not None else NotificationTemplateEngine()
 
     def calculate_severity_score(self, data: dict) -> str:
+        if not isinstance(data, dict):
+            return "LOW"
         count = data.get("count", 0)
         is_fatal = data.get("is_fatal", False)
         
@@ -20,13 +24,35 @@ class IncidentSeverityEvaluator:
         else:
             return "LOW"
 
-    def evaluate(self, module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
+    def evaluate(self, module_name: Any = None, exception: Optional[Exception] = None, traceback_str: Optional[str] = None, incident_id: Optional[str] = None, **kwargs):
+        if isinstance(module_name, dict):
+            payload = dict(module_name)
+            payload.pop("severity_assessment", None)
+            inc_id = payload.get("incident_id") or payload.get("id") or incident_id or str(uuid.uuid4())
+            severity_hint = payload.get("severity_hint") or payload.get("severity")
+            if severity_hint:
+                severity = severity_hint
+            else:
+                severity = self.calculate_severity_score(payload)
+
+            notification_payload = self.template_engine.generate_notification_payload(
+                severity, inc_id, payload
+            )
+            return {
+                "incident_id": inc_id,
+                "severity": severity,
+                "payload": notification_payload,
+                "aggregated_data": payload,
+            }
+
         agg_result = self.aggregator.process_and_aggregate(
             module_name, exception, traceback_str, incident_id
         )
+        if isinstance(agg_result, dict):
+            agg_result.pop("severity_assessment", None)
         
-        severity = self.calculate_severity_score(agg_result)
-        inc_id = agg_result.get("incident_id") or incident_id
+        severity = self.calculate_severity_score(agg_result if isinstance(agg_result, dict) else {})
+        inc_id = (agg_result.get("incident_id") if isinstance(agg_result, dict) else None) or incident_id
         
         payload = self.template_engine.generate_notification_payload(
             severity, inc_id, agg_result
@@ -55,8 +81,8 @@ class IncidentSeverityEvaluator:
             "payload": payload,
         }
 
-    def evaluate_and_notify(self, module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
-        eval_res = self.evaluate(module_name, exception, traceback_str, incident_id)
+    def evaluate_and_notify(self, module_name: Any = None, exception: Optional[Exception] = None, traceback_str: Optional[str] = None, incident_id: Optional[str] = None, **kwargs):
+        eval_res = self.evaluate(module_name, exception, traceback_str, incident_id, **kwargs)
         inc_id = eval_res.get("incident_id")
         severity = eval_res.get("severity")
         agg_data = eval_res.get("aggregated_data", {})
@@ -78,6 +104,9 @@ class IncidentSeverityEvaluator:
         return self.template_engine.export_notification_file(context, output_path)
 
 
-def evaluate_incident_severity(module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
+def evaluate_incident_severity(module_name: Any = None, exception: Optional[Exception] = None, traceback_str: Optional[str] = None, incident_id: Optional[str] = None, **kwargs):
     evaluator = IncidentSeverityEvaluator()
-    return evaluator.evaluate(module_name, exception, traceback_str, incident_id)
+    return evaluator.evaluate(module_name, exception, traceback_str, incident_id, **kwargs)
+
+
+incident_severity_evaluator = IncidentSeverityEvaluator

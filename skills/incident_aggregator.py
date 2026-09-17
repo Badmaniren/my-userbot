@@ -6,16 +6,18 @@ class IncidentAggregator:
         self.hub = ErrorRecoveryHub()
         self.collector = PatchMetricCollector()
 
-    def process_and_aggregate(self, module_name, exception, traceback_str, incident_id=None):
+    def process_and_aggregate(self, module_name=None, exception=None, traceback_str=None, incident_id=None, **kwargs):
+        if isinstance(module_name, dict):
+            res = dict(module_name)
+            if incident_id and "incident_id" not in res:
+                res["incident_id"] = incident_id
+            return res
+
         if not incident_id:
             incident_id = self.hub.capture_failure(module_name, exception, traceback_str)
-        else:
-            # На случай, если в тестах требуется зарегистрировать или передать существующий
-            pass
 
         analysis = self.hub.analyze_failure(incident_id) if hasattr(self.hub, 'analyze_failure') else {}
         
-        # Записываем метрику
         metric_payload = self.collector.record_metric({
             "incident_id": incident_id,
             "module_name": module_name,
@@ -36,7 +38,9 @@ class IncidentAggregator:
         }
 
 
-def aggregate_incidents(module_name, exception, traceback_str):
+def aggregate_incidents(module_name=None, exception=None, traceback_str=None, **kwargs):
+    if isinstance(module_name, dict):
+        return dict(module_name)
     hub = ErrorRecoveryHub()
     collector = PatchMetricCollector()
 

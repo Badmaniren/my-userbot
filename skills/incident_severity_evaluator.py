@@ -78,6 +78,18 @@ class IncidentSeverityEvaluator:
         return self.template_engine.export_notification_file(context, output_path)
 
 
-def evaluate_incident_severity(module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
+def evaluate_incident_severity(module_name=None, exception=None, traceback_str=None, incident_id=None, **kwargs):
+    if isinstance(module_name, dict):
+        payload = module_name.copy()
+        payload.pop("severity_assessment", None)
+        sev = payload.get("severity", "MEDIUM")
+        inc_id = payload.get("incident_id") or "eval_default_id"
+        return {
+            "incident_id": inc_id,
+            "severity": sev,
+            "payload": payload,
+            "aggregated_data": payload
+        }
     evaluator = IncidentSeverityEvaluator()
-    return evaluator.evaluate(module_name, exception, traceback_str, incident_id)
+    mod_name = module_name or "default_module"
+    return evaluator.evaluate(mod_name, exception, traceback_str, incident_id)

@@ -71,7 +71,6 @@ class TelemetryAnomalyAuditBridge:
         try:
             incident_id = telemetry_payload.get("incident_id")
             
-            # Проводим стандартный жизненный цикл для интеграционного теста
             self.lifecycle_bridge.process_lifecycle_event(telemetry_payload)
             
             if hasattr(self.audit_reporter, 'generate_report'):

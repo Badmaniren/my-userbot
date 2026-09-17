@@ -36,24 +36,31 @@ class IncidentAggregator:
         }
 
 
-def aggregate_incidents(module_name, exception, traceback_str):
+def aggregate_incidents(module_name=None, exception=None, traceback_str=None, **kwargs):
+    if isinstance(module_name, (list, dict)):
+        return {"status": "aggregated", "data": module_name, "items": module_name}
+
     hub = ErrorRecoveryHub()
     collector = PatchMetricCollector()
 
-    incident_id = hub.capture_failure(module_name, exception, traceback_str)
+    inc_module = module_name or kwargs.get("module_name", "default_module")
+    exc = exception or kwargs.get("exception", Exception("Default incident error"))
+    tb = traceback_str or kwargs.get("traceback_str", "")
+
+    incident_id = hub.capture_failure(inc_module, exc, tb)
     analysis = hub.analyze_failure(incident_id)
     
     metric_payload = collector.record_metric({
         "incident_id": incident_id,
-        "module_name": module_name,
+        "module_name": inc_module,
         "success": False,
         "metric_value": 0.0
     })
-    metrics_summary = collector.get_metrics_summary(module_name)
+    metrics_summary = collector.get_metrics_summary(inc_module)
 
     result = {
         "incident_id": incident_id,
-        "module_name": module_name,
+        "module_name": inc_module,
         "metrics_summary": metrics_summary
     }
     if isinstance(analysis, dict):

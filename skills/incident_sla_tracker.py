@@ -10,10 +10,47 @@ incident_notification_bridge = None
 incident_auto_escalation_engine = None
 
 class IncidentSLATracker:
-    def __init__(self, sla_thresholds: Dict[str, int], warning_threshold_pct: float):
+    def __init__(self, sla_thresholds: Optional[Dict[str, int]] = None, warning_threshold_pct: float = 0.8):
+        if sla_thresholds is None:
+            sla_thresholds = {
+                "LOW": 14400,
+                "MEDIUM": 7200,
+                "HIGH": 3600,
+                "CRITICAL": 1800
+            }
         self.sla_thresholds = sla_thresholds
         self.warning_threshold_pct = warning_threshold_pct
         self.incidents: Dict[str, Dict[str, Any]] = {}
+
+    def get_incident_sla_metrics(self, incident_id: str) -> Dict[str, Any]:
+        if incident_id not in self.incidents:
+            return {
+                "incident_id": incident_id,
+                "found": False,
+                "status": "UNKNOWN",
+                "time_to_breach": 0.0
+            }
+        inc = self.incidents[incident_id]
+        ttb = self.get_time_to_breach(incident_id)
+        return {
+            "incident_id": incident_id,
+            "found": True,
+            "severity": inc.get("severity", "MEDIUM"),
+            "status": inc.get("status", "ACTIVE"),
+            "created_at": inc.get("created_at"),
+            "time_to_breach": ttb
+        }
+
+    def track(self, incident_id: str, actual_time: float, target_time: float) -> Dict[str, Any]:
+        breach = actual_time > target_time
+        time_diff = target_time - actual_time
+        return {
+            "incident_id": incident_id,
+            "actual_time": float(actual_time),
+            "target_time": float(target_time),
+            "time_diff": float(time_diff),
+            "breached": breach
+        }
 
     def register_incident(self, incident_id: str, severity: str, created_at: datetime) -> None:
         self.incidents[incident_id] = {
@@ -79,8 +116,8 @@ def track_incident_sla(sla_input: Dict[str, Any]) -> Dict[str, Any]:
     aggregated_data = sla_input.get("aggregated_data", {})
     threshold = sla_input.get("threshold_seconds", 3600)
     
-    data = aggregated_data.get("data", {})
-    timestamp = data.get("timestamp")
+    data = aggregated_data.get("data", {}) if isinstance(aggregated_data, dict) else {}
+    timestamp = data.get("timestamp") if isinstance(data, dict) else None
     
     created_at = datetime.fromtimestamp(timestamp) if timestamp else datetime.now()
         
@@ -92,3 +129,14 @@ def track_incident_sla(sla_input: Dict[str, Any]) -> Dict[str, Any]:
         "breach_predicted": time_remaining < 0,
         "time_remaining_seconds": float(time_remaining)
     }
+
+
+IncidentSlaTracker = IncidentSLATracker
+
+
+def incident_sla_tracker(payload: Optional[Dict[str, Any]] = None, **kwargs) -> Any:
+    if payload is not None and isinstance(payload, dict):
+        return track_incident_sla(payload)
+    if kwargs:
+        return track_incident_sla(kwargs)
+    return IncidentSLATracker()

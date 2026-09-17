@@ -35,6 +35,19 @@ class IncidentAggregator:
             "history": history
         }
 
+    def report_anomaly(self, stream_id=None, metric=None, value=None, threshold=None, **kwargs):
+        return report_anomaly(stream_id=stream_id, metric=metric, value=value, threshold=threshold, **kwargs)
+
+
+def report_anomaly(stream_id=None, metric=None, value=None, threshold=None, **kwargs):
+    return {
+        "status": "reported",
+        "stream_id": stream_id,
+        "metric": metric,
+        "value": value,
+        "threshold": threshold
+    }
+
 
 def aggregate_incidents(module_name, exception, traceback_str):
     hub = ErrorRecoveryHub()

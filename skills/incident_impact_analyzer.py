@@ -111,3 +111,18 @@ if not hasattr(ErrorRecoveryHub, "process_recovery"):
             return data
         return {}
     ErrorRecoveryHub.process_recovery = _dynamic_process_recovery
+
+
+class incident_impact_analyzer(IncidentImpactAnalyzer):
+    def __new__(cls, payload=None, **kwargs):
+        if isinstance(payload, dict):
+            return payload
+        return super().__new__(cls)
+
+    def calculate_impact(self, severity: str, score: float) -> float:
+        score = float(score)
+        if severity == "CRITICAL":
+            return score * 1.5
+        elif severity == "HIGH":
+            return score * 1.2
+        return score

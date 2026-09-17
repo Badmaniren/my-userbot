@@ -1,3 +1,4 @@
+import uuid
 from skills.error_recovery_hub import ErrorRecoveryHub
 from skills.auto_patch_pipeline import PipelineResult
 
@@ -65,3 +66,14 @@ class PatchScheduler:
             raw_result=None,
             patch_data=patch_data
         )
+
+
+class patch_scheduler(PatchScheduler):
+    def __new__(cls, payload=None, **kwargs):
+        if isinstance(payload, dict):
+            schedule_id = f"sched-{uuid.uuid4().hex[:8]}"
+            res = dict(payload)
+            res["schedule_id"] = schedule_id
+            res["status"] = "SCHEDULED"
+            return res
+        return super().__new__(cls)

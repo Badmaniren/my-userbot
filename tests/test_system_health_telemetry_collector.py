@@ -1,10 +1,9 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 import uuid
 import random
-import string
+import json
 import io
-
 from skills.system_health_telemetry_collector import SystemHealthTelemetryCollector
 
 
@@ -12,83 +11,132 @@ class TestSystemHealthTelemetryCollector(unittest.TestCase):
 
     def setUp(self):
         self.collector = SystemHealthTelemetryCollector()
-        self.rand_module = f"module_{uuid.uuid4().hex[:8]}"
-        self.rand_incident_key = f"inc_{uuid.uuid4().hex[:8]}"
-        self.rand_incident_val = random.randint(1, 1000)
-        self.rand_audit_key = f"audit_{uuid.uuid4().hex[:8]}"
-        self.rand_audit_val = random.choice(string.ascii_letters)
-        self.rand_metric_key = f"metric_{uuid.uuid4().hex[:8]}"
-        self.rand_metric_val = random.random() * 100
-        self.rand_format = random.choice(["json", "yaml", "html", "xml"])
-        self.rand_path = f"/var/log/{uuid.uuid4().hex}.log"
-        self.rand_stream_data = f"telemetry_stream_{uuid.uuid4().hex}".encode('utf-8')
+        self.module_name = f"module_{uuid.uuid4().hex[:8]}"
+        self.incident_data = {uuid.uuid4().hex: random.randint(1, 100)}
+        self.audit_summary = f"audit_{uuid.uuid4().hex}"
+        self.metrics = {uuid.uuid4().hex: random.random()}
+        self.dashboard_format = random.choice(["json", "xml", "yaml", "html"])
+        self.incidents_list = [uuid.uuid4().hex for _ in range(3)]
+        self.patches_list = [uuid.uuid4().hex for _ in range(2)]
+        self.report_path = f"/tmp/{uuid.uuid4().hex}.json"
+        self.dashboard_path = f"/tmp/{uuid.uuid4().hex}.json"
+        self.stream_data = f"stream_{uuid.uuid4().hex}".encode('utf-8')
+        self.payload = {uuid.uuid4().hex: uuid.uuid4().hex}
 
-    def test_composition_dependencies_exist(self):
-        self.assertTrue(hasattr(self.collector, 'aggregator'), "Архитектурный сбой: модуль не содержит SystemHealthAggregator")
-        self.assertTrue(hasattr(self.collector, 'reporter'), "Архитектурный сбой: модуль не содержит SystemHealthReporter")
+    def test_collect_and_aggregate_telemetry_success(self):
+        expected_agg_result = {uuid.uuid4().hex: uuid.uuid4().hex}
 
-    def test_collect_and_aggregate_telemetry(self):
-        expected_aggregate_result = {
-            f"agg_{uuid.uuid4().hex[:6]}": random.randint(1, 500),
-            "status": random.choice(["HEALTHY", "DEGRADED", "CRITICAL"])
-        }
-
-        incident_data = {self.rand_incident_key: self.rand_incident_val}
-        audit_summary = {self.rand_audit_key: self.rand_audit_val}
-        metrics = {self.rand_metric_key: self.rand_metric_val}
-        incidents_list = [f"inc_item_{uuid.uuid4().hex[:4]}" for _ in range(3)]
-        patches_list = [f"patch_item_{uuid.uuid4().hex[:4]}" for _ in range(2)]
-
-        with patch('skills.system_health_aggregator.SystemHealthAggregator.collect_and_aggregate') as mock_agg_collect, \
-             patch('skills.system_health_reporter.SystemHealthReporter.generate_health_report') as mock_rep_gen:
-
-            mock_agg_collect.return_value = expected_aggregate_result
+        with patch.object(self.collector.aggregator, 'collect_and_aggregate', return_value=expected_agg_result) as mock_agg, \
+             patch.object(self.collector.reporter, 'generate_health_report') as mock_rep:
 
             result = self.collector.collect_and_aggregate_telemetry(
-                module_name=self.rand_module,
-                incident_data=incident_data,
-                audit_summary=audit_summary,
-                metrics=metrics,
-                dashboard_format=self.rand_format,
-                incidents_list=incidents_list,
-                patches_list=patches_list
+                self.module_name,
+                self.incident_data,
+                self.audit_summary,
+                self.metrics,
+                self.dashboard_format,
+                self.incidents_list,
+                self.patches_list
             )
 
-            mock_agg_collect.assert_called_once_with(
-                self.rand_module, incident_data, audit_summary, metrics, self.rand_format, incidents_list, patches_list
+            mock_agg.assert_called_once_with(
+                self.module_name,
+                self.incident_data,
+                self.audit_summary,
+                self.metrics,
+                self.dashboard_format,
+                self.incidents_list,
+                self.patches_list
             )
-            mock_rep_gen.assert_called_once()
-            self.assertEqual(result, expected_aggregate_result)
+            mock_rep.assert_called_once_with(self.module_name)
+            self.assertEqual(result, expected_agg_result)
+
+    def test_collect_and_aggregate_telemetry_type_error_fallback(self):
+        expected_agg_result = {uuid.uuid4().hex: uuid.uuid4().hex}
+
+        with patch.object(self.collector.aggregator, 'collect_and_aggregate', return_value=expected_agg_result), \
+             patch.object(self.collector.reporter, 'generate_health_report', side_effect=TypeError) as mock_rep:
+
+            result = self.collector.collect_and_aggregate_telemetry(
+                self.module_name,
+                self.incident_data,
+                self.audit_summary,
+                self.metrics,
+                self.dashboard_format,
+                self.incidents_list,
+                self.patches_list
+            )
+
+            self.assertEqual(mock_rep.call_count, 2)
+            self.assertEqual(result, expected_agg_result)
 
     def test_process_telemetry_stream(self):
-        mock_stream = io.BytesIO(self.rand_stream_data)
-        expected_parsed_data = {f"parsed_{uuid.uuid4().hex[:5]}": random.choice([True, False])}
+        stream_mock = io.BytesIO(self.stream_data)
+        expected_stream_result = {uuid.uuid4().hex: random.randint(100, 999)}
 
-        with patch('skills.system_health_aggregator.SystemHealthAggregator.process_stream') as mock_agg_stream, \
-             patch('skills.system_health_reporter.SystemHealthReporter.parse_stream_data') as mock_rep_parse:
+        with patch.object(self.collector.aggregator, 'process_stream', return_value=expected_stream_result) as mock_proc, \
+             patch.object(self.collector.reporter, 'parse_stream_data') as mock_parse:
 
-            mock_agg_stream.return_value = expected_parsed_data
+            result = self.collector.process_stream(stream_mock, self.dashboard_path)
 
-            result = self.collector.process_telemetry_stream(mock_stream, self.rand_path)
-
-            mock_agg_stream.assert_called_once_with(mock_stream, self.rand_path)
-            mock_rep_parse.assert_called_once()
-            self.assertEqual(result, expected_parsed_data)
+            mock_proc.assert_called_once_with(stream_mock, self.dashboard_path)
+            mock_parse.assert_called_once()
+            self.assertEqual(result, expected_stream_result)
 
     def test_export_comprehensive_report(self):
-        payload = {f"payload_key_{uuid.uuid4().hex[:4]}": random.randint(100, 999)}
         expected_export_status = random.choice([True, False])
 
-        with patch('skills.system_health_aggregator.SystemHealthAggregator.export_dashboard_file') as mock_agg_export, \
-             patch('skills.system_health_reporter.SystemHealthReporter.export_report_file') as mock_rep_export:
+        with patch.object(self.collector.aggregator, 'export_dashboard_file', return_value=expected_export_status) as mock_export, \
+             patch.object(self.collector.reporter, 'export_report_file') as mock_rep_export:
 
-            mock_agg_export.return_value = expected_export_status
+            result = self.collector.export_comprehensive_report(self.payload, self.dashboard_path)
 
-            result = self.collector.export_comprehensive_report(payload, self.rand_path)
-
-            mock_agg_export.assert_called_once_with(payload, self.rand_path)
-            mock_rep_export.assert_called_once()
+            mock_export.assert_called_once_with(self.payload, self.dashboard_path)
+            mock_rep_export.assert_called_once_with(self.payload, self.dashboard_path)
             self.assertEqual(result, expected_export_status)
+
+    def test_export_comprehensive_report_type_error_fallback(self):
+        expected_export_status = random.choice([True, False])
+
+        with patch.object(self.collector.aggregator, 'export_dashboard_file', return_value=expected_export_status), \
+             patch.object(self.collector.reporter, 'export_report_file', side_effect=TypeError) as mock_rep_export:
+
+            result = self.collector.export_comprehensive_report(self.payload, self.dashboard_path)
+
+            self.assertEqual(mock_rep_export.call_count, 2)
+            self.assertEqual(result, expected_export_status)
+
+    def test_collect_and_process_telemetry(self):
+        agg_result = {uuid.uuid4().hex: uuid.uuid4().hex}
+
+        with patch.object(self.collector, 'collect_and_aggregate_telemetry', return_value=agg_result) as mock_cat, \
+             patch.object(self.collector.reporter, 'export_report_file') as mock_rep_export, \
+             patch.object(self.collector, 'export_comprehensive_report') as mock_ecr, \
+             patch('builtins.open', new_callable=unittest.mock.mock_open()) as mock_file:
+
+            result = self.collector.collect_and_process_telemetry(
+                self.module_name,
+                self.incident_data,
+                self.audit_summary,
+                self.metrics,
+                self.dashboard_format,
+                self.incidents_list,
+                self.patches_list,
+                self.report_path,
+                self.dashboard_path
+            )
+
+            mock_cat.assert_called_once()
+            mock_rep_export.assert_called_once_with(agg_result, self.report_path)
+            mock_ecr.assert_called_once_with(agg_result, self.dashboard_path)
+
+            mock_file.assert_called_once_with(self.report_path, 'w')
+            handle = mock_file.return_value.__enter__()
+            written_data = "".join(call.args[0] for call in handle.write.call_args_list)
+            parsed_json = json.loads(written_data)
+
+            self.assertEqual(parsed_json, {self.module_name: agg_result, "status": "OK"})
+            self.assertEqual(result, {self.module_name: agg_result})
 
 
 if __name__ == '__main__':

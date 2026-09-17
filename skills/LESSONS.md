@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-еская ошибка в коде: invalid syntax (<unknown>, line 1)
-- Последняя ошибка перед фиксом: ----------------------------------------------------------------------
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## incident_auto_recovery_dispatcher (refactor) — раундов: 1
+atcher (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## incident_sla_tracker (refactor) — раундов: 4
@@ -305,4 +301,8 @@
 ## telemetry_anomaly_detector (create) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## telemetry_anomaly_evaluator (create) — раундов: 4
+- Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/unittest/mock.py", line 1446, in __enter__
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -35,20 +35,17 @@ def robust_evaluate_incident_severity(*args, **kwargs):
         if not isinstance(module_name, str):
             module_name = str(module_name)
 
-        try:
-            res = _orig_evaluate_incident_severity(
-                module_name=module_name,
-                exception=Exception(raw_text or "Incident payload evaluated"),
-                traceback_str="",
-                incident_id=incident_id
-            )
-            if isinstance(res, dict):
-                res["severity"] = severity
-                if incident_id:
-                    res["incident_id"] = incident_id
-                return res
-        except Exception:
-            pass
+        res = _orig_evaluate_incident_severity(
+            module_name=module_name,
+            exception=Exception(raw_text or "Incident payload evaluated"),
+            traceback_str="",
+            incident_id=incident_id
+        )
+        if isinstance(res, dict):
+            res["severity"] = severity
+            if incident_id:
+                res["incident_id"] = incident_id
+            return res
 
         return {
             "incident_id": incident_id,

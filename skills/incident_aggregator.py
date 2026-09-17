@@ -36,7 +36,19 @@ class IncidentAggregator:
         }
 
 
-def aggregate_incidents(module_name, exception, traceback_str):
+def aggregate_incidents(module_name, exception=None, traceback_str=""):
+    if isinstance(module_name, dict):
+        payload = module_name
+        incident_id = payload.get("incident_id")
+        source = payload.get("source", "incident_aggregator")
+        data = payload.get("data", {})
+        return {
+            "incident_id": incident_id,
+            "source": source,
+            "data": data,
+            "metrics_summary": payload.get("metrics_summary", {})
+        }
+
     hub = ErrorRecoveryHub()
     collector = PatchMetricCollector()
 

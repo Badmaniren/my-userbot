@@ -3,7 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## incident_sla_tracker (refactor) — раундов: 4
@@ -277,4 +277,8 @@ invalid syntax (<unknown>, line 1); Синтаксическая ошибка в
 
 ## vulnerability_patch_selector (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=4)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## vulnerability_remediation_planner (compose) — раундов: 4
+- Последняя ошибка перед фиксом: patch_strategy = self.scheduler.schedule_patch(package_name, exception_val, traceback_val)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

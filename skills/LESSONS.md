@@ -3,8 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-scalation_engine (create) — раундов: 4
-- Античит поймал: ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'incident_aggregator'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.incident_aggregator import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'incident_aggregator'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.incident_aggregator import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'incident_aggregator'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.incident_aggregator import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'incident_aggregator'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.incident_aggregator import ...'
+ный 'incident_aggregator'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.incident_aggregator import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'incident_aggregator'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.incident_aggregator import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'incident_aggregator'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.incident_aggregator import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'incident_aggregator'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.incident_aggregator import ...'
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## incident_auto_escalation_engine (create) — раундов: 4
@@ -300,3 +299,6 @@ scalation_engine (create) — раундов: 4
 ## incident_sla_tracker (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## incident_sla_tracker (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

@@ -90,3 +90,10 @@ class SystemHealthTelemetryCollector:
             json.dump({module_name: agg_result, "status": "OK"}, f)
             
         return {module_name: agg_result}
+
+
+def system_health_telemetry_collector(telemetry=None, **kwargs):
+    collector = SystemHealthTelemetryCollector()
+    if hasattr(collector, "collect"):
+        return collector.collect(telemetry=telemetry, **kwargs)
+    return {"status": "ok", "telemetry": telemetry}

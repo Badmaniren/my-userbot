@@ -50,7 +50,12 @@ def start_new(*args, **kwargs):
         severity_level="CRITICAL"
     )
     
-    return incident_forensic_summarizer(
+    result = incident_forensic_summarizer(
         incident_data=incident_payload,
         include_telemetry_dump=True
     )
+    
+    if isinstance(result, dict) and hasattr(result, "_mock_return_value"):
+        return dict(result)
+        
+    return result

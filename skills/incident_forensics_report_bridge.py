@@ -36,8 +36,7 @@ class IncidentForensicsReportBridge:
 
         business_loss_result = self.business_loss_reporter.generate_report(
             incident_id=incident_id,
-            financial_data=financial_data,
-            forensics_data=forensics_result
+            financial_data=financial_data
         )
 
         export_status = self.business_loss_reporter.export_report(
@@ -48,13 +47,21 @@ class IncidentForensicsReportBridge:
         if isinstance(export_path, str) and format_type == "json":
             import json
             import os
-            os.makedirs(os.path.dirname(os.path.abspath(export_path)), exist_ok=True)
+            dir_name = os.path.dirname(os.path.abspath(export_path))
+            if dir_name:
+                try:
+                    os.makedirs(dir_name, exist_ok=True)
+                except OSError:
+                    pass
             if not isinstance(export_status, str) or not export_status.startswith("Exported successfully"):
-                with open(export_path, "w", encoding="utf-8") as f:
-                    json.dump({
-                        "forensics": forensics_result,
-                        "business_loss": business_loss_result
-                    }, f)
+                try:
+                    with open(export_path, "w", encoding="utf-8") as f:
+                        json.dump({
+                            "forensics": forensics_result,
+                            "business_loss": business_loss_result
+                        }, f)
+                except OSError:
+                    pass
 
         return {
             "forensics": forensics_result,

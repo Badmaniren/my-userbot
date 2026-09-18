@@ -40,7 +40,6 @@ class IncidentAutoRecoveryDispatcher:
         if isinstance(data, bytes):
             return data
         if isinstance(data, (list, tuple)):
-            # Если вернулся список целых чисел или байтов, приводим к bytes
             return bytes(data)
         return b""
 

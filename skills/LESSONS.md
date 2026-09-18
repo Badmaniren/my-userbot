@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## incident_sla_tracker (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
+)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## incident_sla_tracker (refactor) — раундов: 4
@@ -281,4 +277,8 @@
 ## incident_forensic_logger (start_new) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: cannot use assignment expressions with expression (<unknown>, line 66); ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'telemetry_streamer'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.telemetry_streamer import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'telemetry_streamer'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.telemetry_streamer import ...'
 - Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## incident_forensic_collector (start_new) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=2, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

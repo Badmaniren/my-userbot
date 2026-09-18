@@ -1,11 +1,11 @@
-import io
+import json
+import os
 import requests
 from skills.incident_aggregator import incident_aggregator
 from skills.telemetry_processor import telemetry_processor
 from skills.telemetry_streamer import telemetry_streamer
 from skills.telemetry_anomaly_evaluator_core import telemetry_anomaly_evaluator_core
 from skills.incident_severity_evaluator import incident_severity_evaluator
-from skills.incident_forensic_reporter import incident_forensic_reporter
 
 def start_new(incident_id, telemetry_source, evaluate_anomalies=False):
     logs = incident_aggregator()
@@ -44,3 +44,22 @@ def start_new(incident_id, telemetry_source, evaluate_anomalies=False):
         result["severity"] = severity
 
     return result
+
+def incident_forensic_reporter(config):
+    incident_data = config.get("incident_data", {})
+    output_path = config.get("output_path")
+    
+    target_incident_id = incident_data.get("incident_id")
+    
+    report = {
+        "report_status": "SUCCESS",
+        "target_incident_id": target_incident_id,
+        "details": incident_data
+    }
+    
+    if output_path:
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(report, f, ensure_ascii=False, indent=2)
+            
+    return report

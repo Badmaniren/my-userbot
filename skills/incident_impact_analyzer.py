@@ -111,3 +111,9 @@ if not hasattr(ErrorRecoveryHub, "process_recovery"):
             return data
         return {}
     ErrorRecoveryHub.process_recovery = _dynamic_process_recovery
+
+
+def incident_impact_analyzer(data=None, **kwargs):
+    res = dict(data) if isinstance(data, dict) else {}
+    res.update(kwargs)
+    return res

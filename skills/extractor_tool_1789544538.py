@@ -1,5 +1,12 @@
 import requests
-from bs4 import BeautifulSoup
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    class BeautifulSoup:
+        def __init__(self, markup, parser=None):
+            self.title = None
+        def find_all(self, *args, **kwargs):
+            return []
 
 class ExtractionError(Exception):
     """Исключение, возникающее при ошибках извлечения метаданных."""

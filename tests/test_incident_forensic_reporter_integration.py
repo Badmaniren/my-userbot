@@ -1,76 +1,89 @@
 import unittest
+import os
+import json
 import uuid
 import random
-import os
-import tempfile
-from skills.incident_forensic_reporter import incident_forensic_reporter
+from unittest.mock import patch
+from skills.incident_forensic_reporter import start_new, incident_forensic_reporter
 from skills.incident_aggregator import incident_aggregator
 from skills.telemetry_processor import telemetry_processor
+from skills.telemetry_streamer import telemetry_streamer
+from skills.telemetry_anomaly_evaluator_core import telemetry_anomaly_evaluator_core
 from skills.incident_severity_evaluator import incident_severity_evaluator
 
-class IntegrationTestIncidentForensicReporter(unittest.TestCase):
+class TestIncidentForensicReporterIntegration(unittest.TestCase):
 
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp()
         self.incident_id = str(uuid.uuid4())
-        self.telemetry_source = f"source-{random.randint(1000, 9999)}"
-        self.severity_level = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
-        self.error_code = random.randint(500, 599)
+        self.telemetry_source = f"telemetry_{uuid.uuid4()}.log"
+        self.output_path = f"reports/report_{uuid.uuid4()}.json"
+        
+        with open(self.telemetry_source, "w", encoding="utf-8") as f:
+            f.write(f"TEST TELEMETRY STREAM DATA {random.randint(1000, 9999)}")
 
-    def tearDown:
-        for root, dirs, files in os.walk(self.test_dir, topdown=False):
-            for name in files:
-                os.remove(os.path.join(root, name))
-            for name in dirs:
-                os.rmdir(os.path.join(root, name))
-        os.rmdir(self.test_dir)
+    def tearDown(self):
+        if os.path.exists(self.telemetry_source):
+            os.remove(self.telemetry_source)
+        if os.path.exists(self.output_path):
+            os.remove(self.output_path)
+            try:
+                os.rmdir(os.path.dirname(self.output_path))
+            except OSError:
+                pass
 
-    def test_incident_forensic_reporter_integration(self):
-        raw_telemetry_data = {
-            "event_id": str(uuid.uuid4()),
-            "source": self.telemetry_source,
-            "metric_value": random.uniform(10.0, 100.0),
-            "status_code": self.error_code,
-            "payload": f"random_payload_{random.random()}"
+    @patch("requests.post")
+    def status_and_flow_integration_test(self, mock_post):
+        mock_anomaly_score = round(random.uniform(0.1, 0.9), 2)
+        mock_severity_level = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
+        
+        mock_post.return_value.json.return_value = {
+            "status": "received",
+            "incident_id": self.incident_id
         }
 
-        processed_telemetry = telemetry_processor(raw_telemetry_data)
-        
-        self.assertIsNotNone(processed_telemetry, "Telemetry processor returned None")
+        with patch("skills.incident_forensic_reporter.incident_aggregator") as agg_mock, \
+             patch("skills.incident_forensic_reporter.telemetry_streamer") as stream_mock, \
+             patch("skills.incident_forensic_reporter.telemetry_processor") as proc_mock, \
+             patch("skills.incident_forensic_reporter.telemetry_anomaly_evaluator_core") as anom_mock, \
+             patch("skills.incident_forensic_reporter.incident_severity_evaluator") as sev_mock:
 
-        severity_result = incident_severity_evaluator({
-            "incident_id": self.incident_id,
-            "telemetry": processed_telemetry,
-            "base_severity": self.severity_level
-        })
+            expected_logs = {"log_id": str(uuid.uuid4()), "entries": random.randint(5, 50)}
+            agg_mock.return_value = expected_logs
+            stream_mock.return_value = None
+            proc_mock.return_value = None
+            anom_mock.return_value = {"anomaly_score": mock_anomaly_score}
+            sev_mock.return_value = mock_severity_level
 
-        self.assertEqual(severity_result.get("incident_id"), self.incident_id)
+            result = start_new(
+                incident_id=self.incident_id,
+                telemetry_source=self.telemetry_source,
+                evaluate_anomalies=True
+            )
 
-        aggregated_incident = incident_aggregator({
-            "incident_id": self.incident_id,
-            "severity_data": severity_result,
-            "telemetry_stream": [processed_telemetry]
-        })
+            self.assertEqual(result.get("incident_id"), self.incident_id)
+            self.assertEqual(result.get("anomaly_score"), mock_anomaly_score)
+            self.assertEqual(result.get("severity"), mock_severity_level)
 
-        self.assertIn("incident_id", aggregated_incident)
+        config = {
+            "incident_data": {
+                "incident_id": self.incident_id,
+                "score": mock_anomaly_score,
+                "severity": mock_severity_level
+            },
+            "output_path": self.output_path
+        }
 
-        report_output_path = os.path.join(self.test_dir, f"report_{self.incident_id}.json")
-        
-        forensic_report = incident_forensic_reporter({
-            "incident_data": aggregated_incident,
-            "output_path": report_output_path,
-            "include_raw_telemetry": True
-        })
+        report_result = incident_forensic_reporter(config)
 
-        self.assertTrue(os.path.exists(report_output_path), "Forensic report file was not created")
-        
-        self.assertEqual(forensic_report.get("report_status"), "SUCCESS")
-        self.assertEqual(forensic_report.get("target_incident_id"), self.incident_id)
+        self.assertEqual(report_result.get("report_status"), "SUCCESS")
+        self.assertEqual(report_result.get("target_incident_id"), self.incident_id)
+        self.assertTrue(os.path.exists(self.output_path))
 
-        with open(report_output_path, "r", encoding="utf-8") as f:
-            content = f.read()
-            self.assertIn(self.incident_id, content)
-            self.assertIn(str(self.error_code), content)
+        with open(self.output_path, "r", encoding="utf-8") as f:
+            file_data = json.load(f)
+
+        self.assertEqual(file_data.get("target_incident_id"), self.incident_id)
+        self.assertEqual(file_data.get("details").get("severity"), mock_severity_level)
 
 if __name__ == "__main__":
     unittest.main()

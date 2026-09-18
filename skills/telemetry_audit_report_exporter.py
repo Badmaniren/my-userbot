@@ -11,8 +11,8 @@ class TelemetryAuditReportExporter:
     """Композитный навык для связывания аудита аномалий телеметрии с экспортером отчетов восстановления."""
 
     def __init__(self, anomaly_bridge=None, recovery_exporter=None, anomaly_audit_bridge=None, recovery_report_exporter=None):
-        self.anomaly_bridge = anomaly_bridge if anomaly_bridge is not None else anomaly_audit_bridge
-        self.recovery_exporter = recovery_exporter if recovery_exporter is not None else recovery_report_exporter
+        self.anomaly_bridge = anomaly_bridge if anomaly_bridge is not None else (anomaly_audit_bridge or TelemetryAnomalyAuditBridge())
+        self.recovery_exporter = recovery_exporter if recovery_exporter is not None else (recovery_report_exporter or RecoveryReportExporter())
 
     def export_audit_and_recovery_report(
         self,

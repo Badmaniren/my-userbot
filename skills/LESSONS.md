@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ЕН Унгой, передан на эскалацию
-
-## vulnerability_patch_integrator (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
+перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## system_health_telemetry_collector (refactor) — раундов: 4
@@ -262,3 +259,6 @@
 ## incident_auto_recovery_dispatcher (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: from skills.incident_sla_recovery_coordinator import IncidentSLARecoveryCoordinator
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## incident_auto_recovery_dispatcher (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

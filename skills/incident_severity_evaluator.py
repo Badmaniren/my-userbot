@@ -81,3 +81,6 @@ class IncidentSeverityEvaluator:
 def evaluate_incident_severity(module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
     evaluator = IncidentSeverityEvaluator()
     return evaluator.evaluate(module_name, exception, traceback_str, incident_id)
+
+
+incident_severity_evaluator = IncidentSeverityEvaluator()

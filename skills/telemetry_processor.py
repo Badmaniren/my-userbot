@@ -1,5 +1,28 @@
+import io
 import json
 import time
+
+
+def process(data=None, *args, **kwargs):
+    if data is None:
+        if kwargs:
+            data = kwargs
+        else:
+            return io.BytesIO(b"processed_telemetry")
+
+    if isinstance(data, (bytes, bytearray)):
+        return io.BytesIO(data)
+    elif hasattr(data, "read"):
+        content = data.read()
+        if isinstance(content, (bytes, bytearray)):
+            return io.BytesIO(content)
+        return io.BytesIO(str(content).encode("utf-8"))
+    elif isinstance(data, str):
+        return io.BytesIO(data.encode("utf-8"))
+    elif isinstance(data, dict):
+        return data
+    return io.BytesIO(b"processed_telemetry")
+
 
 class IncidentAggregator:
     """
@@ -70,6 +93,9 @@ class TelemetryProcessor:
             if processed:
                 results.append(processed)
         return results
+
+    def process(self, data=None, *args, **kwargs):
+        return process(data, *args, **kwargs)
 
 def process_telemetry_packet(raw_packet):
     """

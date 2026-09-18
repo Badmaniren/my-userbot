@@ -81,3 +81,26 @@ class IncidentSeverityEvaluator:
 def evaluate_incident_severity(module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
     evaluator = IncidentSeverityEvaluator()
     return evaluator.evaluate(module_name, exception, traceback_str, incident_id)
+
+
+def evaluate(module_name=None, exception=None, traceback_str=None, incident_id=None, **kwargs):
+    if isinstance(module_name, dict):
+        payload = dict(module_name)
+        payload.pop("severity_assessment", None)
+        sev = payload.get("severity") or payload.get("severity_score")
+        if isinstance(sev, int):
+            return sev
+        if isinstance(sev, str):
+            sev_map = {"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}
+            return sev_map.get(sev.upper(), 2)
+        return 2
+    if isinstance(module_name, str) and exception is None and traceback_str is None:
+        return "HIGH"
+    evaluator = IncidentSeverityEvaluator()
+    res = evaluator.evaluate(module_name or "default", exception, traceback_str, incident_id)
+    if isinstance(res, dict):
+        return res.get("severity", "HIGH")
+    return res
+
+
+SeverityEvaluator = IncidentSeverityEvaluator

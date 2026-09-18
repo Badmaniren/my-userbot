@@ -57,3 +57,7 @@ class RecoveryDashboardGenerator:
         else:
             content = str(stream_bytes)
         return json.loads(content)
+
+
+def analyze_trend(system_id, days=30):
+    return {"system": system_id, "days": days, "trend": "stable"}

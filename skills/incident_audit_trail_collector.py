@@ -61,3 +61,21 @@ def collect_incident_audit_trail(incident_data, destination_path, include_raw_te
         "status": "SUCCESS",
         "logged_incident_id": incident_id
     }
+
+
+class IncidentAuditTrailCollector:
+    """
+    Класс сборщика аудиторского следа инцидентов.
+    """
+    def __init__(self):
+        self.events = []
+
+    def record_audit_event(self, event_data: dict) -> dict:
+        self.events.append(event_data)
+        return {"status": "SUCCESS", "event": event_data}
+
+    def collect_incident_audit_trail(self, incident_data, destination_path, include_raw_telemetry=True):
+        return collect_incident_audit_trail(incident_data, destination_path, include_raw_telemetry)
+
+    def start_new(self, *args, **kwargs):
+        return start_new(*args, **kwargs)

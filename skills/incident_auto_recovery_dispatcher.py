@@ -1,16 +1,20 @@
 from skills.incident_auto_escalation_engine import IncidentAutoEscalationEngine
 from skills.error_recovery_hub import ErrorRecoveryHub
+from skills.incident_audit_trail_collector import IncidentAuditTrailCollector
+from skills.system_health_aggregator import SystemHealthAggregator
 
 
 class IncidentAutoRecoveryDispatcher:
     """
     Комбинирует движок автоэскалации инцидентов и хаб восстановления ошибок 
-    для автоматического запуска процедур ликвидации сбоев.
+    для автоматического запуска процедур ликвидации сбоев с интеграцией аудита и проверки здоровья.
     """
 
     def __init__(self):
         self.escalation_engine = IncidentAutoEscalationEngine()
         self.recovery_hub = ErrorRecoveryHub()
+        self.audit_collector = IncidentAuditTrailCollector()
+        self.health_aggregator = SystemHealthAggregator()
 
     def dispatch_escalation(self, incident_id: str):
         return self.escalation_engine.process_escalation(incident_id)
@@ -27,6 +31,16 @@ class IncidentAutoRecoveryDispatcher:
         if should_patch:
             patch_payload = self.recovery_hub.generate_patch(incident_id)
             success = self.recovery_hub.deploy_and_verify(incident_id, patch_payload)
+
+            if hasattr(self.audit_collector, "record_audit_event"):
+                self.audit_collector.record_audit_event({
+                    "incident_id": incident_id,
+                    "module_name": module_name,
+                    "status": "patched" if success else "failed"
+                })
+            if hasattr(self.health_aggregator, "verify_system_stability"):
+                self.health_aggregator.verify_system_stability()
+
             return bool(success)
         return False
 
@@ -41,6 +55,13 @@ class IncidentAutoRecoveryDispatcher:
         recovery_result = self.recovery_hub.analyze_and_recover(module_name, exception, context)
         escalation_result = self.escalation_engine.process_escalation(incident_id)
         
+        if hasattr(self.audit_collector, "record_audit_event"):
+            self.audit_collector.record_audit_event({
+                "incident_id": incident_id,
+                "module_name": module_name,
+                "status": "dispatched"
+            })
+
         return {
             "incident_id": incident_id,
             "recovery_result": recovery_result,

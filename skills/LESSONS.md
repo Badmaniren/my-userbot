@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-# incident_sla_tracker (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## patch_vulnerability_bridge (create) — раундов: 4
-- Античит поймал: ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'vulnerability_scanner'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.vulnerability_scanner import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'patch_validator'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.patch_validator import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'patch_validator'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.patch_validator import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'patch_validator'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.patch_validator import ...'
+ИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'vulnerability_scanner'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.vulnerability_scanner import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'patch_validator'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.patch_validator import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'patch_validator'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.patch_validator import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'patch_validator'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.patch_validator import ...'
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## system_telemetry_streamer (create) — раундов: 4
@@ -263,4 +259,8 @@
 
 ## incident_forensics_compliance_checker (compose) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## incident_forensics_compliance_checker (refactor) — раундов: 2
+- Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main

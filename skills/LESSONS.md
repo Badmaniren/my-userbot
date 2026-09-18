@@ -3,7 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-pipeline import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'auto_patch_pipeline'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.auto_patch_pipeline import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'auto_patch_pipeline'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.auto_patch_pipeline import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'auto_patch_pipeline'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.auto_patch_pipeline import ...'
+апрещено создавать заглушки. Используй честный импорт: 'from skills.auto_patch_pipeline import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'auto_patch_pipeline'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.auto_patch_pipeline import ...'
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## telemetry_anomaly_evaluator_core (create) — раундов: 3
@@ -255,4 +255,8 @@ pipeline import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен 
 
 ## vulnerability_remediation_trend_analyzer (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## vulnerability_remediation_pipeline (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/unittest/mock.py", line 1010, in assert_any_call
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

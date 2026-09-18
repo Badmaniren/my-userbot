@@ -26,10 +26,21 @@ def start_new(
 
     telemetry_payload = None
     if stream_token is not None:
-        stream_obj = telemetry_streamer.stream(token=stream_token)
-        telemetry_payload = telemetry_processor.process(stream_obj)
+        if hasattr(telemetry_streamer, "stream"):
+            stream_obj = telemetry_streamer.stream(token=stream_token)
+        else:
+            stream_obj = telemetry_streamer.TeleStreamer().stream(token=stream_token)
+            
+        if hasattr(telemetry_processor, "process"):
+            telemetry_payload = telemetry_processor.process(stream_obj)
+        else:
+            telemetry_payload = telemetry_processor.TelemetryProcessor().process(stream_obj)
+            
     elif telemetry_source is not None:
-        telemetry_payload = telemetry_processor.process(telemetry_source)
+        if hasattr(telemetry_processor, "process"):
+            telemetry_payload = telemetry_processor.process(telemetry_source)
+        else:
+            telemetry_payload = telemetry_processor.TelemetryProcessor().process(telemetry_source)
     else:
         telemetry_payload = io.BytesIO(b"default_payload")
 
@@ -45,7 +56,10 @@ def start_new(
         aggregated_data["incident_id"] = target_incident_id
 
     if deep_inspection:
-        severity = incident_severity_evaluator.evaluate(target_incident_id)
+        if hasattr(incident_severity_evaluator, "evaluate"):
+            severity = incident_severity_evaluator.evaluate(target_incident_id)
+        else:
+            severity = incident_severity_evaluator.SeverityEvaluator().evaluate(target_incident_id)
         aggregated_data["severity"] = severity
 
     return aggregated_data

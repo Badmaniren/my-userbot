@@ -64,3 +64,11 @@ class PatchMetricCollector:
                 json.dump(self.metrics, f, default=str, indent=2)
             return True
         return False
+
+def patch_metric_collector(metric_data=None, **kwargs):
+    collector = PatchMetricCollector()
+    if isinstance(metric_data, dict):
+        return collector.record_metric(metric_data)
+    elif metric_data is not None:
+        return collector.record_metric({"data": metric_data, **kwargs})
+    return collector

@@ -82,3 +82,18 @@ class AutoPatchPipeline:
 
     def force_analyze_and_recover(self, module_name, exception, context):
         return self.error_recovery_hub.analyze_and_recover(module_name, exception, context)
+
+def auto_patch_pipeline(payload=None, **kwargs):
+    pipeline = AutoPatchPipeline()
+    if isinstance(payload, dict):
+        module_name = payload.get("module_name", "unknown")
+        exception = payload.get("exception")
+        traceback_str = payload.get("traceback_str", "")
+        context = payload.get("context")
+        res = pipeline.run_pipeline(module_name, exception, traceback_str, context)
+        return res
+    elif payload is not None:
+        res = pipeline.run_pipeline(str(payload), None, "", kwargs)
+        res["payload"] = str(payload)
+        return res
+    return pipeline

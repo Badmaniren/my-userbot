@@ -49,7 +49,7 @@ class IncidentKnowledgeBaseSearcher:
 
 _default_searcher: Union[IncidentKnowledgeBaseSearcher, None] = None
 
-def incident_knowledge_base_searcher(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
+def incident_knowledge_base_searcher(payload: Union[Dict[str, Any], str]) -> List[Dict[str, Any]]:
     global _default_searcher
     if _default_searcher is None:
         _default_searcher = IncidentKnowledgeBaseSearcher(
@@ -57,6 +57,11 @@ def incident_knowledge_base_searcher(payload: Dict[str, Any]) -> List[Dict[str, 
             api_token="default_token"
         )
     
+    if isinstance(payload, str):
+        payload = {"query": payload}
+    elif not isinstance(payload, dict):
+        payload = {"query": str(payload)}
+
     query = payload.get("query", "")
     try:
         res = _default_searcher.search_similar_incidents("global-search", query)

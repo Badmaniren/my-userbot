@@ -55,6 +55,10 @@ class IncidentSLABreachPredictor:
 
 
 def incident_sla_breach_predictor(payload):
+    if isinstance(payload, str):
+        payload = {"incident_id": payload}
+    elif not isinstance(payload, dict):
+        payload = {"incident_id": str(payload)}
     incident_id = payload.get("incident_id")
     sla_data = payload.get("sla_data", {})
     trend_data = payload.get("trend_data", {})

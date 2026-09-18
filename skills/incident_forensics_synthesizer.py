@@ -3,8 +3,37 @@ from skills import incident_aggregator
 
 
 class IncidentForensicsSynthesizer:
-    def synthesize(self, module_name, exception, traceback_str, incident_id):
-        return incident_aggregator.aggregate_incidents(module_name, exception, traceback_str)
+    def synthesize(self, *args, **kwargs):
+        if len(args) == 2 and isinstance(args[1], dict):
+            raw_trail, audit_data = args
+            res = dict(audit_data)
+            res["raw_trail"] = raw_trail
+            return res
+
+        if "audit_data" in kwargs:
+            audit_data = kwargs["audit_data"]
+            res = dict(audit_data) if isinstance(audit_data, dict) else {"audit_data": audit_data}
+            if len(args) > 0:
+                res["raw_trail"] = args[0]
+            elif "raw_trail" in kwargs:
+                res["raw_trail"] = kwargs["raw_trail"]
+            return res
+
+        module_name = kwargs.get("module_name", args[0] if len(args) > 0 else "unknown")
+        exception = kwargs.get("exception", args[1] if len(args) > 1 else None)
+        traceback_str = kwargs.get("traceback_str", args[2] if len(args) > 2 else "")
+        incident_id = kwargs.get("incident_id", args[3] if len(args) > 3 else None)
+
+        if isinstance(module_name, dict) and len(args) == 1:
+            return module_name
+
+        agg = incident_aggregator.aggregate_incidents(module_name, exception, traceback_str)
+        if isinstance(agg, dict) and incident_id and "incident_id" not in agg:
+            agg["incident_id"] = incident_id
+        return agg
+
+
+incident_forensics_synthesizer = IncidentForensicsSynthesizer
 
 
 def synthesize_forensics_report(

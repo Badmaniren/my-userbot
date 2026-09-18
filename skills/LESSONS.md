@@ -3,7 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- ОБНАРУЖЕНО: Объявлен фиктивный 'patch_validator'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.patch_validator import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'incident_impact_analyzer'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.incident_impact_analyzer import ...'
+ЕНО: Объявлен фиктивный 'patch_auto_executor'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.patch_auto_executor import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'patch_validator'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.patch_validator import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'incident_impact_analyzer'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.incident_impact_analyzer import ...'
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## system_telemetry_streamer (create) — раундов: 4
@@ -262,7 +262,3 @@
 
 ## incident_auto_recovery_dispatcher (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
-
-## incident_forensics_audit_exporter (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

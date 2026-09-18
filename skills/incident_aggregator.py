@@ -1,6 +1,8 @@
 from skills.error_recovery_hub import ErrorRecoveryHub
 from skills.patch_metric_collector import PatchMetricCollector
 
+incident_aggregator = None
+
 class IncidentAggregator:
     def __init__(self):
         self.hub = ErrorRecoveryHub()
@@ -74,3 +76,6 @@ def export_incident_analytics(module_name, output_path, format="json"):
     if hasattr(collector, 'export_metrics'):
         return collector.export_metrics(output_path, format)
     return False
+
+
+incident_aggregator = IncidentAggregator()

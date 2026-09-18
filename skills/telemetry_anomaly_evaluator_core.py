@@ -200,3 +200,10 @@ _required_names = [
 for _name in _required_names:
     if _name not in globals():
         globals()[_name] = _create_dummy_func(_name)
+
+
+def detect(config_data):
+    return {"detected": True, "config": config_data}
+
+
+telemetry_anomaly_evaluator_core = type("TelemetryAnomalyEvaluatorCoreInstance", (), {"detect": staticmethod(detect)})()

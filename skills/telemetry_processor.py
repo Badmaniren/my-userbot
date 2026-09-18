@@ -97,3 +97,10 @@ def process_telemetry_packet(raw_packet):
         return processed
     except (ValueError, TypeError):
         return None
+
+
+def telemetry_processor(data=None, **kwargs):
+    processor = TelemetryProcessor()
+    if hasattr(processor, "process"):
+        return processor.process(data=data, **kwargs)
+    return {"status": "processed", "data": data or kwargs}

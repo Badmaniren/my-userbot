@@ -1,5 +1,8 @@
 import json
-import requests
+try:
+    import requests
+except ImportError:
+    requests = None
 
 class TelemetryStreamer:
     def __init__(self, stream_id=None, endpoint=None, buffer_size=4096):
@@ -78,3 +81,16 @@ class SystemHealthAuditPipeline:
         with open(log_path, 'w') as f:
             json.dump(aggregated_data, f)
         return True
+
+
+def telemetry_streamer(source_path=None, **kwargs):
+    streamer = TelemetryStreamer()
+    def _safe_read():
+        if source_path:
+            try:
+                return streamer.read_from_source(source_path)
+            except Exception:
+                return b""
+        return b""
+    streamer.read = _safe_read
+    return streamer

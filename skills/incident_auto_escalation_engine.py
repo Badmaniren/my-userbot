@@ -21,6 +21,8 @@ class IncidentAutoEscalationEngine:
 
         if hasattr(incident_severity_evaluator, "evaluate"):
             sev_score = incident_severity_evaluator.evaluate(incident)
+            if isinstance(sev_score, dict):
+                sev_score = sev_score.get("severity_score", 1)
         else:
             sev_score = 1
 

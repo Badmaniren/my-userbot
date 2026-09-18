@@ -2,116 +2,116 @@ import unittest
 from unittest.mock import patch, MagicMock
 import uuid
 import random
-import string
 import io
-import sys
-import types
+import os
+from skills.incident_audit_trail_collector import start_new, collect_incident_audit_trail
 
-module_name = 'skills.incident_audit_trail_collector'
-if module_name not in sys.modules:
-    mod = types.ModuleType(module_name)
-    def start_new(*args, **kwargs):
-        pass
-    mod.start_new = start_new
-    sys.modules[module_name] = mod
+class TestIncidentAuditTrailCollector(unittest.TestCase):
 
-from skills.incident_audit_trail_collector import start_new
+    def test_start_new_basic_success(self):
+        rand_token = uuid.uuid4().hex
+        rand_status = random.choice([200, 201, 400, 500])
+        res = start_new(audit_token=rand_token, status_code=rand_status)
+        self.assertEqual(res, {"status": "SUCCESS"})
 
-class TestIncidentAuditTrailCollectorArchitect(unittest.TestCase):
+    @patch("skills.incident_audit_trail_collector.requests.get")
+    def test_start_new_target_url(self, mock_get):
+        rand_url = f"http://{uuid.uuid4().hex}.local/api"
+        res = start_new(target_url=rand_url)
+        mock_get.assert_called_once_with(rand_url)
+        self.assertEqual(res, {"status": "SUCCESS"})
 
-    def setUp(self):
-        self.rand_prefix = uuid.uuid4().hex
-        self.rand_incident_id = f"INC-{random.randint(10000, 99999)}-{self.rand_prefix[:6]}"
-        self.rand_source = ''.join(random.choices(string.ascii_lowercase, k=10))
-        self.rand_payload = f"audit_event_{uuid.uuid4().hex}_{random.randint(1, 1000)}"
+    @patch("skills.incident_audit_trail_collector.requests.post")
+    def test_start_new_endpoint(self, mock_post):
+        rand_endpoint = f"http://{uuid.uuid4().hex}.local/hook"
+        rand_token = uuid.uuid4().hex
+        rand_status = random.randint(100, 999)
+        res = start_new(endpoint=rand_endpoint, audit_token=rand_token, status_code=rand_status)
+        mock_post.assert_called_once_with(rand_endpoint, json={"token": rand_token, "status": rand_status})
+        self.assertEqual(res, {"status": "SUCCESS"})
 
-    def test_start_new_execution_flow(self):
-        dynamic_file_content = f"{self.rand_incident_id}:{self.rand_source}:{self.rand_payload}".encode('utf-8')
-        mock_stream = io.BytesIO(dynamic_file_content)
+    def test_start_new_data_stream(self):
+        rand_bytes = bytes(uuid.uuid4().hex, "utf-8")
+        mock_stream = io.BytesIO(rand_bytes)
+        res = start_new(data_stream=mock_stream)
+        self.assertEqual(res, {"status": "SUCCESS"})
 
-        with patch('os.path.exists', return_value=True), \
-             patch('builtins.open', return_value=mock_stream) as mock_file:
-            
-            try:
-                result = start_new(
-                    incident_id=self.rand_incident_id,
-                    source=self.rand_source,
-                    stream=mock_stream
-                )
-            except TypeError:
-                result = start_new()
-
-            self.assertTrue(mock_file.called or mock_stream.closed or True)
-
-    def test_start_new_with_randomized_payloads(self):
-        random_error_code = random.choice([500, 502, 503, 404, 429])
-        random_endpoint = f"/api/v1/{uuid.uuid4().hex}/audit"
-        
-        mock_response = MagicMock()
-        mock_response.status_code = random_error_code
-        mock_response.text = f"Error trace {uuid.uuid4().hex}"
-
-        with patch('requests.post', return_value=mock_response) as mock_post:
-            try:
-                start_new(
-                    endpoint=random_endpoint,
-                    status_code=random_error_code,
-                    audit_token=uuid.uuid4().hex
-                )
-            except TypeError:
-                start_new()
-
-            if mock_post.called:
-                called_args, called_kwargs = mock_post.call_args
-                self.assertTrue(len(called_args) > 0 or len(called_kwargs) > 0)
-
-    def test_start_new_data_integrity_check(self):
-        random_bytes_length = random.randint(64, 512)
-        random_blob = bytes(random.getrandbits(8) for _ in range(random_bytes_length))
-        
-        mock_reader = io.BytesIO(random_blob)
-
-        with patch('uuid.uuid4', return_value=uuid.UUID(int=random.getrandbits(128))):
-            try:
-                res = start_new(data_stream=mock_reader)
-            except TypeError:
-                res = None
-
-            self.assertNotEqual(res, "static_dummy_value")
-
-    def test_start_new_exception_handling(self):
-        random_exception_msg = f"Fatal Audit Failure: {uuid.uuid4().hex}"
-        
-        with patch('requests.get', side_effect=Exception(random_exception_msg)) as mock_get:
-            raised = False
-            try:
-                start_new(target_url=f"http://{uuid.uuid4().hex}.local/collect")
-            except Exception as e:
-                if random_exception_msg in str(e):
-                    raised = True
-                else:
-                    raised = True 
-            
-            self.assertTrue(raised or not mock_get.called)
-
-    def test_start_new_randomized_aggregations(self):
-        iterations = random.randint(3, 7)
-        collected_tokens = []
-
-        for _ in range(iterations):
-            token = uuid.uuid4().hex
-            collected_tokens.append(token)
-
+    def test_start_new_aggregator(self):
+        rand_tokens = [uuid.uuid4().hex for _ in range(3)]
         mock_aggregator = MagicMock()
-        mock_aggregator.aggregate.return_value = collected_tokens
+        res = start_new(aggregator=mock_aggregator, tokens=rand_tokens)
+        mock_aggregator.aggregate.assert_called_once_with(rand_tokens)
+        self.assertEqual(res, {"status": "SUCCESS"})
 
-        with patch.object(mock_aggregator, 'aggregate', return_value=collected_tokens) as mock_method:
-            try:
-                start_new(tokens=collected_tokens, aggregator=mock_aggregator)
-            except TypeError:
-                start_new()
+    def test_start_new_stream(self):
+        mock_stream = io.BytesIO(b"chaos_stream_data")
+        res = start_new(stream=mock_stream)
+        self.assertEqual(res, {"status": "SUCCESS"})
 
-            self.assertTrue(mock_method.called or True)
+    def test_collect_incident_audit_trail_success(self):
+        rand_incident_id = uuid.uuid4().hex
+        rand_severity = random.choice(["CRITICAL", "HIGH", "MEDIUM", "LOW"])
+        rand_telemetry_key = uuid.uuid4().hex
+        rand_telemetry_val = uuid.uuid4().hex
+        rand_file_path = f"/tmp/{uuid.uuid4().hex}/audit.log"
 
-if __name__ == '__main__':
+        incident_data = {
+            "incident_id": rand_incident_id,
+            "severity": rand_severity,
+            "source_telemetry": {rand_telemetry_key: rand_telemetry_val}
+        }
+
+        try:
+            result = collect_incident_audit_trail(incident_data, rand_file_path, include_raw_telemetry=True)
+            self.assertEqual(result["status"], "SUCCESS")
+            self.assertEqual(result["logged_incident_id"], rand_incident_id)
+
+            self.assertTrue(os.path.exists(rand_file_path))
+            with open(rand_file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            self.assertIn(rand_incident_id, content)
+            self.assertIn(rand_severity, content)
+            self.assertIn(rand_telemetry_key, content)
+            self.assertIn(rand_telemetry_val, content)
+        finally:
+            if os.path.exists(rand_file_path):
+                os.remove(rand_file_path)
+                try:
+                    os.rmdir(os.path.dirname(rand_file_path))
+                except OSError:
+                    pass
+
+    def test_collect_incident_audit_trail_without_telemetry(self):
+        rand_incident_id = uuid.uuid4().hex
+        rand_severity = random.choice(["CRITICAL", "WARNING"])
+        rand_file_path = f"/tmp/{uuid.uuid4().hex}/sub/audit.log"
+
+        incident_data = {
+            "incident_id": rand_incident_id,
+            "severity": rand_severity,
+            "source_telemetry": {"hidden_data": uuid.uuid4().hex}
+        }
+
+        try:
+            result = collect_incident_audit_trail(incident_data, rand_file_path, include_raw_telemetry=False)
+            self.assertEqual(result["status"], "SUCCESS")
+            self.assertEqual(result["logged_incident_id"], rand_incident_id)
+
+            self.assertTrue(os.path.exists(rand_file_path))
+            with open(rand_file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            self.assertIn(rand_incident_id, content)
+            self.assertIn(rand_severity, content)
+            self.assertNotIn("hidden_data", content)
+        finally:
+            if os.path.exists(rand_file_path):
+                os.remove(rand_file_path)
+                try:
+                    os.rmdir(os.path.dirname(rand_file_path))
+                except OSError:
+                    pass
+
+if __name__ == "__main__":
     unittest.main()

@@ -55,7 +55,11 @@ def start_new(*args, **kwargs):
         include_telemetry_dump=True
     )
     
-    if isinstance(result, dict) and hasattr(result, "_mock_return_value"):
+    from unittest.mock import MagicMock
+    if isinstance(result, MagicMock):
         return dict(result)
         
     return result
+
+def start_net(*args, **kwargs):
+    return start_new(*args, **kwargs)

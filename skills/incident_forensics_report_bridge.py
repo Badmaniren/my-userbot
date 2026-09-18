@@ -34,10 +34,16 @@ class IncidentForensicsReportBridge:
             incident_id=incident_id
         )
 
+        if isinstance(forensics_result, dict):
+            forensics_result["incident_id"] = incident_id
+
         business_loss_result = self.business_loss_reporter.generate_report(
             incident_id=incident_id,
             financial_data=financial_data
         )
+
+        if isinstance(business_loss_result, dict):
+            business_loss_result["incident_id"] = incident_id
 
         export_status = self.business_loss_reporter.export_report(
             business_loss_result,
@@ -54,6 +60,15 @@ class IncidentForensicsReportBridge:
                 except OSError:
                     pass
             if not isinstance(export_status, str) or not export_status.startswith("Exported successfully"):
+                try:
+                    with open(export_path, "w", encoding="utf-8") as f:
+                        json.dump({
+                            "forensics": forensics_result,
+                            "business_loss": business_loss_result
+                        }, f)
+                except OSError:
+                    pass
+            else:
                 try:
                     with open(export_path, "w", encoding="utf-8") as f:
                         json.dump({
@@ -79,4 +94,6 @@ class IncidentForensicsReportBridge:
             incident_id=incident_id,
             financial_data=financial_data
         )
+        if isinstance(report_data, dict):
+            report_data["incident_id"] = incident_id
         return self.business_loss_reporter.export_report(report_data, format_type)

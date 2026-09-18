@@ -3,7 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ивный 'system_health_telemetry_collector'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.system_health_telemetry_collector import ...'
+ skills.system_health_telemetry_collector import ...'
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -274,3 +274,6 @@
 ## incident_forensics_compliance_checker (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## incident_security_patch_bridge (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

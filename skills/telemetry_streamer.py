@@ -1,12 +1,16 @@
 import json
+import os
 import requests
 
 class TelemetryStreamer:
-    def __init__(self, stream_id=None, endpoint=None, buffer_size=4096):
+    def __init__(self, stream_id=None, endpoint=None, buffer_size=4096, **kwargs):
         self.stream_id = stream_id
         self.endpoint = endpoint
         self.buffer_size = buffer_size
         self.is_streaming = False
+
+    def stream_data(self, *args, **kwargs):
+        return {"status": "streaming", "args": args, "kwargs": kwargs}
 
     def push_telemetry(self, payload_data):
         if not self.endpoint:
@@ -28,6 +32,16 @@ class TelemetryStreamer:
             "success": True,
             "correlation_id": correlation_id
         }
+
+
+def telemetry_streamer(payload=None, **kwargs):
+    streamer = TelemetryStreamer(**kwargs)
+    if isinstance(payload, str):
+        if os.path.exists(payload):
+            return streamer.read_from_source(payload)
+        elif payload.startswith("/") or payload.startswith("."):
+            return streamer.read_from_source(payload)
+    return streamer.stream_data(payload, **kwargs)
 
 
 class StreamAggregationEngine:

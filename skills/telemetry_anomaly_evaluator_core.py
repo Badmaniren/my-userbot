@@ -66,6 +66,14 @@ class TelemetryAnomalyEvaluatorCore:
         }
 
 
+def telemetry_anomaly_evaluator_core(data=None, **kwargs):
+    evaluator = TelemetryAnomalyEvaluatorCore()
+    if isinstance(data, dict):
+        if all(k in data for k in ("stream_id", "metric", "value", "threshold")):
+            return evaluator.evaluate(data)
+    return {"anomaly_score": 0.0, "is_anomaly": False}
+
+
 def _create_dummy_func(name):
     def dummy(*args, **kwargs):
         if name in ("telemetry_streamer",):

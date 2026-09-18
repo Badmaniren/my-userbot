@@ -1,5 +1,6 @@
 import json
 import time
+import os
 
 class IncidentAggregator:
     """
@@ -20,6 +21,21 @@ class TelemetryProcessor:
     Processor for raw telemetry data packets ensuring schema consistency.
     Used primarily for system-level metrics.
     """
+    def process(self, data=None, **kwargs):
+        payload = {}
+        if isinstance(data, dict):
+            payload.update(data)
+        elif data is not None:
+            payload["data"] = data
+        payload.update(kwargs)
+
+        source = payload.get("telemetry_source") or payload.get("data") or payload.get("stream_payload")
+        if isinstance(source, str) and os.path.exists(source):
+            return self.ingest_from_file(source)
+        elif isinstance(source, dict):
+            return self.process_packet(source)
+        return payload
+
     def process_packet(self, raw_packet):
         """
         Normalizes a single packet. Returns None if mandatory fields are missing
@@ -70,6 +86,10 @@ class TelemetryProcessor:
             if processed:
                 results.append(processed)
         return results
+
+def telemetry_processor(data=None, **kwargs):
+    processor = TelemetryProcessor()
+    return processor.process(data=data, **kwargs)
 
 def process_telemetry_packet(raw_packet):
     """

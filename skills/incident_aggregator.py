@@ -6,6 +6,25 @@ class IncidentAggregator:
         self.hub = ErrorRecoveryHub()
         self.collector = PatchMetricCollector()
 
+    def report_anomaly(self, *args, **kwargs):
+        return {"status": "reported", "args": args, "kwargs": kwargs}
+
+    @staticmethod
+    def aggregate(data=None, **kwargs):
+        payload = {}
+        if isinstance(data, dict):
+            payload.update(data)
+        elif data is not None:
+            payload["data"] = data
+        payload.update(kwargs)
+
+        if "incident_id" not in payload and "id" in payload:
+            payload["incident_id"] = payload["id"]
+        elif "id" not in payload and "incident_id" in payload:
+            payload["id"] = payload["incident_id"]
+
+        return payload
+
     def process_and_aggregate(self, module_name, exception, traceback_str, incident_id=None):
         if not incident_id:
             incident_id = self.hub.capture_failure(module_name, exception, traceback_str)
@@ -34,6 +53,14 @@ class IncidentAggregator:
             "metrics_summary": metrics_summary,
             "history": history
         }
+
+
+def incident_aggregator(data=None, **kwargs):
+    return IncidentAggregator.aggregate(data, **kwargs)
+
+
+def report_anomaly(*args, **kwargs):
+    return IncidentAggregator().report_anomaly(*args, **kwargs)
 
 
 def aggregate_incidents(module_name, exception, traceback_str):

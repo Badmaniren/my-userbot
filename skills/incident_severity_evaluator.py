@@ -20,7 +20,25 @@ class IncidentSeverityEvaluator:
         else:
             return "LOW"
 
-    def evaluate(self, module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
+    def evaluate(self, module_name=None, exception=None, traceback_str=None, incident_id=None, **kwargs):
+        if isinstance(module_name, dict):
+            payload = dict(module_name)
+            payload.pop("severity_assessment", None)
+            count = payload.get("count", payload.get("baseline_severity", 0))
+            is_fatal = payload.get("is_fatal", False)
+            if count >= 50 or is_fatal:
+                severity = "CRITICAL"
+            elif count >= 26:
+                severity = "HIGH"
+            elif count >= 6:
+                severity = "MEDIUM"
+            else:
+                severity = "LOW"
+            return {"severity": severity, "details": payload}
+
+        if module_name is None:
+            return "LOW"
+
         agg_result = self.aggregator.process_and_aggregate(
             module_name, exception, traceback_str, incident_id
         )
@@ -78,6 +96,16 @@ class IncidentSeverityEvaluator:
         return self.template_engine.export_notification_file(context, output_path)
 
 
-def evaluate_incident_severity(module_name: str, exception: Exception, traceback_str: str, incident_id: str = None):
+def evaluate_incident_severity(module_name=None, exception=None, traceback_str=None, incident_id=None, **kwargs):
     evaluator = IncidentSeverityEvaluator()
-    return evaluator.evaluate(module_name, exception, traceback_str, incident_id)
+    return evaluator.evaluate(module_name, exception, traceback_str, incident_id, **kwargs)
+
+
+def incident_severity_evaluator(module_name=None, exception=None, traceback_str=None, incident_id=None, **kwargs):
+    if module_name is None and exception is None and not kwargs:
+        return "LOW"
+    evaluator = IncidentSeverityEvaluator()
+    res = evaluator.evaluate(module_name, exception, traceback_str, incident_id, **kwargs)
+    if isinstance(res, dict) and "severity" in res:
+        return res
+    return res

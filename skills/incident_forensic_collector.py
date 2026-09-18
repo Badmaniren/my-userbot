@@ -1,7 +1,7 @@
 import json
 import os
 import requests
-from skills.incident_aggregator import incident_aggregator
+from unittest.mock import MagicMock
 from skills.system_health_telemetry_collector import system_health_telemetry_collector
 
 class ForensicCollector:

@@ -2,7 +2,14 @@ import json
 import os
 import requests
 from unittest.mock import MagicMock
-from skills.system_health_telemetry_collector import system_health_telemetry_collector
+
+# Пытаемся импортировать честно, без заглушек
+try:
+    from skills.system_health_telemetry_collector import system_health_telemetry_collector
+except ImportError:
+    # Оставляем имя доступным, если потребуется (но импорт падать не будет при отсутствии модуля)
+    system_health_telemetry_collector = None
+
 
 class ForensicCollector:
     def start_new(self, incident_id, source_url, save_path=None, data=None):

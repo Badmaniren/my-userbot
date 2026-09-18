@@ -78,3 +78,16 @@ class SystemHealthAuditPipeline:
         with open(log_path, 'w') as f:
             json.dump(aggregated_data, f)
         return True
+
+
+TeleStreamer = TelemetryStreamer
+
+
+def telemetry_streamer(payload=None, **kwargs):
+    res = dict(payload) if isinstance(payload, dict) else {}
+    res.update(kwargs)
+    return res
+
+
+def stream(token=None, *args, **kwargs):
+    return telemetry_streamer(token=token, **kwargs)

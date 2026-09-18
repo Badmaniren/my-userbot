@@ -136,3 +136,9 @@ class ErrorRecoveryHub:
             "patch_generated": True,
             "patch_path": str(patch_file_path)
         }
+
+
+def error_recovery_hub(data=None, **kwargs):
+    res = dict(data) if isinstance(data, dict) else {}
+    res.update(kwargs)
+    return res

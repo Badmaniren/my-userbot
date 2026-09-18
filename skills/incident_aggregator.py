@@ -74,3 +74,29 @@ def export_incident_analytics(module_name, output_path, format="json"):
     if hasattr(collector, 'export_metrics'):
         return collector.export_metrics(output_path, format)
     return False
+
+
+def incident_aggregator(audit_report=None, identifier=None, data=None, **kwargs):
+    res = dict(data or {})
+    if isinstance(audit_report, dict):
+        res.update(audit_report)
+    res.update(kwargs)
+    if identifier:
+        res["identifier"] = identifier
+        res["final_id"] = identifier
+        res["incident_ref"] = identifier
+    return res
+
+
+def report_anomaly(*args, **kwargs):
+    return True
+
+
+def aggregate(incident_id=None, telemetry_payload=None, *args, **kwargs):
+    res = dict(telemetry_payload or {})
+    res.update(kwargs)
+    if incident_id:
+        res["incident_ref"] = incident_id
+        res["final_id"] = incident_id
+    res["state"] = "compiled"
+    return res

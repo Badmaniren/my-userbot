@@ -3,8 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
->, line 1)
-- Последняя ошибка перед фиксом: ERROR: test_pipeline_incident_trigger_and_escalation (tests.test_telemetry_anomaly_response_pipeline_integration.IntegrationTestTelemetryAnomalyResponsePipeline.test_pipeline_incident_trigger_and_escalation)
+grationTestTelemetryAnomalyResponsePipeline.test_pipeline_incident_trigger_and_escalation)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## telemetry_incident_trigger (compose) — раундов: 4
@@ -261,3 +260,7 @@
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: AssertionError: Expected 'process_telemetry_stream' to be called once. Called 0 times.
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## vulnerability_remediation_pipeline (refactor) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: успешно прошёл тесты и влит в main

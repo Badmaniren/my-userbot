@@ -34,7 +34,15 @@ class IncidentAutoRecoveryDispatcher:
         return self.escalation_engine.evaluate_system_telemetry_risks()
 
     def consume_and_process_stream(self) -> bytes:
-        return self.escalation_engine.consume_stream_data()
+        data = self.escalation_engine.consume_stream_data()
+        if isinstance(data, str):
+            return data.encode('utf-8')
+        if isinstance(data, bytes):
+            return data
+        if isinstance(data, (list, tuple)):
+            # Если вернулся список целых чисел или байтов, приводим к bytes
+            return bytes(data)
+        return b""
 
     def dispatch_recovery(self, incident_id: str, module_name: str, exception: Exception) -> dict:
         context = {"incident_id": incident_id, "module_name": module_name}

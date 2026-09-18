@@ -1,42 +1,73 @@
 import unittest
+import os
 import uuid
 import random
-import os
-from skills.incident_forensic_summarizer import incident_forensic_summarizer
-from skills.incident_aggregator import incident_aggregator
-from skills.system_health_telemetry_collector import system_health_telemetry_collector
+from io import BytesIO
+from skills.incident_forensic_summarizer import start_new, incident_forensic_summarizer
 
 class TestIncidentForensicSummarizerIntegration(unittest.TestCase):
-    def test_forensic_summarizer_pipeline(self):
-        unique_incident_id = f"inc-{uuid.uuid4()}"
-        telemetry_metric_value = random.uniform(50.0, 500.0)
+    
+    def setUp(self):
+        self.created_files = []
+
+    def tearDown(self):
+        for file_path in self.created_files:
+            if os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                except OSError:
+                    pass
+
+    def test_start_new_integration_flow(self):
+        random_suffix = uuid.uuid4().hex[:8]
+        test_incident_id = f"INC-TEST-{random_suffix}"
         
-        telemetry_data = system_health_telemetry_collector(
-            metric_id=str(uuid.uuid4()),
-            load_value=telemetry_metric_value
+        telemetry_content = f"cpu_load={random.randint(90, 100)}% memory_leak=true id={random_suffix}"
+        telemetry_stream = BytesIO(telemetry_content.encode('utf-8'))
+        
+        result = start_new(
+            incident_id=test_incident_id,
+            telemetry_source=telemetry_stream
         )
         
-        incident_payload = incident_aggregator(
-            incident_id=unique_incident_id,
-            telemetry_payload=telemetry_data,
-            severity_level=random.choice(["HIGH", "CRITICAL", "MEDIUM"])
-        )
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("target_incident_id"), test_incident_id)
+        self.assertIn("summary_id", result)
         
-        summary_result = incident_forensic_summarizer(
-            incident_data=incident_payload,
+        report_path = result.get("report_file_path")
+        self.assertIsNotNone(report_path)
+        self.created_files.append(report_path)
+        
+        self.assertTrue(os.path.exists(report_path), f"Report file {report_path} was not created on disk")
+        
+        with open(report_path, "r", encoding="utf-8") as f:
+            file_content = f.read()
+            self.assertIn(test_incident_id, file_content)
+            self.assertIn(telemetry_content, file_content)
+
+    def test_incident_forensic_summarizer_direct_call(self):
+        random_suffix = uuid.uuid4().hex[:8]
+        custom_incident_id = f"CUSTOM-{random_suffix}"
+        random_payload_key = f"metric_{random.randint(1000, 9999)}"
+        random_payload_val = f"val_{random.randint(1000, 9999)}"
+        
+        incident_data = {
+            "incident_id": custom_incident_id,
+            "telemetry_payload": {random_payload_key: random_payload_val}
+        }
+        
+        result = incident_forensic_summarizer(
+            incident_data=incident_data,
             include_telemetry_dump=True
         )
         
-        self.assertIn("summary_id", summary_result)
-        self.assertEqual(summary_result.get("target_incident_id"), unique_incident_id)
-        self.assertIn(str(telemetry_metric_value), str(summary_result))
+        self.assertEqual(result.get("target_incident_id"), custom_incident_id)
+        self.assertIn(random_payload_key, result.get("telemetry_dump", ""))
+        self.assertIn(random_payload_val, result.get("telemetry_dump", ""))
         
-        report_path = summary_result.get("report_file_path")
-        if report_path:
-            self.assertTrue(os.path.exists(report_path))
-            with open(report_path, "r", encoding="utf-8") as f:
-                content = f.read()
-                self.assertIn(unique_incident_id, content)
+        report_path = result.get("report_file_path")
+        self.created_files.append(report_path)
+        self.assertTrue(os.path.exists(report_path))
 
 if __name__ == "__main__":
     unittest.main()

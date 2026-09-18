@@ -24,7 +24,7 @@ class IncidentAutoEscalationEngine:
         else:
             sev_score = 1
 
-        if sev_score <= 0:
+        if isinstance(sev_score, (int, float)) and sev_score <= 0:
             return {
                 "incident_id": incident_id,
                 "severity": sev_score,

@@ -4,13 +4,18 @@ from skills.error_recovery_hub import ErrorRecoveryHub
 
 class IncidentAutoRecoveryDispatcher:
     """
-    Комбинирует движок автоэскалации инцидентов и хаб восстановления ошибок 
-    для автоматического запуска процедур ликвидации сбоев.
+    Комбинирует движок автоэскалации инцидентов, хаб восстановления ошибок
+    и SLA-координатор для завершения цикла автономного восстановления.
     """
 
-    def __init__(self):
-        self.escalation_engine = IncidentAutoEscalationEngine()
-        self.recovery_hub = ErrorRecoveryHub()
+    def __init__(self, escalation_engine=None, recovery_hub=None, sla_coordinator=None):
+        self.escalation_engine = escalation_engine if escalation_engine is not None else IncidentAutoEscalationEngine()
+        self.recovery_hub = recovery_hub if recovery_hub is not None else ErrorRecoveryHub()
+        if sla_coordinator is not None:
+            self.sla_coordinator = sla_coordinator
+        else:
+            from skills.incident_sla_recovery_coordinator import IncidentSlaRecoveryCoordinator
+            self.sla_coordinator = IncidentSlaRecoveryCoordinator(recovery_dispatcher=self)
 
     def dispatch_escalation(self, incident_id: str):
         return self.escalation_engine.process_escalation(incident_id)
@@ -27,6 +32,8 @@ class IncidentAutoRecoveryDispatcher:
         if should_patch:
             patch_payload = self.recovery_hub.generate_patch(incident_id)
             success = self.recovery_hub.deploy_and_verify(incident_id, patch_payload)
+            if success:
+                self.sla_coordinator.coordinate_sla_closure(incident_id)
             return bool(success)
         return False
 
@@ -40,10 +47,12 @@ class IncidentAutoRecoveryDispatcher:
         context = {"incident_id": incident_id, "module_name": module_name}
         recovery_result = self.recovery_hub.analyze_and_recover(module_name, exception, context)
         escalation_result = self.escalation_engine.process_escalation(incident_id)
+        sla_result = self.sla_coordinator.coordinate_sla_closure(incident_id)
         
         return {
             "incident_id": incident_id,
             "recovery_result": recovery_result,
             "escalation_result": escalation_result,
+            "sla_coordination": sla_result,
             "status": "dispatched"
         }

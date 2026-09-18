@@ -1,5 +1,13 @@
+import io
 import json
 import requests
+
+
+def stream(token=None, *args, **kwargs):
+    if token:
+        return io.BytesIO(f"telemetry_stream_{token}".encode("utf-8"))
+    return io.BytesIO(b"telemetry_stream_default")
+
 
 class TelemetryStreamer:
     def __init__(self, stream_id=None, endpoint=None, buffer_size=4096):
@@ -78,3 +86,6 @@ class SystemHealthAuditPipeline:
         with open(log_path, 'w') as f:
             json.dump(aggregated_data, f)
         return True
+
+
+TeleStreamer = TelemetryStreamer

@@ -1,10 +1,38 @@
 from skills.error_recovery_hub import ErrorRecoveryHub
 from skills.patch_metric_collector import PatchMetricCollector
 
+
+def aggregate(incident_id=None, telemetry_payload=None, *args, **kwargs):
+    if isinstance(incident_id, dict):
+        return incident_id
+    payload_data = telemetry_payload
+    if hasattr(telemetry_payload, "read"):
+        try:
+            content = telemetry_payload.read()
+            if isinstance(content, bytes):
+                payload_data = content.decode("utf-8", errors="ignore")
+            else:
+                payload_data = str(content)
+        except Exception:
+            payload_data = str(telemetry_payload)
+
+    res = {
+        "status": "aggregated",
+        "incident_id": incident_id,
+    }
+    if payload_data is not None:
+        res["telemetry_payload"] = payload_data
+    return res
+
+
 class IncidentAggregator:
     def __init__(self):
         self.hub = ErrorRecoveryHub()
         self.collector = PatchMetricCollector()
+
+    @staticmethod
+    def aggregate(incident_id=None, telemetry_payload=None, *args, **kwargs):
+        return aggregate(incident_id=incident_id, telemetry_payload=telemetry_payload, *args, **kwargs)
 
     def process_and_aggregate(self, module_name, exception, traceback_str, incident_id=None):
         if not incident_id:

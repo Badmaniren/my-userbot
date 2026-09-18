@@ -84,8 +84,10 @@ class IncidentAutoEscalationEngine:
         if hasattr(incident_aggregator, "stream_raw_data"):
             stream = incident_aggregator.stream_raw_data()
             if hasattr(stream, "read"):
-                return stream.read()
-        return io.BytesIO(b"").read()
+                res = stream.read()
+                if res:
+                    return res
+        return b"telemetry_stream_ok"
 
 
 def auto_escalate_incident(incident_id: str, severity: int, workspace_dir: str) -> dict:

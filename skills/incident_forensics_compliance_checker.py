@@ -37,12 +37,15 @@ class IncidentComplianceChecker:
             # Для интеграционного теста, где audit_trail_path уже существует
             audit_res = {"status": "success", "path": audit_trail_path}
 
-        # Шаг 2: Генерация форензик-отчета через мост
+        # Шаг 2: Генерация форензик-отчета через мост с передачей обязательных аргументов по умолчанию
         report_res = self.bridge.generate_comprehensive_report(
             incident_id=inc_id,
             financial_data=financial_data,
             export_path=export_path,
-            format_type=format_type
+            format_type=format_type,
+            module_name=incident_data.get("module_name", "compliance_module"),
+            exception=incident_data.get("exception", "None"),
+            traceback_str=incident_data.get("traceback_str", "None")
         )
 
         # Оценка риска

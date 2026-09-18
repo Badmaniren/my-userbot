@@ -1,51 +1,53 @@
 import unittest
+import os
 import uuid
 import random
-import os
-import tempfile
 from skills.incident_audit_trail_collector import collect_incident_audit_trail
-from skills.incident_aggregator import aggregate_incidents
-from skills.system_health_telemetry_collector import collect_telemetry
 
 class TestIncidentAuditTrailCollectorIntegration(unittest.TestCase):
-    def test_audit_trail_collection_real_flow(self):
-        random_seed = random.randint(1000, 9999)
-        incident_id = f"INC-{uuid.uuid4()}"
-        component_name = f"service-node-{random_seed}"
-        error_code = random.choice([500, 502, 503, 504])
+    def test_collect_incident_audit_trail_integration(self):
+        rand_id = f"INC-{uuid.uuid4()}"
+        severities = ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+        rand_severity = random.choice(severities)
+        rand_telemetry_key = f"metric_{uuid.uuid4().hex[:6]}"
+        rand_telemetry_val = random.randint(100, 999)
         
-        telemetry_data = collect_telemetry(
-            component=component_name,
-            metric="error_rate",
-            value=float(error_code)
-        )
+        incident_data = {
+            "incident_id": rand_id,
+            "severity": rand_severity,
+            "source_telemetry": {
+                rand_telemetry_key: rand_telemetry_val
+            }
+        }
         
-        aggregated_incident = aggregate_incidents(
-            incident_id=incident_id,
-            source_telemetry=telemetry_data,
-            severity="CRITICAL"
-        )
+        dest_dir = f"test_audit_logs_{uuid.uuid4().hex}"
+        destination_path = os.path.join(dest_dir, "audit_trail.log")
         
-        with tempfile.TemporaryDirectory() as temp_dir:
-            output_file_path = os.path.join(temp_dir, f"audit_{incident_id}.log")
-            
-            audit_result = collect_incident_audit_trail(
-                incident_data=aggregated_incident,
-                destination_path=output_file_path,
+        try:
+            result = collect_incident_audit_trail(
+                incident_data=incident_data,
+                destination_path=destination_path,
                 include_raw_telemetry=True
             )
             
-            self.assertTrue(os.path.exists(output_file_path), "Audit trail log file was not created.")
+            self.assertEqual(result.get("status"), "SUCCESS")
+            self.assertEqual(result.get("logged_incident_id"), rand_id)
             
-            with open(output_file_path, "r", encoding="utf-8") as f:
-                file_content = f.read()
+            self.assertTrue(os.path.exists(destination_path), "Файл аудиторского следа не был создан")
+            
+            with open(destination_path, "r", encoding="utf-8") as f:
+                content = f.read()
                 
-            self.assertIn(incident_id, file_content, "Generated incident ID is missing from the audit log.")
-            self.assertIn(str(error_code), file_content, "Telemetry error code is missing from the audit log.")
+            self.assertIn(f"INCIDENT_ID: {rand_id}", content)
+            self.assertIn(f"SEVERITY: {rand_severity}", content)
+            self.assertIn(rand_telemetry_key, content)
+            self.assertIn(str(rand_telemetry_val), content)
             
-            self.assertIsInstance(audit_result, dict)
-            self.assertEqual(audit_result.get("status"), "SUCCESS")
-            self.assertEqual(audit_result.get("logged_incident_id"), incident_id)
+        finally:
+            if os.path.exists(destination_path):
+                os.remove(destination_path)
+            if os.path.exists(dest_dir):
+                os.rmdir(dest_dir)
 
 if __name__ == "__main__":
     unittest.main()

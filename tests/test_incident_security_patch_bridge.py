@@ -1,64 +1,86 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 import uuid
 import random
 import io
 import string
 
-from skills.incident_security_patch_bridge import (
-    incident_security_patch_bridge,
-    _dummy_func
-)
+from skills.incident_security_patch_bridge import incident_security_patch_bridge
+
 
 class TestIncidentSecurityPatchBridge(unittest.TestCase):
 
-    def setUp(self):
-        self.random_prefix = ''.join(random.choices(string.ascii_lowercase, k=8))
-        self.incident_id = f"inc_{uuid.uuid4().hex[:10]}"
-        self.payload = {
-            "incident_id": self.incident_id,
-            "metadata": f"{self.random_prefix}_data"
+    def test_incident_security_patch_bridge_with_valid_dict_payload(self):
+        rand_incident_id = uuid.uuid4().hex
+        payload = {
+            "".join(random.choices(string.ascii_lowercase, k=8)): "".join(random.choices(string.ascii_lowercase, k=10)),
+            "incident_id": rand_incident_id
         }
 
-    def test_incident_security_patch_bridge_with_valid_dict(self):
-        result = incident_security_patch_bridge(self.payload)
+        result = incident_security_patch_bridge(payload)
+
         self.assertIsInstance(result, dict)
         self.assertTrue(result.get("patch_pipeline_triggered"))
-        self.assertEqual(result.get("target_incident_id"), self.incident_id)
+        self.assertEqual(result.get("target_incident_id"), rand_incident_id)
         self.assertEqual(result.get("status"), "success")
         self.assertIn("token", result)
         self.assertIn("value", result)
 
-    def test_incident_security_patch_bridge_with_none_payload(self):
-        result = incident_security_patch_bridge(None)
+    def test_incident_security_patch_bridge_with_invalid_payload_type(self):
+        rand_payload = random.randint(10000, 99999)
+
+        result = incident_security_patch_bridge(rand_payload)
+
         self.assertIsInstance(result, dict)
         self.assertTrue(result.get("patch_pipeline_triggered"))
         self.assertIsNone(result.get("target_incident_id"))
         self.assertEqual(result.get("status"), "success")
+        self.assertIsInstance(result.get("token"), str)
+        self.assertIsInstance(result.get("value"), int)
 
-    def test_incident_security_patch_bridge_with_invalid_payload_type(self):
-        invalid_payload = random.randint(10000, 99999)
-        result = incident_security_patch_bridge(invalid_payload)
+    def test_incident_security_patch_bridge_with_empty_dict_payload(self):
+        payload = {}
+
+        result = incident_security_patch_bridge(payload)
+
         self.assertIsInstance(result, dict)
+        self.assertTrue(result.get("patch_pipeline_triggered"))
         self.assertIsNone(result.get("target_incident_id"))
+        self.assertEqual(result.get("status"), "success")
+        self.assertIsNotNone(result.get("token"))
 
-    def test_dummy_func_behavior(self):
-        res = _dummy_func()
-        self.assertIsInstance(res, dict)
-        self.assertEqual(res.get("status"), "success")
-        self.assertIn("token", res)
-        self.assertIn("value", res)
+    def test_incident_security_patch_bridge_io_stream_mocking(self):
+        rand_bytes = "".join(random.choices(string.ascii_letters, k=50)).encode("utf-8")
+        stream = io.BytesIO(rand_bytes)
 
-    def test_stream_and_io_integration_mocking(self):
-        random_bytes = f"{uuid.uuid4().hex}".encode('utf-8')
-        mock_stream = io.BytesIO(random_bytes)
-        
-        with patch('skills.incident_security_patch_bridge.random.randint', return_value=42) as mock_rand:
-            res = incident_security_patch_bridge(self.payload)
-            self.assertEqual(res["value"], 42)
-            mock_rand.assert_called_once()
-        
-        self.assertEqual(mock_stream.read(), random_bytes)
+        payload = {
+            "incident_id": uuid.uuid4().hex,
+            "stream_data": stream.read().decode("utf-8")
+        }
 
-if __name__ == '__main__':
+        result = incident_security_patch_bridge(payload)
+
+        self.assertEqual(result["target_incident_id"], payload["incident_id"])
+        self.assertEqual(result["status"], "success")
+
+    def test_incident_security_patch_bridge_random_execution_flow(self):
+        rand_id = uuid.uuid4().hex
+        payload = {"incident_id": rand_id}
+
+        with patch("skills.incident_security_patch_bridge.uuid.uuid4") as mock_uuid:
+            mock_token = uuid.uuid4().hex
+            mock_uuid.return_value.hex = mock_token
+            
+            with patch("skills.incident_security_patch_bridge.random.randint") as mock_rand:
+                rand_val = random.randint(100, 500)
+                mock_rand.return_value = rand_val
+
+                result = incident_security_patch_bridge(payload)
+
+                self.assertEqual(result["token"], mock_token)
+                self.assertEqual(result["value"], rand_val)
+                self.assertEqual(result["target_incident_id"], rand_id)
+
+
+if __name__ == "__main__":
     unittest.main()

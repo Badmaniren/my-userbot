@@ -1,63 +1,74 @@
 import unittest
-import os
-import shutil
 import uuid
 import random
-from skills.incident_forensics_compliance_checker import check_incident_compliance
-from skills.incident_audit_trail_collector import collect_incident_audit_trail
-from skills.incident_forensics_report_bridge import IncidentForensicsReportBridge
+import os
+import tempfile
+from skills.incident_forensics_compliance_checker import IncidentComplianceChecker, check_incident_compliance
 
 class TestIncidentForensicsComplianceCheckerIntegration(unittest.TestCase):
     def setUp(self):
-        self.test_dir = f"./test_sandbox_{uuid.uuid4()}"
-        os.makedirs(self.test_dir, exist_ok=True)
-        self.incident_id = str(uuid.uuid4())
-        self.module_name = f"module_{uuid.uuid4().hex[:8]}"
-        self.destination_path = os.path.join(self.test_dir, f"audit_{self.incident_id}.json")
-        self.export_path = os.path.join(self.test_dir, f"forensics_report_{self.incident_id}.json")
-        
-    def tearDown(self):
-        if os.path.exists(self.test_dir):
-            shutil.rmtree(self.test_dir)
+        self.checker = IncidentComplianceChecker()
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.destination_path = os.path.join(self.temp_dir.name, f"audit_{uuid.uuid4().hex}.json")
 
-    def test_compliance_checker_composition(self):
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def test_evaluate_compliance_end_to_end(self):
+        inc_id = f"INC-{uuid.uuid4().hex[:8]}"
+        risk_val = random.randint(1, 15)
+        
         incident_data = {
-            "incident_id": self.incident_id,
-            "severity": random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"]),
-            "description": f"Random security incident {uuid.uuid4()}",
-            "telemetry": {"cpu_usage": random.uniform(50.0, 100.0)}
+            "id": inc_id,
+            "module_name": "auth_service",
+            "exception": "TokenExpiredError",
+            "traceback_str": "Traceback (most recent call last):\n  File 'auth.py', line 42"
         }
         
         financial_data = {
-            "loss_amount": round(random.uniform(1000.0, 50000.0), 2),
-            "currency": "USD"
+            "risk_score": risk_val,
+            "estimated_loss": random.uniform(100.0, 5000.0)
         }
 
-        # Вызываем реальные интегрированные модули для подготовки данных
-        collect_incident_audit_trail(
+        result = check_incident_compliance(
             incident_data=incident_data,
             destination_path=self.destination_path,
-            include_raw_telemetry=True
-        )
-        
-        self.assertTrue(os.path.exists(self.destination_path), "Audit trail collector должен создать файл аудита.")
-
-        # Вызываем целевой модуль, проверяя отсутствие моков и реальное взаимодействие
-        compliance_result = check_incident_compliance(
-            incident_id=self.incident_id,
-            incident_data=incident_data,
-            audit_trail_path=self.destination_path,
+            include_raw_telemetry=True,
             financial_data=financial_data,
-            export_path=self.export_path,
             format_type="json"
         )
 
-        self.assertIsInstance(compliance_result, dict, "Результат должен быть словарем.")
-        self.assertIn("compliance_status", compliance_result, "Ответ должен содержать статус соответствия.")
-        self.assertEqual(compliance_result.get("incident_id"), self.incident_id, "ID инцидента должен совпадать.")
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("incident_id"), inc_id)
         
-        # Проверяем, что отчет форензика также был сформирован в рамках композиции
-        self.assertTrue(os.path.exists(self.export_path), "Форензик-отчет должен быть сгенерирован целевым модулем.")
+        expected_compliant = risk_val < 10
+        self.assertEqual(result.get("compliant"), expected_compliant)
+        self.assertEqual(result.get("compliance_status"), "COMPLIANT" if expected_compliant else "NON_COMPLIANT")
+        
+        audit_trail = result.get("audit_trail")
+        self.assertIsInstance(audit_trail, dict)
+        
+        forensics_report = result.get("forensics_report")
+        self.assertIsInstance(forensics_report, dict)
+        
+        risk_assessment = result.get("risk_assessment")
+        self.assertEqual(risk_assessment.get("score"), risk_val)
+        
+        self.assertTrue(os.path.exists(self.destination_path))
+
+    def test_stream_compliance_package_integration(self):
+        inc_id = f"INC-{uuid.uuid4().hex[:8]}"
+        financial_data = {
+            "risk_score": random.randint(0, 5)
+        }
+
+        stream_result = self.checker.stream_compliance_package(
+            incident_id=inc_id,
+            financial_data=financial_data,
+            format_type="json"
+        )
+
+        self.assertIsNotNone(stream_result)
 
 if __name__ == "__main__":
     unittest.main()

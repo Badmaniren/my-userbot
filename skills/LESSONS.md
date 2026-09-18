@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ТВО ОБНАРУЖЕНО: Объявлен фиктивный 'auto_patch_pipeline'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.auto_patch_pipeline import ...'
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+ЕН Унгой, передан на эскалацию
 
 ## vulnerability_patch_integrator (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
@@ -260,3 +258,7 @@
 
 ## incident_auto_recovery_dispatcher (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## incident_auto_recovery_dispatcher (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: from skills.incident_sla_recovery_coordinator import IncidentSLARecoveryCoordinator
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

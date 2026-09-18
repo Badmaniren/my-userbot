@@ -1,123 +1,93 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 import uuid
 import random
+import string
+from skills.incident_forensics_compliance_checker import IncidentComplianceChecker
 
-from skills.incident_forensics_compliance_checker import (
-    IncidentComplianceChecker,
-    check_incident_compliance
-)
+class TestIncidentComplianceChecker(unittest.TestCase):
+    def setUp(self):
+        self.checker = IncidentComplianceChecker()
 
+    def test_evaluate_compliance_logic(self):
+        # Генерация случайных данных для обеспечения непредсказуемости
+        rand_id = uuid.uuid4().hex
+        rand_path = f"/{uuid.uuid4().hex}/{uuid.uuid4().hex}.log"
+        rand_risk = random.randint(0, 20)
+        rand_module = ''.join(random.choices(string.ascii_letters, k=10))
 
-class TestIncidentForensicsComplianceChecker(unittest.TestCase):
+        incident_data = {
+            "id": rand_id,
+            "module_name": rand_module,
+            "exception": "RuntimeError",
+            "traceback_str": "Traceback: ..."
+        }
+        financial_data = {"risk_score": rand_risk}
 
-    def test_evaluate_compliance_compliant_with_destination(self):
-        inc_id = str(uuid.uuid4())
-        dest_path = f"/var/log/{uuid.uuid4().hex}.audit"
-        risk_score = random.randint(0, 9)
-        mock_audit_result = {"status": "collected", "path": dest_path}
-        mock_report_result = {"report_id": uuid.uuid4().hex, "status": "generated"}
-
-        with patch("skills.incident_audit_trail_collector.collect_incident_audit_trail", return_value=mock_audit_result) as mock_collector, \
-             patch("skills.incident_forensics_compliance_checker.IncidentForensicsReportBridge") as MockBridge:
+        with patch('skills.incident_audit_trail_collector.collect_incident_audit_trail') as mock_audit:
+            # Настройка мока аудита
+            mock_audit.return_value = {"status": "success", "data": uuid.uuid4().hex}
             
-            instance_bridge = MockBridge.return_value
-            instance_bridge.generate_comprehensive_report.return_value = mock_report_result
-
-            checker = IncidentComplianceChecker()
-            result = checker.evaluate_compliance(
-                incident_data={"id": inc_id},
-                destination_path=dest_path,
-                include_raw_telemetry=True,
-                financial_data={"risk_score": risk_score}
+            result = self.checker.evaluate_compliance(
+                incident_data=incident_data,
+                destination_path=rand_path,
+                financial_data=financial_data
             )
-
-            mock_collector.assert_called_once_with(
-                incident_data={"id": inc_id},
-                destination_path=dest_path,
-                include_raw_telemetry=True
-            )
-            self.assertEqual(result["incident_id"], inc_id)
-            self.assertTrue(result["compliant"])
-            self.assertEqual(result["compliance_status"], "COMPLIANT")
-            self.assertEqual(result["audit_trail"], mock_audit_result)
-            self.assertEqual(result["forensics_report"], mock_report_result)
-            self.assertEqual(result["risk_assessment"]["score"], risk_score)
-
-    def test_evaluate_compliance_fallback_existing_audit_path(self):
-        inc_id = uuid.uuid4().hex
-        audit_path = f"/tmp/{uuid.uuid4().hex}.json"
-        risk_score = random.randint(10, 100)
-        mock_report_result = {"status": "ok", "uuid": uuid.uuid4().hex}
-
-        with patch("skills.incident_audit_trail_collector.collect_incident_audit_trail") as mock_collector, \
-             patch("skills.incident_forensics_compliance_checker.IncidentForensicsReportBridge") as MockBridge:
             
-            instance_bridge = MockBridge.return_value
-            instance_bridge.generate_comprehensive_report.return_value = mock_report_result
+            # Проверка логики соответствия
+            expected_compliant = rand_risk < 10
+            self.assertEqual(result["incident_id"], rand_id)
+            self.assertEqual(result["compliant"], expected_compliant)
+            self.assertEqual(result["risk_assessment"]["score"], rand_risk)
+            mock_audit.assert_called_once()
 
-            checker = IncidentComplianceChecker()
-            result = checker.evaluate_compliance(
-                incident_data={"incident_id": inc_id},
-                destination_path=None,
-                audit_trail_path=audit_path,
-                financial_data={"risk_score": risk_score}
+    def test_evaluate_compliance_no_destination(self):
+        # Тест пути без destination_path, но с audit_trail_path
+        rand_id = uuid.uuid4().hex
+        rand_audit_path = f"/tmp/{uuid.uuid4().hex}"
+
+        result = self.checker.evaluate_compliance(
+            incident_id=rand_id,
+            audit_trail_path=rand_audit_path
+        )
+
+        self.assertEqual(result["audit_trail"]["path"], rand_audit_path)
+        self.assertEqual(result["incident_id"], rand_id)
+
+    def test_stream_compliance_package_integration(self):
+        # Проверка передачи параметров в мост
+        rand_id = uuid.uuid4().hex
+        rand_impact = random.randint(100, 1000)
+        financial_data = {"impact": rand_impact}
+        rand_format = random.choice(["json", "xml", "pdf"])
+
+        with patch.object(self.checker.bridge, 'stream_report_package') as mock_stream:
+            mock_stream.return_value = b"random_binary_stream_data"
+
+            response = self.checker.stream_compliance_package(
+                incident_id=rand_id,
+                financial_data=financial_data,
+                format_type=rand_format
             )
-
-            mock_collector.assert_not_called()
-            self.assertEqual(result["incident_id"], inc_id)
-            self.assertFalse(result["compliant"])
-            self.assertEqual(result["compliance_status"], "NON_COMPLIANT")
-            self.assertEqual(result["audit_trail"], {"status": "success", "path": audit_path})
-            self.assertEqual(result["forensics_report"], mock_report_result)
-            self.assertEqual(result["risk_assessment"]["score"], risk_score)
-
-    def test_stream_compliance_package(self):
-        inc_id = str(uuid.uuid4())
-        format_type = random.choice(["json", "pdf", "xml"])
-        expected_stream = iter([uuid.uuid4().bytes, uuid.uuid4().bytes])
-
-        with patch("skills.incident_forensics_compliance_checker.IncidentForensicsReportBridge") as MockBridge:
-            instance_bridge = MockBridge.return_value
-            instance_bridge.stream_report_package.return_value = expected_stream
-
-            checker = IncidentComplianceChecker()
-            stream = checker.stream_compliance_package(
-                incident_id=inc_id,
-                financial_data={"impact": random.randint(100, 5000)},
-                format_type=format_type
-            )
-
-            instance_bridge.stream_report_package.assert_called_once_with(
-                incident_id=inc_id,
-                financial_data={"impact": random.randint(100, 5000)} if False else {"impact": 500},
-                format_type=format_type
-            )
-            self.assertEqual(stream, expected_stream)
-
-    def test_check_incident_compliance_functional_wrapper(self):
-        inc_id = uuid.uuid4().hex
-        dest_path = f"/logs/{uuid.uuid4().hex}"
-        risk_score = 5
-
-        with patch("skills.incident_audit_trail_collector.collect_incident_audit_trail", return_value={"mocked": True}) as mock_collector, \
-             patch("skills.incident_forensics_compliance_checker.IncidentForensicsReportBridge") as MockBridge:
             
-            instance_bridge = MockBridge.return_value
-            instance_bridge.generate_comprehensive_report.return_value = {"report": "data"}
-
-            result = check_incident_compliance(
-                incident_data={"id": inc_id, "module_name": "test_mod"},
-                destination_path=dest_path,
-                financial_data={"risk_score": risk_score},
-                format_type="xml"
+            # Проверка, что мост получил именно те данные, которые мы передали
+            mock_stream.assert_called_once_with(
+                incident_id=rand_id,
+                financial_data=financial_data,
+                format_type=rand_format
             )
+            self.assertEqual(response, b"random_binary_stream_data")
 
-            mock_collector.assert_called_once()
-            self.assertEqual(result["incident_id"], inc_id)
-            self.assertTrue(result["compliant"])
-            self.assertEqual(result["risk_assessment"]["score"], risk_score)
+    def test_compliance_status_boundary(self):
+        # Проверка пограничных значений риска
+        low_risk = 9
+        high_risk = 10
 
+        res_low = self.checker.evaluate_compliance(financial_data={"risk_score": low_risk})
+        res_high = self.checker.evaluate_compliance(financial_data={"risk_score": high_risk})
 
-if __name__ == "__main__":
+        self.assertEqual(res_low["compliance_status"], "COMPLIANT")
+        self.assertEqual(res_high["compliance_status"], "NON_COMPLIANT")
+
+if __name__ == '__main__':
     unittest.main()

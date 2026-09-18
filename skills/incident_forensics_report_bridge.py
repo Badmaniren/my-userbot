@@ -63,6 +63,7 @@ class IncidentForensicsReportBridge:
                 try:
                     with open(export_path, "w", encoding="utf-8") as f:
                         json.dump({
+                            "incident_id": incident_id,
                             "forensics": forensics_result,
                             "business_loss": business_loss_result
                         }, f)
@@ -72,6 +73,7 @@ class IncidentForensicsReportBridge:
                 try:
                     with open(export_path, "w", encoding="utf-8") as f:
                         json.dump({
+                            "incident_id": incident_id,
                             "forensics": forensics_result,
                             "business_loss": business_loss_result
                         }, f)
@@ -79,6 +81,7 @@ class IncidentForensicsReportBridge:
                     pass
 
         return {
+            "incident_id": incident_id,
             "forensics": forensics_result,
             "business_loss": business_loss_result,
             "export_status": export_status

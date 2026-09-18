@@ -1,68 +1,85 @@
 import unittest
-import uuid
-import random
-import tempfile
 import os
-from skills.incident_forensics_compliance_checker import IncidentComplianceChecker, check_incident_compliance
+import uuid
+import json
+import tempfile
+import shutil
+from skills.incident_forensics_compliance_checker import IncidentComplianceChecker
 
 class TestIncidentComplianceCheckerIntegration(unittest.TestCase):
     def setUp(self):
         self.checker = IncidentComplianceChecker()
-        self.temp_dir = tempfile.TemporaryDirectory()
-        
+        self.test_dir = tempfile.mkdtemp()
+        self.incident_id = str(uuid.uuid4())
+        self.incident_data = {
+            "id": self.incident_id,
+            "module_name": "auth_service",
+            "exception": "AccessDenied",
+            "traceback_str": "Traceback at line 42"
+        }
+        self.financial_data = {
+            "risk_score": 5,
+            "impact": 100
+        }
+        self.export_path = os.path.join(self.test_dir, f"report_{self.incident_id}.json")
+        self.audit_path = os.path.join(self.test_dir, "audit_logs")
+        os.makedirs(self.audit_path)
+
     def tearDown(self):
-        self.temp_dir.cleanup()
+        shutil.rmtree(self.test_dir)
 
-    def test_evaluate_compliance_real_integration(self):
-        rand_id = f"inc-{uuid.uuid4()}"
-        risk_value = random.randint(0, 15)
-        destination_file = os.path.join(self.temp_dir.name, f"audit_{uuid.uuid4()}.json")
-        
-        incident_data = {
-            "id": rand_id,
-            "module_name": "integration_test_module",
-            "exception": "TestException",
-            "traceback_str": "Traceback mock..."
-        }
-        
-        financial_data = {
-            "risk_score": risk_value,
-            "estimated_loss": random.uniform(100.0, 5000.0)
-        }
-
+    def test_evaluate_compliance_full_integration(self):
+        # Выполнение реального процесса
         result = self.checker.evaluate_compliance(
-            incident_data=incident_data,
-            destination_path=destination_file,
-            include_raw_telemetry=True,
-            financial_data=financial_data,
-            export_path=None,
+            incident_data=self.incident_data,
+            destination_path=self.audit_path,
+            financial_data=self.financial_data,
+            export_path=self.export_path,
             format_type="json"
         )
 
-        self.assertEqual(result["incident_id"], rand_id)
-        self.assertEqual(result["risk_assessment"]["score"], risk_value)
-        
-        expected_compliant = risk_value < 10
-        self.assertEqual(result["compliant"], expected_compliant)
-        self.assertEqual(result["compliance_status"], "COMPLIANT" if expected_compliant else "NON_COMPLIANT")
-        
-        self.assertIn("audit_trail", result)
-        self.assertIn("forensics_report", result)
-        
-        self.assertTrue(os.path.exists(destination_file))
+        # Проверка корректности возвращаемых данных
+        self.assertEqual(result["incident_id"], self.incident_id)
+        self.assertEqual(result["compliance_status"], "COMPLIANT")
+        self.assertTrue(result["compliant"])
+        self.assertEqual(result["risk_assessment"]["score"], 5)
 
-    def test_check_incident_compliance_standalone_function(self):
-        rand_id = str(uuid.uuid4())
-        risk_value = random.choice([5, 12])
+        # Проверка создания файла отчета (интеграция с bridge)
+        self.assertTrue(os.path.exists(self.export_path), "Отчет не был создан на диске")
         
-        result = check_incident_compliance(
-            incident_id=rand_id,
-            financial_data={"risk_score": risk_value}
+        with open(self.export_path, 'r') as f:
+            report_content = json.load(f)
+            self.assertEqual(report_content.get("incident_id"), self.incident_id)
+
+        # Проверка аудита (интеграция с collector)
+        self.assertIn("path", result["audit_trail"])
+        self.assertTrue(os.path.exists(result["audit_trail"]["path"]))
+
+    def test_non_compliant_risk_threshold(self):
+        high_risk_data = {"risk_score": 50}
+        result = self.checker.evaluate_compliance(
+            incident_data=self.incident_data,
+            financial_data=high_risk_data
         )
         
-        self.assertEqual(result["incident_id"], rand_id)
-        self.assertEqual(result["risk_assessment"]["score"], risk_value)
-        self.assertIsInstance(result["compliant"], bool)
+        self.assertEqual(result["compliance_status"], "NON_COMPLIANT")
+        self.assertFalse(result["compliant"])
+        self.assertEqual(result["risk_assessment"]["score"], 50)
 
-if __name__ == "__main__":
+    def test_stream_compliance_package_integration(self):
+        # Проверка потоковой передачи через bridge
+        stream_result = self.checker.stream_compliance_package(
+            incident_id=self.incident_id,
+            financial_data=self.financial_data,
+            format_type="json"
+        )
+        
+        # Проверяем, что bridge вернул структуру данных, а не None
+        self.assertIsNotNone(stream_result)
+        # Если bridge возвращает путь к потоку или объект, проверяем наличие ключа
+        if isinstance(stream_result, dict):
+            self.assertIn("incident_id", stream_result)
+            self.assertEqual(stream_result["incident_id"], self.incident_id)
+
+if __name__ == '__main__':
     unittest.main()

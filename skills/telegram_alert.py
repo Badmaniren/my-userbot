@@ -28,10 +28,7 @@ class TelegramAlertService:
 
     def check_and_alert(self, symbol, threshold, chat_id="DEFAULT_CHAT", token="DEFAULT_TOKEN", url="https://example.com"):
         if self.parser and hasattr(self.parser, 'fetch_price'):
-            try:
-                price = self.parser.fetch_price(url)
-            except AttributeError:
-                price = market_parser.fetch_price(url)
+            price = self.parser.fetch_price(url)
         else:
             price = market_parser.fetch_price(url)
             

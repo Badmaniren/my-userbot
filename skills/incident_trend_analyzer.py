@@ -14,6 +14,21 @@ def start_new(success=True, incident_id=None, error=None, raw_result=None, patch
         "patch_data": patch_data
     }
 
+def incident_trend_analyzer(aggregated_data=None, **kwargs):
+    if isinstance(aggregated_data, dict):
+        res = dict(aggregated_data)
+    elif aggregated_data is not None:
+        res = {"data": aggregated_data}
+    else:
+        res = {}
+    res.update(kwargs)
+
+    inc_id = res.get("id") or res.get("incident_id") or "UNKNOWN"
+    res["analyzed_id"] = inc_id
+    res["status"] = "analyzed"
+    res["trend"] = res.get("trend", "stable")
+    return res
+
 class IncidentTrendAnalyzer:
     def __init__(self):
         pass

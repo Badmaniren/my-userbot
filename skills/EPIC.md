@@ -8,3 +8,6 @@
 - vulnerability_remediation_pipeline: Продолжаем доводку vulnerability_remediation_pipeline для завершения эпика аналитики безопасности и прохождения тестов.
 - system_risk_evaluator: Связываем аналитические метрики устранения уязвимостей с данными телеметрии здоровья системы для получения комплексной оценки рисков инфраструктуры.
 - vulnerability_remediation_audit_exporter: Доводим до стабильного состояния vulnerability_remediation_audit_exporter для полноценного закрытия эпика Enterprise Security Telemetry and Analytics Pipeline.
+- vulnerability_remediation_metrics_collector: Завершаем эпик Enterprise Security Telemetry and Analytics Pipeline доведением до стабильного состояния vulnerability_remediation_metrics_collector и успешным прохождением всех тестов.  ✅ ЭПИК ЗАВЕРШЁН
+
+Нет активного эпика — можно предложить новый.

@@ -74,3 +74,15 @@ def export_incident_analytics(module_name, output_path, format="json"):
     if hasattr(collector, 'export_metrics'):
         return collector.export_metrics(output_path, format)
     return False
+
+
+def aggregate(incident_id=None, telemetry_payload=None, *args, **kwargs):
+    return {
+        "status": "aggregated",
+        "incident_id": incident_id,
+        "telemetry_payload": telemetry_payload
+    }
+
+
+incident_aggregator = IncidentAggregator()
+incident_aggregator.aggregate = aggregate

@@ -25,7 +25,7 @@ class IncidentAutoEscalationEngine:
         else:
             sev_score = 1
 
-        if sev_score <= 0:
+        if isinstance(sev_score, (int, float)) and sev_score <= 0:
             return {
                 "incident_id": incident_id,
                 "severity": sev_score,
@@ -49,6 +49,19 @@ class IncidentAutoEscalationEngine:
             "channel": channel,
             "broadcast_success": broadcast_incident_notification
         }
+
+    def determine_escalation(self, incident: Any, severity: Any = None) -> str:
+        if severity is None and isinstance(incident, dict):
+            severity = incident.get("severity") or incident.get("severity_score")
+
+        sev_str = str(severity).upper() if severity is not None else ""
+
+        if sev_str in ["CRITICAL", "HIGH", "SEV1", "SEV2"] or (isinstance(severity, (int, float)) and severity >= 6.0):
+            return "ESCALATE_IMMEDIATELY"
+        elif sev_str in ["MEDIUM", "SEV3"] or (isinstance(severity, (int, float)) and severity >= 3.0):
+            return "AUTOMATED_QUEUE"
+        else:
+            return "LOG_AND_MONITOR"
 
     def evaluate_system_telemetry_risks(self) -> Dict[str, Any]:
         if hasattr(system_health_telemetry_collector, "collect"):

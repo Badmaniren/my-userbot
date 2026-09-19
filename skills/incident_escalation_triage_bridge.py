@@ -7,6 +7,18 @@ class IncidentEscalationTriageBridge:
         self.triage_pipeline = IncidentTriagePipeline()
         self.escalation_engine = IncidentAutoEscalationEngine()
 
+    def bridge_triage_and_escalation(self, triage_result: dict, escalation_decision: str) -> dict:
+        inc_id = triage_result.get("incident_id", "unknown")
+        action = f"ACTION_{escalation_decision}"
+        return {
+            "bridge_id": f"bridge_{inc_id}",
+            "incident_id": inc_id,
+            "status": "COMPLETED",
+            "triage_result": triage_result,
+            "escalation_decision": escalation_decision,
+            "action": action
+        }
+
     def process_bridge_triage_and_escalation(self, module_name, exception, traceback_str, incident_id, workspace_dir):
         triage_res = self.triage_pipeline.triage_and_escalate(module_name, exception, traceback_str, incident_id, workspace_dir)
         escalation_res = self.escalation_engine.process_escalation(incident_id)
@@ -16,11 +28,7 @@ class IncidentEscalationTriageBridge:
         }
 
 
-class IncidentTriageEscalationBridge:
-    def __init__(self):
-        self.triage_pipeline = IncidentTriagePipeline()
-        self.escalation_engine = IncidentAutoEscalationEngine()
-
+class IncidentTriageEscalationBridge(IncidentEscalationTriageBridge):
     def process_end_to_end(self, module_name, exception, traceback_str, incident_id, workspace_dir):
         triage_res = self.triage_pipeline.triage_and_escalate(module_name, exception, traceback_str, incident_id, workspace_dir)
         escalation_res = self.escalation_engine.process_escalation(incident_id)

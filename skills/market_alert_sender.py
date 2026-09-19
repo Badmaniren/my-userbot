@@ -1,5 +1,5 @@
 from skills.market_parser import MarketParser
-from skills.db_storage import DbStorage, DBStorage
+from skills.db_storage import DBStorage, DBStorage as DbStorage
 
 
 class MarketAlertSender:
@@ -10,7 +10,7 @@ class MarketAlertSender:
         else:
             storage_file = storage_file_or_parser
             self.parser = MarketParser()
-            self.storage = DbStorage(storage_file) if storage_file else DbStorage()
+            self.storage = DBStorage(storage_file) if storage_file else DBStorage()
 
     def check_and_alert(self, url, symbol, threshold_low, threshold_high):
         price = self.parser.fetch_price(url)
@@ -37,8 +37,6 @@ class MarketAlertSender:
             else:
                 price = threshold + 1.0 if threshold else 100.0
 
-        limit = threshold if threshold is not None else (threshold_low if threshold_low is not None else 0.0)
-        
         if threshold is not None:
             if price <= threshold:
                 return f"Alert: {target_symbol} price {price} reached threshold {threshold}"

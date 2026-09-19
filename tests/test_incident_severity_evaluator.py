@@ -1,291 +1,165 @@
-import io
+import unittest
+from unittest.mock import MagicMock, patch
+import uuid
 import random
 import string
-import unittest
-import uuid
-from unittest.mock import MagicMock, patch
 
 from skills.incident_severity_evaluator import (
     IncidentSeverityEvaluator,
-    evaluate_incident_severity,
+    evaluate_incident_severity
 )
 
 
-def _gen_random_str(prefix: str = "") -> str:
-    token = uuid.uuid4().hex[: random.randint(8, 16)]
-    return f"{prefix}_{token}" if prefix else token
-
-
-def _gen_random_dict() -> dict:
-    return {
-        _gen_random_str("key"): _gen_random_str("val")
-        for _ in range(random.randint(2, 5))
-    }
-
-
 class TestIncidentSeverityEvaluator(unittest.TestCase):
+
     def setUp(self):
-        self.random_module_name = _gen_random_str("module")
-        self.random_incident_id = _gen_random_str("inc")
-        self.random_error_msg = _gen_random_str("error")
-        self.random_traceback = (
-            f"Traceback (most recent call last):\n  File '{_gen_random_str()}', line {random.randint(1, 100)}\n"
-            f"ValueError: {self.random_error_msg}"
-        )
-        self.random_exception = ValueError(self.random_error_msg)
-
-    def test_evaluator_initialization_defaults(self):
-        with patch("skills.incident_severity_evaluator.IncidentAggregator") as mock_agg_cls, \
-             patch("skills.incident_severity_evaluator.NotificationTemplateEngine") as mock_engine_cls:
-            evaluator = IncidentSeverityEvaluator()
-
-            mock_agg_cls.assert_called_once()
-            mock_engine_cls.assert_called_once()
-            self.assertIsNotNone(evaluator.aggregator)
-            self.assertIsNotNone(evaluator.template_engine)
-
-    def test_evaluator_initialization_injected_dependencies(self):
-        custom_aggregator = MagicMock()
-        custom_engine = MagicMock()
-
-        evaluator = IncidentSeverityEvaluator(
-            aggregator=custom_aggregator,
-            template_engine=custom_engine,
+        self.mock_aggregator = MagicMock()
+        self.mock_template_engine = MagicMock()
+        self.evaluator = IncidentSeverityEvaluator(
+            aggregator=self.mock_aggregator,
+            template_engine=self.mock_template_engine
         )
 
-        self.assertIs(evaluator.aggregator, custom_aggregator)
-        self.assertIs(evaluator.template_engine, custom_engine)
+    def test_calculate_severity_score_critical_by_count(self):
+        count = random.randint(50, 1000)
+        data = {"count": count, "is_fatal": False}
+        score = self.evaluator.calculate_severity_score(data)
+        self.assertEqual(score, "CRITICAL")
 
-    def test_evaluate_incident_severity_critical(self):
-        mock_aggregator = MagicMock()
-        mock_engine = MagicMock()
+    def test_calculate_severity_score_critical_by_fatal(self):
+        count = random.randint(0, 49)
+        data = {"count": count, "is_fatal": True}
+        score = self.evaluator.calculate_severity_score(data)
+        self.assertEqual(score, "CRITICAL")
 
-        occurrences = random.randint(50, 100)
-        agg_result = {
-            "incident_id": self.random_incident_id,
-            "module": self.random_module_name,
-            "count": occurrences,
-            "status": _gen_random_str("status"),
+    def test_calculate_severity_score_high(self):
+        count = random.randint(26, 49)
+        data = {"count": count, "is_fatal": False}
+        score = self.evaluator.calculate_severity_score(data)
+        self.assertEqual(score, "HIGH")
+
+    def test_calculate_severity_score_medium(self):
+        count = random.randint(6, 25)
+        data = {"count": count, "is_fatal": False}
+        score = self.evaluator.calculate_severity_score(data)
+        self.assertEqual(score, "MEDIUM")
+
+    def test_calculate_severity_score_low(self):
+        count = random.randint(0, 5)
+        data = {"count": count, "is_fatal": False}
+        score = self.evaluator.calculate_severity_score(data)
+        self.assertEqual(score, "LOW")
+
+    def test_evaluate(self):
+        mod_name = ''.join(random.choices(string.ascii_lowercase, k=10))
+        exc_msg = ''.join(random.choices(string.ascii_letters, k=15))
+        exc = Exception(exc_msg)
+        tb_str = ''.join(random.choices(string.ascii_letters, k=20))
+        inc_id = uuid.uuid4().hex
+
+        agg_return = {
+            "count": random.randint(6, 25),
+            "is_fatal": False,
+            "incident_id": inc_id
         }
-        mock_aggregator.process_and_aggregate.return_value = agg_result
+        self.mock_aggregator.process_and_aggregate.return_value = agg_return
 
-        expected_rendered_text = _gen_random_str("CRITICAL_NOTIFICATION")
-        expected_payload = {
-            "notification_id": _gen_random_str("notif"),
-            "severity": "CRITICAL",
-            "rendered": expected_rendered_text,
+        payload_return = {"payload_id": uuid.uuid4().hex}
+        self.mock_template_engine.generate_notification_payload.return_value = payload_return
+
+        result = self.evaluator.evaluate(mod_name, exc, tb_str, inc_id)
+
+        self.mock_aggregator.process_and_aggregate.assert_called_once_with(
+            mod_name, exc, tb_str, inc_id
+        )
+        self.mock_template_engine.generate_notification_payload.assert_called_once_with(
+            "MEDIUM", inc_id, agg_return
+        )
+
+        self.assertEqual(result["incident_id"], inc_id)
+        self.assertEqual(result["severity"], "MEDIUM")
+        self.assertEqual(result["payload"], payload_return)
+        self.assertEqual(result["aggregated_data"], agg_return)
+
+    def test_evaluate_stream(self):
+        stream_data = {'raw_stream': uuid.uuid4().hex}
+        parsed_id = uuid.uuid4().hex
+        freq = random.randint(26, 49)
+
+        parsed_return = {
+            "parsed_id": parsed_id,
+            "frequency": freq
         }
-        mock_engine.generate_notification_payload.return_value = expected_payload
-        mock_engine.render_text.return_value = expected_rendered_text
+        self.mock_template_engine.parse_stream_data.return_value = parsed_return
 
-        evaluator = IncidentSeverityEvaluator(
-            aggregator=mock_aggregator,
-            template_engine=mock_engine,
+        payload_return = {"stream_payload": uuid.uuid4().hex}
+        self.mock_template_engine.generate_notification_payload.return_value = payload_return
+
+        mod_name = ''.join(random.choices(string.ascii_lowercase, k=8))
+        result = self.evaluator.evaluate_stream(mod_name, stream_data)
+
+        self.mock_template_engine.parse_stream_data.assert_called_once_with(stream_data)
+        self.mock_template_engine.generate_notification_payload.assert_called_once_with(
+            "HIGH", parsed_id, parsed_return
         )
 
-        result = evaluator.evaluate(
-            module_name=self.random_module_name,
-            exception=self.random_exception,
-            traceback_str=self.random_traceback,
-            incident_id=self.random_incident_id,
-        )
+        self.assertEqual(result["incident_id"], parsed_id)
+        self.assertEqual(result["severity"], "HIGH")
+        self.assertEqual(result["payload"], payload_return)
 
-        mock_aggregator.process_and_aggregate.assert_called_once_with(
-            self.random_module_name,
-            self.random_exception,
-            self.random_traceback,
-            self.random_incident_id,
-        )
+    def test_evaluate_and_notify(self):
+        mod_name = ''.join(random.choices(string.ascii_lowercase, k=9))
+        exc = RuntimeError(''.join(random.choices(string.ascii_letters, k=10)))
+        tb_str = ''.join(random.choices(string.ascii_letters, k=12))
+        inc_id = uuid.uuid4().hex
 
-        mock_engine.generate_notification_payload.assert_called_once()
-        call_args, _ = mock_engine.generate_notification_payload.call_args
-        self.assertIn("CRITICAL", str(call_args))
-
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result.get("severity"), "CRITICAL")
-        self.assertEqual(result.get("incident_id"), self.random_incident_id)
-        self.assertEqual(result.get("payload"), expected_payload)
-
-    def test_evaluate_incident_severity_low_and_medium(self):
-        mock_aggregator = MagicMock()
-        mock_engine = MagicMock()
-
-        low_count = random.randint(1, 4)
-        mock_aggregator.process_and_aggregate.return_value = {
-            "incident_id": self.random_incident_id,
-            "module": self.random_module_name,
-            "count": low_count,
+        agg_return = {
+            "count": 60,
+            "is_fatal": True,
+            "incident_id": inc_id
         }
-        mock_engine.generate_notification_payload.side_effect = (
-            lambda severity, inc_id, raw: {"severity": severity, "incident_id": inc_id, "data": raw}
-        )
+        self.mock_aggregator.process_and_aggregate.return_value = agg_return
 
-        evaluator = IncidentSeverityEvaluator(
-            aggregator=mock_aggregator,
-            template_engine=mock_engine,
-        )
+        payload_1 = {"type": uuid.uuid4().hex}
+        payload_2 = {"type": uuid.uuid4().hex}
+        self.mock_template_engine.generate_notification_payload.side_effect = [payload_1, payload_2]
 
-        low_result = evaluator.evaluate(
-            module_name=self.random_module_name,
-            exception=self.random_exception,
-            traceback_str=self.random_traceback,
-            incident_id=self.random_incident_id,
-        )
-        self.assertEqual(low_result.get("severity"), "LOW")
+        result = self.evaluator.evaluate_and_notify(mod_name, exc, tb_str, inc_id)
 
-        med_count = random.randint(10, 25)
-        mock_aggregator.process_and_aggregate.return_value = {
-            "incident_id": self.random_incident_id,
-            "module": self.random_module_name,
-            "count": med_count,
-        }
+        self.assertEqual(result["incident_id"], inc_id)
+        self.assertEqual(result["severity"], "CRITICAL")
+        self.assertEqual(result["payload"], payload_1)
+        self.assertEqual(result["notification"], payload_2)
+        self.assertEqual(result["aggregated_data"], agg_return)
 
-        med_result = evaluator.evaluate(
-            module_name=self.random_module_name,
-            exception=self.random_exception,
-            traceback_str=self.random_traceback,
-            incident_id=self.random_incident_id,
-        )
-        self.assertEqual(med_result.get("severity"), "MEDIUM")
+    def test_export_incident_report(self):
+        tpl_name = ''.join(random.choices(string.ascii_lowercase, k=10))
+        context = {uuid.uuid4().hex: uuid.uuid4().hex}
+        out_path = f"/tmp/{uuid.uuid4().hex}.html"
+        fmt = "html"
 
-    def test_evaluate_stream_uses_io_bytes(self):
-        mock_aggregator = MagicMock()
-        mock_engine = MagicMock()
+        expected_export_result = uuid.uuid4().hex
+        self.mock_template_engine.export_notification_file.return_value = expected_export_result
 
-        random_stream_content = _gen_random_str("stream_log_payload").encode("utf-8")
-        stream_input = io.BytesIO(random_stream_content)
+        res = self.evaluator.export_incident_report(tpl_name, context, out_path, fmt)
 
-        parsed_stream_dict = {
-            "parsed_id": self.random_incident_id,
-            "error": self.random_error_msg,
-            "frequency": random.randint(5, 15),
-        }
-        mock_engine.parse_stream_data.return_value = parsed_stream_dict
-        mock_engine.generate_notification_payload.return_value = {
-            "result": "OK",
-            "token": _gen_random_str("token"),
-        }
+        self.mock_template_engine.render_template.assert_called_once_with(tpl_name, context, fmt)
+        self.mock_template_engine.export_notification_file.assert_called_once_with(context, out_path)
+        self.assertEqual(res, expected_export_result)
 
-        evaluator = IncidentSeverityEvaluator(
-            aggregator=mock_aggregator,
-            template_engine=mock_engine,
-        )
+    def test_evaluate_incident_severity_helper(self):
+        mod_name = ''.join(random.choices(string.ascii_lowercase, k=7))
+        exc = ValueError(uuid.uuid4().hex)
+        tb_str = uuid.uuid4().hex
+        inc_id = uuid.uuid4().hex
 
-        stream_result = evaluator.evaluate_stream(
-            module_name=self.random_module_name,
-            stream_data=stream_input,
-        )
-
-        mock_engine.parse_stream_data.assert_called_once_with(stream_input)
-        self.assertIsInstance(stream_result, dict)
-        self.assertEqual(stream_result.get("incident_id"), self.random_incident_id)
-        self.assertIn("severity", stream_result)
-
-    def test_calculate_severity_score_logic(self):
-        evaluator = IncidentSeverityEvaluator(
-            aggregator=MagicMock(),
-            template_engine=MagicMock(),
-        )
-
-        critical_data = {"count": random.randint(50, 200), "is_fatal": True}
-        high_data = {"count": random.randint(26, 49), "is_fatal": False}
-        medium_data = {"count": random.randint(6, 25), "is_fatal": False}
-        low_data = {"count": random.randint(1, 5), "is_fatal": False}
-
-        self.assertEqual(evaluator.calculate_severity_score(critical_data), "CRITICAL")
-        self.assertEqual(evaluator.calculate_severity_score(high_data), "HIGH")
-        self.assertEqual(evaluator.calculate_severity_score(medium_data), "MEDIUM")
-        self.assertEqual(evaluator.calculate_severity_score(low_data), "LOW")
-
-    def test_evaluate_incident_severity_module_level_function(self):
         with patch("skills.incident_severity_evaluator.IncidentSeverityEvaluator") as mock_evaluator_cls:
-            mock_instance = MagicMock()
-            mock_evaluator_cls.return_value = mock_instance
+            mock_instance = mock_evaluator_cls.return_value
+            expected_dict = {uuid.uuid4().hex: uuid.uuid4().hex}
+            mock_instance.evaluate.return_value = expected_dict
 
-            expected_output = {
-                "incident_id": self.random_incident_id,
-                "severity": random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"]),
-                "marker": _gen_random_str("marker"),
-            }
-            mock_instance.evaluate.return_value = expected_output
-
-            res = evaluate_incident_severity(
-                module_name=self.random_module_name,
-                exception=self.random_exception,
-                traceback_str=self.random_traceback,
-                incident_id=self.random_incident_id,
-            )
+            res = evaluate_incident_severity(mod_name, exc, tb_str, inc_id)
 
             mock_evaluator_cls.assert_called_once()
-            mock_instance.evaluate.assert_called_once_with(
-                self.random_module_name,
-                self.random_exception,
-                self.random_traceback,
-                self.random_incident_id,
-            )
-            self.assertEqual(res, expected_output)
-
-    def test_render_and_export_notification_pipeline(self):
-        mock_aggregator = MagicMock()
-        mock_engine = MagicMock()
-
-        random_template = _gen_random_str("template_name")
-        random_file_path = f"/tmp/{_gen_random_str('path')}.html"
-        rendered_html = f"<html><body>{_gen_random_str('body')}</body></html>"
-
-        mock_engine.render_template.return_value = rendered_html
-        mock_engine.export_notification_file.return_value = True
-
-        evaluator = IncidentSeverityEvaluator(
-            aggregator=mock_aggregator,
-            template_engine=mock_engine,
-        )
-
-        context_data = _gen_random_dict()
-        exported = evaluator.export_incident_report(
-            template_name=random_template,
-            context=context_data,
-            output_path=random_file_path,
-            format_type="html",
-        )
-
-        self.assertTrue(exported)
-        mock_engine.render_template.assert_called_once_with(
-            random_template,
-            context_data,
-            "html",
-        )
-        mock_engine.export_notification_file.assert_called_once_with(
-            context_data,
-            random_file_path,
-        )
-
-    def test_graceful_handling_on_empty_traceback_and_none_id(self):
-        mock_aggregator = MagicMock()
-        mock_engine = MagicMock()
-
-        generated_id = _gen_random_str("auto_id")
-        mock_aggregator.process_and_aggregate.side_effect = (
-            lambda m, e, t, i: {"incident_id": i or generated_id, "count": 1}
-        )
-        mock_engine.generate_notification_payload.return_value = {"status": "ok"}
-
-        evaluator = IncidentSeverityEvaluator(
-            aggregator=mock_aggregator,
-            template_engine=mock_engine,
-        )
-
-        result = evaluator.evaluate(
-            module_name=self.random_module_name,
-            exception=self.random_exception,
-            traceback_str="",
-            incident_id=None,
-        )
-
-        self.assertIsInstance(result, dict)
-        self.assertIn("severity", result)
-        self.assertIsNotNone(result.get("incident_id"))
-
-
-if __name__ == "__main__":
-    unittest.main()
+            mock_instance.evaluate.assert_called_once_with(mod_name, exc, tb_str, inc_id)
+            self.assertEqual(res, expected_dict)

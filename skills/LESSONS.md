@@ -3,7 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ый 'system_health_telemetry_collector'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.system_health_telemetry_collector import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'telemetry_streamer'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.telemetry_streamer import ...'
+reamer'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.telemetry_streamer import ...'
 - Последняя ошибка перед фиксом: from skills.telemetry_anomaly_evaluator_core import (
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -253,4 +253,8 @@
 
 ## incident_triage_pipeline (compose) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (failures=2)
+- Статус: успешно прошёл тесты и влит в main
+
+## incident_escalation_triage_bridge (compose) — раундов: 3
+- Последняя ошибка перед фиксом: ----------------------------------------------------------------------
 - Статус: успешно прошёл тесты и влит в main

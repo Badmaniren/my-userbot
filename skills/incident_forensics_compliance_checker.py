@@ -1,3 +1,4 @@
+import os
 from skills import incident_audit_trail_collector
 from skills.incident_forensics_report_bridge import IncidentForensicsReportBridge
 
@@ -18,21 +19,34 @@ class IncidentComplianceChecker:
     ):
         if incident_data is None:
             incident_data = {}
+        else:
+            # Превращаем в изменяемый словарь, если передан несловарный объект
+            incident_data = dict(incident_data)
+
         if financial_data is None:
             financial_data = {}
             
-        # Извлечение incident_id из доступных источников
+        # Извлечение incident_id из доступных источников с приоритетом аргумента incident_id, затем из incident_data
         inc_id = incident_id or incident_data.get("id") or incident_data.get("incident_id") or "unknown"
 
-        # Шаг 1: Сбор аудита
+        # Гарантируем, что в самом incident_data будут проставлены оба ключа id и incident_id,
+        # чтобы мост (или любые другие компоненты) надежно извлекли идентификатор.
+        incident_data["id"] = inc_id
+        incident_data["incident_id"] = inc_id
+
+        # Шаг 1: Сбор аудита (корректная обработка, если destination_path является директорией)
         audit_res = {}
         if destination_path:
             dest = destination_path
+            if os.path.isdir(dest):
+                dest = os.path.join(dest, f"audit_{inc_id}.log")
             audit_res = incident_audit_trail_collector.collect_incident_audit_trail(
                 incident_data=incident_data,
                 destination_path=dest,
                 include_raw_telemetry=include_raw_telemetry
             )
+            if isinstance(audit_res, dict) and "path" not in audit_res:
+                audit_res["path"] = dest
         elif audit_trail_path and not destination_path:
             audit_res = {"status": "success", "path": audit_trail_path}
         else:
@@ -71,12 +85,9 @@ class IncidentComplianceChecker:
         financial_data=None,
         format_type="json"
     ):
-        # Тест проверяет жесткое значение {"impact": 500} из-за особенностей мока в юнит-тесте.
-        # Подстраиваемся под ожидания assert_called_once_with в юнит-тесте.
-        fd = {"impact": 500} if financial_data and "impact" in financial_data else financial_data
         return self.bridge.stream_report_package(
             incident_id=incident_id,
-            financial_data=fd,
+            financial_data=financial_data,
             format_type=format_type
         )
 

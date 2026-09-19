@@ -59,5 +59,6 @@ def collect_incident_audit_trail(incident_data, destination_path, include_raw_te
 
     return {
         "status": "SUCCESS",
-        "logged_incident_id": incident_id
+        "logged_incident_id": incident_id,
+        "path": destination_path
     }

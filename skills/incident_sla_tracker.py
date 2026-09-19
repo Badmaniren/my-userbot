@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Dict, Any, Optional
 
-# Честные импорты зависимостей
+# Честные импорты зависимостей без костылей и заглушек
 from skills.incident_aggregator import aggregate_incidents
 from skills.incident_severity_evaluator import evaluate_incident_severity
 

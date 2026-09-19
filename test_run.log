@@ -1,0 +1,75 @@
+..............................EE.........................................................................../app/tests/test_incident_forensics_synthesizer_integration.py:31: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  "timestamp": datetime.utcnow().isoformat(),
+................................................................................................................................................................................................................................................/app/skills/vulnerability_remediation_metrics_collector.py:21: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  "timestamp": datetime.datetime.utcnow().isoformat()
+.EE.................................................................................................................................
+======================================================================
+ERROR: test_extractor_tool_1789544538 (unittest.loader._FailedTest.test_extractor_tool_1789544538)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_extractor_tool_1789544538
+Traceback (most recent call last):
+  File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/unittest/loader.py", line 396, in _find_test_path
+    module = self._get_module_from_name(name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/unittest/loader.py", line 339, in _get_module_from_name
+    __import__(name)
+  File "/app/tests/test_extractor_tool_1789544538.py", line 8, in <module>
+    from bs4 import BeautifulSoup
+ModuleNotFoundError: No module named 'bs4'
+
+
+======================================================================
+ERROR: test_extractor_tool_1789544538_integration (unittest.loader._FailedTest.test_extractor_tool_1789544538_integration)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_extractor_tool_1789544538_integration
+Traceback (most recent call last):
+  File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/unittest/loader.py", line 396, in _find_test_path
+    module = self._get_module_from_name(name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/unittest/loader.py", line 339, in _get_module_from_name
+    __import__(name)
+  File "/app/tests/test_extractor_tool_1789544538_integration.py", line 4, in <module>
+    from skills.extractor_tool_1789544538 import extract_metadata
+  File "/app/skills/extractor_tool_1789544538.py", line 2, in <module>
+    from bs4 import BeautifulSoup
+ModuleNotFoundError: No module named 'bs4'
+
+
+======================================================================
+ERROR: test_system_security_audit_log (unittest.loader._FailedTest.test_system_security_audit_log)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_system_security_audit_log
+Traceback (most recent call last):
+  File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/unittest/loader.py", line 396, in _find_test_path
+    module = self._get_module_from_name(name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/unittest/loader.py", line 339, in _get_module_from_name
+    __import__(name)
+  File "/app/tests/test_system_security_audit_log.py", line 8, in <module>
+    from skills.system_security_audit_log import SystemSecurityAuditLog
+  File "/app/skills/system_security_audit_log.py", line 5, in <module>
+    from skills.system_health_audit_pipeline import system_health_audit_pipeline
+ImportError: cannot import name 'system_health_audit_pipeline' from 'skills.system_health_audit_pipeline' (/app/skills/system_health_audit_pipeline.py)
+
+
+======================================================================
+ERROR: test_system_security_audit_log_integration (unittest.loader._FailedTest.test_system_security_audit_log_integration)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_system_security_audit_log_integration
+Traceback (most recent call last):
+  File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/unittest/loader.py", line 396, in _find_test_path
+    module = self._get_module_from_name(name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/unittest/loader.py", line 339, in _get_module_from_name
+    __import__(name)
+  File "/app/tests/test_system_security_audit_log_integration.py", line 6, in <module>
+    from skills.system_security_audit_log import system_security_audit_log
+  File "/app/skills/system_security_audit_log.py", line 5, in <module>
+    from skills.system_health_audit_pipeline import system_health_audit_pipeline
+ImportError: cannot import name 'system_health_audit_pipeline' from 'skills.system_health_audit_pipeline' (/app/skills/system_health_audit_pipeline.py)
+
+
+----------------------------------------------------------------------
+Ran 479 tests in 2.297s
+
+FAILED (errors=4)

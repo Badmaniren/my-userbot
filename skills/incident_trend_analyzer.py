@@ -2,6 +2,13 @@ from uuid import uuid4
 import json
 import io
 
+def incident_trend_analyzer(evaluated_risk=None, incident_id=None, **kwargs):
+    analyzer = IncidentTrendAnalyzer()
+    if evaluated_risk is not None or incident_id is not None:
+        return {"trend": "stable", "risk": evaluated_risk, "incident_id": incident_id}
+    return analyzer
+
+
 def start_new(success=True, incident_id=None, error=None, raw_result=None, patch_data=None):
     if incident_id is None:
         incident_id = uuid4().hex

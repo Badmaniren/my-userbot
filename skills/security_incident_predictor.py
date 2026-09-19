@@ -1,30 +1,18 @@
 import io
 import hashlib
 
-from skills.system_health_telemetry_collector import SystemHealthTelemetryCollector
-from skills.system_risk_evaluator import SystemRiskEvaluator
-from skills.incident_trend_analyzer import IncidentTrendAnalyzer
-
-
-def system_health_telemetry_collector(telemetry_data=None, **kwargs):
-    collector = SystemHealthTelemetryCollector()
-    if telemetry_data is not None:
-        return {"status": "ok", "telemetry": telemetry_data}
-    return collector
-
-
-def system_risk_evaluator(telemetry_data=None, threshold=50, **kwargs):
-    evaluator = SystemRiskEvaluator()
-    if telemetry_data is not None:
-        return {"risk_score": float(threshold), "telemetry": telemetry_data}
-    return evaluator
-
-
-def incident_trend_analyzer(risk_data=None, **kwargs):
-    analyzer = IncidentTrendAnalyzer()
-    if risk_data is not None:
-        return {"trend": "analyzed", "risk_input": risk_data}
-    return analyzer
+from skills.system_health_telemetry_collector import (
+    SystemHealthTelemetryCollector,
+    system_health_telemetry_collector
+)
+from skills.system_risk_evaluator import (
+    SystemRiskEvaluator,
+    system_risk_evaluator
+)
+from skills.incident_trend_analyzer import (
+    IncidentTrendAnalyzer,
+    incident_trend_analyzer
+)
 
 class SecurityIncidentPredictor:
     def predict(self, metrics: dict, telemetry: dict) -> dict:

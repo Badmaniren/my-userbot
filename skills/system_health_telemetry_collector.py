@@ -4,6 +4,13 @@ import io
 import json
 
 
+def system_health_telemetry_collector(telemetry=None, **kwargs):
+    collector = SystemHealthTelemetryCollector()
+    if telemetry is not None:
+        return {"status": "ok", "telemetry": telemetry}
+    return collector
+
+
 class SystemHealthTelemetryCollector:
     def __init__(self):
         self.aggregator = SystemHealthAggregator()

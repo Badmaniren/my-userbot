@@ -1,6 +1,13 @@
 from skills.system_health_aggregator import SystemHealthAggregator
 from skills.vulnerability_remediation_metrics_collector import VulnerabilityRemediationMetricsCollector
 
+def system_risk_evaluator(collected_telemetry=None, threshold=50, **kwargs):
+    evaluator = SystemRiskEvaluator()
+    if collected_telemetry is not None:
+        return {"risk_score": float(threshold), "telemetry": collected_telemetry}
+    return evaluator
+
+
 class SystemRiskEvaluator:
     def __init__(self):
         self.health_aggregator = SystemHealthAggregator()

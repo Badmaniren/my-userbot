@@ -10,12 +10,10 @@ class IncidentAggregator:
         if not incident_id:
             incident_id = self.hub.capture_failure(module_name, exception, traceback_str)
         else:
-            # На случай, если в тестах требуется зарегистрировать или передать существующий
             pass
 
         analysis = self.hub.analyze_failure(incident_id) if hasattr(self.hub, 'analyze_failure') else {}
         
-        # Записываем метрику
         metric_payload = self.collector.record_metric({
             "incident_id": incident_id,
             "module_name": module_name,

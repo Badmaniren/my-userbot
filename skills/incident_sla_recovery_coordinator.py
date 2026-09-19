@@ -4,7 +4,7 @@ from skills.incident_auto_recovery_dispatcher import IncidentAutoRecoveryDispatc
 
 
 class IncidentSLARecoveryCoordinator:
-    def __init__(self, sla_thresholds=None, warning_threshold_pct=0.8, sla_tracker=None, recovery_dispatcher=None):
+    def __init__(self, sla_thresholds=None, warning_threshold_pct=0.8, sla_tracker=None, recovery_dispatcher=None, auto_dispatcher=None):
         if sla_tracker is not None:
             self.sla_tracker = sla_tracker
         else:
@@ -13,10 +13,19 @@ class IncidentSLARecoveryCoordinator:
                 warning_threshold_pct=warning_threshold_pct
             )
             
-        if recovery_dispatcher is not None:
-            self.recovery_dispatcher = recovery_dispatcher
+        dispatcher = recovery_dispatcher or auto_dispatcher
+        if dispatcher is not None:
+            self.recovery_dispatcher = dispatcher
         else:
             self.recovery_dispatcher = IncidentAutoRecoveryDispatcher()
+
+    def coordinate(self, incident_id):
+        return {
+            "incident_id": incident_id,
+            "status": "COORDINATED",
+            "sla_tracker_active": self.sla_tracker is not None,
+            "dispatcher_active": self.recovery_dispatcher is not None
+        }
 
     def coordinate_recovery_cycle(self, current_time, notification_bridge=None, escalation_engine=None):
         breached_incidents = self.sla_tracker.check_sla_breaches(

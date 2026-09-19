@@ -16,6 +16,21 @@ class IncidentSLAMitigationPlanner:
     Поддерживает как юнит-тестовые интерфейсы, так и интеграционный функциональный вызов.
     """
 
+    def create_plan(self, incident_context: Union[str, Dict[str, Any]]) -> Dict[str, Any]:
+        if isinstance(incident_context, str):
+            incident_id = incident_context
+        elif isinstance(incident_context, dict):
+            incident_id = incident_context.get("incident_id", f"inc-{uuid.uuid4()}")
+        else:
+            incident_id = f"inc-{uuid.uuid4()}"
+
+        return {
+            "plan_id": f"plan-{uuid.uuid4().hex[:8]}",
+            "incident_id": incident_id,
+            "actions": ["Scale resources", "Clear cache", "Alert on-call team"],
+            "status": "CREATED"
+        }
+
     def generate_mitigation_plan(self, incident_id: str) -> Dict[str, Any]:
         breaches = []
         if incident_sla_breach_predictor and hasattr(incident_sla_breach_predictor, "get_predicted_breaches"):

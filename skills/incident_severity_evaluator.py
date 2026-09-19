@@ -8,7 +8,7 @@ class IncidentSeverityEvaluator:
         self.template_engine = template_engine if template_engine is not None else NotificationTemplateEngine()
 
     def calculate_severity_score(self, data: dict) -> str:
-        count = data.get("count", 0)
+        count = data.get("count", data.get("frequency", 0))
         is_fatal = data.get("is_fatal", False)
         
         if count >= 50 or is_fatal:
@@ -44,9 +44,14 @@ class IncidentSeverityEvaluator:
         if parsed is None:
             parsed = {}
         inc_id = parsed.get("parsed_id") or parsed.get("incident_id")
+        if not inc_id and isinstance(stream_data, dict):
+            inc_id = stream_data.get("parsed_id") or stream_data.get("incident_id")
+            
         freq = parsed.get("frequency", parsed.get("count", 1))
+        if freq == 1 and isinstance(stream_data, dict):
+            freq = stream_data.get("frequency", stream_data.get("count", 1))
         
-        severity = self.calculate_severity_score({"count": freq})
+        severity = self.calculate_severity_score({"count": freq, "frequency": freq})
         payload = self.template_engine.generate_notification_payload(
             severity, inc_id, parsed
         )

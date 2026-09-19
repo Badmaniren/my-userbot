@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ошёл тесты и влит в main
-
-## telemetry_anomaly_audit_bridge (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/json/encoder.py", line 180, in default
+16/x64/lib/python3.11/json/encoder.py", line 180, in default
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## telemetry_audit_report_exporter (compose) — раундов: 3
@@ -248,3 +245,7 @@
 ## vulnerability_remediation_pipeline (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: успешно прошёл тесты и влит в main
+
+## vulnerability_audit_reporter (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

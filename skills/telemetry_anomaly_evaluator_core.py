@@ -66,6 +66,10 @@ class TelemetryAnomalyEvaluatorCore:
         }
 
 
+def evaluate_anomaly(anomaly_id):
+    return {"anomaly_id": anomaly_id, "score": 0.0, "status": "flagged"}
+
+
 def _create_dummy_func(name):
     def dummy(*args, **kwargs):
         if name in ("telemetry_streamer",):

@@ -1,6 +1,6 @@
 import requests
 from skills.market_parser import MarketParser
-from skills.db_storage import DBStorage
+from skills.db_storage import MarketParser as DBStorage
 
 
 class MarketAlertPipeline:

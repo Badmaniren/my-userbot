@@ -16,12 +16,15 @@ class MarketParser:
             return None
 
     def parse_html_prices(self, url: str):
-        response = requests.get(url, timeout=10)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        element = soup.find()
-        if element and element.text:
-            return float(element.text)
-        return None
+        try:
+            response = requests.get(url, timeout=10)
+            soup = BeautifulSoup(response.text, 'html.parser')
+            element = soup.find()
+            if element and element.text:
+                return float(element.text)
+            return None
+        except Exception:
+            return None
 
     def fetch_and_store(self, symbol: str, price: float):
         conn = sqlite3.connect(self.storage_file)
@@ -35,9 +38,10 @@ class MarketParser:
             )
         ''')
         
+        stored_price = price if price is not None else 0.0
         cursor.execute(
             'INSERT INTO market_data (symbol, price) VALUES (?, ?)',
-            (symbol, price)
+            (symbol, stored_price)
         )
         
         conn.commit()
@@ -51,12 +55,23 @@ class MarketParser:
                 cursor.execute('SELECT symbol, price FROM market_data')
                 rows = cursor.fetchall()
                 data = [f"{row[0]},{row[1]}\n" for row in rows]
-            except Exception:
+            except sqlite3.Error:
                 data = []
             finally:
                 conn.close()
             return data
         else:
-            with open(filename, 'rb') as f:
-                lines = f.readlines()
-                return [line.decode('utf-8') for line in lines]
+            try:
+                with open(filename, 'rb') as f:
+                    lines = f.readlines()
+                    return [line.decode('utf-8') for line in lines]
+            except (UnicodeDecodeError, OSError):
+                try:
+                    conn = sqlite3.connect(filename)
+                    cursor = conn.cursor()
+                    cursor.execute('SELECT symbol, price FROM market_data')
+                    rows = cursor.fetchall()
+                    conn.close()
+                    return [f"{row[0]},{row[1]}\n" for row in rows]
+                except sqlite3.Error:
+                    return []

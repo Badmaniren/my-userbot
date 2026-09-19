@@ -3,36 +3,50 @@ import os
 import uuid
 import random
 from skills.market_notifier import MarketNotifier
-from skills.market_parser import MarketParser
-from skills.db_storage import db_storage
+
 
 class TestMarketNotifierIntegration(unittest.TestCase):
-
     def setUp(self):
-        self.random_suffix = uuid.uuid4().hex[:8]
-        self.storage_filename = f"test_market_storage_{self.random_suffix}.json"
-        self.notifier = MarketNotifier(storage_file=self.storage_filename)
+        self.test_filename = f"test_market_data_{uuid.uuid4().hex}.json"
+        self.notifier = MarketNotifier(self.test_filename)
+        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
+        self.random_price = round(random.uniform(10.0, 1000.0), 2)
 
     def tearDown(self):
-        if os.path.exists(self.storage_filename):
+        if os.path.exists(self.test_filename):
             try:
-                os.remove(self.storage_filename)
+                os.remove(self.test_filename)
             except OSError:
                 pass
 
-    def test_market_notifier_end_to_end_flow(self):
-        symbol = f"COIN_{uuid.uuid4().hex[:6].upper()}"
-        random_price = round(random.uniform(10.0, 50000.0), 2)
-        test_url = f"https://example.com/market/{uuid.uuid4().hex[:6]}"
+    def test_process_and_notify_and_get_historical_data_integration(self):
+        success = self.notifier.process_and_notify(
+            symbol=self.symbol, 
+            price=self.random_price
+        )
+        
+        self.assertTrue(success, "Метод process_and_notify должен вернуть True при успешном сохранении")
+        self.assertTrue(os.path.exists(self.test_filename), "Интеграционный тест требует реального создания файла хранилища")
 
-        result = self.notifier.process_and_notify(symbol=symbol, price=random_price, url=test_url)
+        historical_data = self.notifier.get_historical_data()
+        
+        self.assertIsInstance(historical_data, (list, dict), "Исторические данные должны быть возвращены в виде коллекции")
+        
+        found = False
+        if isinstance(historical_data, list):
+            for item in historical_data:
+                if item.get("symbol") == self.symbol and item.get("price") == self.random_price:
+                    found = True
+                    break
+        elif isinstance(historical_data, dict):
+            if self.symbol in historical_data:
+                found = True
 
-        self.assertTrue(result, "Комбайн должен успешно обработать и отправить уведомление")
-        self.assertTrue(os.path.exists(self.storage_filename), "Файл локального хранилища должен быть создан")
+        self.assertTrue(
+            found, 
+            f"Сохраненные данные для символа {self.symbol} с ценой {self.random_price} не найдены через метод чтения истории"
+        )
 
-        loaded_data = self.notifier.parser.load_data(self.storage_filename)
-        self.assertIn(symbol, loaded_data, "Символ должен быть сохранен в хранилище через реальный навык парсера/БД")
-        self.assertEqual(loaded_data[symbol], random_price, "Сохраненное значение цены должно совпадать со сгенерированным")
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

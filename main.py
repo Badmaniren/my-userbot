@@ -992,6 +992,14 @@ def inspect_code_for_cheating(code: str, existing_skills: list, target_module: s
         return f"Синтаксическая ошибка в коде: {e}"
 
     for node in ast.walk(tree):
+
+
+                # ЖЕСТКИЙ ЗАПРЕТ на переопределение модулей через переменные
+        if isinstance(node, ast.Assign) and getattr(node, 'col_offset', -1) == 0:
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id in existing_skills:
+                    return f"АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль '{target.id}' глобальной переменной!"
+
         if isinstance(node, (ast.ClassDef, ast.FunctionDef)):
             if node.name in existing_skills and node.name != target_module:
                 return (

@@ -41,3 +41,8 @@ class SystemRiskEvaluator:
             "risk_score": score,
             "recommendations": ["Apply pending security patches and monitor system logs."]
         }
+
+
+def evaluate(target=None, limit=None, *args, **kwargs):
+    evaluator = SystemRiskEvaluator()
+    return evaluator.evaluate_risk(target, [], [], None, "limit", limit)

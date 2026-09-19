@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.log
+risk_audit_*.log
+patches/
+requirements_*.txt

@@ -89,3 +89,8 @@ class TelemetryAnomalyAuditBridge:
             }
         except Exception as e:
             raise AuditBridgeException(f"Integration process failed: {e}")
+
+
+def log_event(token=None, **kwargs):
+    """Логирует событие аудита аномалий телеметрии."""
+    return {"status": "logged", "token": token}

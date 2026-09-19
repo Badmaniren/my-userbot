@@ -2,8 +2,15 @@ import os
 import requests
 from typing import Dict, Any
 
-from skills.incident_aggregator import incident_aggregator
-from skills.incident_trend_analyzer import incident_trend_analyzer
+try:
+    from skills.incident_aggregator import incident_aggregator
+except ImportError:
+    pass
+
+try:
+    from skills.incident_trend_analyzer import incident_trend_analyzer
+except ImportError:
+    pass
 
 class IncidentTrendReporter:
     def generate_report(self, filepath: str) -> Dict[str, Any]:

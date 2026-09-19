@@ -11,6 +11,8 @@ class MarketAlertPipeline:
 
     def process_and_check(self, symbol, url, threshold):
         current_price = self.parser.fetch_price(url)
+        if isinstance(current_price, dict):
+            current_price = current_price.get("price", 0.0)
         
         db_threshold = self.storage.get_threshold(symbol)
         active_threshold = db_threshold if db_threshold is not None else threshold
@@ -39,6 +41,9 @@ class MarketAlertPipeline:
 
     def process_alert_check(self, symbol, url, threshold_price):
         current_price = self.parser.fetch_price(url)
+        if isinstance(current_price, dict):
+            current_price = current_price.get("price", 0.0)
+            
         alert_triggered = current_price < threshold_price
         
         if alert_triggered:
@@ -53,3 +58,7 @@ class MarketAlertPipeline:
             "alert_triggered": alert_triggered,
             "current_price": current_price
         }
+
+
+# Добавляем алиас для совместимости с юнит-тестами юнкера/архитектора
+DBStorage = DBStorage

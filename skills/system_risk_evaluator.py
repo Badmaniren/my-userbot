@@ -16,7 +16,20 @@ class SystemRiskEvaluator:
             "recommendations": ["Review system security."]
         }
 
-    def calculate_infrastructure_risk(self, module, incidents, patches, pipeline, metric_name, metric_value):
+    def evaluate_infrastructure_risk(self, metrics_result=None, health_summary=None, *args, **kwargs):
+        risk_score = 0
+        if isinstance(metrics_result, dict):
+            risk_score += metrics_result.get("critical_count", 0) * 15 + metrics_result.get("high_count", 0) * 5
+        return {
+            "risk_score": risk_score,
+            "status": "EVALUATED",
+            "metrics": metrics_result,
+            "health": health_summary
+        }
+
+    def calculate_infrastructure_risk(self, module, incidents=None, patches=None, pipeline=None, metric_name=None, metric_value=None):
+        if isinstance(module, dict) and incidents is not None and not isinstance(incidents, list):
+            return self.evaluate_infrastructure_risk(module, incidents)
         return self.evaluate_risk(module, incidents, patches, pipeline, metric_name, metric_value)
 
     def evaluate(self, module, incidents, patches, pipeline, metric_name, metric_value):

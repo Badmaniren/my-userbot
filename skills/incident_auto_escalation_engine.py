@@ -14,18 +14,23 @@ from skills import (
 )
 
 class IncidentAutoEscalationEngine:
-    def process_escalation(self, incident_id: str) -> Dict[str, Any]:
+    def process_escalation(self, incident_id: str, severity: Any = None, context: Any = None, **kwargs) -> Dict[str, Any]:
         if hasattr(incident_aggregator, "get_incident"):
             incident = incident_aggregator.get_incident(incident_id)
         else:
             incident = {"id": incident_id}
 
-        if hasattr(incident_severity_evaluator, "evaluate"):
+        if context and isinstance(context, dict):
+            incident.update(context)
+
+        if severity is not None:
+            sev_score = severity
+        elif hasattr(incident_severity_evaluator, "evaluate"):
             sev_score = incident_severity_evaluator.evaluate(incident)
         else:
             sev_score = 1
 
-        if sev_score <= 0:
+        if isinstance(sev_score, (int, float)) and sev_score <= 0:
             return {
                 "incident_id": incident_id,
                 "severity": sev_score,

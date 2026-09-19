@@ -10,7 +10,6 @@ class CryptoTracker:
     def _init_db(self):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        # Создаем обе таблицы для поддержки обоих наборов тестов (crypto_records и crypto_prices)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS crypto_records (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,7 +58,6 @@ class CryptoTracker:
         timestamp = datetime.datetime.utcnow().isoformat()
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        # Сохраняем в обе таблицы для полной совместимости
         for table in ["crypto_records", "crypto_prices"]:
             cursor.execute(f"""
                 INSERT INTO {table} (btc_price, eth_price, percentage_diff, timestamp)
@@ -97,7 +95,6 @@ class CryptoTracker:
         """, (btc, eth, diff, timestamp))
         conn.commit()
         record_id = cursor.lastrowid
-        # Дублируем на всякий случай и в crypto_records
         cursor.execute("""
             INSERT INTO crypto_records (btc_price, eth_price, percentage_diff, timestamp)
             VALUES (?, ?, ?, ?)

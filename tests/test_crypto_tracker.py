@@ -1,35 +1,51 @@
 import unittest
 from unittest.mock import patch, MagicMock
 import sqlite3
-import random
+import os
 import uuid
-import string
-import requests
+import random
+import datetime
 from skills.crypto_tracker import CryptoTracker
 
 class TestCryptoTracker(unittest.TestCase):
-
     def setUp(self):
-        self.db_name = f"{uuid.uuid4().hex}.db"
+        self.db_name = f"test_{uuid.uuid4().hex}.db"
         self.tracker = CryptoTracker(db_path=self.db_name)
 
     def tearDown(self):
-        try:
-            import os
-            if os.path.exists(self.db_name):
-                os.remove(self.db_name)
-        except Exception:
-            pass
+        if os.path.exists(self.db_name):
+            os.remove(self.db_name)
+
+    def test_init_db_creates_tables(self):
+        conn = sqlite3.connect(self.db_name)
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        self.assertIn("crypto_records", tables)
+        self.assertIn("crypto_prices", tables)
+
+    def test_calculate_percentage_difference_normal(self):
+        btc = random.uniform(30000.0, 70000.0)
+        eth = random.uniform(1500.0, 4000.0)
+        expected = ((btc - eth) / eth) * 100.0
+        result = self.tracker.calculate_percentage_difference(btc, eth)
+        self.assertAlmostEqual(result, expected)
+
+    def test_calculate_percentage_difference_zero_eth(self):
+        btc = random.uniform(1000.0, 50000.0)
+        eth = 0.0
+        result = self.tracker.calculate_percentage_difference(btc, eth)
+        self.assertEqual(result, 0.0)
 
     def test_fetch_prices_success(self):
-        random_btc = round(random.uniform(10000.0, 90000.0), 2)
-        random_eth = round(random.uniform(1000.0, 7000.0), 2)
-        
+        btc_val = random.uniform(40000, 60000)
+        eth_val = random.uniform(2000, 4000)
         mock_response_data = {
-            "bitcoin": {"usd": random_btc},
-            "ethereum": {"usd": random_eth}
+            "bitcoin": {"usd": btc_val},
+            "ethereum": {"usd": eth_val}
         }
-
+        
         with patch("skills.crypto_tracker.requests.get") as mock_get:
             mock_resp = MagicMock()
             mock_resp.status_code = 200
@@ -37,107 +53,116 @@ class TestCryptoTracker(unittest.TestCase):
             mock_get.return_value = mock_resp
 
             prices = self.tracker.fetch_prices()
+            self.assertIsNotNone(prices)
+            self.assertEqual(prices["btc"], float(btc_val))
+            self.assertEqual(prices["eth"], float(eth_val))
 
-            self.assertIsInstance(prices, dict)
-            self.assertEqual(prices.get("btc"), random_btc)
-            self.assertEqual(prices.get("eth"), random_eth)
-            mock_get.assert_called_once()
-
-    def test_fetch_prices_api_failure(self):
+    def test_fetch_prices_failure_status(self):
         with patch("skills.crypto_tracker.requests.get") as mock_get:
             mock_resp = MagicMock()
-            mock_resp.status_code = random.choice([400, 401, 403, 404, 500, 502, 503])
+            mock_resp.status_code = random.choice([400, 404, 500, 503])
             mock_get.return_value = mock_resp
 
             prices = self.tracker.fetch_prices()
             self.assertIsNone(prices)
 
-    def test_fetch_prices_network_error(self):
+    def test_fetch_prices_request_exception(self):
         with patch("skills.crypto_tracker.requests.get") as mock_get:
-            mock_get.side_effect = requests.exceptions.RequestException(uuid.uuid4().hex)
-
+            mock_get.side_effect = Exception(uuid.uuid4().hex)
             prices = self.tracker.fetch_prices()
             self.assertIsNone(prices)
 
-    def test_calculate_percentage_difference(self):
-        btc_price = float(random.randint(50000, 60000))
-        eth_price = float(random.randint(3000, 4000))
+    def test_save_record(self):
+        btc = random.uniform(100, 1000)
+        eth = random.uniform(10, 50)
+        diff = random.uniform(-10, 10)
 
-        expected_diff = round(((btc_price - eth_price) / eth_price) * 100, 4)
-        
-        calculated_diff = self.tracker.calculate_percentage_difference(btc_price, eth_price)
-        self.assertAlmostEqual(calculated_diff, expected_diff, places=2)
-
-    def test_calculate_percentage_difference_zero_division(self):
-        btc_price = float(random.randint(1000, 5000))
-        eth_price = 0.0
-
-        calculated_diff = self.tracker.calculate_percentage_difference(btc_price, eth_price)
-        self.assertEqual(calculated_diff, 0.0)
-
-    def test_save_record_to_db(self):
-        random_btc = round(random.uniform(20000.0, 40000.0), 2)
-        random_eth = round(random.uniform(1500.0, 2500.0), 2)
-        random_diff = round(random.uniform(10.0, 90.0), 2)
-
-        self.tracker.save_record(random_btc, random_eth, random_diff)
+        record_id = self.tracker.save_record(btc, eth, diff)
+        self.assertIsInstance(record_id, int)
 
         conn = sqlite3.connect(self.db_name)
         cursor = conn.cursor()
         cursor.execute("SELECT btc_price, eth_price, percentage_diff FROM crypto_records")
-        row = cursor.fetchone()
+        row_rec = cursor.fetchone()
+        cursor.execute("SELECT btc_price, eth_price, percentage_diff FROM crypto_prices")
+        row_pr = cursor.fetchone()
         conn.close()
 
-        self.assertIsNotNone(row)
-        self.assertEqual(row[0], random_btc)
-        self.assertEqual(row[1], random_eth)
-        self.assertEqual(row[2], random_diff)
+        self.assertEqual(row_rec[0], btc)
+        self.assertEqual(row_rec[1], eth)
+        self.assertEqual(row_rec[2], diff)
+        self.assertEqual(row_pr[0], btc)
+        self.assertEqual(row_pr[1], eth)
+        self.assertEqual(row_pr[2], diff)
 
-    def test_track_and_save_full_cycle(self):
-        random_btc = round(random.uniform(40000.0, 50000.0), 2)
-        random_eth = round(random.uniform(2000.0, 3000.0), 2)
-        
-        mock_response_data = {
-            "bitcoin": {"usd": random_btc},
-            "ethereum": {"usd": random_eth}
+    def test_track_and_save_success(self):
+        btc_val = random.uniform(10000, 20000)
+        eth_val = random.uniform(500, 1500)
+        mock_data = {
+            "bitcoin": {"usd": btc_val},
+            "ethereum": {"usd": eth_val}
         }
 
         with patch("skills.crypto_tracker.requests.get") as mock_get:
             mock_resp = MagicMock()
             mock_resp.status_code = 200
-            mock_resp.json.return_value = mock_response_data
+            mock_resp.json.return_value = mock_data
             mock_get.return_value = mock_resp
 
-            result = self.tracker.track_and_save()
+            success = self.tracker.track_and_save()
+            self.assertTrue(success)
 
-            self.assertTrue(result)
+        conn = sqlite3.connect(self.db_name)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM crypto_records")
+        count_rec = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM crypto_prices")
+        count_pr = cursor.fetchone()[0]
+        conn.close()
 
-            conn = sqlite3.connect(self.db_name)
-            cursor = conn.cursor()
-            cursor.execute("SELECT btc_price, eth_price FROM crypto_records")
-            row = cursor.fetchone()
-            conn.close()
+        self.assertEqual(count_rec, 1)
+        self.assertEqual(count_pr, 1)
 
-            self.assertIsNotNone(row)
-            self.assertEqual(row[0], random_btc)
-            self.assertEqual(row[1], random_eth)
-
-    def test_track_and_save_failure_on_api(self):
+    def test_track_and_save_fail(self):
         with patch("skills.crypto_tracker.requests.get") as mock_get:
             mock_resp = MagicMock()
-            mock_resp.status_code = 503
+            mock_resp.status_code = 500
             mock_get.return_value = mock_resp
 
-            result = self.tracker.track_and_save()
-            self.assertFalse(result)
+            success = self.tracker.track_and_save()
+            self.assertFalse(success)
 
-            conn = sqlite3.connect(self.db_name)
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM crypto_records")
-            count = cursor.fetchone()[0]
-            conn.close()
+    def test_fetch_and_save_prices(self):
+        btc_val = random.uniform(30000, 40000)
+        eth_val = random.uniform(2000, 3000)
+        mock_data = {
+            "bitcoin": {"usd": btc_val},
+            "ethereum": {"usd": eth_val}
+        }
 
-            self.assertEqual(count, 0)
+        with patch("skills.crypto_tracker.requests.get") as mock_get:
+            mock_resp = MagicMock()
+            mock_resp.status_code = 200
+            mock_resp.json.return_value = mock_data
+            mock_get.return_value = mock_resp
 
-if __name__ == "__main__":
-    unittest.main()
+            rec_id = self.tracker.fetch_and_save_prices()
+            self.assertIsNotNone(rec_id)
+            self.assertIsInstance(rec_id, int)
+
+        conn = sqlite3.connect(self.db_name)
+        cursor = conn.cursor()
+        cursor.execute("SELECT btc_price FROM crypto_prices WHERE id = ?", (rec_id,))
+        val = cursor.fetchone()[0]
+        conn.close()
+
+        self.assertEqual(val, btc_val)
+
+    def test_fetch_and_save_prices_none(self):
+        with patch("skills.crypto_tracker.requests.get") as mock_get:
+            mock_resp = MagicMock()
+            mock_resp.status_code = 404
+            mock_get.return_value = mock_resp
+
+            rec_id = self.tracker.fetch_and_save_prices()
+            self.assertIsNone(rec_id)

@@ -2,107 +2,85 @@ import unittest
 from unittest.mock import patch, MagicMock
 import uuid
 import random
-import string
 import io
-import sys
-import types
 
-try:
-    skills_module = types.ModuleType("skills")
-    sys.modules["skills"] = skills_module
+from skills.incident_escalation_triage_bridge import (
+    IncidentEscalationTriageBridge,
+    IncidentTriageEscalationBridge,
+    bridge_triage_and_escalate
+)
 
-    bridge_module = types.ModuleType("skills.incident_escalation_triage_bridge")
-    
-    class IncidentEscalationTriageBridge:
-        def __init__(self):
-            from skills.incident_triage_pipeline import IncidentTriagePipeline
-            from skills.incident_auto_escalation_engine import IncidentAutoEscalationEngine
-            self.triage_pipeline = IncidentTriagePipeline()
-            self.escalation_engine = IncidentAutoEscalationEngine()
-
-        def process_bridge_triage_and_escalation(self, module_name, exception, traceback_str, incident_id, workspace_dir):
-            triage_res = self.triage_pipeline.triage_and_escalate(module_name, exception, traceback_str, incident_id, workspace_dir)
-            escalation_res = self.escalation_engine.process_escalation(incident_id)
-            return {
-                "triage": triage_res,
-                "escalation": escalation_res
-            }
-
-    bridge_module.IncidentEscalationTriageBridge = IncidentEscalationTriageBridge
-    sys.modules["skills.incident_escalation_triage_bridge"] = bridge_module
-except Exception:
-    pass
 
 class TestIncidentEscalationTriageBridge(unittest.TestCase):
-
-    def setUp(self):
-        self.rand_module = f"mod_{uuid.uuid4().hex[:8]}"
-        self.rand_exception = RuntimeError(f"err_{uuid.uuid4().hex[:8]}")
-        self.rand_traceback = f"Traceback at {uuid.uuid4().hex}"
-        self.rand_incident_id = uuid.uuid4().hex
-        self.rand_workspace = f"/var/tmp/{uuid.uuid4().hex}"
-
     def test_bridge_composition_and_execution(self):
-        from skills.incident_escalation_triage_bridge import IncidentEscalationTriageBridge
+        mod_name = f"module_{uuid.uuid4().hex[:8]}"
+        exc_msg = f"error_{uuid.uuid4().hex[:8]}"
+        tb_str = f"traceback_{uuid.uuid4().hex[:8]}"
+        inc_id = f"inc_{uuid.uuid4().hex[:8]}"
+        ws_dir = f"/tmp/{uuid.uuid4().hex[:8]}"
 
-        mock_triage_result = {"status": "triaged", "id": self.rand_incident_id}
-        mock_escalation_result = {"escalated": True, "level": random.randint(1, 5)}
+        triage_mock_return = {"triage_status": "analyzed", "severity": random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])}
+        escalation_mock_return = {"escalated": True, "target": f"team_{uuid.uuid4().hex[:6]}"}
 
-        with patch("skills.incident_triage_pipeline.IncidentTriagePipeline") as MockTriagePipeline, \
-             patch("skills.incident_auto_escalation_engine.IncidentAutoEscalationEngine") as MockEscalationEngine:
-
-            triage_instance_mock = MockTriagePipeline.return_value
-            triage_instance_mock.triage_and_escalate.return_value = mock_triage_result
-
-            escalation_instance_mock = MockEscalationEngine.return_value
-            escalation_instance_mock.process_escalation.return_value = mock_escalation_result
-
-            bridge = IncidentEscalationTriageBridge()
-            result = bridge.process_bridge_triage_and_escalation(
-                self.rand_module,
-                self.rand_exception,
-                self.rand_traceback,
-                self.rand_incident_id,
-                self.rand_workspace
-            )
-
-            triage_instance_mock.triage_and_escalate.assert_called_once_with(
-                self.rand_module,
-                self.rand_exception,
-                self.rand_traceback,
-                self.rand_incident_id,
-                self.rand_workspace
-            )
-            escalation_instance_mock.process_escalation.assert_called_once_with(
-                self.rand_incident_id
-            )
-
-            self.assertEqual(result["triage"], mock_triage_result)
-            self.assertEqual(result["escalation"], mock_escalation_result)
-
-    def test_bridge_stream_handling(self):
-        from skills.incident_escalation_triage_bridge import IncidentEscalationTriageBridge
-
-        stream_data_bytes = io.BytesIO(uuid.uuid4().bytes + ''.join(random.choices(string.ascii_letters, k=16)).encode())
-        
-        with patch("skills.incident_triage_pipeline.IncidentTriagePipeline") as MockTriagePipeline, \
-             patch("skills.incident_auto_escalation_engine.IncidentAutoEscalationEngine") as MockEscalationEngine:
-
-            triage_instance_mock = MockTriagePipeline.return_value
-            eval_result = {"evaluated": True, "stream_size": len(stream_data_bytes.getvalue())}
-            triage_instance_mock.triage_stream.return_value = eval_result
-
-            escalation_instance_mock = MockEscalationEngine.return_value
-            stream_consumed = stream_data_bytes.getvalue()
-            escalation_instance_mock.consume_stream_data.return_value = stream_consumed
-
-            bridge = IncidentEscalationTriageBridge()
+        with patch("skills.incident_escalation_triage_bridge.IncidentTriagePipeline") as MockTriage, \
+             patch("skills.incident_escalation_triage_bridge.IncidentAutoEscalationEngine") as MockEscalation:
             
-            stream_eval = bridge.triage_pipeline.triage_stream(self.rand_module, stream_data_bytes.read(), self.rand_incident_id)
-            consumed = bridge.escalation_engine.consume_stream_data()
+            instance_triage = MockTriage.return_value
+            instance_triage.triage_and_escalate.return_value = triage_mock_return
 
-            self.assertEqual(stream_eval, eval_result)
-            self.assertEqual(consumed, stream_consumed)
+            instance_escalation = MockEscalation.return_value
+            instance_escalation.process_escalation.return_value = escalation_mock_return
+
+            bridge = IncidentTriageEscalationBridge()
+            result = bridge.process_end_to_end(mod_name, exc_msg, tb_str, inc_id, ws_dir)
+
+            instance_triage.triage_and_escalate.assert_called_once_with(mod_name, exc_msg, tb_str, inc_id, ws_dir)
+            instance_escalation.process_escalation.assert_called_once_with(inc_id)
+
+            self.assertEqual(result.get("incident_id"), inc_id)
+            self.assertEqual(result.get("triage_status"), triage_mock_return["triage_status"])
+            self.assertEqual(result.get("escalated"), escalation_mock_return["escalated"])
+
+    def test_legacy_bridge_method(self):
+        mod_name = f"mod_{uuid.uuid4().hex[:6]}"
+        exc = Exception(f"exc_{uuid.uuid4().hex[:6]}")
+        tb = f"tb_{uuid.uuid4().hex[:6]}"
+        inc_id = f"inc_{uuid.uuid4().hex[:6]}"
+        ws = f"/var/tmp/{uuid.uuid4().hex[:6]}"
+
+        t_res = {"triage_id": uuid.uuid4().hex}
+        e_res = {"escalation_id": uuid.uuid4().hex}
+
+        with patch("skills.incident_escalation_triage_bridge.IncidentTriagePipeline") as MockTriage, \
+             patch("skills.incident_escalation_triage_bridge.IncidentAutoEscalationEngine") as MockEscalation:
+            
+            MockTriage.return_value.triage_and_escalate.return_value = t_res
+            MockEscalation.return_value.process_escalation.return_value = e_res
+
+            bridge = IncidentEscalationTriageBridge()
+            res = bridge.process_bridge_triage_and_escalation(mod_name, exc, tb, inc_id, ws)
+
+            self.assertEqual(res["triage"], t_res)
+            self.assertEqual(res["escalation"], e_res)
+
+    def test_functional_bridge_helper(self):
+        mod_name = f"stream_{uuid.uuid4().hex[:5]}"
+        exc = RuntimeError(uuid.uuid4().hex[:8])
+        tb = uuid.uuid4().hex[:10]
+        inc_id = f"id_{uuid.uuid4().hex[:6]}"
+        ws = f"./{uuid.uuid4().hex[:6]}"
+
+        with patch("skills.incident_escalation_triage_bridge.IncidentTriagePipeline") as MockTriage, \
+             patch("skills.incident_escalation_triage_bridge.IncidentAutoEscalationEngine") as MockEscalation:
+            
+            MockTriage.return_value.triage_and_escalate.return_value = {"status": "ok"}
+            MockEscalation.return_value.process_escalation.return_value = {"level": random.randint(1, 5)}
+
+            res = bridge_triage_and_escalate(mod_name, exc, tb, inc_id, ws)
+            self.assertIn("incident_id", res)
+            self.assertEqual(res["incident_id"], inc_id)
+            self.assertIn("escalation_status", res)
+
 
 if __name__ == "__main__":
     unittest.main()

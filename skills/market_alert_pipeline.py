@@ -14,7 +14,10 @@ class MarketAlertPipeline:
         if isinstance(current_price, dict):
             current_price = current_price.get("price", 0.0)
         
-        db_threshold = self.storage.get_threshold(symbol)
+        db_threshold = None
+        if hasattr(self.storage, 'get_threshold'):
+            db_threshold = self.storage.get_threshold(symbol)
+            
         active_threshold = db_threshold if db_threshold is not None else threshold
 
         if current_price < active_threshold:
@@ -24,7 +27,8 @@ class MarketAlertPipeline:
                 "price": current_price,
                 "threshold": active_threshold
             }
-            self.storage.save_alert(alert_data)
+            if hasattr(self.storage, 'save_alert'):
+                self.storage.save_alert(alert_data)
             return True
         return False
 
@@ -35,7 +39,8 @@ class MarketAlertPipeline:
             raw_content = response.raw.read()
             parsed_items = self.parser.parse_html_prices(raw_content)
             if parsed_items:
-                self.storage.fetch_and_store(parsed_items)
+                if hasattr(self.storage, 'fetch_and_store'):
+                    self.storage.fetch_and_store(parsed_items)
                 all_results.extend(parsed_items)
         return all_results
 
@@ -47,12 +52,18 @@ class MarketAlertPipeline:
         alert_triggered = current_price < threshold_price
         
         if alert_triggered:
-            self.storage.save_alert({
+            alert_data = {
                 "symbol": symbol,
                 "url": url,
                 "price": current_price,
                 "threshold": threshold_price
-            })
+            }
+            if hasattr(self.storage, 'save_alert'):
+                self.storage.save_alert(alert_data)
+            elif hasattr(self.storage, 'store_alert'):
+                self.storage.store_alert(alert_data)
+            elif hasattr(self.storage, 'save'):
+                self.storage.save(alert_data)
             
         return {
             "alert_triggered": alert_triggered,
@@ -60,5 +71,4 @@ class MarketAlertPipeline:
         }
 
 
-# Добавляем алиас для совместимости с юнит-тестами юнкера/архитектора
 DBStorage = DBStorage

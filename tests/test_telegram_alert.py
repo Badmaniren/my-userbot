@@ -1,114 +1,116 @@
 import unittest
 from unittest.mock import patch, MagicMock
-import random
-import uuid
-import string
 import io
-import sys
-import types
+import uuid
+import random
+import string
+from skills.telegram_alert import check_and_alert, process_stream_alert, TelegramAlertService
 
-market_parser_stub = types.ModuleType('skills.market_parser')
-market_parser_stub.MarketParser = MagicMock()
-market_parser_stub.fetch_price = MagicMock()
-market_parser_stub.parse_html_prices = MagicMock()
-market_parser_stub.fetch_and_store = MagicMock()
-market_parser_stub.load_data = MagicMock()
-
-db_storage_stub = types.ModuleType('skills.db_storage')
-db_storage_stub.MarketParser = MagicMock()
-db_storage_stub.fetch_price = MagicMock()
-db_storage_stub.parse_html_prices = MagicMock()
-db_storage_stub.fetch_and_store = MagicMock()
-db_storage_stub.load_data = MagicMock()
-
-sys.modules['skills.market_parser'] = market_parser_stub
-sys.modules['skills.db_storage'] = db_storage_stub
-
-from skills import telegram_alert
-
-
-class TestTelegramAlertComposition(unittest.TestCase):
-
-    def setUp(self):
-        self.rand_symbol = ''.join(random.choices(string.ascii_uppercase, k=5))
-        self.rand_url = f"https://{uuid.uuid4().hex}.com/{uuid.uuid4().hex}"
-        self.rand_chat_id = str(random.randint(100000, 999999))
-        self.rand_price = round(random.uniform(10.0, 1000.0), 2)
-        self.rand_threshold = round(random.uniform(5.0, 2000.0), 2)
-        self.rand_token = uuid.uuid4().hex
-
-    def test_telegram_alert_composition_imports(self):
-        self.assertTrue(hasattr(telegram_alert, 'market_parser') or 'market_parser' in telegram_alert.__globals__.get('', {}),
-                        "Модуль telegram_alert обязан импортировать market_parser")
-        self.assertTrue(hasattr(telegram_alert, 'db_storage') or 'db_storage' in telegram_alert.__globals__.get('', {}),
-                        "Модуль telegram_alert обязан импортировать db_storage")
+class TestTelegramAlert(unittest.TestCase):
 
     @patch('skills.telegram_alert.requests.post')
-    def test_check_and_alert_triggers(self, mock_post):
+    @patch('skills.telegram_alert.db_storage.fetch_and_store')
+    @patch('skills.telegram_alert.market_parser.fetch_price')
+    def test_check_and_alert_success(self, mock_fetch_price, mock_db_store, mock_requests_post):
+        symbol = "".join(random.choices(string.ascii_uppercase, k=5))
+        url = f"https://{uuid.uuid4().hex}.com"
+        threshold = random.uniform(10.0, 50.0)
+        price = threshold + random.uniform(1.0, 10.0)
+        chat_id = str(random.randint(1000, 9999))
+        token = uuid.uuid4().hex
+
+        mock_fetch_price.return_value = price
         mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_post.return_value = mock_response
+        mock_requests_post.return_value = mock_response
 
-        with patch('skills.market_parser.fetch_price', return_value=self.rand_price) as mock_fetch, \
-             patch('skills.db_storage.fetch_and_store') as mock_store:
+        result = check_and_alert(symbol, url, threshold, chat_id=chat_id, token=token)
 
-            if hasattr(telegram_alert, 'check_and_alert'):
-                try:
-                    telegram_alert.check_and_alert(
-                        symbol=self.rand_symbol,
-                        url=self.rand_url,
-                        threshold=self.rand_price - 10.0,
-                        chat_id=self.rand_chat_id,
-                        token=self.rand_token
-                    )
-                except TypeError:
-                    telegram_alert.check_and_alert(self.rand_symbol, self.rand_url, self.rand_price - 10.0)
-
-                mock_fetch.assert_called_once()
-                mock_store.assert_called()
-                mock_post.assert_called_once()
-                
-                called_args, called_kwargs = mock_post.call_args
-                payload = called_kwargs.get('json', {})
-                if not payload and len(called_args) > 1:
-                    payload = called_args[1]
-                
-                self.assertTrue(
-                    any(self.rand_symbol in str(val) for val in payload.values()) or
-                    any(str(self.rand_price) in str(val) for val in payload.values()),
-                    "Уведомление в Telegram должно содержать данные цены или символа"
-                )
+        self.assertTrue(result)
+        mock_fetch_price.assert_called_once_with(url)
+        mock_db_store.assert_called_once_with(symbol, price)
+        mock_requests_post.assert_called_once()
+        
+        args, kwargs = mock_requests_post.call_args
+        self.assertIn(token, args[0])
+        self.assertEqual(kwargs["json"]["chat_id"], chat_id)
+        self.assertIn(symbol, kwargs["json"]["text"])
 
     @patch('skills.telegram_alert.requests.post')
-    def test_check_and_alert_below_threshold(self, mock_post):
-        with patch('skills.market_parser.fetch_price', return_value=self.rand_price) as mock_fetch, \
-             patch('skills.db_storage.fetch_and_store') as mock_store:
+    @patch('skills.telegram_alert.db_storage.fetch_and_store')
+    @patch('skills.telegram_alert.market_parser.fetch_price')
+    def test_check_and_alert_below_threshold(self, mock_fetch_price, mock_db_store, mock_requests_post):
+        symbol = "".join(random.choices(string.ascii_uppercase, k=5))
+        url = f"https://{uuid.uuid4().hex}.com"
+        threshold = random.uniform(50.0, 100.0)
+        price = threshold - random.uniform(1.0, 10.0)
 
-            if hasattr(telegram_alert, 'check_and_alert'):
-                try:
-                    telegram_alert.check_and_alert(
-                        symbol=self.rand_symbol,
-                        url=self.rand_url,
-                        threshold=self.rand_price + 100.0,
-                        chat_id=self.rand_chat_id,
-                        token=self.rand_token
-                    )
-                except TypeError:
-                    pass
+        mock_fetch_price.return_value = price
 
-                mock_fetch.assert_called_once()
-                mock_post.assert_not_called()
+        result = check_and_alert(symbol, url, threshold)
 
-    def test_stream_processing_with_io(self):
-        stream_data = f"{uuid.uuid4().hex},{random.randint(1, 500)}".encode('utf-8')
-        mock_stream = io.BytesIO(stream_data)
+        self.assertFalse(result)
+        mock_fetch_price.assert_called_once_with(url)
+        mock_db_store.assert_called_once_with(symbol, price)
+        mock_requests_post.assert_not_called()
 
-        if hasattr(telegram_alert, 'process_stream_alert'):
-            with patch('skills.market_parser.parse_html_prices') as mock_parse:
-                mock_parse.return_value = stream_data.decode('utf-8')
-                res = telegram_alert.process_stream_alert(mock_stream, uuid.uuid4().hex)
-                self.assertIsNotNone(res)
+    @patch('skills.telegram_alert.market_parser.parse_html_prices')
+    def test_process_stream_alert(self, mock_parse_html):
+        random_bytes = uuid.uuid4().hex.encode('utf-8')
+        stream = io.BytesIO(random_bytes)
+        expected_parsed = {uuid.uuid4().hex: random.uniform(1.0, 100.0)}
+        mock_parse_html.return_value = expected_parsed
 
+        token = uuid.uuid4().hex
+        result = process_stream_alert(stream, token=token)
+
+        self.assertEqual(result, expected_parsed)
+        mock_parse_html.assert_called_once_with(random_bytes)
+
+    @patch('skills.telegram_alert.requests.post')
+    def test_telegram_alert_service_method(self, mock_requests_post):
+        mock_parser = MagicMock()
+        mock_db = MagicMock()
+        
+        symbol = "".join(random.choices(string.ascii_uppercase, k=4))
+        url = f"https://{uuid.uuid4().hex}.org"
+        threshold = random.uniform(20.0, 40.0)
+        price = threshold + 5.0
+        chat_id = str(random.randint(100, 999))
+        token = uuid.uuid4().hex
+
+        mock_parser.fetch_price.return_value = price
+
+        service = TelegramAlertService(db_storage=mock_db, market_parser=mock_parser)
+        result = service.check_and_alert(symbol, threshold, chat_id=chat_id, token=token, url=url)
+
+        self.assertTrue(result)
+        mock_parser.fetch_price.assert_called_once_with(url)
+        mock_db.fetch_and_store.assert_called_once_with(symbol, price)
+        mock_requests_post.assert_called_once()
+        
+        _, kwargs = mock_requests_post.call_args
+        self.assertEqual(kwargs["json"]["chat_id"], chat_id)
+
+    @patch('skills.telegram_alert.requests.post')
+    @patch('skills.telegram_alert.db_storage.fetch_and_store')
+    @patch('skills.telegram_alert.market_parser.fetch_price')
+    def test_telegram_alert_service_default_dependencies(self, mock_fetch_price, mock_db_store, mock_requests_post):
+        mock_parser = None
+        mock_db = None
+        
+        symbol = "".join(random.choices(string.ascii_uppercase, k=4))
+        threshold = random.uniform(10.0, 20.0)
+        price = threshold - 2.0
+
+        mock_fetch_price.return_value = price
+
+        service = TelegramAlertService(db_storage=mock_db, market_parser=mock_parser)
+        result = service.check_and_alert(symbol, threshold)
+
+        self.assertFalse(result)
+        mock_fetch_price.assert_called_once()
+        mock_db_store.assert_called_once_with(symbol, price)
+        mock_requests_post.assert_not_called()
 
 if __name__ == '__main__':
     unittest.main()

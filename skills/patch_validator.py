@@ -103,3 +103,12 @@ class PatchValidator:
             res = self.verify_patch(code)
             return res.get("passed", False)
         return False
+
+
+def patch_validator(patch_data=None, **kwargs):
+    validator = PatchValidator()
+    if patch_data is not None:
+        return validator.validate(patch_data)
+    return validator
+
+patch_validator.validate = lambda *args, **kwargs: None

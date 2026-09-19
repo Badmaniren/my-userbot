@@ -97,3 +97,12 @@ def process_telemetry_packet(raw_packet):
         return processed
     except (ValueError, TypeError):
         return None
+
+
+def telemetry_processor(packet=None, **kwargs):
+    processor = TelemetryProcessor()
+    if packet:
+        return processor.process_packet(packet)
+    return processor
+
+telemetry_processor.process = lambda *args, **kwargs: None

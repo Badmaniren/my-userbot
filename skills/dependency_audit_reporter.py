@@ -34,3 +34,12 @@ class DependencyAuditReporter:
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(content)
         return True
+
+
+def dependency_audit_reporter(audit_data=None, **kwargs):
+    reporter = DependencyAuditReporter()
+    if audit_data is not None and isinstance(audit_data, dict):
+        return reporter.generate_report(audit_data)
+    return reporter
+
+dependency_audit_reporter.generate_report = lambda audit_data=None, *args, **kwargs: DependencyAuditReporter().generate_report(audit_data or {}, *args, **kwargs)

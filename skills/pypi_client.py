@@ -88,3 +88,7 @@ class PyPIClient:
             return json.loads(content)
         except Exception:
             return None
+
+
+def pypi_client(base_url="https://pypi.org/pypi", **kwargs):
+    return PyPIClient(base_url=base_url)

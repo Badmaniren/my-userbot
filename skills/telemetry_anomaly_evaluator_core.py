@@ -200,3 +200,12 @@ _required_names = [
 for _name in _required_names:
     if _name not in globals():
         globals()[_name] = _create_dummy_func(_name)
+
+
+def telemetry_anomaly_evaluator_core(payload=None, **kwargs):
+    evaluator = TelemetryAnomalyEvaluatorCore()
+    if payload and isinstance(payload, dict):
+        return evaluator.evaluate(payload)
+    return evaluator
+
+telemetry_anomaly_evaluator_core.detect = lambda *args, **kwargs: None

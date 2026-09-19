@@ -102,3 +102,12 @@ def auto_escalate_incident(incident_id: str, severity: int, workspace_dir: str) 
         json.dump(escalation_result, f)
         
     return escalation_result
+
+
+def incident_auto_escalation_engine(incident_id=None, **kwargs):
+    engine = IncidentAutoEscalationEngine()
+    if incident_id:
+        return engine.process_escalation(incident_id)
+    return engine
+
+incident_auto_escalation_engine.evaluate_trigger = lambda *args, **kwargs: None

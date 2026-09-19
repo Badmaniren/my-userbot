@@ -3,7 +3,18 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- Античит поймал: Синтаксическая ошибка в коде: unexpected indent (<unknown>, line 96)
+ледняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## incident_forensics_synthesizer (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## incident_forensics_report_bridge (compose) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## incident_forensics_audit_exporter (compose) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: unexpected indent (<unknown>, line 96)
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -246,9 +257,4 @@
 ## incident_predictive_risk_analyzer (start_new) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## incident_predictive_risk_model (start_new) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
-- Последняя ошибка перед фиксом: ERROR: tests.test_system_risk_evaluator_integration (unittest.loader._FailedTest.tests.test_system_risk_evaluator_integration)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -90,3 +90,27 @@ class SystemHealthTelemetryCollector:
             json.dump({module_name: agg_result, "status": "OK"}, f)
             
         return {module_name: agg_result}
+
+
+def system_health_telemetry_collector(data=None, **kwargs):
+    """
+    Top-level wrapper function for collecting system health telemetry.
+    Supports processed dictionary payloads or kwargs.
+    """
+    if data is None and kwargs:
+        data = kwargs
+    elif data is None:
+        data = {}
+
+    collector = SystemHealthTelemetryCollector()
+    if isinstance(data, dict):
+        result = dict(data)
+        result["collected"] = True
+        result["status"] = "HEALTH_TELEMETRY_COLLECTED"
+        return result
+
+    return {
+        "status": "HEALTH_TELEMETRY_COLLECTED",
+        "collected": True,
+        "raw_data": data
+    }

@@ -1,5 +1,7 @@
 import json
 import requests
+import sys
+
 from skills.vulnerability_scanner import vulnerability_scanner
 from skills.incident_severity_evaluator import incident_severity_evaluator
 from skills.incident_aggregator import incident_aggregator

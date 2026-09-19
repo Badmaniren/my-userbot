@@ -17,7 +17,10 @@ def run_pipeline(symbol: str, url: str, telegram_token: str, chat_id: str, stora
     parser.fetch_and_store(symbol, price)
     
     if hasattr(parser, "load_data"):
-        data = parser.load_data()
+        try:
+            data = parser.load_data(storage_file)
+        except TypeError:
+            data = parser.load_data()
     elif hasattr(db_storage, "load_data"):
         data = db_storage.load_data(storage_file)
     elif hasattr(db_storage, "get_data"):
@@ -37,7 +40,10 @@ def run_market_telegram_pipeline(storage_file: str, symbol: str, chat_id: str, u
     parser = MarketParser(storage_file)
     
     if hasattr(parser, "load_data"):
-        data = parser.load_data()
+        try:
+            data = parser.load_data(storage_file)
+        except TypeError:
+            data = parser.load_data()
     elif hasattr(db_storage, "load_data"):
         data = db_storage.load_data(storage_file)
     elif hasattr(db_storage, "get_data"):

@@ -35,3 +35,7 @@ class RecoveryReportExporter:
 
     def export_epic_report_file(self, report_payload, output_path):
         return self.reporter.generate_epic_report(report_payload, output_path)
+
+
+def export_to_format(dashboard_id, format_type, content):
+    return {"status": "exported", "id": dashboard_id, "fmt": format_type}

@@ -3,7 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-НО: Объявлен фиктивный 'auto_patch_pipeline'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.auto_patch_pipeline import ...'
+РУЖЕНО: Объявлен фиктивный 'auto_patch_pipeline'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.auto_patch_pipeline import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'auto_patch_pipeline'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.auto_patch_pipeline import ...'
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -248,8 +248,4 @@
 
 ## telemetry_vulnerability_correlator (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## vulnerability_remediation_metrics_collector (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

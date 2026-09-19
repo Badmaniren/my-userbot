@@ -9,16 +9,13 @@ class MarketNotifier:
         self.storage = MarketStorage(storage_file)
 
     def process_and_notify(self, symbol: str, url: str = None, price: float = None) -> bool:
-        try:
-            if price is None:
-                if url is None:
-                    return False
-                price = self.parser.fetch_price(url)
-            
-            success = self.storage.fetch_and_store(symbol, price)
-            return bool(success)
-        except Exception:
-            return False
+        if price is None:
+            if url is None:
+                return False
+            price = self.parser.fetch_price(url)
+        
+        success = self.storage.fetch_and_store(symbol, price)
+        return bool(success)
 
     def get_historical_data(self, filename: str = None):
         target_file = filename or self.storage_filename

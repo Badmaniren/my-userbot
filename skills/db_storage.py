@@ -60,3 +60,22 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+_default_db_parser = MarketParser()
+
+
+def fetch_price(url: str):
+    return _default_db_parser.fetch_price(url)
+
+
+def parse_html_prices(url: str):
+    return _default_db_parser.parse_html_prices(url)
+
+
+def fetch_and_store(symbol: str, price: float):
+    return _default_db_parser.fetch_and_store(symbol, price)
+
+
+def load_data(filename: str):
+    return _default_db_parser.load_data(filename)

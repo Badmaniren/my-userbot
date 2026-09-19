@@ -20,10 +20,23 @@ class MarketParser:
         except requests.exceptions.RequestException:
             return None
 
-    def parse_html_prices(self, url):
+    def parse_html_prices(self, url_or_data):
+        html = ""
+        if isinstance(url_or_data, str) and (url_or_data.startswith("http://") or url_or_data.startswith("https://")):
+            try:
+                response = requests.get(url_or_data, timeout=10)
+                html = response.text
+            except requests.exceptions.RequestException:
+                return []
+        elif isinstance(url_or_data, bytes):
+            html = url_or_data.decode('utf-8', errors='ignore')
+        elif isinstance(url_or_data, str):
+            html = url_or_data
+        else:
+            return []
+
         try:
-            response = requests.get(url, timeout=10)
-            soup = BeautifulSoup(response.text, 'html.parser')
+            soup = BeautifulSoup(html, 'html.parser')
             parsed_items = []
             
             cards = soup.find_all(class_='crypto-card')
@@ -36,7 +49,7 @@ class MarketParser:
                         "price": price_elem.get_text().strip()
                     })
             return parsed_items
-        except requests.exceptions.RequestException:
+        except (AttributeError, ValueError):
             return []
 
     def fetch_and_store(self, symbol, price):
@@ -66,3 +79,22 @@ class MarketParser:
             with open(filename, 'r', encoding='utf-8') as f:
                 return json.load(f)
         return {}
+
+
+_default_parser = MarketParser()
+
+
+def fetch_price(url):
+    return _default_parser.fetch_price(url)
+
+
+def parse_html_prices(url_or_data):
+    return _default_parser.parse_html_prices(url_or_data)
+
+
+def fetch_and_store(symbol, price):
+    return _default_parser.fetch_and_store(symbol, price)
+
+
+def load_data(filename):
+    return _default_parser.load_data(filename)

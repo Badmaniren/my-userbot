@@ -2,15 +2,8 @@ import os
 import requests
 from typing import Dict, Any
 
-try:
-    from skills.incident_aggregator import incident_aggregator
-except ImportError:
-    pass
-
-try:
-    from skills.incident_trend_analyzer import incident_trend_analyzer
-except ImportError:
-    pass
+from skills.incident_aggregator import incident_aggregator
+from skills.incident_trend_analyzer import incident_trend_analyzer
 
 class IncidentTrendReporter:
     def generate_report(self, filepath: str) -> Dict[str, Any]:
@@ -20,12 +13,16 @@ class IncidentTrendReporter:
 
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
-                lines = f.readlines()
+                content = f.read()
         except Exception as e:
             errors.append(str(e))
             return {"trends": [], "total_incidents": 0, "errors": errors}
 
+        lines = content.splitlines() if isinstance(content, str) else content.decode('utf-8', errors='ignore').splitlines()
+
         for line in lines:
+            if isinstance(line, bytes):
+                line = line.decode('utf-8', errors='ignore')
             line = line.strip()
             if not line:
                 continue
@@ -78,9 +75,9 @@ class IncidentTrendReporter:
 
     def aggregate_trends(self, filepath: str) -> Dict[str, Any]:
         parsed_entries = []
-        with open(filepath, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
+        with open(filepath, 'rb') as f:
+            for raw_line in f:
+                line = raw_line.decode('utf-8', errors='ignore').strip()
                 if not line:
                     continue
                 parts = line.split(',')

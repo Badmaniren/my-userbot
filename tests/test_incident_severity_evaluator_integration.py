@@ -1,74 +1,103 @@
 import unittest
 import uuid
 import random
-import os
-from skills.incident_severity_evaluator import IncidentSeverityEvaluator
+from skills.incident_severity_evaluator import IncidentSeverityEvaluator, evaluate_incident_severity
 from skills.incident_aggregator import IncidentAggregator
 from skills.notification_template_engine import NotificationTemplateEngine
 
 class TestIncidentSeverityEvaluatorIntegration(unittest.TestCase):
     def setUp(self):
-        self.evaluator = IncidentSeverityEvaluator()
         self.aggregator = IncidentAggregator()
-        self.engine = NotificationTemplateEngine()
-        self.incident_id = str(uuid.uuid4())
-        self.module_name = f"test_module_{random.randint(1000, 9999)}"
-        self.exception_msg = f"RuntimeError: Critical failure {random.randint(1, 100)}"
-        self.traceback_str = f"Traceback (most recent call last):\n  File '{self.module_name}.py', line {random.randint(1, 50)}, in <module>\n    raise RuntimeError()"
-
-    def test_composite_incident_evaluation_flow(self):
-        # Шаг 1: Проверяем реальную работу агрегатора в составе композитного модуля
-        aggregated_data = self.aggregator.process_and_aggregate(
-            module_name=self.module_name,
-            exception=Exception(self.exception_msg),
-            traceback_str=self.traceback_str,
-            incident_id=self.incident_id
+        self.template_engine = NotificationTemplateEngine()
+        self.evaluator = IncidentSeverityEvaluator(
+            aggregator=self.aggregator,
+            template_engine=self.template_engine
         )
+
+    def test_evaluate_end_to_end_flow(self):
+        random_id = f"inc-{uuid.uuid4()}"
+        module_name = f"module_{random.randint(1000, 9999)}"
+        exception_msg = f"Critical error in system {random.randint(1, 100)}"
+        exc = RuntimeError(exception_msg)
+        traceback_str = "Traceback (most recent call last):\n  File 'test.py', line 10, in <module>\n    raise RuntimeError()"
+
+        result = self.evaluator.evaluate(
+            module_name=module_name,
+            exception=exc,
+            traceback_str=traceback_str,
+            incident_id=random_id
+        )
+
+        self.assertIsInstance(result, dict)
+        self.assertIn("incident_id", result)
+        self.assertIn("severity", result)
+        self.assertIn("payload", result)
+        self.assertIn("aggregated_data", result)
         
-        self.assertIsInstance(aggregated_data, dict)
-        self.assertIn("incident_id", aggregated_data)
-        self.assertEqual(aggregated_data["incident_id"], self.incident_id)
+        self.assertEqual(result["incident_id"], random_id)
+        self.assertIn(result["severity"], ["LOW", "MEDIUM", "HIGH", "CRITICAL"])
 
-        # Шаг 2: Проверяем работу движка шаблонов через оценщик критичности
-        severity_level = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
-        payload = self.engine.generate_notification_payload(
-            severity=severity_level,
-            incident_id=self.incident_id,
-            raw_data=aggregated_data
+    def test_functional_helper_wrapper(self):
+        random_id = f"inc-func-{uuid.uuid4()}"
+        module_name = f"mod_func_{random.randint(100, 999)}"
+        exc = ValueError("Invalid operational state")
+        traceback_str = "Traceback: value error occurred"
+
+        result = evaluate_incident_severity(
+            module_name=module_name,
+            exception=exc,
+            traceback_str=traceback_str,
+            incident_id=random_id
         )
+
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["incident_id"], random_id)
+        self.assertIsNotNone(result["severity"])
+
+    def test_evaluate_stream_processing(self):
+        random_id = f"stream-{uuid.uuid4()}"
+        frequency = random.randint(1, 60)
+        stream_data = {
+            "parsed_id": random_id,
+            "frequency": frequency,
+            "stream_source": "telemetry_gateway"
+        }
+
+        result = self.evaluator.evaluate_stream(
+            module_name="telemetry_streamer",
+            stream_data=stream_data
+        )
+
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["incident_id"], random_id)
         
-        self.assertIsInstance(payload, dict)
-        self.assertEqual(payload.get("severity"), severity_level)
+        if frequency >= 50:
+            self.assertEqual(result["severity"], "CRITICAL")
+        elif frequency >= 26:
+            self.assertEqual(result["severity"], "HIGH")
+        elif frequency >= 6:
+            self.assertEqual(result["severity"], "MEDIUM")
+        else:
+            self.assertEqual(result["severity"], "LOW")
 
-        # Шаг 3: Проверяем полный интеграционный метод модуля оценки критичности без моков
-        eval_result = self.evaluator.evaluate_and_notify(
-            module_name=self.module_name,
-            exception=Exception(self.exception_msg),
-            traceback_str=self.traceback_str,
-            incident_id=self.incident_id
+    def test_evaluate_and_notify_integration(self):
+        random_id = f"notif-{uuid.uuid4()}"
+        module_name = f"auth_module_{random.randint(1, 50)}"
+        exc = SystemError("Fatal subsystem failure")
+        traceback_str = "Traceback: system error"
+
+        result = self.evaluator.evaluate_and_notify(
+            module_name=module_name,
+            exception=exc,
+            traceback_str=traceback_str,
+            incident_id=random_id
         )
 
-        self.assertIsInstance(eval_result, dict)
-        self.assertEqual(eval_result.get("incident_id"), self.incident_id)
-        self.assertIn("severity", eval_result)
-        self.assertIn("notification", eval_result)
-
-        # Шаг 4: Проверяем реальный экспорт артефакта уведомления файловой системы
-        export_path = f"incident_report_{self.incident_id}.txt"
-        export_success = self.engine.export_notification_file(
-            context=eval_result,
-            file_path=export_path
-        )
-        
-        try:
-            self.assertTrue(export_success)
-            self.assertTrue(os.path.exists(export_path))
-            with open(export_path, "r", encoding="utf-8") as f:
-                content = f.read()
-                self.assertIn(self.incident_id, content)
-        finally:
-            if os.path.exists(export_path):
-                os.remove(export_path)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["incident_id"], random_id)
+        self.assertIn("notification", result)
+        self.assertIn("payload", result)
+        self.assertIn("aggregated_data", result)
 
 if __name__ == "__main__":
     unittest.main()

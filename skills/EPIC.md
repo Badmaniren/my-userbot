@@ -6,3 +6,4 @@
 - vulnerability_remediation_audit_exporter: Создаем недостающий экспортер аудита уязвимостей для завершения конвейера отчетности безопасности.
 - vulnerability_remediation_pipeline: Исправление ключевого модуля vulnerability_remediation_pipeline для успешного завершения текущего эпика безопасности и аналитики.
 - vulnerability_remediation_pipeline: Продолжаем доводку vulnerability_remediation_pipeline для завершения эпика аналитики безопасности и прохождения тестов.
+- system_risk_evaluator: Связываем аналитические метрики устранения уязвимостей с данными телеметрии здоровья системы для получения комплексной оценки рисков инфраструктуры.

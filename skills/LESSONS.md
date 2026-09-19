@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-16/x64/lib/python3.11/json/encoder.py", line 180, in default
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## telemetry_audit_report_exporter (compose) — раундов: 3
-- Последняя ошибка перед фиксом: FAILED (failures=1)
+ошибка перед фиксом: FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main
 
 ## telemetry_forensic_analyzer (create) — раундов: 4
@@ -248,4 +244,8 @@
 
 ## vulnerability_audit_reporter (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## vulnerability_remediation_audit_exporter (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -1,6 +1,7 @@
 import os
 import json
 import io
+from typing import Dict, Any, List, Union
 from skills import (
     incident_severity_evaluator,
     incident_aggregator,
@@ -13,7 +14,7 @@ from skills import (
 )
 
 class IncidentAutoEscalationEngine:
-    def process_escalation(self, incident_id: str) -> dict:
+    def process_escalation(self, incident_id: str) -> Dict[str, Any]:
         if hasattr(incident_aggregator, "get_incident"):
             incident = incident_aggregator.get_incident(incident_id)
         else:
@@ -49,7 +50,7 @@ class IncidentAutoEscalationEngine:
             "broadcast_success": broadcast_incident_notification
         }
 
-    def evaluate_system_telemetry_risks(self) -> dict:
+    def evaluate_system_telemetry_risks(self) -> Dict[str, Any]:
         if hasattr(system_health_telemetry_collector, "collect"):
             telemetry_data = system_health_telemetry_collector.collect()
         else:
@@ -88,7 +89,7 @@ class IncidentAutoEscalationEngine:
         return io.BytesIO(b"").read()
 
 
-def auto_escalate_incident(incident_id: str, severity: int, workspace_dir: str) -> dict:
+def auto_escalate_incident(incident_id: str, severity: int, workspace_dir: str) -> Dict[str, Any]:
     escalation_result = {
         "escalated_incident_id": incident_id,
         "status": "SUCCESS",

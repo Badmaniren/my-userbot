@@ -16,7 +16,3 @@
 - Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: ERROR: test_process_stream_alert (tests.test_telegram_alert.TestTelegramAlert.test_process_stream_alert)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_notifier (compose) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

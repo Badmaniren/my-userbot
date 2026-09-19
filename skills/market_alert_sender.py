@@ -1,5 +1,5 @@
 from skills.market_parser import MarketParser
-from skills.db_storage import DbStorage
+from skills.db_storage import DBStorage as DbStorage
 
 
 class MarketAlertSender:

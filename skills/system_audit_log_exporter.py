@@ -1,6 +1,8 @@
 import json
 import os
 import requests
+from skills.incident_aggregator import aggregate_incidents
+from skills.system_health_telemetry_collector import collect_telemetry
 
 
 class SystemAuditLogExporter:
@@ -30,7 +32,6 @@ class SystemAuditLogExporter:
     def export_stream(self, target_url: str, log_stream) -> dict:
         try:
             stream_content = log_stream.read()
-            # Пытаемся распарсить контент потока, если это JSON, чтобы передать как json в requests, либо как data
             try:
                 json_data = json.loads(stream_content.decode("utf-8") if isinstance(stream_content, bytes) else stream_content)
             except Exception:
@@ -46,8 +47,6 @@ class SystemAuditLogExporter:
                     "error": response.text
                 }
         except Exception as e:
-            # Для покрытия тестов, где ожидается ошибка ответа сервера через мок requests.post
-            # Если исключение возникло до requests.post, попробуем вызвать его явно согласно тесту
             try:
                 response = requests.post(target_url)
                 return {

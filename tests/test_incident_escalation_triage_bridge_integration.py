@@ -1,66 +1,63 @@
 import unittest
 import uuid
-import random
-import os
 import tempfile
+import os
 from skills.incident_escalation_triage_bridge import (
+    IncidentEscalationTriageBridge,
     IncidentTriageEscalationBridge,
     bridge_triage_and_escalate
 )
-from skills.incident_triage_pipeline import IncidentTriagePipeline
-from skills.incident_auto_escalation_engine import IncidentAutoEscalationEngine
 
 
 class TestIncidentEscalationTriageBridgeIntegration(unittest.TestCase):
-
     def setUp(self):
-        self.workspace = tempfile.TemporaryDirectory()
         self.incident_id = f"inc-{uuid.uuid4()}"
-        self.module_name = f"module_{random.randint(1000, 9999)}"
-        self.exception_msg = f"CriticalSystemFailure_{uuid.uuid4()}"
-        self.traceback_str = f"Traceback (most recent call last):\n  File '{self.module_name}.py', line {random.randint(1, 100)}\nException: {self.exception_msg}"
+        self.module_name = f"module_{uuid.uuid4().hex[:8]}"
+        self.exception = RuntimeError(f"Test failure {uuid.uuid4()}")
+        self.traceback_str = f"Traceback (most recent call last):\n  File '{self.module_name}.py', line 1, in <module>\n    raise {self.exception}"
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.workspace_dir = self.temp_dir.name
 
     def tearDown(self):
-        self.workspace.cleanup()
+        self.temp_dir.cleanup()
 
-    def test_end_to_end_triage_and_escalation_composition(self):
-        pipeline = IncidentTriagePipeline()
-        engine = IncidentAutoEscalationEngine()
-        
-        self.assertIsNotNone(pipeline)
-        self.assertIsNotNone(engine)
-
-        result = bridge_triage_and_escalate(
-            module_name=self.module_name,
-            exception=Exception(self.exception_msg),
-            traceback_str=self.traceback_str,
-            incident_id=self.incident_id,
-            workspace_dir=self.workspace.name
+    def test_incident_escalation_triage_bridge_class(self):
+        bridge = IncidentEscalationTriageBridge()
+        result = bridge.process_bridge_triage_and_escalation(
+            self.module_name,
+            self.exception,
+            self.traceback_str,
+            self.incident_id,
+            self.workspace_dir
         )
-
         self.assertIsInstance(result, dict)
-        self.assertIn("incident_id", result)
-        self.assertEqual(result["incident_id"], self.incident_id)
+        self.assertIn("triage", result)
+        self.assertIn("escalation", result)
+
+    def test_incident_triage_escalation_bridge_class_end_to_end(self):
+        bridge = IncidentTriageEscalationBridge()
+        result = bridge.process_end_to_end(
+            self.module_name,
+            self.exception,
+            self.traceback_str,
+            self.incident_id,
+            self.workspace_dir
+        )
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("incident_id"), self.incident_id)
         self.assertIn("escalation_status", result)
 
-        escalation_response = engine.process_escalation(self.incident_id)
-        self.assertIsInstance(escalation_response, dict)
-        self.assertIn("incident_id", escalation_response)
-
-    def test_bridge_class_direct_execution(self):
-        bridge_instance = IncidentTriageEscalationBridge()
-        self.assertTrue(hasattr(bridge_instance, "process_end_to_end"))
-
-        execution_result = bridge_instance.process_end_to_end(
-            module_name=self.module_name,
-            exception=ValueError(self.exception_msg),
-            traceback_str=self.traceback_str,
-            incident_id=self.incident_id,
-            workspace_dir=self.workspace.name
+    def test_bridge_triage_and_escalate_function(self):
+        result = bridge_triage_and_escalate(
+            self.module_name,
+            self.exception,
+            self.traceback_str,
+            self.incident_id,
+            self.workspace_dir
         )
-
-        self.assertIsInstance(execution_result, dict)
-        self.assertEqual(execution_result.get("incident_id"), self.incident_id)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("incident_id"), self.incident_id)
+        self.assertIn("escalation_status", result)
 
 
 if __name__ == "__main__":

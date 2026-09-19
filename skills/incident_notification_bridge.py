@@ -60,12 +60,13 @@ class IncidentNotificationBridge:
                     tb_str = aggregated_incident.get("traceback_str") or aggregated_incident.get("traceboard_str", "")
                     
                     try:
-                        aggregated_incident["severity_assessment"] = self.severity_evaluator.evaluate(exc, tb_str)
-                    except TypeError:
-                        try:
-                            aggregated_incident["severity_assessment"] = self.severity_evaluator.evaluate(aggregated_incident)
-                        except TypeError:
-                            aggregated_incident["severity_assessment"] = self.severity_evaluator.evaluate(exc)
+                        res = self.severity_evaluator.evaluate("unknown", exc, tb_str, incident_id)
+                        if isinstance(res, dict):
+                            aggregated_incident["severity_assessment"] = res
+                        else:
+                            aggregated_incident["severity_assessment"] = {"severity": str(res)}
+                    except Exception:
+                        aggregated_incident["severity_assessment"] = {"severity": "HIGH"}
             except Exception:
                 aggregated_incident["severity_assessment"] = {"severity": "HIGH"}
 

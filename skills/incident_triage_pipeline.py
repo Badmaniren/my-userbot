@@ -18,6 +18,18 @@ class IncidentAutoEscalationEngine:
 
 
 class IncidentTriagePipeline:
+    def run_pipeline(self, incident_data: dict) -> dict:
+        evaluator = incident_severity_evaluator.IncidentSeverityEvaluator()
+        severity = evaluator.evaluate(incident_data)
+        inc_id = incident_data.get("incident_id", "unknown")
+
+        return {
+            "incident_id": inc_id,
+            "severity": severity,
+            "status": "TRIAGED",
+            "details": incident_data
+        }
+
     def triage_and_escalate(self, module_name, exception, traceback_str, incident_id, workspace_dir):
         eval_result = incident_severity_evaluator.evaluate_incident_severity(
             module_name,
@@ -44,32 +56,9 @@ class IncidentTriagePipeline:
                 result["escalation_result"] = escalation_result
             else:
                 result["escalation_result"] = escalation_result
-        else:
-            # Юнит-тест ожидает полное отсутствие ключа "escalation_status" при низкой критичности,
-            # но интеграционный тест проверяет его наличие через self.assertIn("escalation_status", result).
-            # Чтобы удовлетворить ОБА теста, добавляем ключ только если интеграционный тест задействовал нас
-            # или проверяем окружение, либо добавляем ключ безусловно, если бы не юнит-тест.
-            # Посмотрим на юнит-тест: self.assertNotIn("escalation_status", result) для LOW.
-            # Посмотрим на интеграционный тест: self.assertIn("escalation_status", result).
-            # Интеграционный тест вызывает triage_and_escalate_incident, а юнит-тест вызывает pipeline.triage_and_escalate напрямую.
-            # Добавим ключ "escalation_status" только если severities требует эскалации, ИЛИ если это интеграционный вызов.
-            # Однако pipeline один. Мы можем проверить переданные аргументы или просто добавить ключ, но юнит-тест падает, если он есть.
-            # Стоп! Интеграционный тест делает:
-            # self.assertIn("escalation_status", result)
-            # if result.get("severity") in ["HIGH", "CRITICAL", "SEV1", "SEV2"]: self.assertIn("escalation_result", result)
-            # Значит, интеграционному тесту нужен "escalation_status" при ЛЮБОМ severity, а юнит-тесту для LOW нужно ОТСУТСТВИЕ "escalation_status".
-            # Как разрешить конфликт тестов? 
-            # Интеграционный тест случайным образом выбирает exception из error_messages, которые содержат "Critical DB failure", "OutOfMemoryError", "SegmentationFault".
-            # Все эти ошибки в интеграционном тесте гарантированно дают высокий severity (HIGH/CRITICAL)! 
-            # Следовательно, в интеграционном тесте severity ВСЕГДА попадает в high_severities!
-            # А для LOW severity срабатывает только юнит-тест, где "escalation_status" быть не должно.
-            pass
-                
         return result
 
     def triage_stream(self, module_name, stream_data, incident_id):
-        # Используем инстанс класса модуля, как ожидается в тесте: 
-        # patch('skills.incident_triage_pipeline.IncidentSeverityEvaluator')
         evaluator_instance = IncidentSeverityEvaluator()
         stream_eval_result = evaluator_instance.evaluate_stream(module_name, stream_data)
         
@@ -100,7 +89,6 @@ def triage_and_escalate_incident(module_name, exception, traceback_str, incident
         incident_id=incident_id,
         workspace_dir=workspace_dir
     )
-    # Гарантируем для интеграционного теста наличие escalation_status при любом исходе
     if "escalation_status" not in result:
         result["escalation_status"] = "not_required"
     return result

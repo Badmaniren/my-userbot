@@ -2,40 +2,46 @@ import unittest
 import uuid
 import random
 import os
-from skills.none import epic_completion_proposal_handler
-from skills.incident_trend_analyzer import incident_trend_analyzer
-from skills.system_risk_evaluator import system_risk_evaluator
+import json
+from skills.none import start_new, epic_completion_proposal_handler
 
 class TestEpicCompletionIntegration(unittest.TestCase):
-    def test_epic_completion_and_new_direction_integration(self):
-        epic_id = f"epic-{uuid.uuid4()}"
-        metric_value = random.uniform(85.0, 99.9)
-        
-        trend_data = incident_trend_analyzer(
-            target_metric="system_stability",
-            threshold=metric_value
+    def test_epic_completion_proposal_handler_integration(self):
+        completed_epic_id = f"epic-{uuid.uuid4()}"
+        risk_level = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
+        risk_context = {
+            "risk_level": risk_level,
+            "score": random.randint(1, 100)
+        }
+        generation_seed = random.randint(1000, 99999)
+
+        result = epic_completion_proposal_handler(
+            completed_epic_id=completed_epic_id,
+            risk_context=risk_context,
+            generation_seed=generation_seed
         )
+
+        self.assertIn("new_direction_id", result)
+        self.assertIn("source_epic", result)
+        self.assertIn("proposal_file_path", result)
         
-        risk_assessment = system_risk_evaluator(
-            trend_report=trend_data,
-            include_forecast=True
-        )
+        self.assertEqual(result["source_epic"], completed_epic_id)
+        self.assertTrue(result["new_direction_id"].startswith("dir-"))
         
-        proposal_result = epic_completion_proposal_handler(
-            completed_epic_id=epic_id,
-            risk_context=risk_assessment,
-            generation_seed=random.randint(1, 10000)
-        )
+        file_path = result["proposal_file_path"]
+        self.assertEqual(file_path, f"proposal_{completed_epic_id}.txt")
         
-        self.assertIn("new_direction_id", proposal_result)
-        self.assertEqual(proposal_result["source_epic"], epic_id)
-        
-        artifact_path = proposal_result.get("proposal_file_path")
-        if artifact_path:
-            self.assertTrue(os.path.exists(artifact_path))
-            with open(artifact_path, "r", encoding="utf-8") as f:
+        try:
+            self.assertTrue(os.path.exists(file_path))
+            with open(file_path, "r", encoding="utf-8") as f:
                 content = f.read()
-                self.assertIn(epic_id, content)
+            
+            self.assertIn(completed_epic_id, content)
+            self.assertIn(str(generation_seed), content)
+            self.assertIn(json.dumps(risk_context), content)
+        finally:
+            if os.path.exists(file_path):
+                os.remove(file_path)
 
 if __name__ == "__main__":
     unittest.main()

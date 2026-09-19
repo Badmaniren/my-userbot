@@ -1,72 +1,67 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, mock_open
 import uuid
 import random
-import string
-import io
-import sys
+import json
 import os
+from skills.none import start_new, epic_completion_proposal_handler
 
-from skills.none import start_new
+class TestNoneSkill(unittest.TestCase):
 
-class TestArchitectInquisitorStartNew(unittest.TestCase):
+    def test_start_new_success(self):
+        epic_id = f"epic-{uuid.uuid4().hex}"
+        proposal = f"proposal-{uuid.uuid4().hex}"
+        expected_response = {"status": "success", "direction_id": f"dir-{uuid.uuid4().hex}"}
 
-    def setUp(self):
-        self.rand_str_1 = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
-        self.rand_str_2 = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
-        self.rand_id = str(uuid.uuid4())
-        self.rand_num = random.randint(100, 9999)
+        with patch("skills.none.requests.post") as mock_post:
+            mock_post.return_value.status_code = 200
+            mock_post.return_value.json.return_value = expected_response
 
-    def test_start_new_success_flow(self):
-        payload_data = {
-            "epic_id": self.rand_id,
-            "direction": self.rand_str_1,
-            "metric": self.rand_num
-        }
+            result = start_new(epic_id, proposal)
 
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = payload_data
-        mock_response.raw = io.BytesIO(f"DATA_{self.rand_str_2}".encode('utf-8'))
+            mock_post.assert_called_once()
+            called_args, called_kwargs = mock_post.call_args
+            self.assertEqual(called_kwargs["json"]["epic_id"], epic_id)
+            self.assertEqual(called_kwargs["json"]["proposal"], proposal)
+            self.assertEqual(result, expected_response)
 
-        with patch('requests.post', return_value=mock_response) as mock_post:
-            result = start_new(epic_id=self.rand_id, proposal=self.rand_str_1)
+    def test_start_new_failure_raises_exception(self):
+        epic_id = f"epic-{uuid.uuid4().hex}"
+        proposal = f"proposal-{uuid.uuid4().hex}"
+        status_code = random.choice([400, 401, 403, 404, 500, 502, 503])
+        error_text = f"error-{uuid.uuid4().hex}"
+
+        with patch("skills.none.requests.post") as mock_post:
+            mock_post.return_value.status_code = status_code
+            mock_post.return_value.text = error_text
+
+            with self.assertRaises(Exception) as ctx:
+                start_new(epic_id, proposal)
             
-            mock_post.assert_called_once()
-            self.assertIsInstance(result, dict)
-            self.assertEqual(result.get("epic_id"), self.rand_id)
-            self.assertEqual(result.get("direction"), self.rand_str_1)
-            self.assertEqual(result.get("metric"), self.rand_num)
+            self.assertIn(str(status_code), str(ctx.exception))
+            self.assertIn(error_text, str(ctx.exception))
 
-    def test_start_new_failure_handling(self):
-        fail_message = f"ERROR_{uuid.uuid4().hex}"
+    def test_epic_completion_proposal_handler(self):
+        completed_epic_id = f"epic-{uuid.uuid4().hex}"
+        risk_context = {f"risk_{uuid.uuid4().hex}": random.randint(1, 100)}
+        generation_seed = random.randint(1000, 9999)
+
+        mock_file = mock_open()
+        with patch("skills.none.open", mock_file):
+            result = epic_completion_proposal_handler(completed_epic_id, risk_context, generation_seed)
+
+        self.assertIn("new_direction_id", result)
+        self.assertTrue(result["new_direction_id"].startswith("dir-"))
+        self.assertEqual(result["source_epic"], completed_epic_id)
+        self.assertEqual(result["proposal_file_path"], f"proposal_{completed_epic_id}.txt")
+
+        mock_file.assert_called_once_with(f"proposal_{completed_epic_id}.txt", "w", encoding="utf-8")
         
-        mock_response = MagicMock()
-        mock_response.status_code = 500
-        mock_response.text = fail_message
-        mock_response.json.side_effect = ValueError("Invalid JSON")
-        mock_response.raw = io.BytesIO(fail_message.encode('utf-8'))
+        handle = mock_file()
+        written_content = "".join(call.args[0] for call in handle.write.call_args_list)
+        self.assertIn(completed_epic_id, written_content)
+        self.assertIn(str(generation_seed), written_content)
+        self.assertIn(json.dumps(risk_context), written_content)
 
-        with patch('requests.post', return_value=mock_response) as mock_post:
-            with self.assertRaises(Exception):
-                start_new(epic_id=self.rand_id, proposal=self.rand_str_1)
-            mock_post.assert_called_once()
-
-    def test_start_new_randomized_payload_integrity(self):
-        custom_payload = {
-            uuid.uuid4().hex: uuid.uuid4().hex,
-            uuid.uuid4().hex: random.randint(1, 1000)
-        }
-
-        mock_response = MagicMock()
-        mock_response.status_code = 201
-        mock_response.json.return_value = custom_payload
-        mock_response.raw = io.BytesIO(b'chaos_stream')
-
-        with patch('requests.post', return_value=mock_response) as mock_post:
-            res = start_new(epic_id=self.rand_id, proposal=self.rand_str_2)
-            self.assertEqual(res, custom_payload)
-            self.assertIn(list(custom_payload.keys())[0], res)
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

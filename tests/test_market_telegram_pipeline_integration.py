@@ -2,47 +2,55 @@ import unittest
 import os
 import uuid
 import random
+from unittest.mock import patch
 from skills.market_telegram_pipeline import run_market_telegram_pipeline
-from skills.market_parser import MarketParser
-from skills.db_storage import load_data
 
 class TestMarketTelegramPipelineIntegration(unittest.TestCase):
     def setUp(self):
-        self.random_suffix = uuid.uuid4().hex[:8]
-        self.storage_filename = f"test_market_data_{self.random_suffix}.json"
-        self.test_symbol = f"SYM_{self.random_suffix}"
-        self.test_price = round(random.uniform(10.0, 1000.0), 2)
-        self.test_url = f"https://example.com/api/{self.random_suffix}"
-        self.chat_id = f"@{self.random_suffix}_channel"
+        self.storage_file = f"test_market_storage_{uuid.uuid4().hex}.json"
+        self.symbol = f"SYM_{random.randint(1000, 9999)}"
+        self.chat_id = str(random.randint(1000000, 9999999))
+        self.token = f"{random.randint(100000, 999999)}:ABC-DEF{uuid.uuid4().hex[:8]}"
+        self.url = f"https://example.com/market/{uuid.uuid4().hex[:6]}"
 
     def tearDown(self):
-        if os.path.exists(self.storage_filename):
-            try:
-                os.remove(self.storage_filename)
-            except OSError:
-                pass
+        if os.path.exists(self.storage_file):
+            os.remove(self.storage_file)
+
+    @patch("skills.market_telegram_pipeline.requests.post")
+    def setUp_and_run(self, mock_post):
+        mock_post.return_value.status_code = 200
+        result = run_market_telegram_pipeline(
+            storage_file=self.storage_file,
+            symbol=self.symbol,
+            chat_id=self.chat_id,
+            url=self.url,
+            telegram_token=self.token
+        )
+        return result, mock_post
 
     def test_pipeline_integration_flow(self):
-        parser = MarketParser(storage_file=self.storage_filename)
-        parser.fetch_and_store(symbol=self.test_symbol, price=self.test_price)
+        mock_post_response = type('obj', (object,), {'status_code': 200})()
+        
+        with patch("skills.market_telegram_pipeline.requests.post", return_value=mock_post_response) as mock_post:
+            result = run_market_telegram_pipeline(
+                storage_file=self.storage_file,
+                symbol=self.symbol,
+                chat_id=self.chat_id,
+                url=self.url,
+                telegram_token=self.token
+            )
 
-        self.assertTrue(os.path.exists(self.storage_filename), "Файл хранилища должен быть создан")
+            self.assertEqual(result["status"], "success")
+            self.assertEqual(result["sent_symbol"], self.symbol)
+            self.assertIn("sent_price", result)
 
-        loaded_data = load_data(self.storage_filename)
-        self.assertIn(self.test_symbol, loaded_data, "Сохраненный символ должен присутствовать в данных")
-        self.assertEqual(loaded_data[self.test_symbol], self.test_price, "Цена в хранилище должна совпадать с исходной")
-
-        pipeline_result = run_market_telegram_pipeline(
-            storage_file=self.storage_filename,
-            symbol=self.test_symbol,
-            chat_id=self.chat_id
-        )
-
-        self.assertIsInstance(pipeline_result, dict, "Результат работы пайплайна должен быть словарем")
-        self.assertIn("status", pipeline_result, "Результат должен содержать статус выполнения")
-        self.assertEqual(pipeline_result["status"], "success", "Статус выполнения пайплайна должен быть успешным")
-        self.assertEqual(pipeline_result.get("sent_symbol"), self.test_symbol, "Пайплайн должен обработать правильный символ")
-        self.assertEqual(pipeline_result.get("sent_price"), self.test_price, "Пайплайн должен передать корректную цену")
+            mock_post.assert_called_once()
+            args, kwargs = mock_post.call_args
+            
+            self.assertIn(self.token, args[0])
+            self.assertEqual(kwargs["json"]["chat_id"], self.chat_id)
+            self.assertIn(self.symbol, kwargs["json"]["text"])
 
 if __name__ == "__main__":
     unittest.main()

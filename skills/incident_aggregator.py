@@ -7,7 +7,7 @@ class IncidentAggregator:
         self.collector = PatchMetricCollector()
 
     def process_and_aggregate(self, module_name, exception, traceback_str, incident_id=None):
-        if not incident_id:
+        if incident_id is None:
             incident_id = self.hub.capture_failure(module_name, exception, traceback_str)
         else:
             pass

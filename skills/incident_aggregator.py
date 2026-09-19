@@ -22,6 +22,17 @@ class IncidentAggregator:
         })
 
         metrics_summary = self.collector.get_metrics_summary(module_name)
+        if isinstance(metrics_summary, str):
+            import json
+            try:
+                metrics_summary = json.loads(metrics_summary)
+                if isinstance(metrics_summary, list) and len(metrics_summary) > 0 and isinstance(metrics_summary[0], dict):
+                    metrics_summary = metrics_summary[0]
+                elif isinstance(metrics_summary, list):
+                    metrics_summary = {}
+            except Exception:
+                metrics_summary = {}
+
         history = self.hub.get_incident_history(module_name) if hasattr(self.hub, 'get_incident_history') else []
 
         return {
@@ -48,6 +59,16 @@ def aggregate_incidents(module_name, exception, traceback_str):
         "metric_value": 0.0
     })
     metrics_summary = collector.get_metrics_summary(module_name)
+    if isinstance(metrics_summary, str):
+        import json
+        try:
+            metrics_summary = json.loads(metrics_summary)
+            if isinstance(metrics_summary, list) and len(metrics_summary) > 0 and isinstance(metrics_summary[0], dict):
+                metrics_summary = metrics_summary[0]
+            elif isinstance(metrics_summary, list):
+                metrics_summary = {}
+        except Exception:
+            metrics_summary = {}
 
     result = {
         "incident_id": incident_id,

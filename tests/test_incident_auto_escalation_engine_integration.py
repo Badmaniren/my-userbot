@@ -3,25 +3,24 @@ import os
 import json
 import uuid
 import random
-import tempfile
-
-from skills.incident_auto_escalation_engine import (
-    IncidentAutoEscalationEngine,
-    auto_escalate_incident
-)
-from skills import incident_aggregator
+from skills.incident_auto_escalation_engine import IncidentAutoEscalationEngine, auto_escalate_incident
 
 class TestIncidentAutoEscalationEngineIntegration(unittest.TestCase):
+
     def setUp(self):
         self.engine = IncidentAutoEscalationEngine()
-        self.test_dir = tempfile.TemporaryDirectory()
-        self.random_incident_id = f"INC-{uuid.uuid4()}"
-        self.random_severity = random.randint(1, 100)
+        self.random_incident_id = f"inc-{uuid.uuid4()}"
+        self.workspace_dir = f"./test_workspace_{uuid.uuid4()}"
 
     def tearDown(self):
-        self.test_dir.cleanup()
+        if os.path.exists(self.workspace_dir):
+            for file_name in os.listdir(self.workspace_dir):
+                file_path = os.path.join(self.workspace_dir, file_name)
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+            os.rmdir(self.workspace_dir)
 
-    def test_process_escalation_end_to_end(self):
+    def test_process_escalation_integration(self):
         result = self.engine.process_escalation(self.random_incident_id)
         
         self.assertIsInstance(result, dict)
@@ -29,45 +28,41 @@ class TestIncidentAutoEscalationEngineIntegration(unittest.TestCase):
         self.assertEqual(result["incident_id"], self.random_incident_id)
         self.assertIn("severity", result)
         self.assertIn("escalated_to", result)
+        self.assertIn("channel", result)
         self.assertIn("broadcast_success", result)
 
-    def test_evaluate_system_telemetry_risks_flow(self):
-        report = self.engine.evaluate_system_telemetry_risks()
+    def test_evaluate_system_telemetry_risks_integration(self):
+        telemetry_report = self.engine.evaluate_system_telemetry_risks()
         
-        self.assertIsInstance(report, dict)
-        self.assertIn("risk_metric", report)
+        self.assertIsInstance(telemetry_report, dict)
+        self.assertIn("risk_metric", telemetry_report)
+        self.assertIsInstance(telemetry_report["risk_metric"], (int, float))
 
-    def test_check_and_trigger_patching_execution(self):
+    def test_check_and_trigger_patching_integration(self):
         patch_result = self.engine.check_and_trigger_patching()
         self.assertIsInstance(patch_result, bool)
 
-    def test_consume_stream_data_pipeline(self):
+    def test_consume_stream_data_integration(self):
         stream_data = self.engine.consume_stream_data()
         self.assertIsInstance(stream_data, bytes)
 
     def test_auto_escalate_incident_file_creation(self):
-        result = auto_escalate_incident(
-            incident_id=self.random_incident_id,
-            severity=self.random_severity,
-            workspace_dir=self.test_dir.name
-        )
-
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result["escalated_incident_id"], self.random_incident_id)
-        self.assertEqual(result["severity"], self.random_severity)
-        self.assertEqual(result["status"], "SUCCESS")
-
-        expected_filename = f"escalated_{self.random_incident_id}.json"
-        expected_filepath = os.path.join(self.test_dir.name, expected_filename)
+        severity = random.randint(1, 10)
+        escalation_result = auto_escalate_incident(self.random_incident_id, severity, self.workspace_dir)
         
-        self.assertTrue(os.path.exists(expected_filepath), f"File {expected_filepath} was not created.")
+        self.assertEqual(escalation_result["escalated_incident_id"], self.random_incident_id)
+        self.assertEqual(escalation_result["severity"], severity)
+        self.assertEqual(escalation_result["status"], "SUCCESS")
 
-        with open(expected_filepath, "r", encoding="utf-8") as f:
-            file_data = json.load(f)
+        expected_file_path = os.path.join(self.workspace_dir, f"escalated_{self.random_incident_id}.json")
+        self.assertTrue(os.path.exists(expected_file_path), "Файл эскалации инцидента не был создан на диске.")
 
-        self.assertEqual(file_data["escalated_incident_id"], self.random_incident_id)
-        self.assertEqual(file_data["severity"], self.random_severity)
-        self.assertEqual(file_data["status"], "SUCCESS")
+        with open(expected_file_path, "r", encoding="utf-8") as f:
+            file_content = json.load(f)
+            
+        self.assertEqual(file_content["escalated_incident_id"], self.random_incident_id)
+        self.assertEqual(file_content["severity"], severity)
+        self.assertEqual(file_content["status"], "SUCCESS")
 
 if __name__ == "__main__":
     unittest.main()

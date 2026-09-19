@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-FAILED (failures=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## incident_forensics_compliance_checker (compose) — раундов: 2
+ose) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main
 
@@ -254,4 +251,7 @@ FAILED (failures=1)
 
 ## none (start_new) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## predictive_vulnerability_telemetry_bridge (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

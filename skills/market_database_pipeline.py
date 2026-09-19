@@ -1,5 +1,5 @@
 from skills.market_parser import MarketParser
-from skills.db_storage import MarketDatabaseStorage as DbStorage
+from skills.db_storage import DbStorage
 
 class MarketDatabasePipeline:
     def __init__(self, storage_file: str = "market_data.json"):

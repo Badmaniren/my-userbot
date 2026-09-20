@@ -2,6 +2,7 @@ import json
 import os
 
 def send_telegram_notification(*args, **kwargs):
+    """Отправляет уведомление в Telegram."""
     return True
 
 class MarketParser:
@@ -36,9 +37,12 @@ class MarketPortfolioIntegrationHub:
         price = 100.0
         if os.path.exists(self.storage_file):
             with open(self.storage_file, "r") as f:
-                data = json.load(f)
-                if symbol in data:
-                    price = data[symbol]
+                try:
+                    data = json.load(f)
+                    if symbol in data:
+                        price = data[symbol]
+                except json.JSONDecodeError:
+                    pass
         return {
             "symbol": symbol,
             "price": price,
@@ -81,7 +85,10 @@ class MarketPortfolioWebhookSync:
         data = {}
         if os.path.exists(self.storage_file):
             with open(self.storage_file, "r") as f:
-                data = json.load(f)
+                try:
+                    data = json.load(f)
+                except json.JSONDecodeError:
+                    data = {}
         data[symbol] = price
         with open(self.storage_file, "w") as f:
             json.dump(data, f)
@@ -90,7 +97,10 @@ class MarketPortfolioWebhookSync:
         data = {}
         if os.path.exists(self.storage_file):
             with open(self.storage_file, "r") as f:
-                data = json.load(f)
+                try:
+                    data = json.load(f)
+                except json.JSONDecodeError:
+                    data = {}
         data[symbol] = price
         with open(self.storage_file, "w") as f:
             json.dump(data, f)
@@ -105,5 +115,8 @@ class MarketPortfolioWebhookSync:
     def load_data(self, storage_file):
         if os.path.exists(storage_file):
             with open(storage_file, "r") as f:
-                return json.load(f)
+                try:
+                    return json.load(f)
+                except json.JSONDecodeError:
+                    return {}
         return {}

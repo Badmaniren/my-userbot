@@ -1,4 +1,5 @@
 import os
+import json
 from skills.db_storage import MarketParser
 from skills.market_portfolio_valuation import PortfolioValuation
 from skills.market_report_generator import MarketReportGenerator

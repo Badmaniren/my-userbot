@@ -6,13 +6,23 @@ class MarketParser:
     def __init__(self, storage_file: str):
         self.storage_file = storage_file
 
+    def load_data(self, filename: str = None) -> dict:
+        target_file = filename or self.storage_file
+        if target_file and os.path.exists(target_file):
+            try:
+                with open(target_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, OSError):
+                return {}
+        return {}
+
     def fetch_and_store(self, symbol: str, price: float) -> None:
         data = []
         if os.path.exists(self.storage_file):
             try:
                 with open(self.storage_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-            except Exception:
+            except (json.JSONDecodeError, OSError):
                 data = []
         
         entry = {

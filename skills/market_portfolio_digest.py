@@ -16,7 +16,7 @@ def generate_portfolio_digest(symbol, url, telegram_token, chat_id, storage_file
     visualizer = PortfolioVisualizer(storage_file)
     chart_data = visualizer.build_text_report(symbol)
     
-    dispatch_portfolio_alerts()
+    dispatch_portfolio_alerts(symbol, url, telegram_token, chat_id, storage_file)
     
     return {
         "symbol": symbol,

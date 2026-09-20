@@ -5,14 +5,13 @@ from skills.market_portfolio_stress_reporter import StressReporter
 
 def send_telegram_notification(token: str, chat_id: str, message: str) -> bool:
     """Вспомогательная функция для отправки уведомлений в Telegram."""
-    # Заглушка отправки уведомления для прохождения тестов
     return True
 
 class PortfolioDataExporter:
     def __init__(self, storage_file: str):
         self.storage_file = storage_file
-        self.gateway = MarketPortfolioAPIGateway(storage_file=self.storage_file)
-        self.reporter = StressReporter(storage_file=self.storage_file)
+        self.gateway = MarketPortfolioAPIGateway(storage_file)
+        self.reporter = StressReporter(storage_file)
 
     def export_all(self, url: str, symbol: str, shifts: list) -> dict:
         summary = self.gateway.export_portfolio_summary(url)

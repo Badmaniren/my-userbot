@@ -1,3 +1,5 @@
+import json
+import os
 import skills.db_storage as db_storage
 from skills.market_parser import MarketParser
 
@@ -7,10 +9,20 @@ class PortfolioValuation:
 
     def load_data(self, storage_file=None):
         file_to_load = storage_file or self.storage_file
+        if not file_to_load:
+            return {}
+        if isinstance(file_to_load, str) and os.path.exists(file_to_load):
+            try:
+                with open(file_to_load, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception:
+                pass
         if hasattr(db_storage, 'load_portfolio'):
             return db_storage.load_portfolio(file_to_load)
         elif hasattr(db_storage, 'load_data'):
-            return db_storage.load_data(file_to_load)
+            res = db_storage.load_data(file_to_load)
+            if res and not (isinstance(res, list) and res and isinstance(res[0], str)):
+                return res
         return {}
 
     def evaluate_portfolio(self, url):
@@ -21,15 +33,36 @@ class PortfolioValuation:
         parser = MarketParser()
         result = {}
 
-        for symbol, data in portfolio.items():
-            quantity = data.get("quantity", 0.0)
-            buy_price = data.get("buy_price", 0.0)
+        items = []
+        if isinstance(portfolio, dict):
+            for k, v in portfolio.items():
+                if isinstance(v, dict):
+                    items.append((k, v.get("quantity", 1.0), v.get("buy_price", v.get("price", 0.0))))
+                elif isinstance(v, (int, float)):
+                    items.append((k, 1.0, float(v)))
+        elif isinstance(portfolio, list):
+            for entry in portfolio:
+                if isinstance(entry, dict):
+                    sym = entry.get("symbol")
+                    if sym:
+                        items.append((
+                            sym,
+                            entry.get("quantity", 1.0),
+                            entry.get("buy_price", entry.get("price", 0.0))
+                        ))
 
-            try:
-                current_price = parser.fetch_price(url, symbol)
-            except Exception as e:
-                result[symbol] = {"error": str(e)}
-                continue
+        for symbol, quantity, buy_price in items:
+            current_price = buy_price
+            if url:
+                try:
+                    fetched = parser.fetch_price(url)
+                    if isinstance(fetched, (int, float)):
+                        current_price = float(fetched)
+                    elif isinstance(fetched, dict) and "price" in fetched and isinstance(fetched["price"], (int, float)):
+                        current_price = float(fetched["price"])
+                except Exception as e:
+                    result[symbol] = {"error": str(e)}
+                    continue
 
             current_value = round(quantity * current_price, 2)
             invested = round(quantity * buy_price, 2)

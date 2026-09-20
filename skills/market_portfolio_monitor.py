@@ -36,7 +36,17 @@ class MarketParser:
         data = {}
         if os.path.exists(self.storage_file):
             with open(self.storage_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
+                try:
+                    loaded = json.load(f)
+                    if isinstance(loaded, dict):
+                        data = loaded
+                    elif isinstance(loaded, list):
+                        data = {}
+                        for item in loaded:
+                            if isinstance(item, dict) and "symbol" in item and "price" in item:
+                                data[item["symbol"]] = item["price"]
+                except (json.JSONDecodeError, OSError):
+                    data = {}
         
         data[symbol] = price
         with open(self.storage_file, "w", encoding="utf-8") as f:
@@ -55,8 +65,13 @@ class MarketReportGenerator:
 
     def generate_symbol_report(self, symbol):
         data = MarketParser(self.storage_file).load_data(self.storage_file)
-        if data and symbol in data:
+        if isinstance(data, dict) and symbol in data:
             return f"Report for {symbol}: {data[symbol]}"
+        elif isinstance(data, list):
+            symbol_items = [item for item in data if isinstance(item, dict) and item.get("symbol") == symbol]
+            if symbol_items:
+                latest = symbol_items[-1]
+                return f"Report for {symbol}: {latest.get('price')}"
         return f"Report for {symbol}: No data"
 
     def get_raw_stream_dump(self):
@@ -74,7 +89,13 @@ def generate_market_report(storage_file, symbol):
 def run_market_telegram_pipeline(storage_file, symbol, chat_id, url, telegram_token):
     parser = MarketParser(storage_file=storage_file)
     data = parser.load_data(storage_file)
-    price = data.get(symbol, 0.0) if isinstance(data, dict) else 0.0
+    price = 0.0
+    if isinstance(data, dict):
+        price = data.get(symbol, 0.0)
+    elif isinstance(data, list):
+        symbol_items = [item for item in data if isinstance(item, dict) and item.get("symbol") == symbol]
+        if symbol_items:
+            price = symbol_items[-1].get("price", 0.0)
     
     # Имитация отправки в Telegram и работы конвейера
     return {

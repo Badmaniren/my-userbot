@@ -28,7 +28,17 @@ def run_pipeline(symbol: str, url: str, telegram_token: str, chat_id: str, stora
     else:
         data = {}
         
-    current_price = data.get(symbol, price)
+    raw_val = data.get(symbol, price)
+    if isinstance(raw_val, list) and raw_val:
+        last_item = raw_val[-1]
+        if isinstance(last_item, dict):
+            current_price = last_item.get("price", last_item)
+        else:
+            current_price = last_item
+    elif isinstance(raw_val, dict):
+        current_price = raw_val.get("price", raw_val)
+    else:
+        current_price = raw_val
     
     message = f"Market Update: {symbol} = {current_price}"
     resp = send_telegram_notification(telegram_token, chat_id, message)
@@ -51,7 +61,17 @@ def run_market_telegram_pipeline(storage_file: str, symbol: str, chat_id: str, u
     else:
         data = {}
         
-    price = data.get(symbol, 0.0)
+    raw_val = data.get(symbol, 0.0)
+    if isinstance(raw_val, list) and raw_val:
+        last_item = raw_val[-1]
+        if isinstance(last_item, dict):
+            price = last_item.get("price", last_item)
+        else:
+            price = last_item
+    elif isinstance(raw_val, dict):
+        price = raw_val.get("price", raw_val)
+    else:
+        price = raw_val
     
     message = f"Integration Market Update: {symbol} = {price}"
     send_telegram_notification(telegram_token, chat_id, message)

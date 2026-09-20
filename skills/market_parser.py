@@ -50,10 +50,23 @@ class MarketParser:
             except (json.JSONDecodeError, OSError):
                 data = {}
 
-        data[symbol] = {
-            "price": price,
-            "record_id": record_id
-        }
+        is_list_mode = any(isinstance(v, list) for v in data.values()) or isinstance(data.get(symbol), list)
+
+        if is_list_mode:
+            if symbol not in data or not isinstance(data[symbol], list):
+                if symbol in data and isinstance(data[symbol], dict):
+                    data[symbol] = [data[symbol]]
+                else:
+                    data[symbol] = []
+            data[symbol].append({
+                "price": price,
+                "record_id": record_id
+            })
+        else:
+            data[symbol] = {
+                "price": price,
+                "record_id": record_id
+            }
 
         if self.storage_file:
             with open(self.storage_file, 'w', encoding='utf-8') as f:

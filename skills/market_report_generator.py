@@ -14,7 +14,11 @@ class MarketReportGenerator:
         if isinstance(data, list):
             filtered_data = [item for item in data if isinstance(item, dict) and item.get("symbol") == symbol]
         elif isinstance(data, dict) and symbol in data:
-            filtered_data = [{"symbol": symbol, "price": data[symbol]}]
+            val = data[symbol]
+            if isinstance(val, list):
+                filtered_data = [{"symbol": symbol, "price": entry} for entry in val]
+            else:
+                filtered_data = [{"symbol": symbol, "price": val}]
             
         if not filtered_data:
             return {"count": 0, "error": "No data found"}
@@ -78,7 +82,13 @@ def generate_market_report(storage_file, symbol):
     if isinstance(data, dict):
         if symbol in data:
             val = data[symbol]
-            if isinstance(val, dict):
+            if isinstance(val, list) and val:
+                last_item = val[-1]
+                if isinstance(last_item, dict):
+                    price = last_item.get("price")
+                else:
+                    price = last_item
+            elif isinstance(val, dict):
                 price = val.get("price")
             else:
                 price = val

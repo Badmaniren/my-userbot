@@ -44,9 +44,36 @@ class PortfolioVisualizer:
             except Exception:
                 return []
 
+    def generate_ascii_chart(self, symbol_or_data):
+        if isinstance(symbol_or_data, (list, tuple)):
+            return generate_ascii_chart(symbol_or_data)
+
+        data = self.load_data(self.storage_file)
+        if isinstance(data, dict) and isinstance(symbol_or_data, str) and symbol_or_data in data:
+            symbol_data = data[symbol_or_data]
+            if isinstance(symbol_data, list):
+                prices = [item.get("price", 100.0) for item in symbol_data if isinstance(item, dict)]
+            else:
+                prices = []
+        elif isinstance(data, list):
+            prices = [item.get("price", 100.0) for item in data if isinstance(item, dict)]
+        else:
+            prices = []
+
+        if not prices:
+            prices = [100.0, 150.0]
+        return generate_ascii_chart(prices)
+
     def build_text_report(self, symbol):
         data = self.load_data(self.storage_file)
-        prices = [item.get("price", 100.0) for item in data if isinstance(item, dict)]
+        if isinstance(data, dict) and symbol in data:
+            symbol_data = data[symbol]
+            prices = [item.get("price", 100.0) for item in symbol_data if isinstance(item, dict)]
+        elif isinstance(data, list):
+            prices = [item.get("price", 100.0) for item in data if isinstance(item, dict)]
+        else:
+            prices = []
+
         if not prices:
             prices = [100.0, 150.0]
         
@@ -59,12 +86,6 @@ class PortfolioVisualizer:
         send_telegram_notification(token, chat_id, report)
 
 class MarketPortfolioVisualizer(PortfolioVisualizer):
-    def generate_ascii_chart(self, symbol):
-        data = self.load_data(self.storage_file)
-        prices = [item.get("price", 100.0) for item in data if isinstance(item, dict)]
-        if not prices:
-            prices = [100.0, 150.0]
-        return generate_ascii_chart(prices)
 
     def visualize_pnl(self, symbol):
         return format_pnl_notification(symbol, 10.0, 1.5)

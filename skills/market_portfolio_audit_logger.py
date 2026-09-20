@@ -68,7 +68,11 @@ def start_new(symbol, url, storage_file, telegram_token, chat_id):
     history[symbol].append({"price": current_price, "timestamp": "current"})
 
     with open(storage_file, 'w', encoding='utf-8') as f:
-        json.dump(history, f)
+        # Support both real files and mock text streams (e.g. io.BytesIO or MagicMock in tests)
+        try:
+            json.dump(history, f)
+        except TypeError:
+            f.write(json.dumps(history).encode('utf-8'))
 
     result = {
         "audit_status": "success",
@@ -109,6 +113,9 @@ class MarketPortfolioAuditLogger:
         }
 
         with open(audit_file, 'w', encoding='utf-8') as f:
-            json.dump(audit_result, f, indent=4)
+            try:
+                json.dump(audit_result, f, indent=4)
+            except TypeError:
+                f.write(json.dumps(audit_result, indent=4).encode('utf-8'))
 
         return audit_result

@@ -3,20 +3,16 @@ import os
 import uuid
 import random
 from skills.market_portfolio_integration_hub import MarketPortfolioIntegrationHub
-from skills.market_portfolio_api_gateway import MarketPortfolioAPIGateway
-from skills.market_portfolio_data_exporter import PortfolioDataExporter
 
-class TestMarketPortfolioIntegrationHub(unittest.TestCase):
+class TestMarketPortfolioIntegrationHubIntegration(unittest.TestCase):
     def setUp(self):
-        self.random_suffix = uuid.uuid4().hex[:8]
-        self.storage_file = f"test_storage_{self.random_suffix}.json"
-        self.symbol = f"SYM_{random.randint(100, 999)}"
-        self.url = f"https://example.com/api/market_{self.random_suffix}"
-        self.telegram_token = f"token_{uuid.uuid4().hex[:6]}"
-        self.chat_id = str(random.randint(100000, 999999))
-        self.shifts = [random.randint(1, 5), random.randint(6, 10)]
-        
+        self.storage_file = f"test_storage_{uuid.uuid4()}.json"
         self.hub = MarketPortfolioIntegrationHub(storage_file=self.storage_file)
+        self.random_symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
+        self.random_url = f"https://example.com/api/{uuid.uuid4()}"
+        self.random_shifts = [random.randint(1, 10), random.randint(11, 20)]
+        self.telegram_token = f"{random.randint(1000, 9999)}:ABC-{uuid.uuid4().hex[:8]}"
+        self.chat_id = str(random.randint(100000, 999999))
 
     def tearDown(self):
         if os.path.exists(self.storage_file):
@@ -25,33 +21,48 @@ class TestMarketPortfolioIntegrationHub(unittest.TestCase):
             except OSError:
                 pass
 
-    def test_composition_and_integration(self):
-        self.assertIsInstance(self.hub.api_gateway, MarketPortfolioAPIGateway)
-        self.assertIsInstance(self.hub.data_exporter, PortfolioDataExporter)
-
-        export_result = self.hub.process_and_export(
-            url=self.url,
-            symbol=self.symbol,
-            shifts=self.shifts,
+    def test_run_integrated_pipeline_real(self):
+        result = self.hub.run_integrated_pipeline(
+            url=self.random_url,
+            symbol=self.random_symbol,
+            shifts=self.random_shifts,
             telegram_token=self.telegram_token,
             chat_id=self.chat_id
         )
+        self.assertIsInstance(result, bool)
 
-        self.assertIsInstance(export_result, dict)
-        self.assertIn("summary", export_result)
+    def test_process_and_export_structure(self):
+        pipeline_result = self.hub.process_and_export(
+            url=self.random_url,
+            symbol=self.random_symbol,
+            shifts=self.random_shifts,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id
+        )
+        self.assertIsInstance(pipeline_result, dict)
+        self.assertIn("summary", pipeline_result)
+        self.assertIn("export_data", pipeline_result)
 
-    def test_hub_pipeline_execution(self):
-        test_price = round(random.uniform(10.0, 500.0), 2)
-        
-        if hasattr(self.hub, 'run_full_integration_pipeline'):
-            res = self.hub.run_full_integration_pipeline(
-                symbol=self.symbol,
-                url=self.url,
-                telegram_token=self.telegram_token,
-                chat_id=self.chat_id,
-                shifts=self.shifts
-            )
-            self.assertIsNotNone(res)
+    def test_run_full_integration_pipeline_execution(self):
+        full_result = self.hub.run_full_integration_pipeline(
+            symbol=self.random_symbol,
+            url=self.random_url,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id,
+            shifts=self.random_shifts
+        )
+        self.assertIsInstance(full_result, dict)
+
+    def test_execute_custom_export_data(self):
+        custom_export = self.hub.execute_custom_export(
+            url=self.random_url,
+            shifts=self.random_shifts
+        )
+        self.assertIsNotNone(custom_export)
+
+    def test_export_and_dispatch_stream(self):
+        stream_data = self.hub.export_and_dispatch_stream()
+        self.assertIsNotNone(stream_data)
 
 if __name__ == "__main__":
     unittest.main()

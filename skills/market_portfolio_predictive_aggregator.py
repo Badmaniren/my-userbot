@@ -14,7 +14,15 @@ class PredictiveAggregator:
         else:
             valuation = {}
 
-        simulation = self.simulator.simulate_scenario(symbol, shift)
+        try:
+            simulation = self.simulator.simulate_scenario(symbol, shift)
+        except KeyError:
+            simulation = {
+                "symbol": symbol,
+                "shift": shift,
+                "projected_value": 0.0
+            }
+
         return {
             "valuation": valuation,
             "simulation": simulation

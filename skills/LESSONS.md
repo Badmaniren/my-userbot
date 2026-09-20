@@ -272,3 +272,7 @@
 ## market_portfolio_exporter (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_data_exporter (compose) — раундов: 2
+- Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: успешно прошёл тесты и влит в main

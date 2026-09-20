@@ -13,7 +13,6 @@ def run_pipeline(symbol, url, telegram_token, chat_id, storage_file):
     parser = MarketParser(storage_file)
     valuation = PortfolioValuation(storage_file)
     
-    # Симуляция работы пайплайна
     summary = valuation.get_total_summary(url)
     if not summary:
         return None

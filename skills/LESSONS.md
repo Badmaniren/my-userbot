@@ -177,3 +177,6 @@
 ## market_portfolio_visualizer (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_visualizer_v2 (create) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

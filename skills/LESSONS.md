@@ -240,3 +240,7 @@
 ## market_portfolio_predictive_aggregator (compose) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_autonomous_sentinel (compose) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main

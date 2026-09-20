@@ -2,6 +2,8 @@ import os
 import json
 import requests
 from bs4 import BeautifulSoup
+from market_portfolio_collector_agent import MarketParser
+from market_portfolio_valuation import PortfolioValuation
 
 
 def start_new(storage_file=None, url=None, symbol=None, telegram_token=None, chat_id=None, shifts=None):
@@ -23,7 +25,6 @@ def start_new(storage_file=None, url=None, symbol=None, telegram_token=None, cha
             content = f.read()
             if content.strip():
                 loaded = json.loads(content)
-                # Поддержка формата списка (интеграционные тесты) и словаря (юнит-тесты)
                 if isinstance(loaded, list):
                     for entry in loaded:
                         s = entry.get('symbol')
@@ -41,11 +42,6 @@ def start_new(storage_file=None, url=None, symbol=None, telegram_token=None, cha
         data[symbol].append({"price": price, "timestamp": "current"})
 
         if storage_file:
-            # Сохраняем в том же формате, в котором ожидает Valuation/интеграционный тест, если это список,
-            # либо сохраняем в универсальном виде для совместимости обоих тестов.
-            # Интеграционный тест ожидает список словарей с ключами 'symbol', 'price'.
-            # Превратим data-словарь в список плоских записей или сохраним структуру.
-            # Посмотрим на интеграционный тест: PortfolioValuation ожидает формат списка объектов с 'symbol'.
             output_data = []
             for sym, entries in data.items():
                 for entry in entries:

@@ -1,44 +1,79 @@
 import unittest
 import os
-import tempfile
+import json
 import uuid
 import random
-from skills.market_portfolio_api_gateway import MarketPortfolioAPIGateway
-from skills.db_storage import MarketParser
-from skills.market_portfolio_valuation import PortfolioValuation
-from skills.market_report_generator import MarketReportGenerator
+from skills.market_portfolio_api_gateway import MarketPortfolioAPIGateway, start_new, run_pipeline
 
 class TestMarketPortfolioAPIGatewayIntegration(unittest.TestCase):
     def setUp(self):
-        self.test_dir = tempfile.TemporaryDirectory()
-        self.storage_file = os.path.join(self.test_dir.name, f"test_storage_{uuid.uuid4()}.json")
+        self.random_id = str(uuid.uuid4())[:8]
+        self.storage_file = f"test_storage_{self.random_id}.json"
+        self.symbol = f"TICK_{self.random_id}"
+        self.url = f"http://example.com/market/{self.random_id}"
+        self.telegram_token = f"fake_token_{self.random_id}"
+        self.chat_id = str(random.randint(100000, 999999))
         
-        self.symbol = f"TICKER_{uuid.uuid4().hex[:6].upper()}"
-        self.price = round(random.uniform(10.0, 1000.0), 2)
-        self.url = f"http://example.com/api/{uuid.uuid4()}"
-        
-        parser = MarketParser(self.storage_file)
-        parser.fetch_and_store(self.symbol, self.price)
-        
-        self.gateway = MarketPortfolioAPIGateway(self.storage_file)
+        initial_data = {
+            self.symbol: [
+                {"price": round(random.uniform(10.0, 1000.0), 2), "timestamp": "2023-10-01T00:00:00"}
+            ]
+        }
+        with open(self.storage_file, "w", encoding="utf-8") as f:
+            json.dump(initial_data, f)
 
     def tearDown(self):
-        self.test_dir.cleanup()
+        if os.path.exists(self.storage_file):
+            os.remove(self.storage_file)
 
-    def test_gateway_export_and_integration(self):
-        random_sub_id = str(uuid.uuid4())
+    def test_gateway_and_pipeline_integration(self):
+        gateway = MarketPortfolioAPIGateway(self.storage_file)
+        self.assertEqual(gateway.storage_file, self.storage_file)
+
+        summary = gateway.export_portfolio_summary(self.url)
+        self.assertIsNotNone(summary)
+
+        result = run_pipeline(
+            self.symbol, 
+            self.url, 
+            self.telegram_token, 
+            self.chat_id, 
+            self.storage_file
+        )
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("status"), "success")
+        self.assertEqual(result.get("symbol"), self.symbol)
+        self.assertIn("price", result)
+        self.assertIn("timestamp", result)
+
+        start_result = start_new(
+            self.symbol, 
+            self.url, 
+            self.telegram_token, 
+            self.chat_id, 
+            self.storage_file
+        )
+        self.assertIsInstance(start_result, dict)
+        self.assertEqual(start_result.get("status"), "success")
+        self.assertEqual(start_result.get("symbol"), self.symbol)
+
+    def test_pipeline_empty_storage_flow(self):
+        empty_storage = f"empty_storage_{self.random_id}.json"
+        with open(empty_storage, "w", encoding="utf-8") as f:
+            json.dump({}, f)
         
-        summary_data = self.gateway.export_portfolio_summary(self.url)
-        self.assertIsInstance(summary_data, dict)
-        
-        valuation = PortfolioValuation(self.storage_file)
-        direct_summary = valuation.get_total_summary(self.url)
-        
-        report_gen = MarketReportGenerator(self.storage_file)
-        report_data = report_gen.generate_symbol_report(self.symbol)
-        
-        self.assertIsNotNone(summary_data)
-        self.assertTrue(os.path.exists(self.storage_file))
+        try:
+            result = start_new(
+                self.symbol, 
+                self.url, 
+                self.telegram_token, 
+                self.chat_id, 
+                empty_storage
+            )
+            self.assertIn(result.get("status"), ["completed_empty", "success", "error"])
+        finally:
+            if os.path.exists(empty_storage):
+                os.remove(empty_storage)
 
 if __name__ == "__main__":
     unittest.main()

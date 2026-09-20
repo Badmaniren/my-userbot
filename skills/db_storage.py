@@ -8,12 +8,9 @@ class MarketParser:
         self.storage_file = storage_file
 
     def fetch_price(self, url: str):
-        try:
-            response = requests.get(url, timeout=10)
-            data = response.json()
-            return data.get("price")
-        except Exception:
-            return None
+        response = requests.get(url, timeout=10)
+        data = response.json()
+        return data.get("price")
 
     def parse_html_prices(self, url: str):
         response = requests.get(url, timeout=10)
@@ -51,8 +48,6 @@ class MarketParser:
                 cursor.execute('SELECT symbol, price FROM market_data')
                 rows = cursor.fetchall()
                 data = [f"{row[0]},{row[1]}\n" for row in rows]
-            except Exception:
-                data = []
             finally:
                 conn.close()
             return data

@@ -9,7 +9,11 @@ class PredictiveAggregator:
         self.simulator = PortfolioScenarioSimulator(storage_file)
 
     def build_advanced_forecast(self, symbol: str, url: str, shift: float) -> dict:
-        valuation = self.collector.get_total_summary(url)
+        if hasattr(self.collector, "get_total_summary"):
+            valuation = self.collector.get_total_summary(url)
+        else:
+            valuation = {}
+
         simulation = self.simulator.simulate_scenario(symbol, shift)
         return {
             "valuation": valuation,

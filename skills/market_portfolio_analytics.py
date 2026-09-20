@@ -15,7 +15,9 @@ class PortfolioAnalytics:
         if self.parser and hasattr(self.parser, 'load_data'):
             try:
                 data = self.parser.load_data()
-            except (UnicodeDecodeError, Exception):
+            except UnicodeDecodeError:
+                raise
+            except Exception:
                 data = []
         
         prices = []
@@ -27,6 +29,8 @@ class PortfolioAnalytics:
         if not prices and self.parser and hasattr(self.parser, 'get_history'):
             try:
                 prices = self.parser.get_history(symbol)
+            except UnicodeDecodeError:
+                raise
             except Exception:
                 prices = []
 

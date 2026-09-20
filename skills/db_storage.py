@@ -60,3 +60,17 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+def load_data(filename: str):
+    import json
+    import os
+    if os.path.exists(filename):
+        if filename.endswith('.json'):
+            try:
+                with open(filename, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, OSError):
+                pass
+        return MarketParser().load_data(filename)
+    return {}

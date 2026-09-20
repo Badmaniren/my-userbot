@@ -1,46 +1,48 @@
 import unittest
 import os
-import tempfile
 import uuid
 import random
-from skills.market_portfolio_analytics import PortfolioAnalytics
-from skills.db_storage import MarketParser
-from skills.market_report_generator import MarketReportGenerator
+from skills.market_portfolio_analytics import PortfolioAnalytics, start_new
 
-class TestMarketPortfolioAnalyticsIntegration(unittest.TestCase):
+class TestPortfolioAnalyticsIntegration(unittest.TestCase):
     def setUp(self):
-        self.test_dir = tempfile.TemporaryDirectory()
-        self.storage_file = os.path.join(self.test_dir.name, f"test_storage_{uuid.uuid4()}.json")
-        
-        self.symbol = f"TICKER_{uuid.uuid4().hex[:6].upper()}"
-        self.prices = [round(random.uniform(100.0, 500.0), 2) for _ in range(5)]
-        
-        parser = MarketParser(self.storage_file)
-        for p in self.prices:
-            parser.fetch_and_store(self.symbol, p)
+        self.unique_id = str(uuid.uuid4())[:8]
+        self.storage_file = f"test_market_storage_{self.unique_id}.json"
+        self.symbol = f"SYM_{self.unique_id}"
+        self.test_price = round(random.uniform(10.0, 1000.0), 2)
+        self.test_url = f"https://example.com/market/{self.unique_id}"
 
     def tearDown(self):
-        self.test_dir.cleanup()
+        if os.path.exists(self.storage_file):
+            try:
+                os.remove(self.storage_file)
+            except OSError:
+                pass
 
-    def test_portfolio_analytics_integration(self):
-        self.assertTrue(os.path.exists(self.storage_file), "Хранилище данных не было создано")
+    def test_portfolio_analytics_and_pipeline_integration(self):
+        analytics = PortfolioAnalytics(storage_file=self.storage_file)
         
-        report_gen = MarketReportGenerator(self.storage_file)
-        report = report_gen.generate_symbol_report(self.symbol)
-        
-        self.assertIsNotNone(report, "Отчет по символу не сгенерирован")
-        
-        analytics = PortfolioAnalytics(self.storage_file)
-        metrics = analytics.calculate_metrics(self.symbol)
-        
-        self.assertIsInstance(metrics, dict, "Метрики портфеля должны быть возвращены в виде словаря")
-        self.assertIn("return", metrics, "В метриках отсутствует расчет доходности (return)")
-        
-        expected_min = min(self.prices)
-        expected_max = max(self.prices)
-        
-        dump = report_gen.get_raw_stream_dump()
-        self.assertIn(self.symbol, str(dump), "Дамп потока не содержит тестируемый символ")
+        initial_metrics = analytics.calculate_metrics(self.symbol)
+        self.assertEqual(initial_metrics["symbol"], self.symbol)
+        self.assertEqual(initial_metrics["return"], 0.0)
+        self.assertEqual(initial_metrics["prices"], [])
+
+        report = start_new(
+            storage_file=self.storage_file,
+            symbol=self.symbol,
+            url=self.test_url,
+            telegram_token=f"token_{self.unique_id}",
+            chat_id=f"chat_{self.unique_id}"
+        )
+
+        self.assertIsNotNone(report)
+        self.assertTrue(os.path.exists(self.storage_file))
+
+        subsequent_metrics = analytics.calculate_metrics(self.symbol)
+        self.assertEqual(subsequent_metrics["symbol"], self.symbol)
+        self.assertIsInstance(subsequent_metrics["prices"], list)
+        self.assertGreaterEqual(len(subsequent_metrics["prices"]), 1)
+        self.assertIn(self.test_price, subsequent_metrics["prices"])
 
 if __name__ == "__main__":
     unittest.main()

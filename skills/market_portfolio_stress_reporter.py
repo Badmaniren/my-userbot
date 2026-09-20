@@ -2,12 +2,16 @@ from skills.market_portfolio_scenario_simulator import PortfolioScenarioSimulato
 from skills.market_report_generator import MarketReportGenerator
 
 class StressReporter:
-    def __init__(self, storage_file):
-        self.storage_file = storage_file
-        self.simulator = PortfolioScenarioSimulator(storage_file)
-        self.generator = MarketReportGenerator(storage_file)
+    def __init__(self, storage_file="market_data.json"):
+        self.storage_file = storage_file or "market_data.json"
+        self.simulator = PortfolioScenarioSimulator(self.storage_file)
+        self.generator = MarketReportGenerator(self.storage_file)
 
-    def run_stress_reporting(self, symbol, shifts):
+    def run_stress_reporting(self, symbol, shifts, storage_file=None):
+        if storage_file and storage_file != self.storage_file:
+            self.storage_file = storage_file
+            self.simulator = PortfolioScenarioSimulator(storage_file)
+            self.generator = MarketReportGenerator(storage_file)
         sim_results = self.simulator.run_stress_test(symbol, shifts)
         base_report = self.generator.generate_symbol_report(symbol)
         return {
@@ -23,8 +27,8 @@ class StressReporter:
 
 
 class PortfolioStressReporter(StressReporter):
-    def run_stress_report(self, symbol, shifts):
-        return self.run_stress_reporting(symbol, shifts)
+    def run_stress_report(self, symbol, shifts, storage_file=None):
+        return self.run_stress_reporting(symbol, shifts, storage_file=storage_file)
 
 
 def generate_stress_report(storage_file, symbol, percentage):

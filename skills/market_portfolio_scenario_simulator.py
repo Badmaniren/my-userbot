@@ -31,11 +31,24 @@ class PortfolioScenarioSimulator:
         elif isinstance(data, list):
             target = next((item for item in data if isinstance(item, dict) and item.get("symbol") == symbol), None)
         
-        if not target:
+        if target is None:
             raise KeyError(f"Symbol {symbol} not found")
 
-        current_price = target.get("current_price") or target.get("price") or 0.0
-        quantity = target.get("quantity") or target.get("shares") or 0.0
+        if isinstance(target, list):
+            if not target:
+                raise KeyError(f"Symbol {symbol} history is empty")
+            last_entry = target[-1] if isinstance(target[-1], dict) else {"price": target[-1]}
+            current_price = last_entry.get("current_price") or last_entry.get("price") or 0.0
+            quantity = last_entry.get("quantity") or last_entry.get("shares") or 1.0
+        elif isinstance(target, (int, float)):
+            current_price = float(target)
+            quantity = 1.0
+        elif isinstance(target, dict):
+            current_price = target.get("current_price") or target.get("price") or 0.0
+            quantity = target.get("quantity") or target.get("shares") or 1.0
+        else:
+            current_price = 0.0
+            quantity = 1.0
         
         simulated_price = current_price * (1 + percentage / 100.0)
         pnl_impact = (simulated_price - current_price) * quantity

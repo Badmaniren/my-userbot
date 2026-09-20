@@ -16,14 +16,25 @@ class MarketParser:
             return None
 
     def parse_html_prices(self, url: str):
-        response = requests.get(url, timeout=10)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        element = soup.find()
-        if element and element.text:
-            return float(element.text)
-        return None
+        try:
+            response = requests.get(url, timeout=10)
+            soup = BeautifulSoup(response.text, 'html.parser')
+            element = soup.find()
+            if element and element.text:
+                return float(element.text)
+            return None
+        except Exception:
+            return None
 
     def fetch_and_store(self, symbol: str, price: float):
+        if price is None:
+            price = 0.0
+        else:
+            try:
+                price = float(price)
+            except (ValueError, TypeError):
+                price = 0.0
+
         conn = sqlite3.connect(self.storage_file)
         cursor = conn.cursor()
         
@@ -57,6 +68,9 @@ class MarketParser:
                 conn.close()
             return data
         else:
-            with open(filename, 'rb') as f:
-                lines = f.readlines()
-                return [line.decode('utf-8') for line in lines]
+            try:
+                with open(filename, 'rb') as f:
+                    lines = f.readlines()
+                    return [line.decode('utf-8') for line in lines]
+            except Exception:
+                return []

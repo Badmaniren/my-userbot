@@ -300,3 +300,6 @@
 
 ## market_portfolio_webhook_event_logger (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_webhook_sync (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

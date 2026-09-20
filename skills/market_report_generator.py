@@ -41,7 +41,6 @@ class MarketReportGenerator:
 
 
 def generate_market_report(storage_file, symbol):
-    # Обеспечиваем совместимость с интеграционным тестом, если функции load_data/fetch_and_store нет в db_storage
     load_func = getattr(db_storage, "load_data", None)
     if load_func is None and hasattr(db_storage, "load_db"):
         load_func = db_storage.load_db

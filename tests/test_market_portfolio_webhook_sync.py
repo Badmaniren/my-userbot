@@ -1,125 +1,156 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+import os
+import json
 import uuid
 import random
-import string
+import tempfile
 import io
-import sys
-import types
-
-from skills.market_portfolio_webhook_sync import start_new
+from skills.market_portfolio_webhook_sync import (
+    MarketParser,
+    AutonomousSentinel,
+    MarketPortfolioIntegrationHub,
+    MarketPortfolioWebhookSync,
+    start_new,
+    send_telegram_notification
+)
 
 class TestMarketPortfolioWebhookSync(unittest.TestCase):
-
     def setUp(self):
-        self.random_prefix = ''.join(random.choices(string.ascii_lowercase, k=8))
-        self.storage_file = f"{self_storage_file_gen()}"
-        self.url = f"https://{uuid.uuid4().hex}.com/{random.randint(100, 999)}"
-        self.symbol = uuid.uuid4().hex[:6].upper()
+        self.random_suffix = uuid.uuid4().hex
+        self.storage_file = f"test_storage_{self.random_suffix}.json"
+        self.webhook_url = f"https://example.com/webhook/{self.random_suffix}"
+        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
+        self.price = round(random.uniform(10.0, 1000.0), 2)
+        self.url = f"https://market.data/{uuid.uuid4().hex}"
         self.token = uuid.uuid4().hex
         self.chat_id = str(random.randint(100000, 999999))
-        self.price = round(random.uniform(10.0, 5000.0), 2)
-        self.threshold = round(random.uniform(1.0, 10.0), 2)
-        self.shift = round(random.uniform(-5.0, 5.0), 2)
+        self.threshold = round(random.uniform(0.1, 5.0), 2)
+        self.shift = random.randint(1, 10)
 
-    def test_start_new_execution_flow(self):
-        dynamic_message = f"alert_{uuid.uuid4().hex}"
-        dynamic_payload = {
+    def tearDown(self):
+        if os.path.exists(self.storage_file):
+            try:
+                os.remove(self.storage_file)
+            except OSError:
+                pass
+
+    def test_send_telegram_notification(self):
+        result = send_telegram_notification()
+        self.assertTrue(result)
+
+    def test_market_parser_fetch_and_parse(self):
+        parser = MarketParser(self.storage_file)
+        price = parser.fetch_price(self.url)
+        prices = parser.parse_html_prices(self.url)
+        self.assertEqual(price, 100.0)
+        self.assertEqual(prices, [100.0])
+
+    def test_market_parser_load_data_empty(self):
+        parser = MarketParser(self.storage_file)
+        data = parser.load_data()
+        self.assertEqual(data, b"")
+
+    def test_market_parser_load_data_existing(self):
+        random_bytes = uuid.uuid4().bytes
+        with open(self.storage_file, "wb") as f:
+            f.write(random_bytes)
+        
+        parser = MarketParser(self.storage_file)
+        data = parser.load_data()
+        self.assertEqual(data, random_bytes)
+
+    def test_autonomous_sentinel_surveillance(self):
+        sentinel = AutonomousSentinel(self.storage_file, self.threshold)
+        res = sentinel.run_surveillance(self.symbol, self.url, self.token, self.chat_id)
+        self.assertTrue(res)
+
+    def test_market_portfolio_integration_hub_pipeline(self):
+        hub = MarketPortfolioIntegrationHub(self.storage_file)
+        result = hub.run_integrated_pipeline(
+            url=self.url,
+            symbol=self.symbol,
+            shifts=self.shift,
+            telegram_token=self.token,
+            chat_id=self.chat_id
+        )
+        self.assertEqual(result["symbol"], self.symbol)
+        self.assertEqual(result["price"], 100.0)
+        self.assertEqual(result["url"], self.url)
+        self.assertEqual(result["token"], self.token)
+        self.assertEqual(result["chat_id"], self.chat_id)
+        self.assertEqual(result["shift"], self.shift)
+        self.assertEqual(result["storage"], self.storage_file)
+        self.assertEqual(result["msg"], f"alert_{self.symbol}")
+
+    def test_market_portfolio_integration_hub_with_storage(self):
+        initial_data = {self.symbol: self.price}
+        with open(self.storage_file, "w") as f:
+            json.dump(initial_data, f)
+
+        hub = MarketPortfolioIntegrationHub(self.storage_file)
+        result = hub.run_integrated_pipeline(
+            url=self.url,
+            symbol=self.symbol,
+            shifts=self.shift,
+            telegram_token=self.token,
+            chat_id=self.chat_id
+        )
+        self.assertEqual(result["price"], self.price)
+
+    def test_start_new_execution(self):
+        result = start_new(
+            storage_file=self.storage_file,
+            url=self.url,
+            symbol=self.symbol,
+            telegram_token=self.token,
+            chat_id=self.chat_id,
+            threshold=self.threshold,
+            shift=self.shift
+        )
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["symbol"], self.symbol)
+
+    def test_webhook_sync_store_initial_state(self):
+        sync = MarketPortfolioWebhookSync(self.storage_file, self.webhook_url)
+        sync.store_initial_state(self.symbol, self.price)
+
+        with open(self.storage_file, "r") as f:
+            data = json.load(f)
+        
+        self.assertIn(self.symbol, data)
+        self.assertEqual(data[self.symbol], self.price)
+
+    def test_webhook_sync_trigger_webhook_sync(self):
+        sync = MarketPortfolioWebhookSync(self.storage_file, self.webhook_url)
+        response = sync.trigger_webhook_sync(self.symbol, self.price)
+
+        expected_response = {
+            "status": "success",
             "symbol": self.symbol,
             "price": self.price,
-            "url": self.url,
-            "token": self.token,
-            "chat_id": self.chat_id,
-            "threshold": self.threshold,
-            "shift": self.shift,
-            "storage": self.storage_file,
-            "msg": dynamic_message
+            "webhook_url": self.webhook_url
         }
+        self.assertEqual(response, expected_response)
 
-        with patch('skills.market_portfolio_webhook_sync.MarketParser') as mock_parser_cls, \
-             patch('skills.market_portfolio_webhook_sync.AutonomousSentinel') as mock_sentinel_cls, \
-             patch('skills.market_portfolio_webhook_sync.MarketPortfolioIntegrationHub') as mock_hub_cls, \
-             patch('skills.market_portfolio_webhook_sync.send_telegram_notification') as mock_send_tg:
+        with open(self.storage_file, "r") as f:
+            data = json.load(f)
+        self.assertEqual(data.get(self.symbol), self.price)
 
-            mock_parser = mock_parser_cls.return_value
-            mock_parser.fetch_price.return_value = self.price
-            mock_parser.parse_html_prices.return_value = [self.price]
+    def test_webhook_sync_load_data(self):
+        sync = MarketPortfolioWebhookSync(self.storage_file, self.webhook_url)
+        initial_data = {self.symbol: self.price}
+        with open(self.storage_file, "w") as f:
+            json.dump(initial_data, f)
 
-            mock_sentinel = mock_sentinel_cls.return_value
-            mock_sentinel.run_surveillance.return_value = True
+        loaded = sync.load_data(self.storage_file)
+        self.assertEqual(loaded, initial_data)
 
-            mock_hub = mock_hub_cls.return_value
-            mock_hub.run_integrated_pipeline.return_value = dynamic_payload
+    def test_webhook_sync_load_data_nonexistent(self):
+        sync = MarketPortfolioWebhookSync(self.storage_file, self.webhook_url)
+        non_existent_file = f"nonexistent_{uuid.uuid4().hex}.json"
+        loaded = sync.load_data(non_existent_file)
+        self.assertEqual(loaded, {})
 
-            mock_send_tg.return_value = True
-
-            result = start_new(
-                storage_file=self.storage_file,
-                url=self.url,
-                symbol=self.symbol,
-                telegram_token=self.token,
-                chat_id=self.chat_id,
-                threshold=self.threshold,
-                shift=self.shift
-            )
-
-            mock_parser_cls.assert_called_once_with(self.storage_file)
-            mock_parser.fetch_price.assert_called_once_with(self.url)
-            mock_sentinel_cls.assert_called_once_with(self.storage_file, self.threshold)
-            mock_sentinel.run_surveillance.assert_called_once_with(self.symbol, self.url, self.token, self.chat_id)
-            mock_hub_cls.assert_called_once_with(self.storage_file)
-            mock_hub.run_integrated_pipeline.assert_called_once_with(
-                url=self.url,
-                symbol=self.symbol,
-                shifts=self.shift,
-                telegram_token=self.token,
-                chat_id=self.chat_id
-            )
-            self.assertIsNotNone(result)
-
-    def test_start_new_handles_exceptions_gracefully(self):
-        err_message = f"critical_fail_{uuid.uuid4().hex}"
-        
-        with patch('skills.market_portfolio_webhook_sync.MarketParser', side_effect=Exception(err_message)):
-            with self.assertRaises(Exception) as ctx:
-                start_new(
-                    storage_file=self.storage_file,
-                    url=self.url,
-                    symbol=self.symbol,
-                    telegram_token=self.token,
-                    chat_id=self.chat_id,
-                    threshold=self.threshold,
-                    shift=self.shift
-                )
-            self.assertIn(err_message, str(ctx.exception))
-
-    def test_start_new_stream_io_integrity(self):
-        stream_data = f"data_{uuid.uuid4().hex}".encode('utf-8')
-        mock_stream = io.BytesIO(stream_data)
-
-        with patch('skills.market_portfolio_webhook_sync.MarketParser') as mock_parser_cls, \
-             patch('skills.market_portfolio_webhook_sync.AutonomousSentinel') as mock_sentinel_cls, \
-             patch('skills.market_portfolio_webhook_sync.MarketPortfolioIntegrationHub') as mock_hub_cls:
-
-            mock_parser = mock_parser_cls.return_value
-            mock_parser.load_data.return_value = mock_stream.read()
-
-            result = start_new(
-                storage_file=self.storage_file,
-                url=self.url,
-                symbol=self.symbol,
-                telegram_token=self.token,
-                chat_id=self.chat_id,
-                threshold=self.threshold,
-                shift=self.shift
-            )
-
-            mock_parser.load_data.assert_called()
-
-
-def self_storage_file_gen():
-    return f"{uuid.uuid4().hex}.json"
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

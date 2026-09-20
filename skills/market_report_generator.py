@@ -46,7 +46,7 @@ class MarketReportGenerator:
         self.parser.fetch_and_store(symbol, price)
         return price
 
-    def get_raw_stream_dump(self):
+    def get_raw_stream_dump(self, *args, **kwargs):
         return self.parser.load_data(self.storage_file)
 
 

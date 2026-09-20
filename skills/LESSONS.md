@@ -293,7 +293,3 @@
 
 ## market_portfolio_webhook_sync (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_alert_dispatcher (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

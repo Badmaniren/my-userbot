@@ -14,7 +14,11 @@ class MarketReportGenerator:
         if isinstance(data, list):
             filtered_data = [item for item in data if isinstance(item, dict) and item.get("symbol") == symbol]
         elif isinstance(data, dict) and symbol in data:
-            filtered_data = [{"symbol": symbol, "price": data[symbol]}]
+            val = data[symbol]
+            if isinstance(val, list):
+                filtered_data = val
+            else:
+                filtered_data = [{"symbol": symbol, "price": val}]
             
         if not filtered_data:
             return {"count": 0, "error": "No data found"}
@@ -28,6 +32,8 @@ class MarketReportGenerator:
                 elif isinstance(price_val, dict) and "price" in price_val:
                     if isinstance(price_val["price"], (int, float)):
                         prices.append(price_val["price"])
+            elif isinstance(item, (int, float)):
+                prices.append(item)
         
         if not prices:
             return {"count": len(filtered_data), "error": "No valid prices found"}

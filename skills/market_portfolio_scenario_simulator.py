@@ -34,8 +34,18 @@ class PortfolioScenarioSimulator:
         if not target:
             raise KeyError(f"Symbol {symbol} not found")
 
-        current_price = target.get("current_price") or target.get("price") or 0.0
-        quantity = target.get("quantity") or target.get("shares") or 0.0
+        if isinstance(target, list) and len(target) > 0:
+            target = target[-1]
+
+        if isinstance(target, (int, float)):
+            current_price = float(target)
+            quantity = 1.0
+        elif isinstance(target, dict):
+            current_price = target.get("current_price") or target.get("price") or 0.0
+            quantity = target.get("quantity") or target.get("shares") or 1.0
+        else:
+            current_price = 0.0
+            quantity = 1.0
         
         simulated_price = current_price * (1 + percentage / 100.0)
         pnl_impact = (simulated_price - current_price) * quantity

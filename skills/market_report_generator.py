@@ -67,6 +67,10 @@ def generate_market_report(storage_file, symbol):
         load_db_func = getattr(db_storage, "load_db", None)
         if load_db_func is not None:
             data = load_db_func(storage_file)
+            
+    if not data and storage_file:
+        parser = MarketParser(storage_file)
+        data = parser.load_data(storage_file)
     
     price = None
     if isinstance(data, dict):

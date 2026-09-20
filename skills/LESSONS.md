@@ -170,3 +170,6 @@
 ## market_portfolio_valuation (compose) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_alert_dispatcher (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

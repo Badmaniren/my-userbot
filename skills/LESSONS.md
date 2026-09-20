@@ -283,3 +283,6 @@
 ## market_portfolio_alert_dispatcher (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_integration_hub (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

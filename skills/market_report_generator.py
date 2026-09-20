@@ -30,7 +30,7 @@ class MarketReportGenerator:
                         prices.append(price_val["price"])
         
         if not prices:
-            return {"count": 0, "error": "No prices found"}
+            return {"count": len(filtered_data), "error": "No valid prices found"}
 
         return {
             symbol: True,

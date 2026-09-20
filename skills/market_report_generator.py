@@ -19,7 +19,15 @@ class MarketReportGenerator:
         if not filtered_data:
             return {"count": 0, "error": "No data found"}
             
-        prices = [item["price"] for item in filtered_data if "price" in item]
+        prices = []
+        for item in filtered_data:
+            if isinstance(item, dict):
+                price_val = item.get("price")
+                if isinstance(price_val, (int, float)):
+                    prices.append(price_val)
+                elif isinstance(price_val, dict) and "price" in price_val:
+                    if isinstance(price_val["price"], (int, float)):
+                        prices.append(price_val["price"])
         
         if not prices:
             return {"count": 0, "error": "No prices found"}
@@ -41,11 +49,20 @@ class MarketReportGenerator:
 
 
 def generate_market_report(storage_file, symbol):
-    load_func = getattr(db_storage, "load_data", None)
-    if load_func is None and hasattr(db_storage, "load_db"):
-        load_func = db_storage.load_db
+    data = {}
+    try:
+        load_func = getattr(db_storage, "load_data", None)
+        if load_func is None and hasattr(db_storage, "load_db"):
+            load_func = db_storage.load_db
+        if load_func is not None:
+            data = load_func(storage_file)
+    except AttributeError:
+        load_db_func = getattr(db_storage, "load_db", None)
+        if load_db_func is not None:
+            data = load_db_func(storage_file)
+        else:
+            raise
     
-    data = load_func(storage_file) if load_func else {}
     price = None
     if isinstance(data, dict) and symbol in data:
         price = data[symbol]

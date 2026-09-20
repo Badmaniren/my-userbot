@@ -219,3 +219,6 @@
 ## market_portfolio_stress_reporter (compose) — раундов: 4
 - Последняя ошибка перед фиксом: Actual: not called.
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_reporter (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

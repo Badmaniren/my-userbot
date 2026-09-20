@@ -50,20 +50,36 @@ class MarketReportGenerator:
 
 def generate_market_report(storage_file, symbol):
     data = {}
-    try:
-        load_func = getattr(db_storage, "load_data", None)
-        if load_func is None and hasattr(db_storage, "load_db"):
-            load_func = db_storage.load_db
-        if load_func is not None:
+    load_func = getattr(db_storage, "load_data", None)
+    if load_func is None and hasattr(db_storage, "load_db"):
+        load_func = db_storage.load_db
+    
+    if load_func is not None:
+        try:
             data = load_func(storage_file)
-    except AttributeError:
+        except AttributeError:
+            load_db_func = getattr(db_storage, "load_db", None)
+            if load_db_func is not None and load_db_func != load_func:
+                data = load_db_func(storage_file)
+            else:
+                raise
+    else:
         load_db_func = getattr(db_storage, "load_db", None)
         if load_db_func is not None:
             data = load_db_func(storage_file)
-        else:
-            raise
     
     price = None
-    if isinstance(data, dict) and symbol in data:
-        price = data[symbol]
+    if isinstance(data, dict):
+        if symbol in data:
+            val = data[symbol]
+            if isinstance(val, dict):
+                price = val.get("price")
+            else:
+                price = val
+    elif isinstance(data, list):
+        for item in data:
+            if isinstance(item, dict) and item.get("symbol") == symbol:
+                price = item.get("price")
+                break
+                
     return f"Report for {symbol}: price {price}"

@@ -17,8 +17,8 @@ class PerformanceTracker:
         """
         Рассчитывает метрики производительности портфеля на основе данных из хранилища.
         """
-        parser = MarketParser(self.storage_file)
-        data = parser.load_data()
+        parser = MarketParser()
+        data = parser.load_data(self.storage_file)
 
         # Если load_data возвращает стандартный словарь от тестов (mock), проверим его
         if isinstance(data, dict) and "symbol" in data and data["symbol"] == symbol:
@@ -46,7 +46,7 @@ class PerformanceTracker:
 
         # Если цены не найдены в файле через прямой парсинг, попробуем через метод parser, если он есть
         if not prices and hasattr(parser, "get_prices"):
-            prices = parser.get_prices(symbol)
+            prices = parser.get_prices(self.storage_file, symbol)
 
         # Если данных всё еще нет, вернем дефолтные метрики
         if not prices:
@@ -76,8 +76,8 @@ def start_new(symbol: str, url: str, telegram_token: str, chat_id: str, storage_
     вычисляет метрики и отправляет уведомление в Telegram.
     """
     try:
-        parser = MarketParser(storage_file)
-        performance_data = parser.load_data()
+        parser = MarketParser()
+        performance_data = parser.load_data(storage_file)
         
         # Если load_data возвращает пустые данные или мы хотим дополнить их через PerformanceTracker
         if not performance_data or not isinstance(performance_data, dict):

@@ -41,7 +41,12 @@ class MarketReportGenerator:
 
 
 def generate_market_report(storage_file, symbol):
-    data = db_storage.load_data(storage_file)
+    # Обеспечиваем совместимость с интеграционным тестом, если функции load_data/fetch_and_store нет в db_storage
+    load_func = getattr(db_storage, "load_data", None)
+    if load_func is None and hasattr(db_storage, "load_db"):
+        load_func = db_storage.load_db
+    
+    data = load_func(storage_file) if load_func else {}
     price = None
     if isinstance(data, dict) and symbol in data:
         price = data[symbol]

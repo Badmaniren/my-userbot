@@ -1,5 +1,7 @@
 import sqlite3
 import requests
+import json
+import os
 from bs4 import BeautifulSoup
 
 
@@ -44,7 +46,12 @@ class MarketParser:
         conn.close()
 
     def load_data(self, filename: str):
-        if filename.endswith('.db'):
+        if filename.endswith('.json'):
+            if os.path.exists(filename):
+                with open(filename, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            return {}
+        elif filename.endswith('.db'):
             conn = sqlite3.connect(filename)
             cursor = conn.cursor()
             try:
@@ -60,3 +67,7 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+def load_data(filename: str):
+    return MarketParser().load_data(filename)

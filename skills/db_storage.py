@@ -1,3 +1,5 @@
+import json
+import os
 import sqlite3
 import requests
 from bs4 import BeautifulSoup
@@ -24,6 +26,19 @@ class MarketParser:
         return None
 
     def fetch_and_store(self, symbol: str, price: float):
+        if self.storage_file and self.storage_file.endswith('.json'):
+            data = {}
+            if os.path.exists(self.storage_file):
+                try:
+                    with open(self.storage_file, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                except (json.JSONDecodeError, FileNotFoundError, OSError):
+                    data = {}
+            data[symbol] = {"price": price}
+            with open(self.storage_file, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=4)
+            return
+
         conn = sqlite3.connect(self.storage_file)
         cursor = conn.cursor()
         
@@ -44,19 +59,30 @@ class MarketParser:
         conn.close()
 
     def load_data(self, filename: str):
-        if filename.endswith('.db'):
+        if filename.endswith('.json'):
+            if os.path.exists(filename):
+                try:
+                    with open(filename, 'r', encoding='utf-8') as f:
+                        return json.load(f)
+                except (json.JSONDecodeError, FileNotFoundError, OSError):
+                    return {}
+            return {}
+        elif filename.endswith('.db'):
             conn = sqlite3.connect(filename)
             cursor = conn.cursor()
             try:
                 cursor.execute('SELECT symbol, price FROM market_data')
                 rows = cursor.fetchall()
                 data = [f"{row[0]},{row[1]}\n" for row in rows]
-            except Exception:
+            except sqlite3.Error:
                 data = []
             finally:
                 conn.close()
             return data
         else:
-            with open(filename, 'rb') as f:
-                lines = f.readlines()
-                return [line.decode('utf-8') for line in lines]
+            try:
+                with open(filename, 'rb') as f:
+                    lines = f.readlines()
+                    return [line.decode('utf-8') for line in lines]
+            except (UnicodeDecodeError, OSError):
+                return []

@@ -166,3 +166,7 @@
 ## market_portfolio_monitor (start_new) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_valuation (compose) — раундов: 2
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main

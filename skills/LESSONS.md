@@ -276,3 +276,6 @@
 ## market_portfolio_data_exporter (compose) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_integration_hub (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

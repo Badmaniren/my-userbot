@@ -32,7 +32,6 @@ class PortfolioScenarioSimulator:
             target = next((item for item in data if isinstance(item, dict) and item.get("symbol") == symbol), None)
         
         if not target:
-            # Для прохождения теста отсутствующего символа ожидается KeyError/ValueError/TypeError
             raise KeyError(f"Symbol {symbol} not found")
 
         current_price = target.get("current_price") or target.get("price") or 0.0

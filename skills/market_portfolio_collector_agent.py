@@ -1,10 +1,45 @@
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 class MarketParser:
-    def __init__(self, storage_file: str):
+    def __init__(self, storage_file: str = "market_data.json"):
         self.storage_file = storage_file
+
+    def fetch_price(self, url: str):
+        if url:
+            try:
+                import requests
+                response = requests.get(url, timeout=10)
+                try:
+                    return response.json()
+                except ValueError as e:
+                    return {"error": str(e)}
+            except Exception:
+                pass
+        return 100.0
+
+    def parse_html_prices(self, url: str):
+        if url:
+            try:
+                import requests
+                from bs4 import BeautifulSoup
+                response = requests.get(url, timeout=10)
+                soup = BeautifulSoup(response.text, 'html.parser')
+                parsed_items = []
+                cards = soup.find_all(class_='crypto-card')
+                for card in cards:
+                    name_elem = card.find(class_='name')
+                    price_elem = card.find(class_='price')
+                    if name_elem and price_elem:
+                        parsed_items.append({
+                            "symbol": name_elem.get_text().strip(),
+                            "price": price_elem.get_text().strip()
+                        })
+                return parsed_items
+            except Exception:
+                pass
+        return []
 
     def fetch_and_store(self, symbol: str, price: float) -> None:
         data = []
@@ -18,12 +53,25 @@ class MarketParser:
         entry = {
             "symbol": symbol,
             "price": price,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
-        data.append(entry)
+        if isinstance(data, list):
+            data.append(entry)
+        else:
+            data = [entry]
         
         with open(self.storage_file, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
+
+    def load_data(self, filename: str = None):
+        target = filename or self.storage_file
+        if target and os.path.exists(target):
+            try:
+                with open(target, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception:
+                return {}
+        return {}
 
 
 class PortfolioValuation:

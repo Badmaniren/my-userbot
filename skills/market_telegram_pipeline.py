@@ -11,24 +11,41 @@ def send_telegram_notification(token: str, chat_id: str, message: str):
     response = requests.post(url, json=payload)
     return response
 
-def run_pipeline(symbol: str, url: str, telegram_token: str, chat_id: str, storage_file: str):
-    parser = MarketParser(storage_file)
-    price = parser.fetch_price(url)
-    parser.fetch_and_store(symbol, price)
-    
+def _load_parser_or_db_data(parser, storage_file: str, symbol: str, default_price: float):
     if hasattr(parser, "load_data"):
         try:
             data = parser.load_data(storage_file)
         except TypeError:
             data = parser.load_data()
     elif hasattr(db_storage, "load_data"):
-        data = db_storage.load_data(storage_file)
+        try:
+            data = db_storage.load_data(storage_file)
+        except TypeError:
+            data = db_storage.load_data()
+        except AttributeError:
+            if hasattr(db_storage, "get_data"):
+                try:
+                    data = db_storage.get_data(storage_file)
+                except TypeError:
+                    data = db_storage.get_data()
+            else:
+                data = {}
     elif hasattr(db_storage, "get_data"):
-        data = db_storage.get_data(storage_file)
+        try:
+            data = db_storage.get_data(storage_file)
+        except TypeError:
+            data = db_storage.get_data()
     else:
         data = {}
         
-    current_price = data.get(symbol, price)
+    return data.get(symbol, default_price)
+
+def run_pipeline(symbol: str, url: str, telegram_token: str, chat_id: str, storage_file: str):
+    parser = MarketParser(storage_file)
+    price = parser.fetch_price(url)
+    parser.fetch_and_store(symbol, price)
+
+    current_price = _load_parser_or_db_data(parser, storage_file, symbol, price)
     
     message = f"Market Update: {symbol} = {current_price}"
     resp = send_telegram_notification(telegram_token, chat_id, message)
@@ -39,19 +56,7 @@ def run_pipeline(symbol: str, url: str, telegram_token: str, chat_id: str, stora
 def run_market_telegram_pipeline(storage_file: str, symbol: str, chat_id: str, url: str = "https://example.com", telegram_token: str = "123456:ABC-DEF1234abcdWxyz-1234567890"):
     parser = MarketParser(storage_file)
     
-    if hasattr(parser, "load_data"):
-        try:
-            data = parser.load_data(storage_file)
-        except TypeError:
-            data = parser.load_data()
-    elif hasattr(db_storage, "load_data"):
-        data = db_storage.load_data(storage_file)
-    elif hasattr(db_storage, "get_data"):
-        data = db_storage.get_data(storage_file)
-    else:
-        data = {}
-        
-    price = data.get(symbol, 0.0)
+    price = _load_parser_or_db_data(parser, storage_file, symbol, 0.0)
     
     message = f"Integration Market Update: {symbol} = {price}"
     send_telegram_notification(telegram_token, chat_id, message)

@@ -35,11 +35,8 @@ class MarketParser:
     def fetch_and_store(self, symbol, price):
         data = {}
         if os.path.exists(self.storage_file):
-            try:
-                with open(self.storage_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-            except Exception:
-                data = {}
+            with open(self.storage_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
         
         data[symbol] = price
         with open(self.storage_file, "w", encoding="utf-8") as f:

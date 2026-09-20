@@ -222,3 +222,7 @@
 
 ## market_portfolio_stress_reporter (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_collector_agent (start_new) — раундов: 2
+- Последняя ошибка перед фиксом: FAILED (failures=2)
+- Статус: успешно прошёл тесты и влит в main

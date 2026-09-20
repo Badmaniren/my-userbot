@@ -91,9 +91,9 @@ def run_pipeline(symbol: str, url: str, telegram_token: str, chat_id: str, stora
 
 def start_new(symbol: str, url: str, telegram_token: str, chat_id: str, storage_file: str) -> bool:
     return run_pipeline(
-        symbol=symbol,
-        url=url,
-        telegram_token=telegram_token,
-        chat_id=chat_id,
-        storage_file=storage_file
+        symbol,
+        url,
+        telegram_token,
+        chat_id,
+        storage_file
     )

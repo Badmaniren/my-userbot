@@ -1,33 +1,47 @@
 import unittest
+import os
+import json
 import uuid
 import random
-import os
 from skills.market_parser import MarketParser
 
 class TestMarketParserIntegration(unittest.TestCase):
     def setUp(self):
-        self.parser = MarketParser()
-        self.test_symbol = f"COIN_{uuid.uuid4().hex[:6].upper()}"
-        self.test_price = round(random.uniform(10.0, 50000.0), 2)
-        self.output_filename = f"market_data_{uuid.uuid4().hex}.json"
-        self.parser.storage_file = self.output_filename
+        self.random_suffix = uuid.uuid4().hex[:8]
+        self.storage_filename = f"test_market_storage_{self.random_suffix}.json"
+        self.parser = MarketParser(storage_file=self.storage_filename)
 
     def tearDown(self):
-        if os.path.exists(self.output_filename):
-            os.remove(self.output_filename)
+        if os.path.exists(self.storage_filename):
+            try:
+                os.remove(self.storage_filename)
+            except OSError:
+                pass
 
-    def test_market_parser_real_execution(self):
-        result_id = self.parser.fetch_and_store(self.test_symbol, self.test_price)
-        
-        self.assertIsNotNone(result_id)
-        self.assertIsInstance(result_id, str)
-        
-        self.assertTrue(os.path.exists(self.output_filename), "Файл с данными рынка не был создан")
-        
-        loaded_data = self.parser.load_data(self.output_filename)
-        self.assertIn(self.test_symbol, loaded_data)
-        self.assertEqual(loaded_data[self.test_symbol]["price"], self.test_price)
-        self.assertEqual(loaded_data[self.test_symbol]["record_id"], result_id)
+    def test_fetch_and_store_integration(self):
+        random_symbol = f"COIN_{uuid.uuid4().hex[:6].upper()}"
+        random_price = round(random.uniform(10.0, 50000.0), 2)
 
-if __name__ == "__main__":
+        record_id = self.parser.fetch_and_store(random_symbol, random_price)
+        
+        self.assertIsInstance(record_id, str)
+        self.assertTrue(len(record_id) > 0)
+        self.assertTrue(os.path.exists(self.storage_filename))
+
+        loaded_data = self.parser.load_data(self.storage_filename)
+        self.assertIn(random_symbol, loaded_data)
+        self.assertEqual(loaded_data[random_symbol]["price"], random_price)
+        self.assertEqual(loaded_data[random_symbol]["record_id"], record_id)
+
+    def test_parse_html_prices_invalid_url(self):
+        random_invalid_url = f"http://nonexistent-domain-{uuid.uuid4().hex}.local/api"
+        result = self.parser.parse_html_prices(random_invalid_url)
+        self.assertEqual(result, [])
+
+    def test_fetch_price_invalid_url(self):
+        random_invalid_url = f"http://nonexistent-domain-{uuid.uuid4().hex}.local/api"
+        result = self.parser.fetch_price(random_invalid_url)
+        self.assertIsNone(result)
+
+if __name__ == '__main__':
     unittest.main()

@@ -13,7 +13,10 @@ class PortfolioAnalytics:
     def calculate_metrics(self, symbol):
         data = []
         if self.parser and hasattr(self.parser, 'load_data'):
-            data = self.parser.load_data()
+            try:
+                data = self.parser.load_data()
+            except (UnicodeDecodeError, Exception):
+                data = []
         
         prices = []
         if data:
@@ -22,7 +25,10 @@ class PortfolioAnalytics:
                     prices.append(entry[symbol])
 
         if not prices and self.parser and hasattr(self.parser, 'get_history'):
-            prices = self.parser.get_history(symbol)
+            try:
+                prices = self.parser.get_history(symbol)
+            except Exception:
+                prices = []
 
         ret = 0.0
         if len(prices) >= 2:

@@ -149,3 +149,6 @@
 ## market_report_generator (refactor) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main
+
+## market_report_generator (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

@@ -290,3 +290,6 @@
 ## market_portfolio_webhook_sync (start_new) — раундов: 2
 - Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
 - Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_webhook_sync (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

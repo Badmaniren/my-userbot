@@ -268,7 +268,3 @@
 ## market_portfolio_webhook_sync (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=3)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_exporter (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

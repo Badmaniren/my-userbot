@@ -7,10 +7,14 @@ class PortfolioValuation:
 
     def load_data(self, storage_file=None):
         file_to_load = storage_file or self.storage_file
-        return db_storage.load_portfolio(file_to_load)
+        if hasattr(db_storage, 'load_portfolio'):
+            return db_storage.load_portfolio(file_to_load)
+        elif hasattr(db_storage, 'load_data'):
+            return db_storage.load_data(file_to_load)
+        return {}
 
     def evaluate_portfolio(self, url):
-        portfolio = db_storage.load_portfolio(self.storage_file)
+        portfolio = self.load_data(self.storage_file)
         if not portfolio:
             return {}
 

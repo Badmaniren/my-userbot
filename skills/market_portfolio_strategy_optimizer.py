@@ -28,8 +28,13 @@ class PortfolioStrategyOptimizer:
             return f.read()
 
     def optimize_and_evaluate(self, symbol: str, allocation: float, shifts) -> dict:
-        backtest_res = self.backtester.run_backtest(symbol, shifts)
-        stress_res = self.simulator.run_stress_test(symbol, shifts)
+        if isinstance(shifts, (float, int)):
+            shifts_iterable = [shifts]
+        else:
+            shifts_iterable = shifts
+
+        backtest_res = self.backtester.run_backtest(symbol, shifts_iterable)
+        stress_res = self.simulator.run_stress_test(symbol, shifts_iterable)
         drawdown = self.backtester.calculate_maximum_drawdown(symbol)
         
         optimized_weights = {symbol: allocation}

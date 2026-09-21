@@ -1,116 +1,127 @@
 import unittest
-from unittest.mock import patch, MagicMock
-import os
-import tempfile
+from unittest.mock import patch
 import json
+import os
+import io
 import uuid
 import random
-import io
-import sys
-
-from skills.market_portfolio_backtester import MarketPortfolioBacktester
+from skills.market_portfolio_backtester import MarketPortfolioBacktester, MarketBacktester
 
 class TestMarketPortfolioBacktester(unittest.TestCase):
 
     def setUp(self):
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.storage_file = os.path.join(self.temp_dir.name, f"{uuid.uuid4().hex}.json")
-        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
+        self.random_filepath = f"{uuid.uuid4().hex}.json"
+        self.symbol = f"SYM_{uuid.uuid4().hex[:6]}"
+        self.random_capital = round(random.uniform(1000.0, 50000.0), 2)
+        self.prices = [round(random.uniform(10.0, 500.0), 2) for _ in range(random.randint(5, 15))]
         
-        self.sample_data = {
-            self.symbol: [
-                {"timestamp": 1000, "price": 100.0},
-                {"timestamp": 2000, "price": 105.0},
-                {"timestamp": 3000, "price": 102.0},
-                {"timestamp": 4000, "price": 110.0},
-                {"timestamp": 5000, "price": 108.0}
-            ]
+        self.mock_data = {
+            self.symbol: [{"price": p, "timestamp": random.randint(1600000000, 1700000000)} for p in self.prices]
         }
-        with open(self.storage_file, 'w', encoding='utf-8') as f:
-            json.dump(self.sample_data, f)
 
     def tearDown(self):
-        self.temp_dir.cleanup()
+        if os.path.exists(self.random_filepath):
+            try:
+                os.remove(self.random_filepath)
+            except OSError:
+                pass
 
-    def test_init_and_load_data(self):
-        rand_file = os.path.join(self.temp_dir.name, f"{uuid.uuid4().hex}.json")
-        rand_symbol = f"T_{uuid.uuid4().hex[:4]}"
-        inner_data = {rand_symbol: [{"timestamp": random.randint(1, 100), "price": random.uniform(10, 50)}]}
-        with open(rand_file, 'w', encoding='utf-8') as f:
-            json.dump(inner_data, f)
+    def test_load_data_valid_json(self):
+        json_content = json.dumps(self.mock_data)
+        with patch('builtins.open', return_value=io.StringIO(json_content)), \
+             patch('os.path.exists', return_value=True):
+            backtester = MarketPortfolioBacktester(self.random_filepath)
+            self.assertEqual(backtester.data, self.mock_data)
 
-        backtester = MarketPortfolioBacktester(rand_file)
-        loaded = backtester.load_data(rand_file)
-        self.assertIn(rand_symbol, loaded)
-        self.assertEqual(loaded[rand_symbol][0]["price"], inner_data[rand_symbol][0]["price"])
+    def test_load_data_empty_file(self):
+        with patch('builtins.open', return_value=io.StringIO("   ")), \
+             patch('os.path.exists', return_value=True):
+            backtester = MarketPortfolioBacktester(self.random_filepath)
+            self.assertEqual(backtester.data, {})
 
-    def test_load_data_missing_file(self):
-        missing_file = os.path.join(self.temp_dir.name, f"{uuid.uuid4().hex}.json")
-        backtester = MarketPortfolioBacktester(missing_file)
-        data = backtester.load_data(missing_file)
-        self.assertEqual(data, {})
+    def test_load_data_file_not_found(self):
+        with patch('os.path.exists', return_value=False):
+            backtester = MarketPortfolioBacktester(self.random_filepath)
+            self.assertEqual(backtester.data, {})
 
-    def test_run_backtest_strategy(self):
-        backtester = MarketPortfolioBacktester(self.storage_file)
-        initial_capital = round(random.uniform(1000.0, 5000.0), 2)
+    def test_run_backtest_with_shifts(self):
+        shifts = [random.uniform(-5.0, 5.0), random.uniform(-10.0, 10.0)]
+        backtester = MarketPortfolioBacktester()
+        backtester.data = self.mock_data
+
+        result = backtester.run_backtest(self.symbol, shifts)
+        self.assertIn(self.symbol, result)
+        self.assertEqual(result[self.symbol]["status"], "completed")
+        self.assertEqual(result[self.symbol]["shifts_tested"], len(shifts))
+        for shift in shifts:
+            key = f"{self.symbol}_shift_{shift}"
+            self.assertIn(key, result)
+            self.assertEqual(result[key]["shift"], shift)
+            self.assertEqual(result[key]["data_points"], len(self.mock_data[self.symbol]))
+
+    def test_run_backtest_strategy_execution(self):
         strategy_params = {
-            "buy_threshold": round(random.uniform(100.0, 103.0), 2),
-            "sell_threshold": round(random.uniform(106.0, 112.0), 2)
+            "buy_threshold": self.prices[0] + 1.0,
+            "sell_threshold": self.prices[-1] + 10.0
         }
-        
-        result = backtester.run_backtest(self.symbol, initial_capital, strategy_params)
-        self.assertIsInstance(result, dict)
+        backtester = MarketPortfolioBacktester()
+        backtester.data = self.mock_data
+
+        result = backtester.run_backtest(self.symbol, self.random_capital, strategy_params)
         self.assertIn("final_portfolio_value", result)
         self.assertIn("total_trades", result)
         self.assertIn("pnl_percentage", result)
+        self.assertIsInstance(result["final_portfolio_value"], float)
+        self.assertIsInstance(result["total_trades"], int)
+        self.assertIsInstance(result["pnl_percentage"], float)
 
-    def test_run_backtest_nonexistent_symbol(self):
-        backtester = MarketPortfolioBacktester(self.storage_file)
-        fake_symbol = f"MISSING_{uuid.uuid4().hex[:4]}"
-        capital = round(random.uniform(500, 1500), 2)
-        result = backtester.run_backtest(fake_symbol, capital, {})
-        self.assertEqual(result.get("final_portfolio_value"), capital)
-        self.assertEqual(result.get("total_trades"), 0)
+    def test_run_backtest_empty_symbol_data(self):
+        missing_symbol = f"MISSING_{uuid.uuid4().hex[:6]}"
+        backtester = MarketPortfolioBacktester()
+        backtester.data = {}
 
-    def test_calculate_drawdown(self):
-        backtester = MarketPortfolioBacktester(self.storage_file)
-        equity_curve = [
-            random.uniform(100, 110),
-            random.uniform(115, 125),
-            random.uniform(90, 99),
-            random.uniform(105, 115)
-        ]
+        result = backtester.run_backtest(missing_symbol, self.random_capital)
+        self.assertEqual(result["final_portfolio_value"], self.random_capital)
+        self.assertEqual(result["total_trades"], 0)
+        self.assertEqual(result["pnl_percentage"], 0.0)
+
+    def test_calculate_maximum_drawdown(self):
+        curve_len = random.randint(5, 20)
+        equity_curve = [round(random.uniform(100.0, 1000.0), 2) for _ in range(curve_len)]
+        backtester = MarketPortfolioBacktester()
+
         max_dd = backtester.calculate_maximum_drawdown(equity_curve)
         self.assertIsInstance(max_dd, float)
         self.assertGreaterEqual(max_dd, 0.0)
+        self.assertLessEqual(max_dd, 1.0)
 
-    def test_calculate_drawdown_empty(self):
-        backtester = MarketPortfolioBacktester(self.storage_file)
-        max_dd = backtester.calculate_maximum_drawdown([])
-        self.assertEqual(max_dd, 0.0)
+    def test_calculate_maximum_drawdown_empty(self):
+        backtester = MarketPortfolioBacktester()
+        self.assertEqual(backtester.calculate_maximum_drawdown([]), 0.0)
 
     def test_simulate_historical_trades(self):
-        backtester = MarketPortfolioBacktester(self.storage_file)
-        allocation = round(random.uniform(0.1, 1.0), 2)
+        allocation = round(random.uniform(100.0, 1000.0), 2)
+        backtester = MarketPortfolioBacktester()
+        backtester.data = self.mock_data
+
         trades = backtester.simulate_historical_trades(self.symbol, allocation)
-        self.assertIsInstance(trades, list)
-        if len(trades) > 0:
-            self.assertIn("action", trades[0])
-            self.assertIn("price", trades[0])
+        self.assertEqual(len(trades), len(self.prices))
+        for i, trade in enumerate(trades):
+            self.assertIn(trade["action"], ["BUY", "SELL"])
+            self.assertEqual(trade["price"], self.prices[i])
+            self.assertEqual(trade["allocation"], allocation)
 
     def test_get_backtest_summary(self):
-        backtester = MarketPortfolioBacktester(self.storage_file)
-        summary = backtester.get_backtest_summary(self.symbol)
-        self.assertIsInstance(summary, dict)
-        self.assertIn("symbol", summary)
-        self.assertEqual(summary["symbol"], self.symbol)
+        backtester = MarketPortfolioBacktester()
+        backtester.data = self.mock_data
 
-    def test_stream_data_io_mock(self):
-        backtester = MarketPortfolioBacktester(self.storage_file)
-        random_bytes = f'{{"{self.symbol}": [{{"timestamp": 9999, "price": 123.45}}]}}'.encode('utf-8')
-        mock_file_obj = io.BytesIO(random_bytes)
-        
-        with patch('builtins.open', return_value=mock_file_obj):
-            data = backtester.load_data(self.storage_file)
-            self.assertIn(self.symbol, data)
-            self.assertEqual(data[self.symbol][0]["price"], 123.45)
+        summary = backtester.get_backtest_summary(self.symbol)
+        self.assertEqual(summary["symbol"], self.symbol)
+        self.assertEqual(summary["total_records"], len(self.prices))
+        self.assertEqual(summary["status"], "ready")
+
+    def test_market_backtester_alias(self):
+        self.assertEqual(MarketBacktester, MarketPortfolioBacktester)
+
+if __name__ == '__main__':
+    unittest.main()

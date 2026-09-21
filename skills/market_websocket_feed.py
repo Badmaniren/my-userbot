@@ -1,6 +1,10 @@
 import time
 import json
-import websockets
+
+try:
+    import websockets
+except ImportError:
+    websockets = None
 
 from skills.market_parser import MarketParser
 from skills.market_portfolio_stress_reporter import StressReporter

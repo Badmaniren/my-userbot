@@ -3,6 +3,13 @@ import requests
 
 def start_new(token: str, chat_id: str, message: str) -> bool:
     """Отправляет уведомление в Telegram (функция для юнит-тестов)."""
+    if not isinstance(token, str) or not token.strip():
+        return False
+    if not isinstance(chat_id, (str, int)) or not str(chat_id).strip():
+        return False
+    if not isinstance(message, str) or not message.strip():
+        return False
+
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {
         "chat_id": chat_id,
@@ -15,7 +22,7 @@ def start_new(token: str, chat_id: str, message: str) -> bool:
         if data.get("ok"):
             return True
         return False
-    except Exception:
+    except (requests.exceptions.RequestException, ValueError, TypeError, KeyError):
         return False
 
 

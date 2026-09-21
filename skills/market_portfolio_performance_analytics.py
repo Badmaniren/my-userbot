@@ -23,15 +23,41 @@ class PortfolioPerformanceAnalytics:
 
     def calculate_metrics(self, symbol: str) -> dict:
         data = self.load_data(self.storage_file)
-        filtered_prices = [
-            item.get("price")
-            for item in data
-            if isinstance(item, dict)
-            and item.get("symbol") == symbol
-            and "price" in item
-            and isinstance(item.get("price"), (int, float))
-            and not isinstance(item.get("price"), bool)
-        ]
+        filtered_prices = []
+
+        def process_item(item):
+            if isinstance(item, (int, float)) and not isinstance(item, bool):
+                filtered_prices.append(float(item))
+            elif isinstance(item, dict):
+                if symbol in item:
+                    val = item[symbol]
+                    if isinstance(val, list):
+                        for sub in val:
+                            process_item(sub)
+                    elif isinstance(val, dict):
+                        process_item(val)
+                    elif isinstance(val, (int, float)) and not isinstance(val, bool):
+                        filtered_prices.append(float(val))
+                elif "price" in item and isinstance(item["price"], (int, float)) and not isinstance(item["price"], bool):
+                    if "symbol" not in item or item["symbol"] == symbol:
+                        filtered_prices.append(float(item["price"]))
+                elif "prices" in item and isinstance(item["prices"], list):
+                    if "symbol" not in item or item["symbol"] == symbol:
+                        for p in item["prices"]:
+                            if isinstance(p, (int, float)) and not isinstance(p, bool):
+                                filtered_prices.append(float(p))
+
+                for key in ("assets", "holdings"):
+                    if key in item and isinstance(item[key], list):
+                        for asset in item[key]:
+                            if isinstance(asset, dict) and asset.get("symbol") == symbol:
+                                process_item(asset)
+
+        if isinstance(data, list):
+            for entry in data:
+                process_item(entry)
+        elif isinstance(data, dict):
+            process_item(data)
 
         if not filtered_prices or len(filtered_prices) == 1:
             return {

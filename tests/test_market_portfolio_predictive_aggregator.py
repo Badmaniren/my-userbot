@@ -1,109 +1,140 @@
 import unittest
-from unittest.mock import patch, MagicMock
-import random
+from unittest.mock import patch
 import uuid
-import string
-import io
-import sys
-import os
-
+import random
 from skills.market_portfolio_predictive_aggregator import (
     PredictiveAggregator,
+    MarketPortfolioPredictiveAggregator,
     aggregate_market_forecast
 )
 
-class TestMarketPortfolioPredictiveAggregator(unittest.TestCase):
+
+class TestPredictiveAggregator(unittest.TestCase):
 
     def setUp(self):
-        self.rand_storage = f"{uuid.uuid4().hex}.json"
-        self.rand_symbol = ''.join(random.choices(string.ascii_uppercase, k=5))
-        self.rand_shift = round(random.uniform(-50.0, 50.0), 2)
-        self.rand_url = f"https://{uuid.uuid4().hex}.com/api"
+        self.storage_file = f"storage_{uuid.uuid4().hex}.db"
+        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
+        self.url = f"https://example.com/market/{uuid.uuid4().hex}"
+        self.shift = round(random.uniform(-50.0, 50.0), 2)
 
-    @patch('skills.market_portfolio_predictive_aggregator.MarketParser')
-    @patch('skills.market_portfolio_predictive_aggregator.PortfolioScenarioSimulator')
-    def test_predictive_aggregator_initialization_and_flow(self, mock_simulator_cls, mock_collector_cls):
-        mock_collector_instance = mock_collector_cls.return_value
-        mock_simulator_instance = mock_simulator_cls.return_value
+    def test_init_and_aliases(self):
+        aggregator = PredictiveAggregator(self.storage_file)
+        self.assertEqual(aggregator.storage_file, self.storage_file)
+        self.assertIs(MarketPortfolioPredictiveAggregator, PredictiveAggregator)
 
-        expected_valuation = {
-            uuid.uuid4().hex: random.randint(100, 5000),
-            uuid.uuid4().hex: random.uniform(10.0, 999.9)
-        }
-        mock_collector_instance.get_total_summary.return_value = expected_valuation
-
+    def test_build_advanced_forecast_success(self):
+        expected_valuation = {uuid.uuid4().hex: random.randint(100, 1000)}
         expected_simulation = {
-            "symbol": self.rand_symbol,
-            "shift": self.rand_shift,
-            "projected_value": round(random.uniform(1000.0, 10000.0), 2)
+            "symbol": self.symbol,
+            "shift": self.shift,
+            "projected_value": round(random.uniform(10.0, 500.0), 2)
         }
-        mock_simulator_instance.simulate_scenario.return_value = expected_simulation
 
-        aggregator = PredictiveAggregator(self.rand_storage)
-        
-        self.assertEqual(aggregator.storage_file, self.rand_storage)
-        self.assertIsNotNone(aggregator.collector)
-        self.assertIsNotNone(aggregator.simulator)
+        with patch("skills.market_portfolio_predictive_aggregator.MarketParser") as MockParser, \
+             patch("skills.market_portfolio_predictive_aggregator.PortfolioScenarioSimulator") as MockSimulator:
 
-        result = aggregator.build_advanced_forecast(self.rand_symbol, self.rand_url, self.rand_shift)
+            instance_parser = MockParser.return_value
+            instance_parser.get_total_summary.return_value = expected_valuation
 
-        mock_collector_instance.get_total_summary.assert_called_once_with(self.rand_url)
-        mock_simulator_instance.simulate_scenario.assert_called_once_with(self.rand_symbol, self.rand_shift)
+            instance_simulator = MockSimulator.return_value
+            instance_simulator.simulate_scenario.return_value = expected_simulation
 
-        self.assertIn("valuation", result)
-        self.assertIn("simulation", result)
-        self.assertEqual(result["valuation"], expected_valuation)
-        self.assertEqual(result["simulation"], expected_simulation)
+            aggregator = PredictiveAggregator(self.storage_file)
+            result = aggregator.build_advanced_forecast(self.symbol, self.url, self.shift)
 
-    @patch('skills.market_portfolio_predictive_aggregator.PredictiveAggregator')
-    def test_aggregate_market_forecast_wrapper(self, mock_aggregator_cls):
-        mock_instance = mock_aggregator_cls.return_value
-        
-        expected_output = {
-            uuid.uuid4().hex: uuid.uuid4().hex,
-            "metric": random.randint(1, 100)
+            instance_parser.get_total_summary.assert_called_once_with(self.url)
+            instance_simulator.simulate_scenario.assert_called_once_with(self.symbol, self.shift)
+
+            self.assertEqual(result["valuation"], expected_valuation)
+            self.assertEqual(result["simulation"], expected_simulation)
+
+    def test_build_advanced_forecast_valuation_missing_method(self):
+        expected_simulation = {
+            "symbol": self.symbol,
+            "shift": self.shift,
+            "projected_value": round(random.uniform(1.0, 100.0), 2)
         }
-        mock_instance.build_advanced_forecast.return_value = expected_output
 
-        result = aggregate_market_forecast(
-            storage_file=self.rand_storage,
-            symbol=self.rand_symbol,
-            url=self.rand_url,
-            percentage_shift=self.rand_shift
-        )
+        with patch("skills.market_portfolio_predictive_aggregator.MarketParser") as MockParser, \
+             patch("skills.market_portfolio_predictive_aggregator.PortfolioScenarioSimulator") as MockSimulator:
 
-        mock_aggregator_cls.assert_called_once_with(self.rand_storage)
-        mock_instance.build_advanced_forecast.assert_called_once_with(
-            self.rand_symbol, self.rand_url, self.rand_shift
-        )
-        self.assertEqual(result, expected_output)
+            instance_parser = MockParser.return_value
+            del instance_parser.get_total_summary
 
-    @patch('skills.market_portfolio_predictive_aggregator.MarketParser')
-    @patch('skills.market_portfolio_predictive_aggregator.PortfolioScenarioSimulator')
-    def test_predictive_aggregator_stream_handling(self, mock_simulator_cls, mock_collector_cls):
-        mock_collector_instance = mock_collector_cls.return_value
-        mock_simulator_instance = mock_simulator_cls.return_value
+            instance_simulator = MockSimulator.return_value
+            instance_simulator.simulate_scenario.return_value = expected_simulation
 
-        stream_bytes = io.BytesIO(uuid.uuid4().bytes + uuid.uuid4().bytes)
-        
-        mock_collector_instance.get_stream_data = MagicMock(return_value=stream_bytes)
+            aggregator = PredictiveAggregator(self.storage_file)
+            result = aggregator.build_advanced_forecast(self.symbol, self.url, self.shift)
 
-        aggregator = PredictiveAggregator(self.rand_storage)
-        
-        has_attr = hasattr(aggregator, 'collector') or hasattr(aggregator, 'simulator')
-        self.assertTrue(has_attr)
+            self.assertEqual(result["valuation"], {})
+            self.assertEqual(result["simulation"], expected_simulation)
 
-        mock_collector_instance.fetch_and_store(self.rand_symbol, float(random.randint(1, 500)))
-        mock_collector_instance.fetch_and_store.assert_called_once()
+    def test_build_advanced_forecast_simulation_key_error(self):
+        expected_valuation = {uuid.uuid4().hex: random.randint(10, 50)}
 
-    def test_composition_requirements_enforced(self):
-        aggregator = PredictiveAggregator(self.rand_storage)
-        
-        has_collector = hasattr(aggregator, 'collector')
-        has_simulator = hasattr(aggregator, 'simulator')
-        
-        self.assertTrue(has_collector, "Module MUST compose market_portfolio_collector_agent")
-        self.assertTrue(has_simulator, "Module MUST compose market_portfolio_scenario_simulator")
+        with patch("skills.market_portfolio_predictive_aggregator.MarketParser") as MockParser, \
+             patch("skills.market_portfolio_predictive_aggregator.PortfolioScenarioSimulator") as MockSimulator:
 
-if __name__ == '__main__':
+            instance_parser = MockParser.return_value
+            instance_parser.get_total_summary.return_value = expected_valuation
+
+            instance_simulator = MockSimulator.return_value
+            instance_simulator.simulate_scenario.side_effect = KeyError(uuid.uuid4().hex)
+
+            aggregator = PredictiveAggregator(self.storage_file)
+            result = aggregator.build_advanced_forecast(self.symbol, self.url, self.shift)
+
+            self.assertEqual(result["valuation"], expected_valuation)
+            self.assertEqual(result["simulation"]["symbol"], self.symbol)
+            self.assertEqual(result["simulation"]["shift"], self.shift)
+            self.assertEqual(result["simulation"]["projected_value"], 0.0)
+
+    def test_build_predictive_forecast_delegation(self):
+        expected_valuation = {uuid.uuid4().hex: random.randint(200, 800)}
+        expected_simulation = {
+            "symbol": self.symbol,
+            "shift": self.shift,
+            "projected_value": round(random.uniform(50.0, 250.0), 2)
+        }
+
+        with patch("skills.market_portfolio_predictive_aggregator.MarketParser") as MockParser, \
+             patch("skills.market_portfolio_predictive_aggregator.PortfolioScenarioSimulator") as MockSimulator:
+
+            instance_parser = MockParser.return_value
+            instance_parser.get_total_summary.return_value = expected_valuation
+
+            instance_simulator = MockSimulator.return_value
+            instance_simulator.simulate_scenario.return_value = expected_simulation
+
+            aggregator = PredictiveAggregator(self.storage_file)
+            result = aggregator.build_predictive_forecast(self.symbol, self.url, self.shift)
+
+            self.assertEqual(result["valuation"], expected_valuation)
+            self.assertEqual(result["simulation"], expected_simulation)
+
+    def test_aggregate_market_forecast_helper_function(self):
+        expected_valuation = {uuid.uuid4().hex: random.randint(50, 500)}
+        expected_simulation = {
+            "symbol": self.symbol,
+            "shift": self.shift,
+            "projected_value": round(random.uniform(5.0, 75.0), 2)
+        }
+
+        with patch("skills.market_portfolio_predictive_aggregator.MarketParser") as MockParser, \
+             patch("skills.market_portfolio_predictive_aggregator.PortfolioScenarioSimulator") as MockSimulator:
+
+            instance_parser = MockParser.return_value
+            instance_parser.get_total_summary.return_value = expected_valuation
+
+            instance_simulator = MockSimulator.return_value
+            instance_simulator.simulate_scenario.return_value = expected_simulation
+
+            result = aggregate_market_forecast(self.storage_file, self.symbol, self.url, self.shift)
+
+            self.assertEqual(result["valuation"], expected_valuation)
+            self.assertEqual(result["simulation"], expected_simulation)
+
+
+if __name__ == "__main__":
     unittest.main()

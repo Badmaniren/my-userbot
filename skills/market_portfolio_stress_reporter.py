@@ -1,6 +1,7 @@
 from skills.market_portfolio_scenario_simulator import PortfolioScenarioSimulator
 from skills.market_report_generator import MarketReportGenerator
 
+
 class StressReporter:
     def __init__(self, storage_file):
         self.storage_file = storage_file

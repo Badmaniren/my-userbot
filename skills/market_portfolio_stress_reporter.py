@@ -10,6 +10,7 @@ class StressReporter:
     def run_stress_reporting(self, symbol, shifts):
         sim_results = self.simulator.run_stress_test(symbol, shifts)
         base_report = self.generator.generate_symbol_report(symbol)
+
         return {
             "simulation_results": sim_results,
             "base_report": base_report

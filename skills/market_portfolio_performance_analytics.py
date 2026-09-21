@@ -1,6 +1,7 @@
 import math
 from skills.market_parser import MarketParser
 
+
 class PortfolioPerformanceAnalytics:
     def __init__(self, storage_file: str):
         self.storage_file = storage_file
@@ -13,24 +14,21 @@ class PortfolioPerformanceAnalytics:
     def calculate_metrics(self, symbol: str) -> dict:
         data = self.parser.load_data(self.storage_file)
         filtered_prices = [
-            item.get("price") for item in data 
-            if isinstance(item, dict) and item.get("symbol") == symbol and "price" in item
+            item.get("price")
+            for item in data
+            if isinstance(item, dict)
+            and item.get("symbol") == symbol
+            and "price" in item
+            and isinstance(item.get("price"), (int, float))
+            and not isinstance(item.get("price"), bool)
         ]
-        
-        if not filtered_prices:
-            return {
-                "symbol": symbol,
-                "return": 0.0,
-                "volatility": 0.0,
-                "sharpe_ratio": 0.0
-            }
 
-        if len(filtered_prices) == 1:
+        if not filtered_prices or len(filtered_prices) == 1:
             return {
                 "symbol": symbol,
                 "return": 0.0,
                 "volatility": 0.0,
-                "sharpe_ratio": 0.0
+                "sharpe_ratio": 0.0,
             }
 
         returns = []
@@ -43,7 +41,11 @@ class PortfolioPerformanceAnalytics:
             else:
                 returns.append(0.0)
 
-        total_return = (filtered_prices[-1] - filtered_prices[0]) / filtered_prices[0] if filtered_prices[0] != 0 else 0.0
+        total_return = (
+            (filtered_prices[-1] - filtered_prices[0]) / filtered_prices[0]
+            if filtered_prices[0] != 0
+            else 0.0
+        )
 
         if returns:
             mean_return = sum(returns) / len(returns)
@@ -62,7 +64,7 @@ class PortfolioPerformanceAnalytics:
             "symbol": symbol,
             "return": float(total_return),
             "volatility": float(volatility),
-            "sharpe_ratio": float(sharpe_ratio)
+            "sharpe_ratio": float(sharpe_ratio),
         }
 
     def evaluate_performance(self, symbol: str) -> dict:
@@ -74,33 +76,30 @@ class PortfolioPerformanceAnalytics:
         return {
             "return": 0.0,
             "volatility": 0.0,
-            "sharpe_ratio": 0.0
+            "sharpe_ratio": 0.0,
         }
 
 
 def start_new(storage_file: str, symbol: str, url: str) -> dict:
     parser = MarketParser(storage_file)
     data = parser.load_data(storage_file)
-    
-    filtered_prices = [
-        item.get("price") for item in data 
-        if isinstance(item, dict) and item.get("symbol") == symbol and "price" in item
-    ]
-    
-    if not filtered_prices:
-        return {
-            "symbol": symbol,
-            "return": 0.0,
-            "volatility": 0.0,
-            "sharpe_ratio": 0.0
-        }
 
-    if len(filtered_prices) == 1:
+    filtered_prices = [
+        item.get("price")
+        for item in data
+        if isinstance(item, dict)
+        and item.get("symbol") == symbol
+        and "price" in item
+        and isinstance(item.get("price"), (int, float))
+        and not isinstance(item.get("price"), bool)
+    ]
+
+    if not filtered_prices or len(filtered_prices) == 1:
         return {
             "symbol": symbol,
             "return": 0.0,
             "volatility": 0.0,
-            "sharpe_ratio": 0.0
+            "sharpe_ratio": 0.0,
         }
 
     returns = []
@@ -113,7 +112,11 @@ def start_new(storage_file: str, symbol: str, url: str) -> dict:
         else:
             returns.append(0.0)
 
-    total_return = (filtered_prices[-1] - filtered_prices[0]) / filtered_prices[0] if filtered_prices[0] != 0 else 0.0
+    total_return = (
+        (filtered_prices[-1] - filtered_prices[0]) / filtered_prices[0]
+        if filtered_prices[0] != 0
+        else 0.0
+    )
 
     if returns:
         mean_return = sum(returns) / len(returns)
@@ -132,5 +135,5 @@ def start_new(storage_file: str, symbol: str, url: str) -> dict:
         "symbol": symbol,
         "return": float(total_return),
         "volatility": float(volatility),
-        "sharpe_ratio": float(sharpe_ratio)
+        "sharpe_ratio": float(sharpe_ratio),
     }

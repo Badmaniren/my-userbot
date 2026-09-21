@@ -48,9 +48,15 @@ class PortfolioDigestManager:
         
         visualizer = PortfolioVisualizer(self.storage_file)
         if hasattr(visualizer, "generate_ascii_chart"):
-            ascii_chart = visualizer.generate_ascii_chart(symbol)
+            try:
+                ascii_chart = visualizer.generate_ascii_chart(symbol)
+            except (ValueError, TypeError):
+                ascii_chart = ""
         else:
-            ascii_chart = generate_ascii_chart(symbol)
+            try:
+                ascii_chart = generate_ascii_chart(symbol)
+            except (ValueError, TypeError):
+                ascii_chart = ""
         
         return {
             "symbol": symbol,

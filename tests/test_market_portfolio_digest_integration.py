@@ -2,50 +2,47 @@ import unittest
 import os
 import uuid
 import random
-from skills.market_portfolio_valuation import PortfolioValuation
-from skills.market_portfolio_visualizer_v2 import PortfolioVisualizer, generate_ascii_chart
-from skills.market_portfolio_alert_dispatcher import dispatch_portfolio_alerts
-from skills.market_portfolio_digest import generate_extended_digest
+from skills.market_portfolio_digest import (
+    generate_portfolio_digest,
+    generate_extended_digest,
+    PortfolioDigestManager
+)
 
 
 class TestMarketPortfolioDigestIntegration(unittest.TestCase):
 
     def setUp(self):
-        self.unique_id = str(uuid.uuid4())[:8]
-        self.storage_file = f"test_storage_{self.unique_id}.json"
-        self.symbol = f"TICK_{self.unique_id.upper()}"
-        self.url = f"https://example.com/api/{self.symbol.lower()}"
-        self.telegram_token = f"token_{self.unique_id}"
+        self.random_suffix = uuid.uuid4().hex[:8]
+        self.storage_file = f"test_portfolio_{self.random_suffix}.json"
+        self.symbol = f"TICK_{random.randint(100, 999)}"
+        self.url = f"http://example.com/api/market/{self.random_suffix}"
+        self.telegram_token = f"token_{self.random_suffix}"
         self.chat_id = str(random.randint(100000, 999999))
-        
-        test_data = {
-            self.symbol: [
-                {"price": round(random.uniform(10.0, 100.0), 2), "timestamp": "2023-10-01T00:00:00"},
-                {"price": round(random.uniform(100.0, 200.0), 2), "timestamp": "2023-10-02T00:00:00"}
-            ]
-        }
-        
-        import json
+
         with open(self.storage_file, "w") as f:
-            json.dump(test_data, f)
+            f.write("{}")
 
     def tearDown(self):
         if os.path.exists(self.storage_file):
             os.remove(self.storage_file)
 
-    def test_digest_composition_and_execution(self):
-        valuation_inst = PortfolioValuation(self.storage_file)
-        summary = valuation_inst.get_total_summary(self.url)
-        self.assertIsNotNone(summary)
+    def test_generate_portfolio_digest_integration(self):
+        result = generate_portfolio_digest(
+            symbol=self.symbol,
+            url=self.url,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id,
+            storage_file=self.storage_file
+        )
 
-        visualizer_inst = PortfolioVisualizer(self.storage_file)
-        text_report = visualizer_inst.build_text_report(self.symbol)
-        self.assertIsInstance(text_report, str)
+        self.assertIsInstance(result, dict)
+        self.assertIn("symbol", result)
+        self.assertEqual(result["symbol"], self.symbol)
+        self.assertIn("valuation", result)
+        self.assertIn("report", result)
 
-        ascii_chart = generate_ascii_chart([x["price"] for x in valuation_inst.load_data(self.storage_file).get(self.symbol, [])])
-        self.assertIsInstance(ascii_chart, str)
-
-        digest_result = generate_extended_digest(
+    def test_generate_extended_digest_integration(self):
+        result = generate_extended_digest(
             storage_file=self.storage_file,
             symbol=self.symbol,
             url=self.url,
@@ -53,10 +50,21 @@ class TestMarketPortfolioDigestIntegration(unittest.TestCase):
             chat_id=self.chat_id
         )
 
-        self.assertIsNotNone(digest_result)
-        if isinstance(digest_result, dict):
-            self.assertIn("status", digest_result)
-            self.assertEqual(digest_result["status"], "success")
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("status"), "success")
+        self.assertEqual(result.get("symbol"), self.symbol)
+
+    def test_portfolio_digest_manager_integration(self):
+        manager = PortfolioDigestManager(self.storage_file)
+
+        compile_result = manager.compile_digest(self.symbol, self.url)
+        self.assertIsInstance(compile_result, dict)
+        self.assertEqual(compile_result.get("symbol"), self.symbol)
+        self.assertIn("summary", compile_result)
+        self.assertIn("ascii_chart", compile_result)
+
+        render_result = manager.render_and_send(self.symbol, self.telegram_token, self.chat_id)
+        self.assertTrue(render_result)
 
 
 if __name__ == "__main__":

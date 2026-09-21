@@ -1,48 +1,65 @@
-import unittest
 import os
-import tempfile
+import unittest
 import uuid
 import random
-import json
-
 from skills.market_portfolio_backtest_evaluator_bridge import MarketPortfolioBacktestEvaluatorBridge
-from skills.market_portfolio_backtester import MarketPortfolioBacktester
-from skills.market_portfolio_performance_analytics import PortfolioPerformanceAnalytics
 
 class TestMarketPortfolioBacktestEvaluatorBridgeIntegration(unittest.TestCase):
     def setUp(self):
-        self.test_dir = tempfile.TemporaryDirectory()
-        self.storage_file = os.path.join(self.test_dir.name, f"test_data_{uuid.uuid4()}.json")
+        self.unique_id = str(uuid.uuid4())[:8]
+        self.storage_file = f"test_storage_{self.unique_id}.json"
+        self.symbol = f"SYM_{self.unique_id}"
         
-        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
-        self.initial_capital = round(random.uniform(10000.0, 50000.0), 2)
-        
-        sample_data = {
+        # Заполняем тестовое хранилище минимальными данными, необходимыми для работы бэктестера и аналитики
+        import json
+        initial_data = {
             self.symbol: [
-                {"price": 100.0 + random.uslar if hasattr(random, 'uslar') else 100.0 + random.uniform(-5, 5), "shift": 1},
-                {"price": 105.0 + random.uniform(-5, 5), "shift": 2},
-                {"price": 102.0 + random.uniform(-5, 5), "shift": 3},
-                {"price": 110.0 + random.uniform(-5, 5), "shift": 4}
+                {"price": 100.0 + random.random() * 10, "timestamp": "2023-01-01"},
+                {"price": 105.0 + random.random() * 10, "timestamp": "2023-01-02"},
+                {"price": 110.0 + random.random() * 10, "timestamp": "2023-01-03"},
+                {"price": 108.0 + random.random() * 10, "timestamp": "2023-01-04"},
+                {"price": 115.0 + random.random() * 10, "timestamp": "2023-01-05"}
             ]
         }
-        with open(self.storage_file, 'w') as f:
-            json.dump(sample_data, f)
+        with open(self.storage_file, "w") as f:
+            json.dump(initial_data, f)
+            
+        self.bridge = MarketPortfolioBacktestEvaluatorBridge(self.storage_file)
 
     def tearDown(self):
-        self.test_dir.cleanup()
+        if os.path.exists(self.storage_file):
+            os.remove(self.storage_file)
 
-    def test_bridge_composition_and_evaluation(self):
-        bridge = MarketPortfolioBacktestEvaluatorBridge(self.storage_file)
+    def test_evaluate_backtest_performance_integration(self):
+        result = self.bridge.evaluate_backtest_performance(self.symbol)
         
-        self.assertIsInstance(bridge.backtester, MarketPortfolioBacktester)
-        self.assertIsInstance(bridge.analytics, PortfolioPerformanceAnalytics)
+        self.assertIsInstance(result, dict)
+        self.assertIn("backtest_summary", result)
+        self.assertIn("performance_metrics", result)
+        self.assertIn("performance_evaluation", result)
 
-        strategy_params = {"multiplier": round(random.uniform(1.0, 3.0), 2)}
-        evaluation_result = bridge.evaluate_strategy_backtest(self.symbol, self.initial_capital, strategy_params)
+    def test_run_comprehensive_evaluation_integration(self):
+        initial_capital = round(1000.0 + random.random() * 500, 2)
+        strategy_params = {"threshold": round(random.random(), 2)}
+        
+        result = self.bridge.run_comprehensive_evaluation(self.symbol, initial_capital, strategy_params)
+        
+        self.assertIsInstance(result, dict)
+        self.assertIn("backtest_execution", result)
+        self.assertIn("summary", result)
+        self.assertIn("metrics", result)
+        self.assertIn("evaluation", result)
 
-        self.assertIsInstance(evaluation_result, dict)
-        self.assertIn("backtest_summary", evaluation_result)
-        self.assertIn("performance_metrics", evaluation_result)
+    def test_evaluate_strategy_backtest_integration(self):
+        initial_capital = round(5000.0 + random.random() * 1000, 2)
+        strategy_params = {"risk_tolerance": round(random.random(), 2)}
+        
+        result = self.bridge.evaluate_strategy_backtest(self.symbol, initial_capital, strategy_params)
+        
+        self.assertIsInstance(result, dict)
+        self.assertIn("backtest_summary", result)
+        self.assertIn("performance_metrics", result)
+        self.assertIn("performance_evaluation", result)
 
 if __name__ == "__main__":
     unittest.main()

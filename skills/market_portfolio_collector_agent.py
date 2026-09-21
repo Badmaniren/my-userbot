@@ -30,6 +30,16 @@ class PortfolioValuation:
     def __init__(self, storage_file: str):
         self.storage_file = storage_file
 
+    def load_data(self, storage_file: str = None):
+        target = storage_file or self.storage_file
+        if target and os.path.exists(target):
+            try:
+                with open(target, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception:
+                return []
+        return []
+
     def get_total_summary(self, url: str) -> dict:
         return {"summary": "ok", "url": url}
 

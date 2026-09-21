@@ -1,61 +1,81 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, Mock
 import uuid
 import random
-import string
-import sys
-import os
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
-
-from skills.market_portfolio_telegram_notifier import start_new
-
+import requests
+from skills.market_portfolio_telegram_notifier import start_new, send_telegram_notification
 
 class TestMarketPortfolioTelegramNotifier(unittest.TestCase):
 
-    def test_start_new_success_execution(self):
-        rand_token = ''.join(random.choices(string.ascii_letters + string.digits, k=32))
-        rand_chat_id = str(random.randint(100000, 99999999))
-        rand_message = f"Inquisition report: {uuid.uuid4().hex}"
+    def test_start_new_success_flow(self):
+        token = f"bot{uuid.uuid4().hex}"
+        chat_id = str(random.randint(100000, 999999999))
+        message = f"report_success_{uuid.uuid4().hex}"
 
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"ok": True, "result": {"message_id": random.randint(1, 1000)}}
+        mock_response = Mock()
+        mock_response.json.return_value = {"ok": True, "result": {"message_id": random.randint(1, 10000)}}
+        mock_response.raise_for_status.return_value = None
 
-        with patch('requests.post', return_value=mock_response) as mock_post:
-            result = start_new(rand_token, rand_chat_id, rand_message)
-            
+        with patch("skills.market_portfolio_telegram_notifier.requests.post", return_value=mock_response) as mock_post:
+            result = start_new(token, chat_id, message)
             self.assertTrue(result)
             mock_post.assert_called_once()
-            called_args, called_kwargs = mock_post.call_args
-            self.assertIn(rand_token, called_args[0] if called_args else called_kwargs.get('url', ''))
+            called_kwargs = mock_post.call_args[1]
+            self.assertEqual(called_kwargs["json"]["chat_id"], chat_id)
+            self.assertEqual(called_kwargs["json"]["text"], message)
+            self.assertIn(token, mock_post.call_args[0][0])
 
-    def test_start_new_request_exception_handling(self):
-        rand_token = uuid.uuid4().hex
-        rand_chat_id = str(random.randint(1000, 9999))
-        rand_message = uuid.uuid4().hex
+    def test_start_new_failure_response(self):
+        token = f"bot{uuid.uuid4().hex}"
+        chat_id = str(random.randint(100000, 999999999))
+        message = f"report_fail_{uuid.uuid4().hex}"
 
-        with patch('requests.post', side_effect=Exception(uuid.uuid4().hex)) as mock_post:
-            result = start_new(rand_token, rand_chat_id, rand_message)
-            
+        mock_response = Mock()
+        mock_response.json.return_value = {"ok": False, "description": "Unauthorized"}
+        mock_response.raise_for_status.return_value = None
+
+        with patch("skills.market_portfolio_telegram_notifier.requests.post", return_value=mock_response) as mock_post:
+            result = start_new(token, chat_id, message)
             self.assertFalse(result)
             mock_post.assert_called_once()
 
-    def test_start_new_http_error_status(self):
-        rand_token = uuid.uuid4().hex
-        rand_chat_id = str(random.randint(100, 999))
-        rand_message = uuid.uuid4().hex
+    def test_start_new_request_exception(self):
+        token = f"bot{uuid.uuid4().hex}"
+        chat_id = str(random.randint(100000, 999999999))
+        message = f"report_exception_{uuid.uuid4().hex}"
 
-        mock_response = MagicMock()
-        mock_response.status_code = random.choice([400, 401, 403, 404, 500, 502])
-        mock_response.raise_for_status.side_effect = Exception("HTTP Error")
-
-        with patch('requests.post', return_value=mock_response) as mock_post:
-            result = start_new(rand_token, rand_chat_id, rand_message)
-            
+        with patch("skills.market_portfolio_telegram_notifier.requests.post", side_effect=requests.RequestException("Connection timeout")) as mock_post:
+            result = start_new(token, chat_id, message)
             self.assertFalse(result)
             mock_post.assert_called_once()
 
+    def test_send_telegram_notification_alias(self):
+        token = f"bot{uuid.uuid4().hex}"
+        chat_id = str(random.randint(100000, 999999999))
+        message = f"alias_test_{uuid.uuid4().hex}"
 
-if __name__ == '__main__':
+        mock_response = Mock()
+        mock_response.json.return_value = {"ok": True}
+        mock_response.raise_for_status.return_value = None
+
+        with patch("skills.market_portfolio_telegram_notifier.requests.post", return_value=mock_response) as mock_post:
+            result = send_telegram_notification(token, chat_id, message)
+            self.assertTrue(result)
+            mock_post.assert_called_once()
+
+    def test_start_new_json_decode_error(self):
+        token = f"bot{uuid.uuid4().hex}"
+        chat_id = str(random.randint(100000, 999999999))
+        message = f"json_error_{uuid.uuid4().hex}"
+
+        mock_response = Mock()
+        mock_response.json.side_effect = ValueError("Invalid JSON")
+        mock_response.raise_for_status.return_value = None
+
+        with patch("skills.market_portfolio_telegram_notifier.requests.post", return_value=mock_response) as mock_post:
+            result = start_new(token, chat_id, message)
+            self.assertFalse(result)
+            mock_post.assert_called_once()
+
+if __name__ == "__main__":
     unittest.main()

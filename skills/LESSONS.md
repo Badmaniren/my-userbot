@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-прошёл тесты и влит в main
-
-## telegram_alert (compose) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
+ку предсказуемо или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: ERROR: test_process_stream_alert (tests.test_telegram_alert.TestTelegramAlert.test_process_stream_alert)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -325,4 +322,8 @@
 
 ## market_portfolio_performance_analytics (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_performance_analytics (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

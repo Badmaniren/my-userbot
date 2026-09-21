@@ -47,6 +47,9 @@ class MarketPortfolioWebsocketBridge:
     def stream_portfolio_updates(self, symbol: str) -> str:
         """Возвращает актуальные данные портфеля для указанного символа."""
         data = self.parser.load_data(self.storage_file)
-        prices = data.get(symbol, [])
+        if isinstance(data, dict):
+            prices = data.get(symbol, [])
+        else:
+            prices = []
         latest_price = prices[-1] if prices else 0.0
         return f"Stream update -> Symbol: {symbol}, Price: {latest_price}"

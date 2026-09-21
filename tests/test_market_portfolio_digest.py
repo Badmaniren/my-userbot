@@ -1,12 +1,13 @@
 import unittest
 from unittest.mock import patch, MagicMock
-import random
 import uuid
+import random
 import string
-import io
 
 from skills.market_portfolio_digest import (
+    send_telegram_notification,
     generate_portfolio_digest,
+    generate_extended_digest,
     PortfolioDigestManager
 )
 
@@ -14,99 +15,121 @@ from skills.market_portfolio_digest import (
 class TestMarketPortfolioDigest(unittest.TestCase):
 
     def setUp(self):
-        self.rand_symbol = ''.join(random.choices(string.ascii_uppercase, k=5))
-        self.rand_url = f"https://{uuid.uuid4().hex}.com/api"
-        self.rand_token = uuid.uuid4().hex
-        self.rand_chat_id = str(random.randint(100000, 999999))
-        self.rand_storage = f"{uuid.uuid4().hex}.json"
-        
-        self.mock_valuation_data = {
-            "total_value": round(random.uniform(1000.0, 50000.0), 2),
-            "pnl": round(random.uniform(-500.0, 1500.0), 2)
-        }
-        self.mock_chart_data = f"CHART-{uuid.uuid4().hex[:8]}"
+        self.symbol = ''.join(random.choices(string.ascii_uppercase, k=5))
+        self.url = f"https://{uuid.uuid4().hex}.com/{uuid.uuid4().hex}"
+        self.token = uuid.uuid4().hex
+        self.chat_id = str(random.randint(100000, 999999))
+        self.storage_file = f"{uuid.uuid4().hex}.db"
 
-    def test_digest_composition_and_execution(self):
-        with patch('skills.market_portfolio_digest.PortfolioValuation') as mock_valuation_cls, \
-             patch('skills.market_portfolio_digest.PortfolioVisualizer') as mock_visualizer_cls, \
-             patch('skills.market_portfolio_digest.dispatch_portfolio_alerts') as mock_dispatch:
+    def test_send_telegram_notification_stub(self):
+        result = send_telegram_notification()
+        self.assertTrue(result)
 
-            mock_val_instance = mock_valuation_cls.return_value
-            mock_val_instance.evaluate_portfolio.return_value = self.mock_valuation_data
+    @patch('skills.market_portfolio_digest.PortfolioValuation')
+    @patch('skills.market_portfolio_digest.PortfolioVisualizer')
+    @patch('skills.market_portfolio_digest.dispatch_portfolio_alerts')
+    def test_generate_portfolio_digest(self, mock_dispatch, mock_visualizer_cls, mock_valuation_cls):
+        expected_valuation = {uuid.uuid4().hex: random.randint(100, 1000)}
+        expected_report = uuid.uuid4().hex
 
-            mock_vis_instance = mock_visualizer_cls.return_value
-            mock_vis_instance.build_text_report.return_value = self.mock_chart_data
+        mock_valuation_instance = mock_valuation_cls.return_value
+        mock_valuation_instance.evaluate_portfolio.return_value = expected_valuation
 
-            result = generate_portfolio_digest(
-                symbol=self.rand_symbol,
-                url=self.rand_url,
-                telegram_token=self.rand_token,
-                chat_id=self.rand_chat_id,
-                storage_file=self.rand_storage
-            )
+        mock_visualizer_instance = mock_visualizer_cls.return_value
+        mock_visualizer_instance.build_text_report.return_value = expected_report
 
-            mock_valuation_cls.assert_called_once_with(self.rand_storage)
-            mock_val_instance.evaluate_portfolio.assert_called_once_with(self.rand_url)
+        result = generate_portfolio_digest(
+            self.symbol,
+            self.url,
+            self.token,
+            self.chat_id,
+            self.storage_file
+        )
 
-            mock_visualizer_cls.assert_called_once_with(self.rand_storage)
-            mock_vis_instance.build_text_report.assert_called_once_with(self.rand_symbol)
+        mock_valuation_cls.assert_called_once_with(self.storage_file)
+        mock_valuation_instance.load_data.assert_called_once_with(self.storage_file)
+        mock_valuation_instance.evaluate_portfolio.assert_called_once_with(self.url)
 
-            mock_dispatch.assert_called_once()
-            
-            self.assertIn(self.rand_symbol, result.get("symbol", ""))
-            self.assertEqual(result["valuation"], self.mock_valuation_data)
-            self.assertEqual(result["report"], self.mock_chart_data)
+        mock_visualizer_cls.assert_called_once_with(self.storage_file)
+        mock_visualizer_instance.build_text_report.assert_called_once_with(self.symbol)
 
-    def test_portfolio_digest_manager_class(self):
-        with patch('skills.market_portfolio_digest.PortfolioValuation') as mock_valuation_cls, \
-             patch('skills.market_portfolio_digest.PortfolioVisualizer') as mock_visualizer_cls, \
-             patch('skills.market_portfolio_digest.send_telegram_notification') as mock_send_tg:
+        mock_dispatch.assert_called_once_with(
+            self.symbol,
+            self.url,
+            self.token,
+            self.chat_id,
+            self.storage_file
+        )
 
-            manager = PortfolioDigestManager(storage_file=self.rand_storage)
-            self.assertEqual(manager.storage_file, self.rand_storage)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["symbol"], self.symbol)
+        self.assertEqual(result["valuation"], expected_valuation)
+        self.assertEqual(result["report"], expected_report)
 
-            mock_val_instance = mock_valuation_cls.return_value
-            mock_val_instance.calculate_portfolio_pnl.return_value = self.mock_valuation_data
+    @patch('skills.market_portfolio_digest.PortfolioValuation')
+    @patch('skills.market_portfolio_digest.PortfolioVisualizer')
+    def test_generate_extended_digest(self, mock_visualizer_cls, mock_valuation_cls):
+        mock_valuation_instance = mock_valuation_cls.return_value
+        mock_visualizer_instance = mock_visualizer_cls.return_value
 
-            mock_vis_instance = mock_visualizer_cls.return_value
-            mock_vis_instance.generate_ascii_chart.return_value = self.mock_chart_data
+        result = generate_extended_digest(
+            self.storage_file,
+            self.symbol,
+            self.url,
+            self.token,
+            self.chat_id
+        )
 
-            digest = manager.compile_digest(self.rand_symbol, self.rand_url)
+        mock_valuation_cls.assert_called_once_with(self.storage_file)
+        mock_valuation_instance.get_total_summary.assert_called_once_with(self.url)
 
-            self.assertEqual(digest["symbol"], self.rand_symbol)
-            self.assertEqual(digest["summary"], self.mock_valuation_data)
-            self.assertEqual(digest["ascii_chart"], self.mock_chart_data)
+        mock_visualizer_cls.assert_called_once_with(self.storage_file)
+        mock_visualizer_instance.build_text_report.assert_called_once_with(self.symbol)
 
-            dispatch_res = manager.render_and_send(
-                symbol=self.rand_symbol,
-                token=self.rand_token,
-                chat_id=self.rand_chat_id
-            )
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["symbol"], self.symbol)
 
-            mock_vis_instance.render_and_dispatch.assert_called_once_with(
-                self.rand_symbol, self.rand_token, self.rand_chat_id
-            )
-            self.assertTrue(dispatch_res)
+    @patch('skills.market_portfolio_digest.PortfolioValuation')
+    @patch('skills.market_portfolio_digest.PortfolioVisualizer')
+    def test_portfolio_digest_manager_compile_digest(self, mock_visualizer_cls, mock_valuation_cls):
+        expected_summary = {uuid.uuid4().hex: float(random.randint(1, 100))}
+        expected_chart = uuid.uuid4().hex
 
-    def test_digest_with_io_stream_mocking(self):
-        stream_data = io.BytesIO(uuid.uuid4().bytes)
-        
-        with patch('skills.market_portfolio_digest.PortfolioValuation') as mock_valuation_cls, \
-             patch('skills.market_portfolio_digest.PortfolioVisualizer') as mock_visualizer_cls:
+        mock_valuation_instance = mock_valuation_cls.return_value
+        mock_valuation_instance.calculate_portfolio_pnl.return_value = expected_summary
 
-            mock_val_instance = mock_valuation_cls.return_value
-            mock_val_instance.load_data.return_value = stream_data.read()
+        mock_visualizer_instance = mock_visualizer_cls.return_value
+        mock_visualizer_instance.generate_ascii_chart.return_value = expected_chart
 
-            digest_res = generate_portfolio_digest(
-                symbol=self.rand_symbol,
-                url=self.rand_url,
-                telegram_token=self.rand_token,
-                chat_id=self.rand_chat_id,
-                storage_file=self.rand_storage
-            )
+        manager = PortfolioDigestManager(self.storage_file)
+        result = manager.compile_digest(self.symbol, self.url)
 
-            self.assertIsNotNone(digest_res)
-            mock_val_instance.load_data.assert_called_once_with(self.rand_storage)
+        mock_valuation_cls.assert_called_once_with(self.storage_file)
+        mock_valuation_instance.calculate_portfolio_pnl.assert_called_once_with(self.url)
+
+        mock_visualizer_cls.assert_called_once_with(self.storage_file)
+        mock_visualizer_instance.generate_ascii_chart.assert_called_once_with(self.symbol)
+
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["symbol"], self.symbol)
+        self.assertEqual(result["summary"], expected_summary)
+        self.assertEqual(result["ascii_chart"], expected_chart)
+
+    @patch('skills.market_portfolio_digest.PortfolioVisualizer')
+    def test_portfolio_digest_manager_render_and_send(self, mock_visualizer_cls):
+        mock_visualizer_instance = mock_visualizer_cls.return_value
+
+        manager = PortfolioDigestManager(self.storage_file)
+        result = manager.render_and_send(self.symbol, self.token, self.chat_id)
+
+        mock_visualizer_cls.assert_called_once_with(self.storage_file)
+        mock_visualizer_instance.render_and_dispatch.assert_called_once_with(
+            self.symbol,
+            self.token,
+            self.chat_id
+        )
+        self.assertTrue(result)
 
 
 if __name__ == '__main__':

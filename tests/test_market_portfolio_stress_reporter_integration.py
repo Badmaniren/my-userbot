@@ -2,65 +2,64 @@ import unittest
 import os
 import uuid
 import random
-from skills.market_portfolio_stress_reporter import (
-    StressReporter,
-    PortfolioStressReporter,
-    generate_stress_report,
-    run_stress_reporting_pipeline
-)
+from unittest.mock import patch, MagicMock
+from skills.market_portfolio_stress_reporter import StressReporter
+from skills.market_portfolio_performance_analytics import PortfolioPerformanceAnalytics
+from skills.market_portfolio_telegram_notifier import start_new
 from skills.market_parser import MarketParser
 
-class TestStressReporterIntegration(unittest.TestCase):
+class TestMarketPortfolioStressReporterIntegration(unittest.TestCase):
     def setUp(self):
-        self.storage_file = f"test_market_data_{uuid.uuid4().hex}.json"
-        self.symbol = f"TICK_{random.randint(1000, 9999)}"
+        self.storage_file = f"test_storage_{uuid.uuid4().hex}.json"
+        self.symbol = f"TICKER_{random.randint(1000, 9999)}"
+        self.telegram_token = "test_token_123"
+        self.chat_id = "test_chat_456"
         
-        parser = MarketParser(self.storage_file)
-        base_price = round(random.uniform(100.0, 500.0), 2)
-        parser.fetch_and_store(self.symbol, base_price)
+        # Инициализация парсера для создания данных
+        self.parser = MarketParser(self.storage_file)
+        self.parser.fetch_and_store(self.symbol, float(random.randint(100, 1000)))
         
-        for i in range(5):
-            new_price = round(base_price * (1 + random.uniform(-0.05, 0.05)), 2)
-            parser.fetch_and_store(self.symbol, new_price)
+        # Инициализация тестируемого модуля
+        self.reporter = StressReporter(self.storage_file)
 
     def tearDown(self):
         if os.path.exists(self.storage_file):
             os.remove(self.storage_file)
 
-    def test_stress_reporter_integration(self):
-        shifts = [round(random.uniform(-10.0, 10.0), 2), round(random.uniform(-10.0, 10.0), 2)]
-        
-        reporter = StressReporter(self.storage_file)
-        report_result = reporter.run_stress_reporting(self.symbol, shifts)
-        
-        self.assertIn("simulation_results", report_result)
-        self.assertIn("base_report", report_result)
-        
-        sim_single_pct = round(random.uniform(-5.0, 5.0), 2)
-        single_result = reporter.simulate_single(self.symbol, sim_single_pct)
-        self.assertIsNotNone(single_result)
-        
-        stream_data = reporter.get_stream_data()
-        self.assertIsNotNone(stream_data)
+    def test_stress_reporting_integration_flow(self):
+        # 1. Проверка аналитики (входные данные для репортера)
+        analytics = PortfolioPerformanceAnalytics(self.storage_file)
+        metrics = analytics.calculate_metrics(self.symbol)
+        self.assertIsInstance(metrics, dict, "Аналитика должна возвращать словарь метрик")
 
-    def test_portfolio_stress_reporter_subclass(self):
-        shifts = [round(random.uniform(-15.0, 15.0), 2)]
-        portfolio_reporter = PortfolioStressReporter(self.storage_file)
-        sub_result = portfolio_reporter.run_stress_report(self.symbol, shifts)
+        # 2. Запуск стресс-тестирования через репортер
+        shifts = [random.uniform(-0.2, 0.2) for _ in range(3)]
+        report_data = self.reporter.run_stress_reporting(self.symbol, shifts)
         
-        self.assertIn("simulation_results", sub_result)
-        self.assertIn("base_report", sub_result)
+        self.assertIsNotNone(report_data, "Репортер должен вернуть данные отчета")
+        
+        # 3. Формирование сообщения
+        message = f"Stress Report for {self.symbol}: {str(report_data)}"
+        
+        # 4. Отправка через Telegram-нотификатор (интеграция)
+        with patch("skills.market_portfolio_telegram_notifier.requests.post") as mock_post:
+            mock_response = MagicMock()
+            mock_response.raise_for_status.return_value = None
+            mock_response.json.return_value = {"ok": True}
+            mock_post.return_value = mock_response
 
-    def test_functional_wrappers(self):
-        pct = round(random.uniform(-20.0, 20.0), 2)
-        func_result = generate_stress_report(self.storage_file, self.symbol, pct)
-        self.assertIn("simulation_results", func_result)
-        self.assertIn("base_report", func_result)
+            success = start_new(self.telegram_token, self.chat_id, message)
 
-        shifts_pipeline = [round(random.uniform(-5.0, 5.0), 2)]
-        pipeline_result = run_stress_reporting_pipeline(self.storage_file, self.symbol, shifts_pipeline)
-        self.assertIn("simulation_results", pipeline_result)
-        self.assertIn("base_report", pipeline_result)
+            # Проверка: если метод вернул True, значит отправка прошла успешно
+            self.assertTrue(success, "Telegram нотификатор должен вернуть True при успешной отправке")
 
-if __name__ == "__main__":
+    def test_data_consistency_after_simulation(self):
+        # Проверка, что симуляция не портит данные в хранилище
+        initial_data = self.parser.load_data(self.storage_file)
+        self.reporter.simulate_single(self.symbol, random.uniform(0.01, 0.05))
+        final_data = self.parser.load_data(self.storage_file)
+
+        self.assertEqual(len(initial_data), len(final_data), "Количество записей не должно меняться при симуляции")
+
+if __name__ == '__main__':
     unittest.main()

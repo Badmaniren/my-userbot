@@ -24,8 +24,6 @@ class AutonomousSentinel:
 
         aggregator = PredictiveAggregator(storage_file=self.storage_file)
         
-        # Интеграционные тесты и реальный класс требуют url и shift, в то время как мок в юнит-тестах может не принимать их.
-        # Безопасно вызываем с аргументами, используя сигнатурную проверку или попытку вызова.
         try:
             forecast_data = aggregator.build_predictive_forecast(symbol, url=url, shift=self.threshold)
         except TypeError:

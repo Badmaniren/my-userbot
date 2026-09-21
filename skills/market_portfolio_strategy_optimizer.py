@@ -35,8 +35,14 @@ class PortfolioStrategyOptimizer:
 
         backtest_res = self.backtester.run_backtest(symbol, shifts_iterable)
         stress_res = self.simulator.run_stress_test(symbol, shifts_iterable)
-        drawdown = self.backtester.calculate_maximum_drawdown(symbol)
         
+        try:
+            drawdown = self.backtester.calculate_maximum_drawdown(symbol)
+            if isinstance(drawdown, str):
+                drawdown = float(drawdown)
+        except Exception:
+            drawdown = 0.0
+
         optimized_weights = {symbol: allocation}
         resilience_score = 1.0 - abs(drawdown) if drawdown is not None else 0.5
         

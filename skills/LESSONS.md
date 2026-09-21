@@ -312,3 +312,6 @@
 ## market_portfolio_websocket_bridge (start_new) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_performance_analytics (start_new) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

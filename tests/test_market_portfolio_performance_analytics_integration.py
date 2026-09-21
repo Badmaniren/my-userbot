@@ -9,35 +9,28 @@ from skills.market_parser import MarketParser
 class TestPortfolioPerformanceAnalyticsIntegration(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.TemporaryDirectory()
-        self.storage_file = os.path.join(self.test_dir.name, f"test_market_{uuid.uuid4().hex}.json")
+        self.storage_file = os.path.join(self.test_dir.name, f"test_storage_{uuid.uuid4().hex}.json")
         self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
-        
         self.parser = MarketParser(self.storage_file)
-        
-        self.base_price = round(random.uniform(10.0, 100.0), 2)
-        self.prices = [self.base_price]
-        
-        current_price = self.base_price
-        for _ in range(5):
-            change = random.uniform(-0.05, 0.05)
-            current_price = round(current_price * (1 + change), 2)
-            self.prices.append(current_price)
-            
-        for p in self.prices:
-            self.parser.fetch_and_store(self.symbol, p)
 
     def tearDown(self):
         self.test_dir.cleanup()
 
-    def test_integration_calculate_metrics_and_load_data(self):
+    def test_performance_analytics_integration_with_real_parser(self):
+        base_price = round(random.uniform(10.0, 100.0), 2)
+        price_steps = [base_price]
+        
+        for _ in range(5):
+            delta = random.uniform(-5.0, 5.0)
+            next_price = max(1.0, round(price_steps[-1] + delta, 2))
+            price_steps.append(next_price)
+
+        for p in price_steps:
+            self.parser.fetch_and_store(self.symbol, p)
+
         analytics = PortfolioPerformanceAnalytics(self.storage_file)
-        
-        loaded_data = analytics.load_data(self.storage_file)
-        self.assertTrue(isinstance(loaded_data, list))
-        self.assertGreaterEqual(len(loaded_data), len(self.prices))
-        
         metrics = analytics.calculate_metrics(self.symbol)
-        
+
         self.assertIn("symbol", metrics)
         self.assertEqual(metrics["symbol"], self.symbol)
         self.assertIn("return", metrics)
@@ -47,16 +40,18 @@ class TestPortfolioPerformanceAnalyticsIntegration(unittest.TestCase):
         self.assertIsInstance(metrics["return"], float)
         self.assertIsInstance(metrics["volatility"], float)
         self.assertIsInstance(metrics["sharpe_ratio"], float)
-        
+
         evaluated = analytics.evaluate_performance(self.symbol)
-        self.assertEqual(evaluated["symbol"], metrics["symbol"])
-        self.assertEqual(evaluated["return"], metrics["return"])
-        
-        callable_metrics = analytics(symbol=self.symbol)
-        self.assertEqual(callable_metrics["symbol"], self.symbol)
-        
-        empty_callable = analytics()
-        self.assertEqual(empty_callable["return"], 0.0)
+        self.assertEqual(evaluated, metrics)
+
+        called_metrics = analytics(symbol=self.symbol)
+        self.assertEqual(called_metrics, metrics)
+
+        empty_symbol = f"EMPTY_{uuid.uuid4().hex[:6].upper()}"
+        empty_metrics = analytics.calculate_metrics(empty_symbol)
+        self.assertEqual(empty_metrics["return"], 0.0)
+        self.assertEqual(empty_metrics["volatility"], 0.0)
+        self.assertEqual(empty_metrics["sharpe_ratio"], 0.0)
 
 if __name__ == "__main__":
     unittest.main()

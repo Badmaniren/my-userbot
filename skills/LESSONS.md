@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-f-8') for line in lines]
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_database_pipeline (compose) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1)
+ED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_notifier (compose) — раундов: 4
@@ -329,4 +325,8 @@ f-8') for line in lines]
 
 ## market_portfolio_stress_reporter (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_telegram_notifier (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

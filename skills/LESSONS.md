@@ -3,7 +3,8 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ocess_stream_alert)
+ку предсказуемо или пробрось наружу через raise.
+- Последняя ошибка перед фиксом: ERROR: test_process_stream_alert (tests.test_telegram_alert.TestTelegramAlert.test_process_stream_alert)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_notifier (compose) — раундов: 4
@@ -325,8 +326,4 @@ ocess_stream_alert)
 
 ## market_portfolio_performance_analytics (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_performance_analytics (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

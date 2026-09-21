@@ -1,98 +1,165 @@
 import unittest
 from unittest.mock import patch, MagicMock
-import random
 import uuid
-import string
+import random
+import math
 import io
-import json
-import os
+from skills.market_portfolio_performance_analytics import (
+    PortfolioPerformanceAnalytics,
+    start_new
+)
 
-from skills.market_portfolio_performance_analytics import start_new
+class TestPortfolioPerformanceAnalytics(unittest.TestCase):
 
-class TestMarketPortfolioPerformanceAnalytics(unittest.TestCase):
+    def setUp(self):
+        self.storage_file = f"storage_{uuid.uuid4().hex}.json"
+        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
 
-    def test_start_new_returns_expected_analytics_structure(self):
-        random_symbol = ''.join(random.choices(string.ascii_uppercase, k=5))
-        random_storage = f"{uuid.uuid4().hex}.json"
-        random_url = f"https://{uuid.uuid4().hex}.com/market"
-        
-        mock_prices = [
-            {"symbol": random_symbol, "price": round(random.uniform(10.0, 1000.0), 2)} 
-            for _ in range(10)
-        ]
-
+    def test_calculate_metrics_insufficient_data(self):
+        rand_symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
         with patch("skills.market_portfolio_performance_analytics.MarketParser") as MockParser:
             instance = MockParser.return_value
-            instance.load_data.return_value = mock_prices
-            instance.fetch_price.return_value = round(random.uniform(10.0, 1000.0), 2)
+            instance.load_data.return_value = [
+                {"symbol": rand_symbol, "price": round(random.uniform(10.0, 100.0), 2)}
+            ]
 
-            result = start_new(random_storage, random_symbol, random_url)
+            analytics = PortfolioPerformanceAnalytics(self.storage_file)
+            metrics = analytics.calculate_metrics(rand_symbol)
 
-            self.assertIsInstance(result, dict)
-            self.assertIn("symbol", result)
-            self.assertIn("return", result)
-            self.assertIn("volatility", result)
-            self.assertIn("sharpe_ratio", result)
-            self.assertEqual(result["symbol"], random_symbol)
+            self.assertEqual(metrics["symbol"], rand_symbol)
+            self.assertEqual(metrics["return"], 0.0)
+            self.assertEqual(metrics["volatility"], 0.0)
+            self.assertEqual(metrics["sharpe_ratio"], 0.0)
 
-    def test_start_new_calculates_correct_metrics_with_chaos_data(self):
-        random_symbol = ''.join(random.choices(string.ascii_uppercase, k=4))
-        random_storage = f"storage_{uuid.uuid4().hex}"
-        random_url = f"http://{uuid.uuid4().hex}.local/api"
-
-        base_price = random.uniform(50.0, 500.0)
-        price_fluctuations = [base_price * (1 + random.uniform(-0.1, 0.1)) for _ in range(15)]
-        
-        mock_data = [{"symbol": random_symbol, "price": p} for p in price_fluctuations]
+    def test_calculate_metrics_valid_data(self):
+        rand_symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
+        prices = [100.0, 105.0, 102.0, 110.0]
+        mock_data = [{"symbol": rand_symbol, "price": p} for p in prices]
 
         with patch("skills.market_portfolio_performance_analytics.MarketParser") as MockParser:
             instance = MockParser.return_value
             instance.load_data.return_value = mock_data
 
-            analysis_result = start_new(storage_file=random_storage, symbol=random_symbol, url=random_url)
+            analytics = PortfolioPerformanceAnalytics(self.storage_file)
+            metrics = analytics.calculate_metrics(rand_symbol)
 
-            self.assertIsInstance(analysis_result.get("return"), float)
-            self.assertIsInstance(analysis_result.get("volatility"), float)
-            self.assertIsInstance(analysis_result.get("sharpe_ratio"), float)
-            
-            instance.load_data.assert_called_once_with(random_storage)
+            expected_return = (110.0 - 100.0) / 100.0
+            self.assertEqual(metrics["symbol"], rand_symbol)
+            self.assertAlmostEqual(metrics["return"], expected_return, places=4)
+            self.assertGreater(metrics["volatility"], 0.0)
+            self.assertIsInstance(metrics["sharpe_ratio"], float)
 
-    def test_start_new_handles_empty_dataset_gracefully(self):
-        random_symbol = uuid.uuid4().hex[:6].upper()
-        random_storage = f"{uuid.uuid4().hex}.db"
-        random_url = f"https://{uuid.uuid4().hex}.org/feed"
+    def test_evaluate_performance(self):
+        rand_symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
+        mock_data = [
+            {"symbol": rand_symbol, "price": 50.0},
+            {"symbol": rand_symbol, "price": 75.0}
+        ]
 
         with patch("skills.market_portfolio_performance_analytics.MarketParser") as MockParser:
             instance = MockParser.return_value
-            instance.load_data.return_value = []
+            instance.load_data.return_value = mock_data
 
-            result = start_new(random_storage, random_symbol, random_url)
+            analytics = PortfolioPerformanceAnalytics(self.storage_file)
+            res = analytics.evaluate_performance(rand_symbol)
 
-            self.assertIsInstance(result, dict)
-            self.assertEqual(result.get("return"), 0.0)
-            self.assertEqual(result.get("volatility"), 0.0)
-            self.assertEqual(result.get("sharpe_ratio"), 0.0)
-            self.assertEqual(result.get("symbol"), random_symbol)
+            self.assertEqual(res["symbol"], rand_symbol)
+            self.assertAlmostEqual(res["return"], 0.5, places=4)
 
-    def test_start_new_integration_with_io_stream(self):
-        random_symbol = ''.join(random.choices(string.ascii_uppercase, k=3))
-        random_storage = f"{uuid.uuid4().hex}.dat"
-        random_url = f"https://{uuid.uuid4().hex}.net/stream"
+    def test_call_method_with_symbol(self):
+        rand_symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
+        mock_data = [
+            {"symbol": rand_symbol, "price": 200.0},
+            {"symbol": rand_symbol, "price": 100.0}
+        ]
+
+        with patch("skills.market_portfolio_performance_analytics.MarketParser") as MockParser:
+            instance = MockParser.return_value
+            instance.load_data.return_value = mock_data
+
+            analytics = PortfolioPerformanceAnalytics(self.storage_file)
+            res = analytics(symbol=rand_symbol)
+
+            self.assertEqual(res["symbol"], rand_symbol)
+            self.assertAlmostEqual(res["return"], -0.5, places=4)
+
+    def test_call_method_without_symbol(self):
+        analytics = PortfolioPerformanceAnalytics(self.storage_file)
+        res = analytics()
+
+        self.assertEqual(res["return"], 0.0)
+        self.assertEqual(res["volatility"], 0.0)
+        self.assertEqual(res["sharpe_ratio"], 0.0)
+
+    def test_start_new_function(self):
+        rand_symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
+        rand_url = f"https://example.com/{uuid.uuid4().hex}"
+        mock_data = [
+            {"symbol": rand_symbol, "price": 10.0},
+            {"symbol": rand_symbol, "price": 20.0}
+        ]
+
+        with patch("skills.market_portfolio_performance_analytics.MarketParser") as MockParser:
+            instance = MockParser.return_value
+            instance.load_data.return_value = mock_data
+
+            res = start_new(self.storage_file, rand_symbol, rand_url)
+
+            self.assertEqual(res["symbol"], rand_symbol)
+            self.assertAlmostEqual(res["return"], 1.0, places=4)
+
+    def test_load_data_custom_file(self):
+        custom_file = f"custom_{uuid.uuid4().hex}.json"
+        rand_symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
         
-        raw_payload = json.dumps([
-            {"symbol": random_symbol, "price": 100.0},
-            {"symbol": random_symbol, "price": 105.0},
-            {"symbol": random_symbol, "price": 102.0}
-        ]).encode('utf-8')
+        with patch("skills.market_portfolio_performance_analytics.MarketParser") as MockParser:
+            instance = MockParser.return_value
+            expected_output = [{"symbol": rand_symbol, "price": 123.45}]
+            instance.load_data.return_value = expected_output
 
-        mock_file_stream = io.BytesIO(raw_payload)
+            analytics = PortfolioPerformanceAnalytics(self.storage_file)
+            data = analytics.load_data(custom_file)
+
+            instance.load_data.assert_called_once_with(custom_file)
+            self.assertEqual(data, expected_output)
+
+    def test_zero_division_price_handling(self):
+        rand_symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
+        mock_data = [
+            {"symbol": rand_symbol, "price": 0.0},
+            {"symbol": rand_symbol, "price": 50.0}
+        ]
 
         with patch("skills.market_portfolio_performance_analytics.MarketParser") as MockParser:
             instance = MockParser.return_value
-            instance.load_data.return_value = json.loads(mock_file_stream.read().decode('utf-8'))
+            instance.load_data.return_value = mock_data
 
-            res = start_new(random_storage, random_symbol, random_url)
-            
-            self.assertIsNotNone(res)
-            self.assertIn("sharpe_ratio", res)
-            self.assertGreaterEqual(res["volatility"], 0.0)
+            analytics = PortfolioPerformanceAnalytics(self.storage_file)
+            metrics = analytics.calculate_metrics(rand_symbol)
+
+            self.assertEqual(metrics["symbol"], rand_symbol)
+            self.assertEqual(metrics["return"], 0.0)
+
+    def test_generate_ascii_chart_and_build_report(self):
+        rand_symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
+        mock_data = [
+            {"symbol": rand_symbol, "price": 50.0},
+            {"symbol": rand_symbol, "price": 75.0}
+        ]
+
+        with patch("skills.market_portfolio_performance_analytics.MarketParser") as MockParser:
+            instance = MockParser.return_value
+            instance.load_data.return_value = mock_data
+
+            analytics = PortfolioPerformanceAnalytics(self.storage_file)
+            chart = analytics.generate_ascii_chart(rand_symbol)
+            self.assertIn("50.00", chart)
+            self.assertIn("#", chart)
+
+            report = analytics.build_performance_report(rand_symbol)
+            self.assertIn(rand_symbol, report)
+            self.assertIn("Performance Report", report)
+            self.assertIn("Price Dynamics", report)
+
+if __name__ == "__main__":
+    unittest.main()

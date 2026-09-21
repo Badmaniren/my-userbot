@@ -22,6 +22,10 @@ class PortfolioScenarioSimulator:
         if isinstance(data, dict):
             if symbol in data:
                 target = data[symbol]
+                if isinstance(target, list) and target:
+                    target = target[-1] if isinstance(target[-1], dict) else {"price": target[-1]}
+                elif isinstance(target, (int, float)):
+                    target = {"price": float(target)}
             elif "assets" in data and isinstance(data["assets"], list):
                 target = next((item for item in data["assets"] if item.get("symbol") == symbol), None)
             elif "holdings" in data and isinstance(data["holdings"], list):

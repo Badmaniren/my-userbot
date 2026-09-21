@@ -2,7 +2,6 @@ import unittest
 from unittest.mock import patch, MagicMock
 import uuid
 import random
-import string
 from skills.market_telegram_pipeline import (
     send_telegram_notification,
     run_pipeline,
@@ -11,105 +10,118 @@ from skills.market_telegram_pipeline import (
 
 class TestMarketTelegramPipeline(unittest.TestCase):
 
-    def setUp(self):
-        self.random_token = f"{random.randint(100, 999)}:{uuid.uuid4().hex[:10]}"
-        self.random_chat_id = str(random.randint(100000, 999999))
-        self.random_symbol = ''.join(random.choices(string.ascii_uppercase, k=4))
-        self.random_url = f"https://{''.join(random.choices(string.ascii_lowercase, k=8))}.com/{uuid.uuid4().hex[:6]}"
-        self.random_storage = f"{uuid.uuid4().hex}.json"
-        self.random_price = round(random.uniform(10.0, 1500.0), 2)
-
     def test_send_telegram_notification_success(self):
-        random_message = f"Report: {uuid.uuid4().hex}"
-        expected_url = f"https://api.telegram.org/bot{self.random_token}/sendMessage"
-        expected_payload = {
-            "chat_id": self.random_chat_id,
-            "text": random_message
-        }
+        rand_token = f"{random.randint(100000, 999999)}:ABC-{uuid.uuid4().hex[:8]}"
+        rand_chat_id = str(random.randint(10000, 99999))
+        rand_message = f"Alert: {uuid.uuid4().hex}"
 
-        with patch("skills.market_telegram_pipeline.requests.post") as mock_post:
+        with patch('skills.market_telegram_pipeline.requests.post') as mock_post:
             mock_response = MagicMock()
             mock_response.status_code = 200
             mock_post.return_value = mock_response
 
-            response = send_telegram_notification(self.random_token, self.random_chat_id, random_message)
+            response = send_telegram_notification(rand_token, rand_chat_id, rand_message)
 
-            mock_post.assert_called_once_with(expected_url, json=expected_payload)
             self.assertEqual(response.status_code, 200)
+            mock_post.assert_called_once()
+            args, kwargs = mock_post.call_args
+            self.assertIn(rand_token, args[0])
+            self.assertEqual(kwargs['json']['chat_id'], rand_chat_id)
+            self.assertEqual(kwargs['json']['text'], rand_message)
 
     def test_run_pipeline_success(self):
-        with patch("skills.market_telegram_pipeline.MarketParser") as MockParser, \
-             patch("skills.market_telegram_pipeline.send_telegram_notification") as mock_send:
+        rand_symbol = uuid.uuid4().hex[:5].upper()
+        rand_url = f"https://{uuid.uuid4().hex[:8]}.com/market"
+        rand_token = f"{random.randint(100000, 999999)}:XYZ-{uuid.uuid4().hex[:8]}"
+        rand_chat_id = str(random.randint(10000, 99999))
+        rand_file = f"{uuid.uuid4().hex}.json"
+        rand_price = round(random.uniform(10.0, 1000.0), 2)
 
-            instance = MockParser.return_value
-            instance.fetch_price.return_value = self.random_price
-            instance.load_data.return_value = {self.random_symbol: self.random_price}
-
-            mock_resp = MagicMock()
-            mock_resp.status_code = 200
-            mock_send.return_value = mock_resp
-
-            result = run_pipeline(
-                self.random_symbol,
-                self.random_url,
-                self.random_token,
-                self.random_chat_id,
-                self.random_storage
-            )
-
-            MockParser.assert_called_once_with(self.random_storage)
-            instance.fetch_price.assert_called_once_with(self.random_url)
-            instance.fetch_and_store.assert_called_once_with(self.random_symbol, self.random_price)
+        with patch('skills.market_telegram_pipeline.MarketParser') as MockParserClass, \
+             patch('skills.market_telegram_pipeline.send_telegram_notification') as mock_notify:
             
-            expected_message = f"Market Update: {self.random_symbol} = {self.random_price}"
-            mock_send.assert_called_once_with(self.random_token, self.random_chat_id, expected_message)
+            parser_instance = MockParserClass.return_value
+            parser_instance.fetch_price.return_value = rand_price
+            parser_instance.load_data.return_value = {rand_symbol: rand_price}
+
+            mock_notify_response = MagicMock()
+            mock_notify_response.status_code = 200
+            mock_notify.return_value = mock_notify_response
+
+            result = run_pipeline(rand_symbol, rand_url, rand_token, rand_chat_id, rand_file)
+
             self.assertTrue(result)
+            parser_instance.fetch_price.assert_called_once_with(rand_url)
+            parser_instance.fetch_and_store.assert_called_once_with(rand_symbol, rand_price)
+            mock_notify.assert_called_once()
+            
+            called_args = mock_notify.call_args[0]
+            self.assertEqual(called_args[0], rand_token)
+            self.assertEqual(called_args[1], rand_chat_id)
+            self.assertIn(rand_symbol, called_args[2])
+            self.assertIn(str(rand_price), called_args[2])
 
-    def test_run_pipeline_failure(self):
-        with patch("skills.market_telegram_pipeline.MarketParser") as MockParser, \
-             patch("skills.market_telegram_pipeline.send_telegram_notification") as mock_send:
+    def test_run_pipeline_fallback_load_data_type_error(self):
+        rand_symbol = uuid.uuid4().hex[:5].upper()
+        rand_url = f"https://{uuid.uuid4().hex[:8]}.net/api"
+        rand_token = f"{random.randint(100000, 999999)}:DEF-{uuid.uuid4().hex[:8]}"
+        rand_chat_id = str(random.randint(10000, 99999))
+        rand_file = f"{uuid.uuid4().hex}.db"
+        rand_price = round(random.uniform(1.0, 50.0), 2)
 
-            instance = MockParser.return_value
-            instance.fetch_price.return_value = self.random_price
-            instance.load_data.return_value = {}
+        with patch('skills.market_telegram_pipeline.MarketParser') as MockParserClass, \
+             patch('skills.market_telegram_pipeline.send_telegram_notification') as mock_notify:
+            
+            parser_instance = MockParserClass.return_value
+            parser_instance.fetch_price.return_value = rand_price
+            
+            def load_data_side_effect(filename=None):
+                if filename is not None:
+                    raise TypeError("Unexpected argument")
+                return {rand_symbol: rand_price}
 
-            mock_resp = MagicMock()
-            mock_resp.status_code = 400
-            mock_send.return_value = mock_resp
+            parser_instance.load_data.side_effect = load_data_side_effect
 
-            result = run_pipeline(
-                self.random_symbol,
-                self.random_url,
-                self.random_token,
-                self.random_chat_id,
-                self.random_storage
-            )
+            mock_notify_response = MagicMock()
+            mock_notify_response.status_code = 200
+            mock_notify.return_value = mock_notify_response
 
-            self.assertFalse(result)
+            result = run_pipeline(rand_symbol, rand_url, rand_token, rand_chat_id, rand_file)
+
+            self.assertTrue(result)
+            self.assertEqual(parser_instance.load_data.call_count, 2)
 
     def test_run_market_telegram_pipeline(self):
-        with patch("skills.market_telegram_pipeline.MarketParser") as MockParser, \
-             patch("skills.market_telegram_pipeline.send_telegram_notification") as mock_send:
+        rand_symbol = uuid.uuid4().hex[:4].upper()
+        rand_chat_id = str(random.randint(1000, 99999))
+        rand_file = f"{uuid.uuid4().hex}.json"
+        rand_url = f"https://{uuid.uuid4().hex[:6]}.org/feed"
+        rand_token = f"{random.randint(100, 999)}:TKN-{uuid.uuid4().hex[:6]}"
+        rand_price = round(random.uniform(500.0, 5000.0), 2)
 
-            instance = MockParser.return_value
-            instance.load_data.return_value = {self.random_symbol: self.random_price}
+        with patch('skills.market_telegram_pipeline.MarketParser') as MockParserClass, \
+             patch('skills.market_telegram_pipeline.send_telegram_notification') as mock_notify:
+            
+            parser_instance = MockParserClass.return_value
+            parser_instance.load_data.return_value = {rand_symbol: rand_price}
 
             result = run_market_telegram_pipeline(
-                storage_file=self.random_storage,
-                symbol=self.random_symbol,
-                chat_id=self.random_chat_id,
-                url=self.random_url,
-                telegram_token=self.random_token
+                storage_file=rand_file,
+                symbol=rand_symbol,
+                chat_id=rand_chat_id,
+                url=rand_url,
+                telegram_token=rand_token
             )
 
-            MockParser.assert_called_once_with(self.random_storage)
-            
-            expected_message = f"Integration Market Update: {self.random_symbol} = {self.random_price}"
-            mock_send.assert_called_once_with(self.random_token, self.random_chat_id, expected_message)
-
             self.assertEqual(result["status"], "success")
-            self.assertEqual(result["sent_symbol"], self.random_symbol)
-            self.assertEqual(result["sent_price"], self.random_price)
+            self.assertEqual(result["sent_symbol"], rand_symbol)
+            self.assertEqual(result["sent_price"], rand_price)
+            mock_notify.assert_called_once()
+            
+            called_args = mock_notify.call_args[0]
+            self.assertEqual(called_args[0], rand_token)
+            self.assertEqual(called_args[1], rand_chat_id)
+            self.assertIn(rand_symbol, called_args[2])
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

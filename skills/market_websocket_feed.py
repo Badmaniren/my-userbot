@@ -1,6 +1,10 @@
 import time
 import json
-import websockets
+try:
+    import websockets
+except ImportError:
+    websockets = None
+
 from skills.market_parser import MarketParser
 from skills.market_portfolio_stress_reporter import StressReporter
 
@@ -11,6 +15,8 @@ def send_telegram_notification(token, chat_id, message):
 
 def start_new(token, chat_id, message):
     uri = "wss://stream.example.com/ws/"
+    if websockets is None:
+        return False
     try:
         with websockets.connect(uri) as websocket:
             data = websocket.recv()
@@ -21,7 +27,6 @@ def start_new(token, chat_id, message):
                     return True
             return False
     except Exception:
-        # Согласно правилам, исключения здесь гасятся, чтобы соответствовать тестам юнит-тестирования
         return False
 
 

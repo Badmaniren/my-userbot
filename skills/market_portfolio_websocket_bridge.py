@@ -51,5 +51,13 @@ class MarketPortfolioWebsocketBridge:
             prices = data.get(symbol, [])
         else:
             prices = []
-        latest_price = prices[-1] if prices else 0.0
+            
+        latest_price = 0.0
+        if prices:
+            last_item = prices[-1]
+            if isinstance(last_item, (int, float)):
+                latest_price = last_item
+            elif isinstance(last_item, dict):
+                latest_price = last_item.get("price", last_item.get("value", 0.0))
+
         return f"Stream update -> Symbol: {symbol}, Price: {latest_price}"

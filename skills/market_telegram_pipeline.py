@@ -39,6 +39,9 @@ def run_pipeline(symbol: str, url: str, telegram_token: str, chat_id: str, stora
 def run_market_telegram_pipeline(storage_file: str, symbol: str, chat_id: str, url: str = "https://example.com", telegram_token: str = "123456:ABC-DEF1234abcdWxyz-1234567890"):
     parser = MarketParser(storage_file)
     
+    price = parser.fetch_price(url)
+    parser.fetch_and_store(symbol, price)
+    
     if hasattr(parser, "load_data"):
         try:
             data = parser.load_data(storage_file)
@@ -51,7 +54,7 @@ def run_market_telegram_pipeline(storage_file: str, symbol: str, chat_id: str, u
     else:
         data = {}
         
-    price = data.get(symbol, 0.0)
+    price = data.get(symbol, price)
     
     message = f"Integration Market Update: {symbol} = {price}"
     send_telegram_notification(telegram_token, chat_id, message)

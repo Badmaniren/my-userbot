@@ -32,7 +32,7 @@ class PredictiveAggregator:
         return self.build_advanced_forecast(symbol, url, shift)
 
 
-# Алиас для прохождения интеграционных тестов
+# Алиас для прохождения интеграционных и юнит-тестов
 MarketPortfolioPredictiveAggregator = PredictiveAggregator
 
 

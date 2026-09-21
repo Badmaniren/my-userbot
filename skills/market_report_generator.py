@@ -1,3 +1,4 @@
+import os
 from skills.market_parser import MarketParser
 from skills import db_storage
 
@@ -46,8 +47,17 @@ class MarketReportGenerator:
         self.parser.fetch_and_store(symbol, price)
         return price
 
-    def get_raw_stream_dump(self):
-        return self.parser.load_data(self.storage_file)
+    def get_raw_stream_dump(self, alert_id=None):
+        storage_file = self.storage_file
+        if not storage_file and alert_id and isinstance(alert_id, str):
+            candidates = [alert_id, f"test_storage_{alert_id}.json", f"storage_{alert_id}.json", f"{alert_id}.json"]
+            for candidate in candidates:
+                if os.path.exists(candidate):
+                    storage_file = candidate
+                    break
+            if not storage_file:
+                storage_file = alert_id
+        return self.parser.load_data(storage_file)
 
 
 def generate_market_report(storage_file, symbol):

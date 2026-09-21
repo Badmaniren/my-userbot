@@ -62,7 +62,7 @@ class MarketParser:
         return record_id
 
     def load_data(self, filename):
-        if os.path.exists(filename):
+        if filename and os.path.exists(filename):
             with open(filename, 'r', encoding='utf-8') as f:
                 return json.load(f)
         return {}

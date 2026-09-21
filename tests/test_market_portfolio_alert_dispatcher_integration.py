@@ -2,26 +2,35 @@ import unittest
 import os
 import uuid
 import random
-import tempfile
-from skills.market_portfolio_alert_dispatcher import dispatch_portfolio_alerts
-
+from skills import market_portfolio_alert_dispatcher
+from skills import market_parser
 
 class TestMarketPortfolioAlertDispatcherIntegration(unittest.TestCase):
 
     def setUp(self):
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.storage_file = os.path.join(self.temp_dir.name, f"test_storage_{uuid.uuid4()}.json")
+        self.unique_id = str(uuid.uuid4())[:8]
+        self.symbol = f"TICK_{self.unique_id}"
+        self.storage_file = f"test_storage_{self.unique_id}.json"
+        self.telegram_token = f"token_{self.unique_id}"
+        self.chat_id = str(random.randint(10000, 99999))
+        self.random_price = round(random.uniform(10.0, 1000.0), 2)
         
-        self.symbol = f"SYM_{random.randint(1000, 9999)}"
-        self.url = f"http://example.com/api/{uuid.uuid4()}"
-        self.telegram_token = f"token_{uuid.uuid4()}"
-        self.chat_id = str(random.randint(100000, 999999))
+        # Создаем начальные данные через реальный парсер/хранилище, чтобы модулям было с чем работать
+        parser = market_parser.MarketParser(storage_file=self.storage_file)
+        parser.fetch_and_store(self.symbol, self.random_price)
+
+        # Формируем валидный локальный URL или заглушку для файловой/сетевой системы
+        self.url = f"file://{os.path.abspath(self.storage_file)}"
 
     def tearDown(self):
-        self.temp_dir.cleanup()
+        if os.path.exists(self.storage_file):
+            try:
+                os.remove(self.storage_file)
+            except OSError:
+                pass
 
     def test_dispatch_portfolio_alerts_integration(self):
-        result = dispatch_portfolio_alerts(
+        result = market_portfolio_alert_dispatcher.dispatch_portfolio_alerts(
             symbol=self.symbol,
             url=self.url,
             telegram_token=self.telegram_token,
@@ -29,9 +38,16 @@ class TestMarketPortfolioAlertDispatcherIntegration(unittest.TestCase):
             storage_file=self.storage_file
         )
 
-        self.assertIsNotNone(result)
-        self.assertTrue(os.path.exists(self.storage_file))
+        self.assertIsInstance(result, dict)
+        self.assertIn("summary", result)
+        self.assertIn("pnl", result)
+        self.assertEqual(result.get("status"), "dispatched")
 
+        self.assertTrue(os.path.exists(self.storage_file), "Файл хранилища должен существовать после выполнения диспатчера")
+
+    def test_process_stream_alert_integration(self):
+        stream_data = market_portfolio_alert_dispatcher.process_stream_alert(self.unique_id)
+        self.assertIsNotNone(stream_data)
 
 if __name__ == "__main__":
     unittest.main()

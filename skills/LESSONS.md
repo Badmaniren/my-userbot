@@ -3,7 +3,11 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-бка перед фиксом: FAILED (errors=1)
+яя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_database_notifier (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_threshold_pipeline (compose) — раундов: 4
@@ -325,7 +329,3 @@
 ## market_portfolio_strategy_optimizer (compose) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_backtester (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=3)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

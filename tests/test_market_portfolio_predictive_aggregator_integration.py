@@ -2,43 +2,58 @@ import os
 import unittest
 import uuid
 import random
-import tempfile
+from skills.market_portfolio_predictive_aggregator import PredictiveAggregator, aggregate_market_forecast
+from skills.market_portfolio_collector_agent import MarketParser
+from skills.market_portfolio_scenario_simulator import PortfolioScenarioSimulator
 
-from skills.market_portfolio_predictive_aggregator import MarketPortfolioPredictiveAggregator
-from skills.market_portfolio_collector_agent import PortfolioValuation as CollectorValuation
-from skills.market_portfolio_scenario_simulator import PortfolioScenarioSimulator as ScenarioSimulator
-
-class TestMarketPortfolioPredictiveAggregatorIntegration(unittest.TestCase):
+class TestPredictiveAggregatorIntegration(unittest.TestCase):
     def setUp(self):
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.storage_file = os.path.join(self.temp_dir.name, f"test_storage_{uuid.uuid4().hex}.json")
-        
-        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
-        self.url = f"https://example.com/market/{uuid.uuid4().hex[:6]}"
-        self.percentage_shift = round(random.uniform(-20.0, 20.0), 2)
-        
-        with open(self.storage_file, "w", encoding="utf-8") as f:
-            f.write("{}")
+        self.unique_id = uuid.uuid4().hex[:8]
+        self.storage_file = f"test_storage_{self.unique_id}.json"
+        self.symbol = f"SYM_{self.unique_id}"
+        self.url = f"http://example.com/market/{self.unique_id}"
+        self.shift = round(random.uniform(-50.0, 50.0), 2)
+        self.initial_price = round(random.uniform(10.0, 1000.0), 2)
+
+        parser = MarketParser(self.storage_file)
+        if hasattr(parser, "fetch_and_store"):
+            parser.fetch_and_store(self.symbol, self.initial_price)
 
     def tearDown(self):
-        self.temp_dir.cleanup()
+        if os.path.exists(self.storage_file):
+            try:
+                os.remove(self.storage_file)
+            except OSError:
+                pass
 
-    def test_predictive_aggregator_integration(self):
-        collector_inst = CollectorValuation(self.storage_file)
-        self.assertIsNotNone(collector_inst)
+    def test_integration_build_advanced_forecast(self):
+        aggregator = PredictiveAggregator(self.storage_file)
+        result = aggregator.build_advanced_forecast(self.symbol, self.url, self.shift)
 
-        simulator_inst = ScenarioSimulator(self.storage_file)
-        self.assertIsNotNone(simulator_inst)
+        self.assertIsInstance(result, dict)
+        self.assertIn("valuation", result)
+        self.assertIn("simulation", result)
 
-        aggregator = MarketPortfolioPredictiveAggregator(self.storage_file)
-        self.assertIsNotNone(aggregator)
+        simulation = result["simulation"]
+        self.assertEqual(simulation.get("symbol"), self.symbol)
+        self.assertEqual(simulation.get("shift"), self.shift)
+        self.assertIsInstance(simulation.get("projected_value"), (int, float))
 
-        self.assertTrue(hasattr(aggregator, "build_predictive_forecast"))
-        
-        forecast_result = aggregator.build_predictive_forecast(self.symbol, self.url, self.percentage_shift)
-        
-        self.assertIsInstance(forecast_result, dict)
-        self.assertTrue(os.path.exists(self.storage_file))
+    def test_integration_build_predictive_forecast(self):
+        aggregator = PredictiveAggregator(self.storage_file)
+        result = aggregator.build_predictive_forecast(self.symbol, self.url, self.shift)
+
+        self.assertIsInstance(result, dict)
+        self.assertIn("valuation", result)
+        self.assertIn("simulation", result)
+
+    def test_integration_aggregate_market_forecast_function(self):
+        result = aggregate_market_forecast(self.storage_file, self.symbol, self.url, self.shift)
+
+        self.assertIsInstance(result, dict)
+        self.assertIn("valuation", result)
+        self.assertIn("simulation", result)
+        self.assertEqual(result["simulation"].get("symbol"), self.symbol)
 
 if __name__ == "__main__":
     unittest.main()

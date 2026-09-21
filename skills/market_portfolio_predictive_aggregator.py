@@ -16,6 +16,14 @@ class PredictiveAggregator:
 
         try:
             simulation = self.simulator.simulate_scenario(symbol, shift)
+            if simulation is None:
+                simulation = {}
+            if "shift" not in simulation or simulation["shift"] is None:
+                simulation["shift"] = shift
+            if "symbol" not in simulation or simulation["symbol"] is None:
+                simulation["symbol"] = symbol
+            if "projected_value" not in simulation:
+                simulation["projected_value"] = 0.0
         except KeyError:
             simulation = {
                 "symbol": symbol,

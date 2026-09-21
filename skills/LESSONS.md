@@ -3,15 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-оследняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: успешно прошёл тесты и влит в main
-
-## market_alert_analyzer (compose) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
-- Последняя ошибка перед фиксом: FAILED (failures=2, errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_threshold_alerter (compose) — раундов: 4
+ market_threshold_alerter (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -325,4 +317,9 @@
 ## market_portfolio_digest (refactor) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: ----------------------------------------------------------------------
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_telegram_notifier (refactor) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid character '—' (U+2014) (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

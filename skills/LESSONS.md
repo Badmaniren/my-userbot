@@ -3,7 +3,18 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-erator (refactor) — раундов: 4
+бка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_threshold_pipeline (compose) — раундов: 4
+- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
+- Последняя ошибка перед фиксом: FAILED (errors=3)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_telegram_pipeline (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_report_generator (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main
 
@@ -317,9 +328,4 @@ erator (refactor) — раундов: 4
 
 ## market_portfolio_backtester (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=3)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_backtest_optimizer_bridge (compose) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.; АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
-- Последняя ошибка перед фиксом: simulation_result = self.simulator.simulate_scenario(symbol, percentage)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

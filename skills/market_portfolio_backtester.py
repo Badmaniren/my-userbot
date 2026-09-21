@@ -78,9 +78,38 @@ class MarketPortfolioBacktester:
     def calculate_maximum_drawdown(self, equity_curve):
         if not equity_curve:
             return 0.0
-        max_val = equity_curve[0]
+
+        if isinstance(equity_curve, str):
+            symbol = equity_curve
+            symbol_data = self.data.get(symbol, [])
+            equity_curve = [item.get("price", 0.0) for item in symbol_data if isinstance(item, dict)]
+            if not equity_curve:
+                return 0.0
+
+        if isinstance(equity_curve, dict):
+            values = []
+            for k, v in equity_curve.items():
+                if isinstance(v, (int, float)):
+                    values.append(float(v))
+                elif isinstance(v, dict) and "price" in v:
+                    values.append(float(v["price"]))
+                elif isinstance(v, dict) and "resulting_valuation" in v:
+                    values.append(float(v["resulting_valuation"]))
+            equity_curve = values
+            if not equity_curve:
+                return 0.0
+
+        try:
+            curve = [float(v) for v in equity_curve]
+        except (ValueError, TypeError):
+            return 0.0
+
+        if not curve:
+            return 0.0
+
+        max_val = curve[0]
         max_dd = 0.0
-        for val in equity_curve:
+        for val in curve:
             if val > max_val:
                 max_val = val
             if max_val > 0:

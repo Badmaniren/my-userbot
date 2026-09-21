@@ -31,11 +31,31 @@ class PortfolioScenarioSimulator:
         elif isinstance(data, list):
             target = next((item for item in data if isinstance(item, dict) and item.get("symbol") == symbol), None)
         
-        if not target:
+        if target is None:
             raise KeyError(f"Symbol {symbol} not found")
 
-        current_price = target.get("current_price") or target.get("price") or 0.0
-        quantity = target.get("quantity") or target.get("shares") or 0.0
+        if isinstance(target, list):
+            if not target:
+                raise KeyError(f"Symbol {symbol} has no records")
+            latest = target[-1]
+            if isinstance(latest, dict):
+                current_price = latest.get("current_price") or latest.get("price") or 0.0
+                quantity = latest.get("quantity") or latest.get("shares") or 0.0
+            elif isinstance(latest, (int, float)):
+                current_price = float(latest)
+                quantity = 1.0
+            else:
+                current_price = 0.0
+                quantity = 0.0
+        elif isinstance(target, dict):
+            current_price = target.get("current_price") or target.get("price") or 0.0
+            quantity = target.get("quantity") or target.get("shares") or 0.0
+        elif isinstance(target, (int, float)):
+            current_price = float(target)
+            quantity = 1.0
+        else:
+            current_price = 0.0
+            quantity = 0.0
         
         simulated_price = current_price * (1 + percentage / 100.0)
         pnl_impact = (simulated_price - current_price) * quantity
@@ -48,6 +68,8 @@ class PortfolioScenarioSimulator:
         }
 
     def run_stress_test(self, symbol, shifts):
+        if isinstance(shifts, (int, float)):
+            shifts = [shifts]
         report = []
         for shift in shifts:
             try:

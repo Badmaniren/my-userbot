@@ -1,62 +1,92 @@
 import unittest
 import os
+import tempfile
 import uuid
 import random
-from skills.market_portfolio_valuation import PortfolioValuation
-from skills.market_portfolio_visualizer_v2 import PortfolioVisualizer, generate_ascii_chart
-from skills.market_portfolio_alert_dispatcher import dispatch_portfolio_alerts
-from skills.market_portfolio_digest import generate_extended_digest
+import json
+from unittest.mock import patch
+
+from skills.market_portfolio_digest import (
+    generate_portfolio_digest,
+    generate_extended_digest,
+    PortfolioDigestManager,
+)
 
 
 class TestMarketPortfolioDigestIntegration(unittest.TestCase):
 
     def setUp(self):
-        self.unique_id = str(uuid.uuid4())[:8]
-        self.storage_file = f"test_storage_{self.unique_id}.json"
-        self.symbol = f"TICK_{self.unique_id.upper()}"
-        self.url = f"https://example.com/api/{self.symbol.lower()}"
-        self.telegram_token = f"token_{self.unique_id}"
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.storage_file = os.path.join(
+            self.temp_dir.name, f"digest_storage_{uuid.uuid4().hex}.json"
+        )
+        self.symbol = f"SYM_{random.randint(1000, 9999)}"
+        self.url = f"https://api.example.com/{uuid.uuid4().hex}"
+        self.token = f"token_{uuid.uuid4().hex}"
         self.chat_id = str(random.randint(100000, 999999))
-        
-        test_data = {
-            self.symbol: [
-                {"price": round(random.uniform(10.0, 100.0), 2), "timestamp": "2023-10-01T00:00:00"},
-                {"price": round(random.uniform(100.0, 200.0), 2), "timestamp": "2023-10-02T00:00:00"}
-            ]
+
+        sample_data = {
+            self.symbol: {"buy_price": 90.0, "quantity": 2.0}
         }
-        
-        import json
-        with open(self.storage_file, "w") as f:
-            json.dump(test_data, f)
+        with open(self.storage_file, "w", encoding="utf-8") as f:
+            json.dump(sample_data, f)
 
     def tearDown(self):
-        if os.path.exists(self.storage_file):
-            os.remove(self.storage_file)
+        self.temp_dir.cleanup()
 
-    def test_digest_composition_and_execution(self):
-        valuation_inst = PortfolioValuation(self.storage_file)
-        summary = valuation_inst.get_total_summary(self.url)
-        self.assertIsNotNone(summary)
+    @patch("skills.market_portfolio_digest.send_telegram_notification")
+    @patch("skills.market_portfolio_valuation.MarketParser.fetch_price")
+    def test_generate_portfolio_digest_integration(
+        self, mock_fetch_price, mock_send
+    ):
+        mock_fetch_price.return_value = 105.0
 
-        visualizer_inst = PortfolioVisualizer(self.storage_file)
-        text_report = visualizer_inst.build_text_report(self.symbol)
-        self.assertIsInstance(text_report, str)
-
-        ascii_chart = generate_ascii_chart([x["price"] for x in valuation_inst.load_data(self.storage_file).get(self.symbol, [])])
-        self.assertIsInstance(ascii_chart, str)
-
-        digest_result = generate_extended_digest(
-            storage_file=self.storage_file,
-            symbol=self.symbol,
-            url=self.url,
-            telegram_token=self.telegram_token,
-            chat_id=self.chat_id
+        result = generate_portfolio_digest(
+            self.symbol, self.url, self.token, self.chat_id, self.storage_file
         )
 
-        self.assertIsNotNone(digest_result)
-        if isinstance(digest_result, dict):
-            self.assertIn("status", digest_result)
-            self.assertEqual(digest_result["status"], "success")
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["symbol"], self.symbol)
+        self.assertIn("valuation", result)
+        self.assertIn("report", result)
+        self.assertIn("performance_metrics", result)
+
+    @patch("skills.market_portfolio_digest.send_telegram_notification")
+    @patch("skills.market_portfolio_valuation.MarketParser.fetch_price")
+    def test_generate_extended_digest_integration(
+        self, mock_fetch_price, mock_send
+    ):
+        mock_fetch_price.return_value = 105.0
+
+        status = generate_extended_digest(
+            self.storage_file, self.symbol, self.url, self.token, self.chat_id
+        )
+
+        self.assertIsInstance(status, dict)
+        self.assertEqual(status["status"], "success")
+        self.assertEqual(status["symbol"], self.symbol)
+        self.assertIn("summary", status)
+        self.assertIn("report", status)
+
+    @patch("skills.market_portfolio_valuation.MarketParser.fetch_price")
+    def test_portfolio_digest_manager_integration(self, mock_fetch_price):
+        mock_fetch_price.return_value = 105.0
+
+        manager = PortfolioDigestManager(self.storage_file)
+        digest = manager.compile_digest(self.symbol, self.url)
+
+        self.assertIsInstance(digest, dict)
+        self.assertEqual(digest["symbol"], self.symbol)
+        self.assertIn("summary", digest)
+        self.assertIn("ascii_chart", digest)
+
+    @patch("skills.market_portfolio_visualizer_v2.send_telegram_notification")
+    def test_portfolio_digest_manager_render_and_send_integration(
+        self, mock_send
+    ):
+        manager = PortfolioDigestManager(self.storage_file)
+        manager.render_and_send(self.symbol, self.token, self.chat_id)
+        mock_send.assert_called_once()
 
 
 if __name__ == "__main__":

@@ -54,17 +54,18 @@ class PortfolioVisualizer:
         pnl_msg = format_pnl_notification(symbol, 42.5, 5.2)
         return f"Report for {symbol}\n{chart}\n{pnl_msg}"
 
-    def render_and_dispatch(self, symbol, token, chat_id):
-        report = self.build_text_report(symbol)
-        send_telegram_notification(token, chat_id, report)
-
-class MarketPortfolioVisualizer(PortfolioVisualizer):
-    def generate_ascii_chart(self, symbol):
+    def generate_ascii_chart(self, symbol=None):
         data = self.load_data(self.storage_file)
         prices = [item.get("price", 100.0) for item in data if isinstance(item, dict)]
         if not prices:
             prices = [100.0, 150.0]
         return generate_ascii_chart(prices)
+
+    def render_and_dispatch(self, symbol, token, chat_id):
+        report = self.build_text_report(symbol)
+        send_telegram_notification(token, chat_id, report)
+
+class MarketPortfolioVisualizer(PortfolioVisualizer):
 
     def visualize_pnl(self, symbol):
         return format_pnl_notification(symbol, 10.0, 1.5)

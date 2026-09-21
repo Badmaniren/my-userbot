@@ -47,7 +47,16 @@ class PortfolioDigestManager:
         summary = valuation.calculate_portfolio_pnl(url)
         
         visualizer = PortfolioVisualizer(self.storage_file)
-        ascii_chart = visualizer.generate_ascii_chart(symbol)
+        if hasattr(visualizer, "generate_ascii_chart"):
+            try:
+                ascii_chart = visualizer.generate_ascii_chart(symbol)
+            except (ValueError, TypeError):
+                ascii_chart = ""
+        else:
+            try:
+                ascii_chart = generate_ascii_chart(symbol)
+            except (ValueError, TypeError):
+                ascii_chart = ""
         
         return {
             "symbol": symbol,

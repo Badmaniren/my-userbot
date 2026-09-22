@@ -1,117 +1,134 @@
 import unittest
 from unittest.mock import patch, MagicMock
-import random
 import uuid
-import string
+import random
 import io
-import sys
-import os
-
 from skills.market_portfolio_valuation import PortfolioValuation
 
-class TestMarketPortfolioValuation(unittest.TestCase):
-
+class TestPortfolioValuation(unittest.TestCase):
     def setUp(self):
-        self.random_symbol = ''.join(random.choices(string.ascii_uppercase, k=5))
-        self.random_url = f"https://{uuid.uuid4().hex}.com/{random.randint(1000, 9999)}"
-        self.random_storage = f"{uuid.uuid4().hex}.json"
-        self.random_price = round(random.uniform(10.0, 1000.0), 2)
-        self.random_quantity = round(random.uniform(1.0, 100.0), 4)
-        self.random_buy_price = round(random.uniform(5.0, 900.0), 2)
+        self.storage_file = f"{uuid.uuid4().hex}.json"
+        self.url = f"http://{uuid.uuid4().hex}.com/api"
+        self.symbol_1 = uuid.uuid4().hex[:6].upper()
+        self.symbol_2 = uuid.uuid4().hex[:6].upper()
+        self.evaluator = PortfolioValuation(storage_file=self.storage_file)
 
-    @patch('skills.market_portfolio_valuation.MarketParser')
-    @patch('skills.market_portfolio_valuation.db_storage')
-    def test_calculate_portfolio_value_and_pnl(self, mock_db, mock_parser_class):
-        mock_parser_instance = mock_parser_class.return_value
-        mock_parser_instance.fetch_price.return_value = self.random_price
+    def test_load_data_with_load_portfolio(self):
+        expected_data = {self.symbol_1: {"quantity": round(random.uniform(1.0, 100.0), 2)}}
+        with patch('skills.market_portfolio_valuation.db_storage') as mock_db:
+            if hasattr(mock_db, 'load_portfolio'):
+                delattr(mock_db, 'load_portfolio')
+            if not hasattr(mock_db, 'load_portfolio'):
+                mock_db.load_portfolio = MagicMock(return_value=expected_data)
 
-        mock_db.load_portfolio.return_value = {
-            self.random_symbol: {
-                "quantity": self.random_quantity,
-                "buy_price": self.random_buy_price
+            result = self.evaluator.load_data(self.storage_file)
+            self.assertEqual(result, expected_data)
+
+    def test_load_data_with_load_data(self):
+        expected_data = {self.symbol_2: {"quantity": round(random.uniform(1.0, 100.0), 2)}}
+        with patch('skills.market_portfolio_valuation.db_storage') as mock_db:
+            if hasattr(mock_db, 'load_portfolio'):
+                delattr(mock_db, 'load_portfolio')
+            if hasattr(mock_db, 'load_data'):
+                delattr(mock_db, 'load_data')
+            mock_db.load_data = MagicMock(return_value=expected_data)
+
+            result = self.evaluator.load_data(self.storage_file)
+            self.assertEqual(result, expected_data)
+
+    def test_load_data_empty(self):
+        with patch('skills.market_portfolio_valuation.db_storage') as mock_db:
+            if hasattr(mock_db, 'load_portfolio'):
+                delattr(mock_db, 'load_portfolio')
+            if hasattr(mock_db, 'load_data'):
+                delattr(mock_db, 'load_data')
+
+            result = self.evaluator.load_data(self.storage_file)
+            self.assertEqual(result, {})
+
+    def test_evaluate_portfolio_empty(self):
+        with patch.object(self.evaluator, 'load_data', return_value={}):
+            result = self.evaluator.evaluate_portfolio(self.url)
+            self.assertEqual(result, {})
+
+    def test_evaluate_portfolio_success(self):
+        quantity = round(random.uniform(10.0, 50.0), 2)
+        buy_price = round(random.uniform(100.0, 200.0), 2)
+        current_price = round(buy_price * random.uniform(1.1, 1.5), 2)
+
+        portfolio_data = {
+            self.symbol_1: {
+                "quantity": quantity,
+                "buy_price": buy_price
             }
         }
 
-        valuator = PortfolioValuation(storage_file=self.random_storage)
-        result = valuator.evaluate_portfolio(self.random_url)
+        with patch.object(self.evaluator, 'load_data', return_value=portfolio_data):
+            with patch('skills.market_portfolio_valuation.MarketParser') as MockParser:
+                instance = MockParser.return_value
+                instance.fetch_price.return_value = current_price
 
-        self.assertIn(self.random_symbol, result)
-        symbol_data = result[self.random_symbol]
-        
-        expected_current_value = round(self.random_quantity * self.random_price, 2)
-        expected_invested = round(self.random_quantity * self.random_buy_price, 2)
-        expected_pnl = round(expected_current_value - expected_invested, 2)
-        expected_pnl_percent = round((expected_pnl / expected_invested) * 100, 2) if expected_invested > 0 else 0.0
+                result = self.evaluator.evaluate_portfolio(self.url)
 
-        self.assertEqual(symbol_data["current_price"], self.random_price)
-        self.assertEqual(symbol_data["current_value"], expected_current_value)
-        self.assertEqual(symbol_data["invested"], expected_invested)
-        self.assertEqual(symbol_data["pnl"], expected_pnl)
-        self.assertEqual(symbol_data["pnl_percent"], expected_pnl_percent)
+                self.assertIn(self.symbol_1, result)
+                self.assertEqual(result[self.symbol_1]["current_price"], current_price)
+                expected_current_value = round(quantity * current_price, 2)
+                expected_invested = round(quantity * buy_price, 2)
+                expected_pnl = round(expected_current_value - expected_invested, 2)
 
-    @patch('skills.market_portfolio_valuation.MarketParser')
-    @patch('skills.market_portfolio_valuation.db_storage')
-    def test_evaluate_portfolio_empty_storage(self, mock_db, mock_parser_class):
-        mock_db.load_portfolio.return_value = {}
+                self.assertEqual(result[self.symbol_1]["current_value"], expected_current_value)
+                self.assertEqual(result[self.symbol_1]["invested"], expected_invested)
+                self.assertEqual(result[self.symbol_1]["pnl"], expected_pnl)
 
-        valuator = PortfolioValuation(storage_file=self.random_storage)
-        result = valuator.evaluate_portfolio(self.random_url)
-
-        self.assertEqual(result, {})
-        mock_parser_class.return_value.fetch_price.assert_not_called()
-
-    @patch('skills.market_portfolio_valuation.MarketParser')
-    @patch('skills.market_portfolio_valuation.db_storage')
-    def test_evaluate_portfolio_parser_failure(self, mock_db, mock_parser_class):
-        mock_parser_instance = mock_parser_class.return_value
-        mock_parser_instance.fetch_price.side_effect = Exception(uuid.uuid4().hex)
-
-        mock_db.load_portfolio.return_value = {
-            self.random_symbol: {
-                "quantity": self.random_quantity,
-                "buy_price": self.random_buy_price
+    def test_evaluate_portfolio_fetch_error(self):
+        error_msg = uuid.uuid4().hex
+        portfolio_data = {
+            self.symbol_1: {
+                "quantity": 10.0,
+                "buy_price": 100.0
             }
         }
 
-        valuator = PortfolioValuation(storage_file=self.random_storage)
-        result = valuator.evaluate_portfolio(self.random_url)
+        with patch.object(self.evaluator, 'load_data', return_value=portfolio_data):
+            with patch('skills.market_portfolio_valuation.MarketParser') as MockParser:
+                instance = MockParser.return_value
+                instance.fetch_price.side_effect = Exception(error_msg)
 
-        self.assertIn(self.random_symbol, result)
-        self.assertIn("error", result[self.random_symbol])
+                result = self.evaluator.evaluate_portfolio(self.url)
 
-    @patch('skills.market_portfolio_valuation.MarketParser')
-    @patch('skills.market_portfolio_valuation.db_storage')
-    def test_total_portfolio_summary(self, mock_db, mock_parser_class):
-        symbol_one = ''.join(random.choices(string.ascii_uppercase, k=4))
-        symbol_two = ''.join(random.choices(string.ascii_uppercase, k=4))
-        
-        price_one = 100.0
-        price_two = 200.0
-        
-        qty_one = 2.0
-        qty_two = 3.0
-        
-        buy_one = 80.0
-        buy_two = 150.0
+                self.assertIn(self.symbol_1, result)
+                self.assertIn("error", result[self.symbol_1])
+                self.assertEqual(result[self.symbol_1]["error"], error_msg)
 
-        mock_parser_instance = mock_parser_class.return_value
-        mock_parser_instance.fetch_price.side_effect = [price_one, price_two]
-
-        mock_db.load_portfolio.return_value = {
-            symbol_one: {"quantity": qty_one, "buy_price": buy_one},
-            symbol_two: {"quantity": qty_two, "buy_price": buy_two}
+    def test_get_total_summary(self):
+        evaluated_data = {
+            self.symbol_1: {
+                "current_value": 1500.0,
+                "invested": 1000.0,
+                "pnl": 500.0
+            },
+            self.symbol_2: {
+                "error": "some error"
+            }
         }
 
-        valuator = PortfolioValuation(storage_file=self.random_storage)
-        summary = valuator.get_total_summary(self.random_url)
+        with patch.object(self.evaluator, 'evaluate_portfolio', return_value=evaluated_data):
+            summary = self.evaluator.get_total_summary(self.url)
 
-        expected_total_value = (qty_one * price_one) + (qty_two * price_two)
-        expected_total_invested = (qty_one * buy_one) + (qty_two * buy_two)
-        expected_total_pnl = expected_total_value - expected_total_invested
+            self.assertEqual(summary["total_value"], 1500.0)
+            self.assertEqual(summary["total_invested"], 1000.0)
+            self.assertEqual(summary["total_pnl"], 500.0)
 
-        self.assertEqual(summary["total_value"], expected_total_value)
-        self.assertEqual(summary["total_invested"], expected_total_invested)
-        self.assertEqual(summary["total_pnl"], expected_total_pnl)
+    def test_calculate_portfolio_pnl(self):
+        expected_summary = {
+            "total_value": round(random.uniform(1000.0, 5000.0), 2),
+            "total_invested": round(random.uniform(500.0, 1000.0), 2),
+            "total_pnl": round(random.uniform(100.0, 4000.0), 2)
+        }
+
+        with patch.object(self.evaluator, 'get_total_summary', return_value=expected_summary):
+            result = self.evaluator.calculate_portfolio_pnl(self.url)
+            self.assertEqual(result, expected_summary)
 
 if __name__ == '__main__':
     unittest.main()

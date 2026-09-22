@@ -1,3 +1,5 @@
+import json
+import os
 import skills.db_storage as db_storage
 from skills.market_parser import MarketParser
 
@@ -8,9 +10,27 @@ class PortfolioValuation:
     def load_data(self, storage_file=None):
         file_to_load = storage_file or self.storage_file
         if hasattr(db_storage, 'load_portfolio'):
-            return db_storage.load_portfolio(file_to_load)
-        elif hasattr(db_storage, 'load_data'):
-            return db_storage.load_data(file_to_load)
+            data = db_storage.load_portfolio(file_to_load)
+            if data:
+                return data
+        if hasattr(db_storage, 'load_data'):
+            data = db_storage.load_data(file_to_load)
+            if data and isinstance(data, dict):
+                return data
+        if file_to_load and os.path.exists(file_to_load):
+            try:
+                with open(file_to_load, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        return data
+                    elif isinstance(data, list):
+                        res = {}
+                        for item in data:
+                            if isinstance(item, dict) and "symbol" in item:
+                                res[item["symbol"]] = item
+                        return res
+            except (json.JSONDecodeError, OSError, TypeError, ValueError):
+                pass
         return {}
 
     def evaluate_portfolio(self, url):
@@ -18,17 +38,40 @@ class PortfolioValuation:
         if not portfolio:
             return {}
 
-        parser = MarketParser()
+        parser = MarketParser(self.storage_file)
         result = {}
 
         for symbol, data in portfolio.items():
-            quantity = data.get("quantity", 0.0)
-            buy_price = data.get("buy_price", 0.0)
+            if not isinstance(data, dict):
+                continue
+
+            quantity = float(data.get("quantity", 0.0))
+            buy_price = float(data.get("buy_price", 0.0))
+
+            current_price = None
+            fetch_error = None
 
             try:
-                current_price = parser.fetch_price(url, symbol)
+                fetched = parser.fetch_price(url, symbol)
+                if isinstance(fetched, (int, float)) and not isinstance(fetched, bool):
+                    current_price = float(fetched)
+                elif isinstance(fetched, dict):
+                    if symbol in fetched and isinstance(fetched[symbol], (int, float)) and not isinstance(fetched[symbol], bool):
+                        current_price = float(fetched[symbol])
+                    elif "price" in fetched and isinstance(fetched["price"], (int, float)) and not isinstance(fetched["price"], bool):
+                        current_price = float(fetched["price"])
             except Exception as e:
-                result[symbol] = {"error": str(e)}
+                fetch_error = str(e)
+
+            if current_price is None:
+                if "price" in data and isinstance(data["price"], (int, float)) and not isinstance(data["price"], bool):
+                    current_price = float(data["price"])
+                elif "current_price" in data and isinstance(data["current_price"], (int, float)) and not isinstance(data["current_price"], bool):
+                    current_price = float(data["current_price"])
+
+            if current_price is None:
+                err_msg = fetch_error if fetch_error else "Could not determine current price"
+                result[symbol] = {"error": err_msg}
                 continue
 
             current_value = round(quantity * current_price, 2)

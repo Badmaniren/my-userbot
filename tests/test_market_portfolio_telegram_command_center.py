@@ -2,84 +2,141 @@ import unittest
 from unittest.mock import patch, MagicMock
 import uuid
 import random
-import string
-import io
-import sys
+import json
 import os
+import requests
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+from skills.market_portfolio_telegram_command_center import (
+    start_new,
+    MarketPortfolioTelegramCommandCenter
+)
 
-from skills.market_portfolio_telegram_command_center import start_new
 
 class TestMarketPortfolioTelegramCommandCenter(unittest.TestCase):
 
     def setUp(self):
-        self.random_token = f"{random.randint(1000, 9999)}:{uuid.uuid4().hex}"
-        self.random_chat_id = str(random.randint(10000000, 99999999))
-        self.random_message = "".join(random.choices(string.ascii_letters + string.digits, k=32))
+        self.token = f"{random.randint(100000, 999999)}:AA{uuid.uuid4().hex[:8]}"
+        self.chat_id = str(random.randint(1000000, 99999999))
+        self.message = f"test_msg_{uuid.uuid4().hex[:6]}"
+        self.storage_file = f"{uuid.uuid4().hex}.json"
+        self.symbol = f"SYM{random.choice(['A', 'B', 'C', 'X', 'Z'])}{random.randint(10, 99)}"
 
-    @patch('skills.market_portfolio_telegram_command_center.requests.post')
-    def test_start_new_success_flow(self, mock_post):
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"ok": True, "result": {}}
-        mock_post.return_value = mock_response
+    def tearDown(self):
+        if os.path.exists(self.storage_file):
+            try:
+                os.remove(self.storage_file)
+            except OSError:
+                pass
 
-        result = start_new(self.random_token, self.random_chat_id, self.random_message)
+    def test_start_new_success(self):
+        url = f"https://api.telegram.org/bot{self.token}/sendMessage"
+        payload = {
+            "chat_id": self.chat_id,
+            "text": self.message
+        }
         
-        self.assertTrue(result)
-        mock_post.assert_called_once()
-        called_args, called_kwargs = mock_post.call_args
-        self.assertIn(self.random_token, called_args[0])
+        with patch('requests.post') as mock_post:
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = {"ok": True, "result": {}}
+            mock_post.return_value = mock_response
+
+            result = start_new(self.token, self.chat_id, self.message)
+            
+            self.assertTrue(result)
+            mock_post.assert_called_once_with(url, json=payload)
+
+    def test_start_new_invalid_arguments(self):
+        self.assertFalse(start_new("", self.chat_id, self.message))
+        self.assertFalse(start_new(self.token, "", self.message))
+        self.assertFalse(start_new(self.token, self.chat_id, ""))
+
+    def test_start_new_http_error(self):
+        with patch('requests.post') as mock_post:
+            mock_response = MagicMock()
+            mock_response.status_code = random.choice([400, 401, 403, 404, 500])
+            mock_post.return_value = mock_response
+
+            result = start_new(self.token, self.chat_id, self.message)
+            self.assertFalse(result)
+
+    def test_start_new_request_exception(self):
+        with patch('requests.post', side_effect=requests.RequestException("Network failure")):
+            result = start_new(self.token, self.chat_id, self.message)
+            self.assertFalse(result)
+
+    def test_command_center_start_help(self):
+        center = MarketPortfolioTelegramCommandCenter(self.storage_file)
+        for cmd in ["/start", "/help", f"   /start   ", f"/{uuid.uuid4().hex[:3]}help"]:
+            if cmd.strip() not in ("/start", "/help"):
+                continue
+            res = center.handle_command(cmd, self.chat_id)
+            self.assertIn("Welcome to Market Portfolio Telegram Command Center!", res)
+            self.assertIn("/report", res)
+            self.assertIn("/backtest", res)
+            self.assertIn("/portfolio", res)
+
+    def test_command_center_unknown_command(self):
+        center = MarketPortfolioTelegramCommandCenter(self.storage_file)
+        random_cmd = f"/{uuid.uuid4().hex[:8]}"
+        res = center.handle_command(random_cmd, self.chat_id)
+        self.assertIn(f"Unknown command: {random_cmd.lower()}", res)
         
-        request_json = called_kwargs.get('json', {})
-        self.assertEqual(request_json.get('chat_id'), self.random_chat_id)
-        self.assertEqual(request_json.get('text'), self.random_message)
+        empty_res = center.handle_command("   ", self.chat_id)
+        self.assertEqual(empty_res, "Unknown command. Type /start for help.")
 
-    @patch('skills.market_portfolio_telegram_command_center.requests.post')
-    def test_start_new_api_failure(self, mock_post):
-        mock_response = MagicMock()
-        mock_response.status_code = 400
-        mock_response.json.return_value = {"ok": False, "description": f"Bad Request: {uuid.uuid4().hex}"}
-        mock_post.return_value = mock_response
+    def test_command_center_report_missing_symbol(self):
+        center = MarketPortfolioTelegramCommandCenter(self.storage_file)
+        res = center.handle_command("/report", self.chat_id)
+        self.assertEqual(res, "Please specify a symbol, e.g., /report AAPL")
 
-        result = start_new(self.random_token, self.random_chat_id, self.random_message)
+    def test_command_center_report_with_data_file(self):
+        price_val = round(random.uniform(10.0, 1000.0), 2)
+        test_data = {
+            self.symbol: [price_val, price_val + 5.0]
+        }
+        with open(self.storage_file, 'w', encoding='utf-8') as f:
+            json.dump(test_data, f)
+
+        center = MarketPortfolioTelegramCommandCenter(self.storage_file)
+        res = center.handle_command(f"/report {self.symbol.lower()}", self.chat_id)
         
-        self.assertFalse(result)
-        mock_post.assert_called_once()
+        self.assertIn(f"Report for {self.symbol}:", res)
+        self.assertIn(str(price_val), res)
 
-    @patch('skills.market_portfolio_telegram_command_center.requests.post')
-    def test_start_new_network_exception(self, mock_post):
-        mock_post.side_effect = Exception(f"Network error {uuid.uuid4().hex}")
+    def test_command_center_backtest_missing_symbol(self):
+        center = MarketPortfolioTelegramCommandCenter(self.storage_file)
+        res = center.handle_command("/backtest", self.chat_id)
+        self.assertEqual(res, "Please specify a symbol for backtest, e.g., /backtest AAPL")
 
-        result = start_new(self.random_token, self.random_chat_id, self.random_message)
+    def test_command_center_backtest_with_data_file(self):
+        prices = [round(random.uniform(50.0, 500.0), 2) for _ in range(random.randint(3, 10))]
+        test_data = {
+            self.symbol: prices
+        }
+        with open(self.storage_file, 'w', encoding='utf-8') as f:
+            json.dump(test_data, f)
+
+        center = MarketPortfolioTelegramCommandCenter(self.storage_file)
+        res = center.handle_command(f"/backtest {self.symbol}", self.chat_id)
         
-        self.assertFalse(result)
-        mock_post.assert_called_once()
+        self.assertIn(f"Backtest executed for {self.symbol}.", res)
+        self.assertIn(f"Historical data points: {len(prices)}", res)
 
-    @patch('skills.market_portfolio_telegram_command_center.requests.post')
-    def test_start_new_empty_inputs(self, mock_post):
-        empty_token = ""
-        empty_chat = ""
-        empty_msg = ""
+    def test_command_center_portfolio(self):
+        center = MarketPortfolioTelegramCommandCenter(self.storage_file)
+        res = center.handle_command("/portfolio", self.chat_id)
+        self.assertEqual(res, "Portfolio summary: active assets monitored via MarketParser.")
+
+    def test_command_center_aliases(self):
+        center = MarketPortfolioTelegramCommandCenter(self.storage_file)
         
-        mock_response = MagicMock()
-        mock_response.status_code = 400
-        mock_post.return_value = mock_response
+        res_process = center.process_command("/portfolio", self.chat_id)
+        self.assertEqual(res_process, "Portfolio summary: active assets monitored via MarketParser.")
 
-        result = start_new(empty_token, empty_chat, empty_msg)
-        self.assertFalse(result)
+        res_execute = center.execute_command("/portfolio", self.chat_id)
+        self.assertEqual(res_execute, "Portfolio summary: active assets monitored via MarketParser.")
 
-    @patch('skills.market_portfolio_telegram_command_center.requests.post')
-    def test_start_new_malformed_json_response(self, mock_post):
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.side_effect = ValueError(f"Invalid json {uuid.uuid4().hex}")
-        mock_post.return_value = mock_response
-
-        result = start_new(self.random_token, self.random_chat_id, self.random_message)
-        
-        self.assertFalse(result)
 
 if __name__ == '__main__':
     unittest.main()

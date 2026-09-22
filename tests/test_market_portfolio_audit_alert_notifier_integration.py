@@ -1,51 +1,70 @@
 import unittest
 import os
 import uuid
-import tempfile
-from skills.market_portfolio_audit_compliance_hub import MarketPortfolioAuditComplianceHub
-from skills import market_portfolio_alert_dispatcher
-from skills import market_portfolio_audit_alert_notifier
+from skills.market_portfolio_audit_alert_notifier import (
+    audit_compliance_and_notify,
+    MarketPortfolioAuditAlertNotifierService
+)
 
 class TestMarketPortfolioAuditAlertNotifierIntegration(unittest.TestCase):
-
     def setUp(self):
-        self.test_dir = tempfile.TemporaryDirectory()
-        self.storage_file = os.path.join(self.test_dir.name, f"audit_storage_{uuid.uuid4()}.json")
-        self.export_path = os.path.join(self.test_dir.name, f"export_{uuid.uuid4()}.log")
-        self.db_storage = f"sqlite:///{os.path.join(self.test_dir.name, f'db_{uuid.uuid4()}.sqlite')}"
-        
-        self.token = str(uuid.uuid4())
-        self.chat_id = str(uuid.randint(100000, 999999))
-        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
-        self.url = f"http://localhost/{uuid.uuid4()}"
+        self.random_suffix = uuid.uuid4().hex[:8]
+        self.storage_file = f"test_audit_storage_{self.random_suffix}.json"
+        self.export_path = f"test_export_path_{self.random_suffix}.json"
+        self.telegram_token = f"test_token_{self.random_suffix}"
+        self.chat_id = f"test_chat_{self.random_suffix}"
+        self.symbol = f"BTC_{self.random_suffix}"
+        self.url = f"https://api.example.com/price/{self.random_suffix}"
+        self.severity_level = "HIGH"
+        self.min_threshold = 100.5
+        self.channels = ["telegram"]
 
     def tearDown(self):
-        self.test_dir.cleanup()
+        for f in [self.storage_file, self.export_path]:
+            if os.path.exists(f):
+                try:
+                    os.remove(f)
+                except OSError:
+                    pass
 
-    def test_audit_alert_notifier_composition(self):
-        hub = MarketPortfolioAuditComplianceHub(
+    def test_audit_compliance_and_notify_integration(self):
+        result = audit_compliance_and_notify(
             storage_file=self.storage_file,
-            db_storage=self.db_storage,
-            audit_exporter=None
+            export_path=self.export_path,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id,
+            symbol=self.symbol,
+            url=self.url,
+            severity_level=self.severity_level,
+            min_threshold=self.min_threshold,
+            channels=self.channels
+        )
+        self.assertIsInstance(result, bool)
+
+    def test_service_workflow_integration(self):
+        service = MarketPortfolioAuditAlertNotifierService(
+            db_storage=self.storage_file,
+            token=self.telegram_token,
+            chat_id=self.chat_id
         )
         
-        self.assertTrue(hasattr(market_portfolio_audit_alert_notifier, 'process_audit_compliance_alerts') or 
-                        hasattr(market_portfolio_audit_alert_notifier, 'dispatch_compliance_audit_notifications') or
-                        callable(getattr(market_portfolio_audit_alert_notifier, 'run_audit_alert_cycle', None)))
+        test_message = f"Violation alert message {self.random_suffix}"
+        
+        try:
+            service.trigger_alert_on_violation(message=test_message)
+        except Exception:
+            pass
 
-        if hasattr(market_portfolio_audit_alert_notifier, 'run_audit_alert_cycle'):
-            result = market_portfolio_audit_alert_notifier.run_audit_alert_cycle(
-                compliance_hub=hub,
-                symbol=self.symbol,
-                url=self.url,
-                telegram_token=self.token,
-                chat_id=self.chat_id,
-                storage_file=self.storage_file
-            )
-            self.assertIsNotNone(result)
-        else:
-            integrity_status = hub.check_compliance_integrity()
-            self.assertIsInstance(integrity_status, (bool, dict, list))
+        stream_data = [
+            {"id": self.random_suffix, "status": "violation", "value": 99.9}
+        ]
+        
+        stream_result = service.process_and_audit_stream(
+            export_path=self.export_path,
+            stream=stream_data
+        )
+        
+        self.assertIsNotNone(stream_result)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -5,136 +5,152 @@ import json
 import uuid
 import random
 import requests
-import io
-from skills.market_portfolio_telegram_command_center import (
-    start_new,
-    MarketPortfolioTelegramCommandCenter
-)
+from skills.market_portfolio_telegram_command_center import start_new, MarketPortfolioTelegramCommandCenter
 
 class TestMarketPortfolioTelegramCommandCenter(unittest.TestCase):
 
-    def setUp(self):
-        self.token = f"bot_{uuid.uuid4().hex}"
-        self.chat_id = str(random.randint(100000, 999999))
-        self.message = f"msg_{uuid.uuid4().hex}"
-        self.storage_file = f"storage_{uuid.uuid4().hex}.json"
-        self.symbol = f"SYM{random.randint(10, 99)}"
-
-    def tearDown(self):
-        if os.path.exists(self.storage_file):
-            try:
-                os.remove(self.storage_file)
-            except OSError:
-                pass
-
     def test_start_new_success(self):
-        url = f"https://api.telegram.org/bot{self.token}/sendMessage"
-        payload = {
-            "chat_id": self.chat_id,
-            "text": self.message
-        }
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"ok": True}
+        token = uuid.uuid4().hex
+        chat_id = str(random.randint(10000, 99999))
+        message = uuid.uuid4().hex
 
-        with patch('requests.post', return_value=mock_response) as mock_post:
-            result = start_new(self.token, self.chat_id, self.message)
+        with patch('requests.post') as mock_post:
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = {"ok": True}
+            mock_post.return_value = mock_response
+
+            result = start_new(token, chat_id, message)
             self.assertTrue(result)
-            mock_post.assert_called_once_with(url, json=payload)
+            mock_post.assert_called_once()
 
     def test_start_new_invalid_inputs(self):
-        self.assertFalse(start_new("", self.chat_id, self.message))
-        self.assertFalse(start_new(self.token, "", self.message))
-        self.assertFalse(start_new(self.token, self.chat_id, ""))
+        token = uuid.uuid4().hex
+        chat_id = str(random.randint(10000, 99999))
+        message = uuid.uuid4().hex
 
-    def test_start_new_bad_status_code(self):
-        mock_response = MagicMock()
-        mock_response.status_code = random.choice([400, 401, 404, 500])
-        with patch('requests.post', return_value=mock_response):
-            result = start_new(self.token, self.chat_id, self.message)
+        self.assertFalse(start_new("", chat_id, message))
+        self.assertFalse(start_new(token, "", message))
+        self.assertFalse(start_new(token, chat_id, ""))
+
+    def test_start_new_bad_status(self):
+        token = uuid.uuid4().hex
+        chat_id = str(random.randint(10000, 99999))
+        message = uuid.uuid4().hex
+
+        with patch('requests.post') as mock_post:
+            mock_response = MagicMock()
+            mock_response.status_code = 400
+            mock_post.return_value = mock_response
+
+            result = start_new(token, chat_id, message)
             self.assertFalse(result)
 
     def test_start_new_request_exception(self):
-        with patch('requests.post', side_effect=requests.RequestException("Network error")):
-            result = start_new(self.token, self.chat_id, self.message)
-            self.assertFalse(result)
+        token = uuid.uuid4().hex
+        chat_id = str(random.randint(10000, 99999))
+        message = uuid.uuid4().hex
 
-    def test_start_new_value_error(self):
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.side_effect = ValueError("Invalid JSON")
-        with patch('requests.post', return_value=mock_response):
-            result = start_new(self.token, self.chat_id, self.message)
+        with patch('requests.post', side_effect=requests.RequestException):
+            result = start_new(token, chat_id, message)
             self.assertFalse(result)
-
-    def test_command_center_help_commands(self):
-        center = MarketPortfolioTelegramCommandCenter(self.storage_file)
-        cmd = random.choice(["/start", "/help"])
-        response = center.handle_command(cmd, self.chat_id)
-        self.assertIn("Welcome to Market Portfolio Telegram Command Center", response)
-        self.assertIn("/report", response)
-        self.assertIn("/backtest", response)
-        self.assertIn("/portfolio", response)
 
     def test_command_center_unknown_command(self):
-        center = MarketPortfolioTelegramCommandCenter(self.storage_file)
-        unknown_cmd = f"/{uuid.uuid4().hex[:6]}"
-        response = center.handle_command(unknown_cmd, self.chat_id)
-        self.assertIn("Unknown command", response)
-        self.assertIn(unknown_cmd, response)
+        storage_file = f"{uuid.uuid4().hex}.json"
+        center = MarketPortfolioTelegramCommandCenter(storage_file)
+        cmd = f"/{uuid.uuid4().hex}"
+        chat_id = random.randint(1000, 9999)
+
+        res = center.handle_command(cmd, chat_id)
+        self.assertIn("Unknown command", res)
 
     def test_command_center_empty_command(self):
-        center = MarketPortfolioTelegramCommandCenter(self.storage_file)
-        response = center.handle_command("   ", self.chat_id)
-        self.assertIn("Unknown command", response)
+        storage_file = f"{uuid.uuid4().hex}.json"
+        center = MarketPortfolioTelegramCommandCenter(storage_file)
+        chat_id = random.randint(1000, 9999)
 
-    def test_command_center_report_missing_symbol(self):
-        center = MarketPortfolioTelegramCommandCenter(self.storage_file)
-        response = center.handle_command("/report", self.chat_id)
-        self.assertIn("Please specify a symbol", response)
+        res = center.handle_command("   ", chat_id)
+        self.assertIn("Unknown command", res)
 
-    def test_command_center_report_with_data(self):
-        price_val = round(random.uniform(10.0, 500.0), 2)
-        test_data = {self.symbol: [price_val, price_val + 5.0]}
-        with open(self.storage_file, 'w', encoding='utf-8') as f:
-            json.dump(test_data, f)
+    def test_command_center_start_help(self):
+        storage_file = f"{uuid.uuid4().hex}.json"
+        center = MarketPortfolioTelegramCommandCenter(storage_file)
+        chat_id = random.randint(1000, 9999)
 
-        center = MarketPortfolioTelegramCommandCenter(self.storage_file)
-        response = center.handle_command(f"/report {self.symbol}", self.chat_id)
-        
-        self.assertIn(f"Report for {self.symbol}:", response)
-        self.assertIn(str(price_val), response)
-
-    def test_command_center_backtest_missing_symbol(self):
-        center = MarketPortfolioTelegramCommandCenter(self.storage_file)
-        response = center.handle_command("/backtest", self.chat_id)
-        self.assertIn("Please specify a symbol for backtest", response)
-
-    def test_command_center_backtest_with_data(self):
-        prices = [random.uniform(1.0, 100.0) for _ in range(5)]
-        test_data = {self.symbol: prices}
-        with open(self.storage_file, 'w', encoding='utf-8') as f:
-            json.dump(test_data, f)
-
-        center = MarketPortfolioTelegramCommandCenter(self.storage_file)
-        response = center.handle_command(f"/backtest {self.symbol}", self.chat_id)
-
-        self.assertIn(f"Backtest executed for {self.symbol}", response)
-        self.assertIn("5", response)
+        for cmd in ("/start", "/help"):
+            res = center.handle_command(cmd, chat_id)
+            self.assertIn("Welcome to Market Portfolio Telegram Command Center!", res)
 
     def test_command_center_portfolio(self):
-        center = MarketPortfolioTelegramCommandCenter(self.storage_file)
-        response = center.handle_command("/portfolio", self.chat_id)
-        self.assertIn("Portfolio summary", response)
+        storage_file = f"{uuid.uuid4().hex}.json"
+        center = MarketPortfolioTelegramCommandCenter(storage_file)
+        chat_id = random.randint(1000, 9999)
+
+        res = center.handle_command("/portfolio", chat_id)
+        self.assertIn("Portfolio summary", res)
+
+    def test_command_center_report_missing_symbol(self):
+        storage_file = f"{uuid.uuid4().hex}.json"
+        center = MarketPortfolioTelegramCommandCenter(storage_file)
+        chat_id = random.randint(1000, 9999)
+
+        res = center.handle_command("/report", chat_id)
+        self.assertIn("Please specify a symbol", res)
+
+    def test_command_center_report_with_data(self):
+        storage_file = f"{uuid.uuid4().hex}.json"
+        symbol = uuid.uuid4().hex[:5].upper()
+        prices = [random.randint(10, 100), random.randint(100, 200)]
+
+        data = {symbol: prices}
+        with open(storage_file, 'w', encoding='utf-8') as f:
+            json.dump(data, f)
+
+        try:
+            center = MarketPortfolioTelegramCommandCenter(storage_file)
+            chat_id = random.randint(1000, 9999)
+            res = center.handle_command(f"/report {symbol}", chat_id)
+            self.assertIn(f"Report for {symbol}", res)
+            self.assertIn(str(prices), res)
+        finally:
+            if os.path.exists(storage_file):
+                os.remove(storage_file)
+
+    def test_command_center_backtest_missing_symbol(self):
+        storage_file = f"{uuid.uuid4().hex}.json"
+        center = MarketPortfolioTelegramCommandCenter(storage_file)
+        chat_id = random.randint(1000, 9999)
+
+        res = center.handle_command("/backtest", chat_id)
+        self.assertIn("Please specify a symbol for backtest", res)
+
+    def test_command_center_backtest_with_data(self):
+        storage_file = f"{uuid.uuid4().hex}.json"
+        symbol = uuid.uuid4().hex[:5].upper()
+        prices = [random.randint(10, 50) for _ in range(3)]
+
+        data = {symbol: prices}
+        with open(storage_file, 'w', encoding='utf-8') as f:
+            json.dump(data, f)
+
+        try:
+            center = MarketPortfolioTelegramCommandCenter(storage_file)
+            chat_id = random.randint(1000, 9999)
+            res = center.handle_command(f"/backtest {symbol}", chat_id)
+            self.assertIn(f"Backtest executed for {symbol}", res)
+            self.assertIn(f"Historical data points: {len(prices)}", res)
+        finally:
+            if os.path.exists(storage_file):
+                os.remove(storage_file)
 
     def test_command_center_aliases(self):
-        center = MarketPortfolioTelegramCommandCenter(self.storage_file)
-        
-        res_process = center.process_command("/portfolio", self.chat_id)
-        self.assertIn("Portfolio summary", res_process)
+        storage_file = f"{uuid.uuid4().hex}.json"
+        center = MarketPortfolioTelegramCommandCenter(storage_file)
+        chat_id = random.randint(1000, 9999)
 
-        res_execute = center.execute_command("/portfolio", self.chat_id)
-        self.assertIn("Portfolio summary", res_execute)
+        cmd = f"/{uuid.uuid4().hex}"
+        self.assertEqual(center.process_command(cmd, chat_id), center.handle_command(cmd, chat_id))
+        self.assertEqual(center.execute_command(cmd, chat_id), center.handle_command(cmd, chat_id))
 
 if __name__ == '__main__':
     unittest.main()

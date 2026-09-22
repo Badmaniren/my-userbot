@@ -1,114 +1,163 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+import os
+import json
 import uuid
 import random
-import string
-import io
-import sys
-import types
+import tempfile
 
-# Создаем заглушки модулей, если они отсутствуют, для обеспечения импорта тестируемого модуля
-for mod_name in [
-    'skills.market_portfolio_alert_filter_router',
-    'skills.market_portfolio_alert_dispatcher'
-]:
-    if mod_name not in sys.modules:
-        m = types.ModuleType(mod_name)
-        if 'filter_router' in mod_name:
-            m.AlertFilterRouter = type('AlertFilterRouter', (), {
-                '__init__': lambda self, sf: None,
-                'process_and_route': lambda self, *a, **kw: random.choice([True, False]),
-                'load_stream_data': lambda self: {},
-                'route_filtered_alerts': lambda self, *a, **kw: uuid.uuid4().hex
-            })
-            m.route_and_filter_alerts = lambda *a, **kw: uuid.uuid4().hex
-            m.filter_and_route_portfolio_alerts = lambda *a, **kw: True
-            m.process_alert_filter_routing = lambda *a, **kw: True
-        if 'dispatcher' in mod_name:
-            m.send_telegram_notification = lambda *a, **kw: True
-            m.dispatch_portfolio_alerts = lambda *a, **kw: uuid.uuid4().hex
-            m.process_stream_alert = lambda *a, **kw: random.randint(1, 100)
-        sys.modules[mod_name] = m
-
-from skills import market_portfolio_alert_event_sink
-
+from skills.market_portfolio_alert_event_sink import (
+    handle_portfolio_alert_event,
+    process_incoming_stream,
+    route_and_sink_alerts,
+    load_sink_stream_data,
+    process_event_sink_trigger,
+    AlertFilterRouter
+)
 
 class TestMarketPortfolioAlertEventSink(unittest.TestCase):
 
     def setUp(self):
-        self.rand_symbol = ''.join(random.choices(string.ascii_uppercase, k=5))
-        self.rand_url = f"https://{uuid.uuid4().hex}.org/{uuid.uuid4().hex}"
-        self.rand_token = f"{random.randint(100000,999999)}:{uuid.uuid4().hex}"
-        self.rand_chat_id = str(random.randint(-999999999, -1000000))
-        self.rand_storage = f"/tmp/{uuid.uuid4().hex}.json"
-        self.rand_severity = random.choice(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'])
-        self.rand_threshold = round(random.uniform(0.1, 99.9), 2)
-        self.rand_channels = [uuid.uuid4().hex, uuid.uuid4().hex]
+        self.rand_symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
+        self.rand_url = f"https://example.com/api/{uuid.uuid4().hex}"
+        self.rand_token = uuid.uuid4().hex
+        self.rand_chat_id = str(random.randint(100000, 999999))
+        self.rand_severity = random.choice(["INFO", "WARNING", "CRITICAL"])
+        self.rand_threshold = round(random.uniform(1.0, 100.0), 2)
+        self.rand_channels = [random.choice(["telegram", "webhook", "email"])]
         self.rand_alert_id = uuid.uuid4().hex
+        
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.storage_file = os.path.join(self.temp_dir.name, f"storage_{uuid.uuid4().hex}.json")
 
-    def test_sink_initialization_and_composition(self):
-        self.assertTrue(hasattr(market_portfolio_alert_event_sink, 'AlertFilterRouter') or hasattr(market_portfolio_alert_event_sink, 'process_stream_alert'))
+    def tearDown(self):
+        self.temp_dir.cleanup()
 
-    def test_event_sink_handler_dispatch(self):
-        expected_result = uuid.uuid4().hex
-        with patch('skills.market_portfolio_alert_dispatcher.dispatch_portfolio_alerts', return_value=expected_result) as mock_dispatch:
-            if hasattr(market_portfolio_alert_event_sink, 'handle_portfolio_alert_event'):
-                res = market_portfolio_alert_event_sink.handle_portfolio_alert_event(
-                    self.rand_symbol, self.rand_url, self.rand_token, self.rand_chat_id,
-                    self.rand_storage, self.rand_severity, self.rand_threshold, self.rand_channels
-                )
-                mock_dispatch.assert_called_once_with(
-                    self.rand_symbol, self.rand_url, self.rand_token, self.rand_chat_id,
-                    self.rand_storage, self.rand_severity, self.rand_threshold, self.rand_channels
-                )
-                self.assertEqual(res, expected_result)
-            elif hasattr(market_portfolio_alert_event_sink, 'AlertEventSink'):
-                sink_cls = getattr(market_portfolio_alert_event_sink, 'AlertEventSink')
-                sink_instance = sink_cls(self.rand_storage)
-                if hasattr(sink_instance, 'dispatch_event'):
-                    res = sink_instance.dispatch_event(
-                        self.rand_symbol, self.rand_url, self.rand_token, self.rand_chat_id,
-                        self.rand_severity, self.rand_threshold, self.rand_channels
-                    )
-                    self.assertIsNotNone(res)
+    @patch("skills.market_portfolio_alert_dispatcher.dispatch_portfolio_alerts")
+    def test_handle_portfolio_alert_event(self, mock_dispatch):
+        expected_result = {"status": "dispatched", "ref": uuid.uuid4().hex}
+        mock_dispatch.return_value = expected_result
 
-    def test_event_sink_stream_processing(self):
-        expected_val = random.randint(100, 999)
-        with patch('skills.market_portfolio_alert_dispatcher.process_stream_alert', return_value=expected_val) as mock_stream:
-            if hasattr(market_portfolio_alert_event_sink, 'process_incoming_stream'):
-                res = market_portfolio_alert_event_sink.process_incoming_stream(self.rand_alert_id)
-                mock_stream.assert_called_once_with(self.rand_alert_id)
-                self.assertEqual(res, expected_val)
+        result = handle_portfolio_alert_event(
+            self.rand_symbol,
+            self.rand_url,
+            self.rand_token,
+            self.rand_chat_id,
+            self.storage_file,
+            self.rand_severity,
+            self.rand_threshold,
+            self.rand_channels
+        )
 
-    def test_event_sink_filter_routing_integration(self):
-        expected_route = uuid.uuid4().hex
-        with patch('skills.market_portfolio_alert_filter_router.AlertFilterRouter') as mock_router_cls:
-            mock_router_instance = mock_router_cls.return_value
-            mock_router_instance.route_filtered_alerts.return_value = expected_route
+        mock_dispatch.assert_called_once_with(
+            self.rand_symbol,
+            self.rand_url,
+            self.rand_token,
+            self.rand_chat_id,
+            self.storage_file,
+            self.rand_severity,
+            self.rand_threshold,
+            self.rand_channels
+        )
+        self.assertEqual(result, expected_result)
 
-            if hasattr(market_portfolio_alert_event_sink, 'route_and_sink_alerts'):
-                res = market_portfolio_alert_event_sink.route_and_sink_alerts(
-                    self.rand_storage, self.rand_symbol, self.rand_url, self.rand_token,
-                    self.rand_chat_id, self.rand_severity, self.rand_threshold, self.rand_channels
-                )
-                mock_router_cls.assert_called_with(self.rand_storage)
-                mock_router_instance.route_filtered_alerts.assert_called_once_with(
-                    self.rand_symbol, self.rand_url, self.rand_token, self.rand_chat_id,
-                    self.rand_severity, self.rand_threshold, self.rand_channels
-                )
-                self.assertEqual(res, expected_route)
+    @patch("skills.market_portfolio_alert_dispatcher.process_stream_alert")
+    def test_process_incoming_stream(self, mock_process_stream):
+        expected_stream_data = {"alert_id": self.rand_alert_id, "processed": True}
+        mock_process_stream.return_value = expected_stream_data
 
-    def test_stream_data_loading_via_io(self):
-        random_bytes = uuid.uuid4().bytes + b"\xff\x00\xaa"
-        fake_stream = io.BytesIO(random_bytes)
-        with patch('skills.market_portfolio_alert_filter_router.AlertFilterRouter') as mock_router_cls:
-            mock_instance = mock_router_cls.return_value
-            mock_instance.load_stream_data.return_value = fake_stream.read()
+        result = process_incoming_stream(self.rand_alert_id)
 
-            if hasattr(market_portfolio_alert_event_sink, 'load_sink_stream_data'):
-                data = market_portfolio_alert_event_sink.load_sink_stream_data(self.rand_storage)
-                self.assertEqual(data, random_bytes)
+        mock_process_stream.assert_called_once_with(self.rand_alert_id)
+        self.assertEqual(result, expected_stream_data)
 
+    @patch.object(AlertFilterRouter, "route_filtered_alerts")
+    def test_route_and_sink_alerts(self, mock_route):
+        expected_routing = {"routed": True, "symbol": self.rand_symbol}
+        mock_route.return_value = expected_routing
 
-if __name__ == '__main__':
+        result = route_and_sink_alerts(
+            self.storage_file,
+            self.rand_symbol,
+            self.rand_url,
+            self.rand_token,
+            self.rand_chat_id,
+            self.rand_severity,
+            self.rand_threshold,
+            self.rand_channels
+        )
+
+        self.assertEqual(result, expected_routing)
+
+    @patch.object(AlertFilterRouter, "load_stream_data")
+    def test_load_sink_stream_data(self, mock_load):
+        expected_data = {"stream": uuid.uuid4().hex}
+        mock_load.return_value = expected_data
+
+        result = load_sink_stream_data(self.storage_file)
+
+        self.assertEqual(result, expected_data)
+
+    @patch("skills.market_portfolio_alert_filter_router.AlertFilterRouter.route_filtered_alerts")
+    @patch("skills.market_portfolio_alert_dispatcher.dispatch_portfolio_alerts")
+    def test_process_event_sink_trigger_new_file(self, mock_dispatch, mock_route):
+        dispatch_mock_response = {"dispatch_id": uuid.uuid4().hex}
+        mock_dispatch.return_value = dispatch_mock_response
+        mock_route.return_value = True
+
+        self.assertFalse(os.path.exists(self.storage_file))
+
+        result = process_event_sink_trigger(
+            self.rand_symbol,
+            self.rand_url,
+            self.rand_token,
+            self.rand_chat_id,
+            self.storage_file,
+            self.rand_severity,
+            self.rand_threshold,
+            self.rand_channels
+        )
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["symbol"], self.rand_symbol)
+        self.assertEqual(result["dispatch_result"], dispatch_mock_response)
+
+        self.assertTrue(os.path.exists(self.storage_file))
+        with open(self.storage_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            self.assertEqual(data["symbol"], self.rand_symbol)
+            self.assertEqual(data["status"], "processed")
+
+    @patch("skills.market_portfolio_alert_filter_router.AlertFilterRouter.route_filtered_alerts")
+    @patch("skills.market_portfolio_alert_dispatcher.dispatch_portfolio_alerts")
+    def test_process_event_sink_trigger_existing_file(self, mock_dispatch, mock_route):
+        dispatch_mock_response = {"dispatch_id": uuid.uuid4().hex}
+        mock_dispatch.return_value = dispatch_mock_response
+        mock_route.return_value = True
+
+        initial_data = {"symbol": "OLD_SYM", "extra": uuid.uuid4().hex}
+        with open(self.storage_file, "w", encoding="utf-8") as f:
+            json.dump(initial_data, f)
+
+        result = process_event_sink_trigger(
+            self.rand_symbol,
+            self.rand_url,
+            self.rand_token,
+            self.rand_chat_id,
+            self.storage_file,
+            self.rand_severity,
+            self.rand_threshold,
+            self.rand_channels
+        )
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["symbol"], self.rand_symbol)
+
+        with open(self.storage_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            self.assertEqual(data["symbol"], self.rand_symbol)
+            self.assertEqual(data["status"], "processed")
+            self.assertEqual(data["extra"], initial_data["extra"])
+
+if __name__ == "__main__":
     unittest.main()

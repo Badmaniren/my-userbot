@@ -22,7 +22,7 @@ class PortfolioAuditLogExporter:
             # Перехватываем для безопасного возврата ошибки наружу в логике экспорта/сумм
             raise
 
-    def export_audit_logs(self, export_path: str) -> bool:
+    def export_audit_logs(self, export_path: str):
         try:
             with open(self.storage_file, 'r', encoding='utf-8') as f:
                 data = f.read()
@@ -32,6 +32,8 @@ class PortfolioAuditLogExporter:
             with open(export_path, 'w', encoding='utf-8') as f:
                 f.write(data)
             return True
+        except FileNotFoundError:
+            return None
         except Exception:
             return False
 

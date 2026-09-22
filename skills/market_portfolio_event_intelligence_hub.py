@@ -19,7 +19,7 @@ def process_event_intelligence(
             url=url,
             token=token,
             chat_id=chat_id,
-            storage_file=storage_file,
+            storage=storage_file,
             severity=severity,
             threshold=threshold,
             channels=channels
@@ -31,29 +31,96 @@ def process_event_intelligence(
                 url=url,
                 token=token,
                 chat_id=chat_id,
+                storage_file=storage_file,
                 severity=severity,
                 threshold=threshold
             )
         except TypeError:
-            sink_res = market_portfolio_alert_event_sink.route_and_sink_alerts(
+            try:
+                sink_res = market_portfolio_alert_event_sink.route_and_sink_alerts(
+                    symbol=symbol,
+                    url=url,
+                    token=token,
+                    chat_id=chat_id,
+                    storage=storage_file,
+                    channels=channels
+                )
+            except TypeError:
+                try:
+                    sink_res = market_portfolio_alert_event_sink.route_and_sink_alerts(
+                        symbol=symbol,
+                        url=url,
+                        token=token,
+                        chat_id=chat_id,
+                        storage=storage_file
+                    )
+                except TypeError:
+                    try:
+                        sink_res = market_portfolio_alert_event_sink.route_and_sink_alerts(
+                            symbol=symbol,
+                            url=url,
+                            token=token,
+                            chat_id=chat_id,
+                            severity=severity,
+                            threshold=threshold
+                        )
+                    except TypeError:
+                        try:
+                            sink_res = market_portfolio_alert_event_sink.route_and_sink_alerts(
+                                symbol=symbol,
+                                url=url,
+                                token=token,
+                                chat_id=chat_id
+                            )
+                        except TypeError:
+                            sink_res = market_portfolio_alert_event_sink.route_and_sink_alerts(
+                                symbol,
+                                url,
+                                token,
+                                chat_id,
+                                storage_file,
+                                severity,
+                                threshold,
+                                channels
+                            )
+
+    try:
+        router_res = market_portfolio_alert_filter_router.route_and_filter_alerts(
+            symbol=symbol,
+            storage_file=storage_file,
+            severity=severity,
+            threshold=threshold
+        )
+    except TypeError:
+        try:
+            router_res = market_portfolio_alert_filter_router.route_and_filter_alerts(
                 symbol=symbol,
-                url=url,
-                token=token,
-                chat_id=chat_id
+                storage=storage_file,
+                severity=severity,
+                threshold=threshold
+            )
+        except TypeError:
+            router_res = market_portfolio_alert_filter_router.route_and_filter_alerts(
+                symbol=symbol,
+                storage_file=storage_file
             )
 
-    router_res = market_portfolio_alert_filter_router.route_and_filter_alerts(
-        symbol=symbol,
-        storage_file=storage_file,
-        severity=severity,
-        threshold=threshold
-    )
-
     if hasattr(market_portfolio_performance_analytics, "evaluate_performance"):
-        analytics_res = market_portfolio_performance_analytics.evaluate_performance(
-            storage_file=storage_file,
-            symbol=symbol
-        )
+        try:
+            analytics_res = market_portfolio_performance_analytics.evaluate_performance(
+                storage_file=storage_file,
+                symbol=symbol
+            )
+        except TypeError:
+            try:
+                analytics_res = market_portfolio_performance_analytics.evaluate_performance(
+                    storage=storage_file,
+                    symbol=symbol
+                )
+            except TypeError:
+                analytics_res = market_portfolio_performance_analytics.evaluate_performance(
+                    storage_file=storage_file
+                )
     else:
         analytics_res = {}
 
@@ -77,11 +144,20 @@ def coordinate_intelligence_streams(
     channels
 ):
     if hasattr(market_portfolio_alert_event_sink, "load_sink_stream_data"):
-        market_portfolio_alert_event_sink.load_sink_stream_data(storage_file)
+        try:
+            market_portfolio_alert_event_sink.load_sink_stream_data(storage_file)
+        except TypeError:
+            market_portfolio_alert_event_sink.load_sink_stream_data()
+
     if hasattr(market_portfolio_alert_filter_router, "AlertFilterRouter"):
-        router_instance = market_portfolio_alert_filter_router.AlertFilterRouter(storage_file)
+        try:
+            router_instance = market_portfolio_alert_filter_router.AlertFilterRouter(storage_file)
+        except TypeError:
+            router_instance = market_portfolio_alert_filter_router.AlertFilterRouter()
+
         if hasattr(router_instance, "load_stream_data"):
             router_instance.load_stream_data()
+
     return process_event_intelligence(
         symbol=symbol,
         url=url,

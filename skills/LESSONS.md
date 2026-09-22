@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- в main
-
-## market_portfolio_valuation (compose) — раундов: 2
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: успешно прошёл тесты и влит в main
+ Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_alert_dispatcher (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
@@ -322,4 +318,7 @@
 ## market_portfolio_telegram_command_center (start_new) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_telegram_command_center (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

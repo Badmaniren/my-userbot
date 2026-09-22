@@ -46,7 +46,11 @@ class MarketPortfolioAuditAlertNotifierService:
         )
 
     def process_and_audit_stream(self, export_path, stream):
-        return self.hub.process_audit_stream_data(
+        res = self.hub.process_audit_stream_data(
             export_path=export_path,
             stream=stream
         )
+        summary = self.hub.get_audit_stream_summary()
+        if summary is not None:
+            return summary
+        return res

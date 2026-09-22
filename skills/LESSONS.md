@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-legram_pipeline (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## db_storage (refactor) — раундов: 1
+аундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_parser (refactor) — раундов: 1
@@ -323,3 +319,7 @@ legram_pipeline (refactor) — раундов: 4
 
 ## market_portfolio_stress_reporter (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_performance_analytics (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

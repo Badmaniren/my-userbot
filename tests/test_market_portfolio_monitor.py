@@ -1,131 +1,87 @@
-import unittest
 import os
-import json
-import uuid
-import random
-import string
+import unittest
 from unittest.mock import patch
 from skills.market_portfolio_monitor import (
-    MarketParser,
-    MarketReportGenerator,
-    generate_market_report,
-    run_market_telegram_pipeline,
-    run_pipeline,
+    MarketPortfolioMonitor,
+    MarketMonitorException,
     start_new
 )
 
-class TestMarketPortfolioMonitor(unittest.TestCase):
 
+class TestMarketPortfolioMonitor(unittest.TestCase):
     def setUp(self):
-        self.random_symbol = ''.join(random.choices(string.ascii_uppercase, k=5))
-        self.random_url = f"https://{uuid.uuid4().hex}.com/{uuid.uuid4().hex}"
-        self.random_token = uuid.uuid4().hex
-        self.random_chat_id = str(random.randint(100000, 999999))
-        self.random_storage = f"{uuid.uuid4().hex}.json"
-        self.random_price = round(random.uniform(1.0, 1000.0), 4)
+        self.test_storage = "test_monitor_unit.db"
 
     def tearDown(self):
-        if os.path.exists(self.random_storage):
+        if os.path.exists(self.test_storage):
             try:
-                os.remove(self.random_storage)
+                os.remove(self.test_storage)
             except OSError:
                 pass
 
-    def test_market_parser_fetch_and_load(self):
-        parser = MarketParser(storage_file=self.random_storage)
-        parser.fetch_and_store(symbol=self.random_symbol, price=self.random_price)
-        
-        self.assertTrue(os.path.exists(self.random_storage))
-        
-        loaded_data = parser.load_data(self.random_storage)
-        self.assertIsInstance(loaded_data, dict)
-        self.assertIn(self.random_symbol, loaded_data)
-        self.assertEqual(loaded_data[self.random_symbol], self.random_price)
+    def test_init_invalid_storage(self):
+        with self.assertRaises(MarketMonitorException):
+            MarketPortfolioMonitor(storage_file="")
+        with self.assertRaises(MarketMonitorException):
+            MarketPortfolioMonitor(storage_file=None)
 
-    def test_market_parser_load_nonexistent(self):
-        non_existent_file = f"{uuid.uuid4().hex}.json"
-        parser = MarketParser(storage_file=non_existent_file)
-        data = parser.load_data(non_existent_file)
-        self.assertIsNone(data)
+    @patch("skills.db_storage.MarketParser.fetch_price")
+    @patch("skills.db_storage.MarketParser.fetch_and_store")
+    def test_fetch_and_process_market_data_success(self, mock_store, mock_fetch):
+        mock_fetch.return_value = {"price": 150.5}
+        monitor = MarketPortfolioMonitor(storage_file=self.test_storage)
+        price = monitor.fetch_and_process_market_data("AAPL", "http://example.com/api")
+        self.assertEqual(price, 150.5)
 
-    def test_market_report_generator_symbol_report(self):
-        parser = MarketParser(storage_file=self.random_storage)
-        parser.fetch_and_store(symbol=self.random_symbol, price=self.random_price)
-        
-        report_gen = MarketReportGenerator(storage_file=self.random_storage)
-        report = report_gen.generate_symbol_report(symbol=self.random_symbol)
-        
-        self.assertIn(self.random_symbol, report)
-        self.assertIn(str(self.random_price), report)
+    def test_fetch_and_process_market_data_invalid_inputs(self):
+        monitor = MarketPortfolioMonitor(storage_file=self.test_storage)
+        with self.assertRaises(MarketMonitorException):
+            monitor.fetch_and_process_market_data("", "http://example.com")
+        with self.assertRaises(MarketMonitorException):
+            monitor.fetch_and_process_market_data("AAPL", "")
 
-    def test_market_report_generator_no_data(self):
-        report_gen = MarketReportGenerator(storage_file=self.random_storage)
-        report = report_gen.generate_symbol_report(symbol=self.random_symbol)
-        
-        self.assertIn(self.random_symbol, report)
-        self.assertIn("No data", report)
+    def test_track_insider_trades_success(self):
+        monitor = MarketPortfolioMonitor(storage_file=self.test_storage)
+        trade = {
+            "symbol": "TSLA",
+            "volume": 15000,
+            "insider_name": "Elon Musk",
+            "trade_type": "BUY"
+        }
+        res = monitor.track_insider_trades(trade)
+        self.assertEqual(res["symbol"], "TSLA")
+        self.assertEqual(res["volume"], 15000.0)
+        self.assertTrue(res["is_suspicious"])
 
-    def test_market_report_generator_raw_stream_dump(self):
-        parser = MarketParser(storage_file=self.random_storage)
-        parser.fetch_and_store(symbol=self.random_symbol, price=self.random_price)
-        
-        report_gen = MarketReportGenerator(storage_file=self.random_storage)
-        dump = report_gen.get_raw_stream_dump()
-        
-        parsed_dump = json.loads(dump)
-        self.assertIn(self.random_symbol, parsed_dump)
-        self.assertEqual(parsed_dump[self.random_symbol], self.random_price)
+    def test_track_insider_trades_invalid_data(self):
+        monitor = MarketPortfolioMonitor(storage_file=self.test_storage)
+        with self.assertRaises(MarketMonitorException):
+            monitor.track_insider_trades("not a dict")
+        with self.assertRaises(MarketMonitorException):
+            monitor.track_insider_trades({"symbol": "AAPL", "volume": 100})  # Missing insider_name
 
-    def test_generate_market_report_function(self):
-        parser = MarketParser(storage_file=self.random_storage)
-        parser.fetch_and_store(symbol=self.random_symbol, price=self.random_price)
-        
-        report = generate_market_report(storage_file=self.random_storage, symbol=self.random_symbol)
-        self.assertIn(self.random_symbol, report)
-        self.assertIn(str(self.random_price), report)
+    def test_scan_insider_activity(self):
+        monitor = MarketPortfolioMonitor(storage_file=self.test_storage)
+        trade = {
+            "symbol": "AAPL",
+            "volume": 5000,
+            "insider_name": "Tim Cook",
+            "trade_type": "BUY"
+        }
+        monitor.track_insider_trades(trade)
+        res = monitor.scan_insider_activity("AAPL")
+        self.assertEqual(len(res), 1)
+        self.assertEqual(res[0]["symbol"], "AAPL")
 
-    def test_run_market_telegram_pipeline(self):
-        parser = MarketParser(storage_file=self.random_storage)
-        parser.fetch_and_store(symbol=self.random_symbol, price=self.random_price)
-        
-        result = run_market_telegram_pipeline(
-            storage_file=self.random_storage,
-            symbol=self.random_symbol,
-            chat_id=self.random_chat_id,
-            url=self.random_url,
-            telegram_token=self.random_token
-        )
-        
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result["status"], "success")
-        self.assertEqual(result["symbol"], self.random_symbol)
-        self.assertEqual(result["price"], self.random_price)
-        self.assertEqual(result["chat_id"], self.random_chat_id)
-        self.assertEqual(result["url"], self.random_url)
+    @patch("skills.market_portfolio_monitor.MarketPortfolioMonitor.fetch_and_process_market_data")
+    @patch("skills.market_portfolio_telegram_notifier.send_telegram_notification")
+    def test_run_pipeline_and_start_new(self, mock_notify, mock_fetch):
+        mock_fetch.return_value = 200.0
+        res = start_new("BTC", "http://crypto.com", "token123", "chat456", self.test_storage)
+        self.assertTrue(res)
+        mock_fetch.assert_called_once_with("BTC", "http://crypto.com")
+        mock_notify.assert_called_once()
 
-    def test_run_pipeline(self):
-        success = run_pipeline(
-            symbol=self.random_symbol,
-            url=self.random_url,
-            telegram_token=self.random_token,
-            chat_id=self.random_chat_id,
-            storage_file=self.random_storage
-        )
-        self.assertTrue(success)
-        self.assertTrue(os.path.exists(self.random_storage))
-
-    def test_start_new(self):
-        success = start_new(
-            symbol=self.random_symbol,
-            url=self.random_url,
-            telegram_token=self.random_token,
-            chat_id=self.random_chat_id,
-            storage_file=self.random_storage
-        )
-        self.assertTrue(success)
-        parser = MarketParser(storage_file=self.random_storage)
-        data = parser.load_data(self.random_storage)
-        self.assertIn(self.random_symbol, data)
 
 if __name__ == "__main__":
     unittest.main()

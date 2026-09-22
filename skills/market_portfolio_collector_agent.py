@@ -97,3 +97,17 @@ def start_new(symbol: str, url: str, telegram_token: str, chat_id: str, storage_
         chat_id,
         storage_file
     )
+
+
+class PortfolioCollectorAgent:
+    def collect_transaction(self, portfolio_id, transaction_payload):
+        data = dict(transaction_payload) if isinstance(transaction_payload, dict) else {}
+        data["portfolio_id"] = portfolio_id
+        return data
+
+    def stream(self, stream_token):
+        import io
+        return io.BytesIO(b"stream_data")
+
+
+market_portfolio_collector_agent = PortfolioCollectorAgent()

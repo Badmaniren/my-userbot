@@ -66,3 +66,11 @@ class MarketParser:
             with open(filename, 'r', encoding='utf-8') as f:
                 return json.load(f)
         return {}
+
+    def parse_market_feed(self, feed_data):
+        if isinstance(feed_data, dict):
+            return dict(feed_data)
+        return feed_data
+
+
+market_parser = MarketParser()

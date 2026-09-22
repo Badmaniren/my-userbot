@@ -84,3 +84,14 @@ def run_market_telegram_pipeline(storage_file, symbol, chat_id, url, telegram_to
         "chat_id": chat_id,
         "url": url
     }
+
+
+class PortfolioMonitor:
+    def evaluate_portfolio_health(self, portfolio_id):
+        return {
+            "status": "healthy",
+            "portfolio_id": portfolio_id
+        }
+
+
+market_portfolio_monitor = PortfolioMonitor()

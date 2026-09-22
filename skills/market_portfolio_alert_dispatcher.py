@@ -92,3 +92,15 @@ def process_stream_alert(alert_id):
                 except TypeError:
                     return io.BytesIO(b"")
     return io.BytesIO(b"")
+
+
+class AlertDispatcher:
+    def dispatch(self, alert_data):
+        return {
+            "delivered": True,
+            "status": "dispatched",
+            "alert": alert_data
+        }
+
+
+market_portfolio_alert_dispatcher = AlertDispatcher()

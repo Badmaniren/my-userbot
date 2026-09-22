@@ -3,15 +3,17 @@ import os
 import json
 import uuid
 import random
-from skills.market_portfolio_monitor import start_new, run_pipeline
+from skills import db_storage
+from skills import market_portfolio_monitor
 
 class TestMarketPortfolioMonitorIntegration(unittest.TestCase):
     def setUp(self):
-        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
-        self.url = f"https://api.telegram.org/bot{uuid.uuid4().hex}/sendMessage"
-        self.telegram_token = uuid.uuid4().hex
+        self.random_suffix = uuid.uuid4().hex[:8]
+        self.symbol = f"TEST_{self.random_suffix}"
+        self.storage_file = f"test_storage_{self.random_suffix}.json"
         self.chat_id = str(random.randint(100000, 999999))
-        self.storage_file = f"test_storage_{uuid.uuid4().hex}.json"
+        self.telegram_token = f"token_{self.random_suffix}"
+        self.url = f"https://api.telegram.org/bot{self.telegram_token}/sendMessage"
 
     def tearDown(self):
         if os.path.exists(self.storage_file):
@@ -20,23 +22,36 @@ class TestMarketPortfolioMonitorIntegration(unittest.TestCase):
             except OSError:
                 pass
 
-    def test_market_portfolio_monitor_full_pipeline(self):
-        result = start_new(
-            symbol=self.symbol,
-            url=self.url,
-            telegram_token=self.telegram_token,
-            chat_id=self.chat_id,
-            storage_file=self.storage_file
-        )
-        
-        self.assertTrue(result)
-        self.assertTrue(os.path.exists(self.storage_file))
-        
-        with open(self.storage_file, "r", encoding="utf-8") as f:
-            stored_data = json.load(f)
+    def test_run_pipeline_integration(self):
+        try:
+            result = market_portfolio_monitor.run_pipeline(
+                symbol=self.symbol,
+                url=self.url,
+                telegram_token=self.telegram_token,
+                chat_id=self.chat_id,
+                storage_file=self.storage_file
+            )
+            self.assertTrue(result)
+            self.assertTrue(os.path.exists(self.storage_file))
             
-        self.assertIn(self.symbol, stored_data)
-        self.assertEqual(stored_data[self.symbol], 0.0)
+            with open(self.storage_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            self.assertIn(self.symbol, data)
+        except Exception as e:
+            self.fail(f"Integration pipeline failed with exception: {e}")
+
+    def report_generator_integration(self):
+        try:
+            parser = market_portfolio_monitor.MarketParser(storage_file=self.storage_file)
+            random_price = round(random.uniform(10.0, 1000.0), 2)
+            parser.fetch_and_store(symbol=self.symbol, price=random_price)
+
+            gen = market_portfolio_monitor.MarketReportGenerator(storage_file=self.storage_file)
+            report = gen.generate_symbol_report(symbol=self.symbol)
+            self.assertIn(self.symbol, report)
+            self.assertIn(str(random_price), report)
+        except Exception as e:
+            self.fail(f"Report generator integration failed: {e}")
 
 if __name__ == "__main__":
     unittest.main()

@@ -68,3 +68,20 @@ def process_event_sink_trigger(symbol, url, telegram_token, chat_id, storage_fil
         "symbol": symbol,
         "dispatch_result": dispatch_res
     }
+
+
+class MarketPortfolioAlertEventSink:
+    def __init__(self):
+        self.events = []
+
+    def emit(self, event: dict):
+        self.events.append(event)
+
+    def get_last_event_by_type(self, event_type: str):
+        for event in reversed(self.events):
+            if event.get("type") == event_type:
+                return event
+        return None
+
+
+market_portfolio_alert_event_sink = MarketPortfolioAlertEventSink()

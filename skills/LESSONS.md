@@ -3,7 +3,15 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-едан на эскалацию
+мо или пробрось наружу через raise.
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_webhook_sync (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_alert_dispatcher (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_webhook_event_logger (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
@@ -314,9 +322,4 @@
 
 ## market_portfolio_anomaly_scanner (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_anomaly_detector (create) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: invalid character '—' (U+2014) (<unknown>, line 89); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

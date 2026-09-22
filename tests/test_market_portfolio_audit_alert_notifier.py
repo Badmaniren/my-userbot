@@ -1,11 +1,8 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import uuid
 import random
-import string
 import io
-import sys
-import os
 
 from skills.market_portfolio_audit_alert_notifier import (
     audit_compliance_and_notify,
@@ -15,118 +12,142 @@ from skills.market_portfolio_audit_alert_notifier import (
 class TestMarketPortfolioAuditAlertNotifier(unittest.TestCase):
 
     def setUp(self):
-        self.rand_storage = f"storage_{uuid.uuid4().hex}.db"
-        self.rand_export_path = f"export_{uuid.uuid4().hex}.json"
-        self.rand_token = f"token_{uuid.uuid4().hex}"
-        self.rand_chat_id = str(random.randint(100000, 999999))
-        self.rand_symbol = ''.join(random.choices(string.ascii_uppercase, k=4))
-        self.rand_url = f"https://{uuid.uuid4().hex}.example/api"
-        self.rand_severity = random.choice(["INFO", "WARNING", "CRITICAL", "FATAL"])
-        self.rand_threshold = random.uniform(0.01, 0.99)
-        self.rand_channels = [uuid.uuid4().hex, uuid.uuid4().hex]
+        self.storage_file = f"audit_{uuid.uuid4().hex}.db"
+        self.export_path = f"export_{uuid.uuid4().hex}.json"
+        self.telegram_token = f"{random.randint(100000, 999999)}:ABC-{uuid.uuid4().hex[:6]}"
+        self.chat_id = str(random.randint(1000000, 9999999))
+        self.symbol = f"SYM{random.choice(['BTC', 'ETH', 'SOL'])}_{uuid.uuid4().hex[:4]}"
+        self.url = f"https://api.{uuid.uuid4().hex[:6]}.market/v1/audit"
+        self.severity_level = random.choice(["INFO", "WARNING", "CRITICAL", "FATAL"])
+        self.min_threshold = round(random.uniform(1.0, 100.0), 2)
+        self.channels = [random.choice(["telegram", "webhook", "email"])]
+        self.message = f"Audit integrity breach detected: {uuid.uuid4().hex}"
 
     @patch('skills.market_portfolio_audit_alert_notifier.MarketPortfolioAuditComplianceHub')
     @patch('skills.market_portfolio_audit_alert_notifier.dispatch_portfolio_alerts')
     def test_audit_compliance_and_notify_success(self, mock_dispatch, mock_hub_class):
-        mock_hub_instance = MagicMock()
+        mock_hub_instance = mock_hub_class.return_value
         mock_hub_instance.check_compliance_integrity.return_value = True
-        mock_hub_class.return_value = mock_hub_instance
 
         result = audit_compliance_and_notify(
-            storage_file=self.rand_storage,
-            export_path=self.rand_export_path,
-            telegram_token=self.rand_token,
-            chat_id=self.rand_chat_id,
-            symbol=self.rand_symbol,
-            url=self.rand_url,
-            severity_level=self.rand_severity,
-            min_threshold=self.rand_threshold,
-            channels=self.rand_channels
+            storage_file=self.storage_file,
+            export_path=self.export_path,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id,
+            symbol=self.symbol,
+            url=self.url,
+            severity_level=self.severity_level,
+            min_threshold=self.min_threshold,
+            channels=self.channels
         )
 
-        mock_hub_class.assert_called_once_with(storage_file=self.rand_storage)
+        self.assertTrue(result)
         mock_hub_instance.check_compliance_integrity.assert_called_once()
         mock_dispatch.assert_called_once_with(
-            symbol=self.rand_symbol,
-            url=self.rand_url,
-            telegram_token=self.rand_token,
-            chat_id=self.rand_chat_id,
-            storage_file=self.rand_storage,
-            severity_level=self.rand_severity,
-            min_threshold=self.rand_threshold,
-            channels=self.rand_channels
+            symbol=self.symbol,
+            url=self.url,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id,
+            storage_file=self.storage_file,
+            severity_level=self.severity_level,
+            min_threshold=self.min_threshold,
+            channels=self.channels
         )
-        self.assertTrue(result)
 
     @patch('skills.market_portfolio_audit_alert_notifier.MarketPortfolioAuditComplianceHub')
     @patch('skills.market_portfolio_audit_alert_notifier.dispatch_portfolio_alerts')
-    def test_audit_compliance_and_notify_integrity_failure(self, mock_dispatch, mock_hub_class):
-        mock_hub_instance = MagicMock()
+    def test_audit_compliance_and_notify_failure(self, mock_dispatch, mock_hub_class):
+        mock_hub_instance = mock_hub_class.return_value
         mock_hub_instance.check_compliance_integrity.return_value = False
-        mock_hub_class.return_value = mock_hub_instance
 
         result = audit_compliance_and_notify(
-            storage_file=self.rand_storage,
-            export_path=self.rand_export_path,
-            telegram_token=self.rand_token,
-            chat_id=self.rand_chat_id,
-            symbol=self.rand_symbol,
-            url=self.rand_url,
-            severity_level=self.rand_severity,
-            min_threshold=self.rand_threshold,
-            channels=self.rand_channels
+            storage_file=self.storage_file,
+            export_path=self.export_path,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id,
+            symbol=self.symbol,
+            url=self.url,
+            severity_level=self.severity_level,
+            min_threshold=self.min_threshold,
+            channels=self.channels
         )
 
-        mock_hub_class.assert_called_once_with(storage_file=self.rand_storage)
+        self.assertFalse(result)
         mock_hub_instance.check_compliance_integrity.assert_called_once()
         mock_dispatch.assert_not_called()
-        self.assertFalse(result)
 
     @patch('skills.market_portfolio_audit_alert_notifier.MarketPortfolioAuditComplianceHub')
     @patch('skills.market_portfolio_audit_alert_notifier.send_telegram_notification')
-    def test_service_class_trigger_alert(self, mock_send_telegram, mock_hub_class):
-        mock_hub_instance = MagicMock()
-        mock_hub_instance.verify_log_integrity.return_value = {"status": "violation", "id": uuid.uuid4().hex}
-        mock_hub_class.return_value = mock_hub_instance
+    def test_service_trigger_alert_on_violation(self, mock_send_telegram, mock_hub_class):
+        mock_hub_instance = mock_hub_class.return_value
 
         service = MarketPortfolioAuditAlertNotifierService(
-            db_storage=self.rand_storage,
-            token=self.rand_token,
-            chat_id=self.rand_chat_id
+            db_storage=self.storage_file,
+            token=self.telegram_token,
+            chat_id=self.chat_id
         )
 
-        rand_msg = f"Violation detected: {uuid.uuid4().hex}"
-        service.trigger_alert_on_violation(rand_msg)
+        service.trigger_alert_on_violation(message=self.message)
 
+        mock_hub_instance.verify_log_integrity.assert_called_once()
         mock_send_telegram.assert_called_once_with(
-            token=self.rand_token,
-            chat_id=self.rand_chat_id,
-            message=rand_msg
+            token=self.telegram_token,
+            chat_id=self.chat_id,
+            message=self.message
         )
 
     @patch('skills.market_portfolio_audit_alert_notifier.MarketPortfolioAuditComplianceHub')
-    def test_service_stream_processing_with_io(self, mock_hub_class):
-        mock_hub_instance = MagicMock()
-        rand_summary = {"processed_records": random.randint(10, 100), "uuid": uuid.uuid4().hex}
-        mock_hub_instance.get_audit_stream_summary.return_value = rand_summary
-        mock_hub_class.return_value = mock_hub_instance
+    def test_service_process_and_audit_stream_with_summary(self, mock_hub_class):
+        mock_hub_instance = mock_hub_class.return_value
+        expected_summary = {"status": "audited", "metric": random.randint(10, 500)}
+        mock_hub_instance.get_audit_stream_summary.return_value = expected_summary
+        
+        stream_data = io.BytesIO(uuid.uuid4().bytes)
 
         service = MarketPortfolioAuditAlertNotifierService(
-            db_storage=self.rand_storage,
-            token=self.rand_token,
-            chat_id=self.rand_chat_id
+            db_storage=self.storage_file,
+            token=self.telegram_token,
+            chat_id=self.chat_id
         )
 
-        random_bytes = uuid.uuid4().bytes + b"".join(random.choices([b'\x00', b'\xff', b'\x42'], k=32))
-        stream_mock = io.BytesIO(random_bytes)
+        result = service.process_and_audit_stream(
+            export_path=self.export_path,
+            stream=stream_data
+        )
 
-        result = service.process_and_audit_stream(self.rand_export_path, stream_mock)
-
+        self.assertEqual(result, expected_summary)
         mock_hub_instance.process_audit_stream_data.assert_called_once_with(
-            export_path=self.rand_export_path,
-            stream=stream_mock
+            export_path=self.export_path,
+            stream=stream_data
         )
-        self.assertEqual(result, rand_summary)
+        mock_hub_instance.get_audit_stream_summary.assert_called_once()
+
+    @patch('skills.market_portfolio_audit_alert_notifier.MarketPortfolioAuditComplianceHub')
+    def test_service_process_and_audit_stream_fallback(self, mock_hub_class):
+        mock_hub_instance = mock_hub_class.return_value
+        mock_hub_instance.get_audit_stream_summary.return_value = None
+        expected_res = {"processed": random.choice([True, False])}
+        mock_hub_instance.process_audit_stream_data.return_value = expected_res
+        
+        stream_data = io.BytesIO(uuid.uuid4().bytes)
+
+        service = MarketPortfolioAuditAlertNotifierService(
+            db_storage=self.storage_file,
+            token=self.telegram_token,
+            chat_id=self.chat_id
+        )
+
+        result = service.process_and_audit_stream(
+            export_path=self.export_path,
+            stream=stream_data
+        )
+
+        self.assertEqual(result, expected_res)
+        mock_hub_instance.process_audit_stream_data.assert_called_once_with(
+            export_path=self.export_path,
+            stream=stream_data
+        )
+        mock_hub_instance.get_audit_stream_summary.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()

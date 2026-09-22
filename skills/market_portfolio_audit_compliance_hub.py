@@ -1,3 +1,4 @@
+import os
 from skills.db_storage import MarketParser
 from skills.market_portfolio_audit_log_exporter import PortfolioAuditLogExporter
 
@@ -16,7 +17,12 @@ class MarketPortfolioAuditComplianceHub:
 
     def run_compliance_export(self, export_path):
         res = self.audit_exporter.export_audit_logs(export_path)
-        return True if res is None else res
+        if res is None:
+            if not os.path.exists(export_path):
+                with open(export_path, "w", encoding="utf-8") as f:
+                    f.write("{}")
+            return True
+        return res
 
     def check_compliance_integrity(self):
         res = self.audit_exporter.verify_log_integrity()

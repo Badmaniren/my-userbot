@@ -1,94 +1,71 @@
-import unittest
 import os
-import tempfile
+import unittest
 import uuid
-import json
 import random
+import json
+from skills.market_portfolio_alert_filter_router import AlertFilterRouter
 
-from skills.market_portfolio_alert_filter_router import *
-from skills import market_portfolio_alert_dispatcher
-from skills import market_portfolio_performance_analytics
-
-
-class TestMarketPortfolioAlertFilterRouterIntegration(unittest.TestCase):
-
+class TestAlertFilterRouterIntegration(unittest.TestCase):
     def setUp(self):
-        self.test_dir = tempfile.TemporaryDirectory()
-        self.storage_file = os.path.join(self.test_dir.name, f"test_market_data_{uuid.uuid4()}.json")
+        self.test_dir = "test_storage_" + str(uuid.uuid4())
+        os.makedirs(self.test_dir, exist_ok=True)
+        self.storage_file = os.path.join(self.test_dir, f"storage_{uuid.uuid4()}.json")
         
-        self.symbol = f"TEST_{uuid.uuid4().hex[:6].upper()}"
-        self.url = f"https://example.com/api/{uuid.uuid4()}"
-        self.telegram_token = f"token_{uuid.uuid4().hex}"
-        self.chat_id = str(random.randint(100000, 999999))
-        self.severity_level = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
-        self.min_threshold = round(random.uniform(10.0, 100.0), 2)
-        self.channels = ["telegram", "log"]
-
+        # Генерируем случайные начальные данные для реального хранилища, чтобы избежать моков
+        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
         initial_data = {
             self.symbol: [
-                {"timestamp": "2023-01-01T00:00:00", "price": 100.0},
-                {"timestamp": "2023-01-02T00:00:00", "price": 105.0},
-                {"timestamp": "2023-01-03T00:00:00", "price": 102.0}
+                {"price": round(random.uniform(10.0, 100.0), 2), "timestamp": "2023-01-01T00:00:00"}
             ]
         }
         with open(self.storage_file, "w", encoding="utf-8") as f:
             json.dump(initial_data, f)
 
+        self.url = f"https://example.com/api/{uuid.uuid4()}"
+        self.telegram_token = f"token_{uuid.uuid4()}"
+        self.chat_id = str(random.randint(100000, 999999))
+        self.severity_level = random.choice(["LOW", "MEDIUM", "HIGH"])
+        self.min_threshold = round(random.uniform(1.0, 5.0), 2)
+        self.channels = ["telegram"]
+
     def tearDown(self):
-        self.test_dir.cleanup()
+        if os.path.exists(self.storage_file):
+            os.remove(self.storage_file)
+        if os.path.exists(self.test_dir):
+            os.rmdir(self.test_dir)
 
-    def test_composition_and_filtering_integration(self):
-        analytics_instance = market_portfolio_performance_analytics.PortfolioPerformanceAnalytics(self.storage_file)
-        metrics = analytics_instance.calculate_metrics(self.symbol)
+    def test_alert_filter_router_integration_flow(self):
+        router = AlertFilterRouter(storage_file=self.storage_file)
         
-        self.assertIsInstance(metrics, dict, "Аналитический навык должен возвращать словарь метрик")
+        # Проверяем интеграционный вызов load_stream_data, который читает реальный файл
+        stream_data = router.load_stream_data()
+        self.assertIsNotNone(stream_data)
 
-        try:
-            filter_result = filter_and_route_portfolio_alerts(
-                symbol=self.symbol,
-                url=self.url,
-                telegram_token=self.telegram_token,
-                chat_id=self.chat_id,
-                storage_file=self.storage_file,
-                severity_level=self.severity_level,
-                min_threshold=self.min_threshold,
-                channels=self.channels
-            )
-        except NameError:
-            try:
-                filter_result = process_alert_filter_routing(
-                    symbol=self.symbol,
-                    url=self.url,
-                    telegram_token=self.telegram_token,
-                    chat_id=self.chat_id,
-                    storage_file=self.storage_file,
-                    severity_level=self.severity_level,
-                    min_threshold=self.min_threshold,
-                    channels=self.channels
-                )
-            except NameError:
-                router_cls = getattr(sys.modules[__name__], 'AlertFilterRouter', None)
-                if router_cls:
-                    router = router_cls(self.storage_file)
-                    filter_result = router.route_filtered_alerts(
-                        symbol=self.symbol,
-                        url=self.url,
-                        telegram_token=self.telegram_token,
-                        chat_id=self.chat_id,
-                        severity_level=self.severity_level,
-                        min_threshold=self.min_threshold,
-                        channels=self.channels
-                    )
-                else:
-                    self.fail("Не найдены ожидаемые функции или классы для интеграции в market_portfolio_alert_filter_router")
+        # Выполняем комплексную маршрутизацию и фильтрацию без моков
+        result = router.process_and_route(
+            symbol=self.symbol,
+            url=self.url,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id,
+            severity_level=self.severity_level,
+            min_threshold=self.min_threshold,
+            channels=self.channels
+        )
 
-        self.assertIsNotNone(filter_result, "Результат маршрутизации алертов не должен быть пустым")
+        self.assertIsInstance(result, dict)
+        self.assertIn("analytics_data", result)
         
-        if isinstance(filter_result, dict):
-            self.assertIn("status", filter_result)
-        elif isinstance(filter_result, bool):
-            self.assertTrue(filter_result)
-
+        # Проверяем алиас метод
+        routed_result = router.route_filtered_alerts(
+            symbol=self.symbol,
+            url=self.url,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id,
+            severity_level=self.severity_level,
+            min_threshold=self.min_threshold,
+            channels=self.channels
+        )
+        self.assertIsInstance(routed_result, dict)
 
 if __name__ == "__main__":
     unittest.main()

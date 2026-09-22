@@ -25,7 +25,7 @@ def start_new(token: str, chat_id: str, message: str) -> bool:
             
         data = response.json()
         return bool(data.get("ok", False))
-    except (ValueError, requests.RequestException, Exception):
+    except (ValueError, requests.RequestException):
         return False
 
 

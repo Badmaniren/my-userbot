@@ -1,18 +1,36 @@
-from skills import market_portfolio_alert_event_sink
-from skills import market_portfolio_alert_filter_router
-from skills import market_portfolio_performance_analytics
+import os
+import sys
+
+skills_dir = os.path.dirname(os.path.abspath(__file__))
+if skills_dir not in sys.path:
+    sys.path.insert(0, skills_dir)
+
+try:
+    from skills import market_portfolio_alert_event_sink
+    from skills import market_portfolio_alert_filter_router
+    from skills import market_portfolio_performance_analytics
+except ImportError:
+    import market_portfolio_alert_event_sink
+    import market_portfolio_alert_filter_router
+    import market_portfolio_performance_analytics
 
 
 def process_event_intelligence(
-    symbol,
-    url,
-    token,
-    chat_id,
-    storage_file,
-    severity,
-    threshold,
-    channels
+    symbol=None,
+    url=None,
+    token=None,
+    chat_id=None,
+    storage_file=None,
+    severity=None,
+    threshold=None,
+    channels=None,
+    **kwargs
 ):
+    token = token or kwargs.get("telegram_token")
+    severity = severity or kwargs.get("severity_level")
+    threshold = threshold if threshold is not None else kwargs.get("min_threshold")
+    storage_file = storage_file or kwargs.get("storage")
+
     try:
         sink_res = market_portfolio_alert_event_sink.route_and_sink_alerts(
             symbol=symbol,
@@ -42,7 +60,7 @@ def process_event_intelligence(
                     url=url,
                     token=token,
                     chat_id=chat_id,
-                    storage=storage_file,
+                    storage_file=storage_file,
                     channels=channels
                 )
             except TypeError:
@@ -52,7 +70,7 @@ def process_event_intelligence(
                         url=url,
                         token=token,
                         chat_id=chat_id,
-                        storage=storage_file
+                        storage_file=storage_file
                     )
                 except TypeError:
                     try:
@@ -119,7 +137,7 @@ def process_event_intelligence(
                 try:
                     router_res = market_portfolio_alert_filter_router.route_and_filter_alerts(
                         symbol=symbol,
-                        storage=storage_file
+                        storage_file=storage_file
                     )
                 except TypeError:
                     router_res = market_portfolio_alert_filter_router.route_and_filter_alerts(
@@ -263,3 +281,7 @@ def process_intelligence_hub_trigger(
         "processed_symbol": symbol,
         "details": res
     }
+
+
+sys.modules['market_portfolio_event_intelligence_hub'] = sys.modules[__name__]
+sys.modules['skills.market_portfolio_event_intelligence_hub'] = sys.modules[__name__]

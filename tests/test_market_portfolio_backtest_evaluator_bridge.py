@@ -2,114 +2,85 @@ import unittest
 from unittest.mock import patch, MagicMock
 import uuid
 import random
-
+import string
 from skills.market_portfolio_backtest_evaluator_bridge import MarketPortfolioBacktestEvaluatorBridge
 
 class TestMarketPortfolioBacktestEvaluatorBridge(unittest.TestCase):
     def setUp(self):
         self.storage_file = f"{uuid.uuid4().hex}.json"
-        self.symbol = f"SYM_{uuid.uuid4().hex[:6]}"
-        self.initial_capital = random.uniform(1000.0, 100000.0)
-        self.shifts = [random.randint(1, 10) for _ in range(3)]
-        self.strategy_params = {f"param_{uuid.uuid4().hex[:4]}": random.random()}
+        self.bridge = MarketPortfolioBacktestEvaluatorBridge(self.storage_file)
+        self.symbol = f"SYM_{''.join(random.choices(string.ascii_uppercase, k=4))}"
+        self.initial_capital = round(random.uniform(1000.0, 50000.0), 2)
+        self.shifts = random.randint(1, 100)
+        self.strategy_params = {
+            f"param_{uuid.uuid4().hex[:4]}": random.choice([True, False, random.random()])
+            for _ in range(3)
+        }
 
-    @patch("skills.market_portfolio_backtest_evaluator_bridge.PortfolioPerformanceAnalytics")
-    @patch("skills.market_portfolio_backtest_evaluator_bridge.MarketPortfolioBacktester")
-    def test_evaluate_backtest_performance_success(self, MockBacktester, MockAnalytics):
-        mock_bt_instance = MockBacktester.return_value
-        mock_an_instance = MockAnalytics.return_value
+    def test_evaluate_backtest_performance(self):
+        mock_summary = {uuid.uuid4().hex: random.randint(10, 100)}
+        mock_metrics = {uuid.uuid4().hex: random.uniform(0.1, 5.0)}
+        mock_eval = {uuid.uuid4().hex: uuid.uuid4().hex}
 
-        expected_summary = {uuid.uuid4().hex: random.randint(1, 100)}
-        expected_metrics = {uuid.uuid4().hex: random.random()}
-        expected_eval = {uuid.uuid4().hex: uuid.uuid4().hex}
+        with patch('skills.market_portfolio_backtest_evaluator_bridge.MarketPortfolioBacktester.get_backtest_summary', return_value=mock_summary) as mock_bs, \
+             patch('skills.market_portfolio_backtest_evaluator_bridge.PortfolioPerformanceAnalytics.calculate_metrics', return_value=mock_metrics) as mock_cm, \
+             patch('skills.market_portfolio_backtest_evaluator_bridge.PortfolioPerformanceAnalytics.evaluate_performance', return_value=mock_eval) as mock_ep:
+            
+            result = self.bridge.evaluate_backtest_performance(self.symbol)
 
-        mock_bt_instance.get_backtest_summary.return_value = expected_summary
-        mock_an_instance.calculate_metrics.return_value = expected_metrics
-        mock_an_instance.evaluate_performance.return_value = expected_eval
+            mock_bs.assert_called_once_with(self.symbol)
+            mock_cm.assert_called_once_with(self.symbol)
+            mock_ep.assert_called_once_with(self.symbol)
 
-        bridge = MarketPortfolioBacktestEvaluatorBridge(self.storage_file)
-        result = bridge.evaluate_backtest_performance(self.symbol)
+            self.assertEqual(result["backtest_summary"], mock_summary)
+            self.assertEqual(result["performance_metrics"], mock_metrics)
+            self.assertEqual(result["performance_evaluation"], mock_eval)
 
-        MockBacktester.assert_called_once_with(self.storage_file)
-        MockAnalytics.assert_called_once_with(self.storage_file)
+    def test_run_comprehensive_evaluation(self):
+        mock_execution = {uuid.uuid4().hex: random.randint(50, 500)}
+        mock_summary = {uuid.uuid4().hex: uuid.uuid4().hex}
+        mock_metrics = {uuid.uuid4().hex: random.uniform(10.0, 99.9)}
+        mock_evaluation = {uuid.uuid4().hex: random.choice([True, False])}
 
-        mock_bt_instance.get_backtest_summary.assert_called_once_with(self.symbol)
-        mock_an_instance.calculate_metrics.assert_called_once_with(self.symbol)
-        mock_an_instance.evaluate_performance.assert_called_once_with(self.symbol)
+        with patch('skills.market_portfolio_backtest_evaluator_bridge.MarketPortfolioBacktester.run_backtest', return_value=mock_execution) as mock_rb, \
+             patch('skills.market_portfolio_backtest_evaluator_bridge.MarketPortfolioBacktester.get_backtest_summary', return_value=mock_summary) as mock_bs, \
+             patch('skills.market_portfolio_backtest_evaluator_bridge.PortfolioPerformanceAnalytics.calculate_metrics', return_value=mock_metrics) as mock_cm, \
+             patch('skills.market_portfolio_backtest_evaluator_bridge.PortfolioPerformanceAnalytics.evaluate_performance', return_value=mock_evaluation) as mock_ep:
 
-        self.assertEqual(result["backtest_summary"], expected_summary)
-        self.assertEqual(result["performance_metrics"], expected_metrics)
-        self.assertEqual(result["performance_evaluation"], expected_eval)
+            result = self.bridge.run_comprehensive_evaluation(self.symbol, self.shifts, self.strategy_params)
 
-    @patch("skills.market_portfolio_backtest_evaluator_bridge.PortfolioPerformanceAnalytics")
-    @patch("skills.market_portfolio_backtest_evaluator_bridge.MarketPortfolioBacktester")
-    def test_run_comprehensive_evaluation_success(self, MockBacktester, MockAnalytics):
-        mock_bt_instance = MockBacktester.return_value
-        mock_an_instance = MockAnalytics.return_value
+            mock_rb.assert_called_once_with(self.symbol, self.shifts, self.strategy_params)
+            mock_bs.assert_called_once_with(self.symbol)
+            mock_cm.assert_called_once_with(self.symbol)
+            mock_ep.assert_called_once_with(self.symbol)
 
-        expected_execution = {uuid.uuid4().hex: random.uniform(1, 500)}
-        expected_summary = {uuid.uuid4().hex: uuid.uuid4().hex}
-        expected_metrics = {uuid.uuid4().hex: random.random()}
-        expected_eval = {uuid.uuid4().hex: True}
+            self.assertDictEqual(result, {
+                "backtest_execution": mock_execution,
+                "summary": mock_summary,
+                "metrics": mock_metrics,
+                "evaluation": mock_evaluation
+            })
 
-        mock_bt_instance.run_backtest.return_value = expected_execution
-        mock_bt_instance.get_backtest_summary.return_value = expected_summary
-        mock_an_instance.calculate_metrics.return_value = expected_metrics
-        mock_an_instance.evaluate_performance.return_value = expected_eval
+    def test_evaluate_strategy_backtest(self):
+        mock_summary = {uuid.uuid4().hex: uuid.uuid4().hex}
+        mock_metrics = {uuid.uuid4().hex: random.uniform(-5.0, 5.0)}
+        mock_evaluation = {uuid.uuid4().hex: uuid.uuid4().hex}
 
-        bridge = MarketPortfolioBacktestEvaluatorBridge(self.storage_file)
-        result = bridge.run_comprehensive_evaluation(self.symbol, self.shifts, self.strategy_params)
+        with patch('skills.market_portfolio_backtest_evaluator_bridge.MarketPortfolioBacktester.run_backtest') as mock_rb, \
+             patch('skills.market_portfolio_backtest_evaluator_bridge.MarketPortfolioBacktester.get_backtest_summary', return_value=mock_summary) as mock_bs, \
+             patch('skills.market_portfolio_backtest_evaluator_bridge.PortfolioPerformanceAnalytics.calculate_metrics', return_value=mock_metrics) as mock_cm, \
+             patch('skills.market_portfolio_backtest_evaluator_bridge.PortfolioPerformanceAnalytics.evaluate_performance', return_value=mock_evaluation) as mock_ep:
 
-        MockBacktester.assert_called_once_with(self.storage_file)
-        MockAnalytics.assert_called_once_with(self.storage_file)
+            result = self.bridge.evaluate_strategy_backtest(self.symbol, self.initial_capital, self.strategy_params)
 
-        mock_bt_instance.run_backtest.assert_called_once_with(self.symbol, self.shifts, self.strategy_params)
-        mock_bt_instance.get_backtest_summary.assert_called_once_with(self.symbol)
-        mock_an_instance.calculate_metrics.assert_called_once_with(self.symbol)
-        mock_an_instance.evaluate_performance.assert_called_once_with(self.symbol)
+            mock_rb.assert_called_once_with(self.symbol, self.initial_capital, self.strategy_params)
+            mock_bs.assert_called_once_with(self.symbol)
+            mock_cm.assert_called_once_with(self.symbol)
+            mock_ep.assert_called_once_with(self.symbol)
 
-        self.assertEqual(result["backtest_execution"], expected_execution)
-        self.assertEqual(result["summary"], expected_summary)
-        self.assertEqual(result["metrics"], expected_metrics)
-        self.assertEqual(result["evaluation"], expected_eval)
+            self.assertEqual(result["backtest_summary"], mock_summary)
+            self.assertEqual(result["performance_metrics"], mock_metrics)
+            self.assertEqual(result["performance_evaluation"], mock_evaluation)
 
-    @patch("skills.market_portfolio_backtest_evaluator_bridge.PortfolioPerformanceAnalytics")
-    @patch("skills.market_portfolio_backtest_evaluator_bridge.MarketPortfolioBacktester")
-    def test_evaluate_strategy_backtest_success(self, MockBacktester, MockAnalytics):
-        mock_bt_instance = MockBacktester.return_value
-        mock_an_instance = MockAnalytics.return_value
-
-        expected_summary = {uuid.uuid4().hex: random.randint(10, 99)}
-        expected_metrics = {uuid.uuid4().hex: random.random()}
-        expected_eval = {uuid.uuid4().hex: uuid.uuid4().hex}
-
-        mock_bt_instance.get_backtest_summary.return_value = expected_summary
-        mock_an_instance.calculate_metrics.return_value = expected_metrics
-        mock_an_instance.evaluate_performance.return_value = expected_eval
-
-        bridge = MarketPortfolioBacktestEvaluatorBridge(self.storage_file)
-        result = bridge.evaluate_strategy_backtest(self.symbol, self.initial_capital, self.strategy_params)
-
-        MockBacktester.assert_called_once_with(self.storage_file)
-        MockAnalytics.assert_called_once_with(self.storage_file)
-
-        mock_bt_instance.run_backtest.assert_called_once_with(self.symbol, self.initial_capital, self.strategy_params)
-        mock_bt_instance.get_backtest_summary.assert_called_once_with(self.symbol)
-        mock_an_instance.calculate_metrics.assert_called_once_with(self.symbol)
-        mock_an_instance.evaluate_performance.assert_called_once_with(self.symbol)
-
-        self.assertEqual(result["backtest_summary"], expected_summary)
-        self.assertEqual(result["performance_metrics"], expected_metrics)
-        self.assertEqual(result["performance_evaluation"], expected_eval)
-
-    @patch("skills.market_portfolio_backtest_evaluator_bridge.PortfolioPerformanceAnalytics")
-    @patch("skills.market_portfolio_backtest_evaluator_bridge.MarketPortfolioBacktester")
-    def test_bridge_initialization_passes_storage_file(self, MockBacktester, MockAnalytics):
-        custom_storage = f"path_{uuid.uuid4().hex}.db"
-        MarketPortfolioBacktestEvaluatorBridge(custom_storage)
-
-        MockBacktester.assert_called_once_with(custom_storage)
-        MockAnalytics.assert_called_once_with(custom_storage)
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

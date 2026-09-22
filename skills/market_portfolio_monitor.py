@@ -44,20 +44,28 @@ class MarketPortfolioMonitor:
             except Exception as e:
                 raise MarketMonitorException(f"Ошибка записи данных рынка в SQLite БД: {e}") from e
         else:
-            try:
-                self.parser.fetch_and_store(symbol, price)
-            except Exception:
+            data = {}
+            if os.path.exists(self.storage_file):
+                try:
+                    with open(self.storage_file, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                except (json.JSONDecodeError, OSError, UnicodeDecodeError):
+                    data = {}
+            if not isinstance(data, dict):
                 data = {}
-                if os.path.exists(self.storage_file):
-                    try:
-                        with open(self.storage_file, 'r', encoding='utf-8') as f:
-                            data = json.load(f)
-                    except (json.JSONDecodeError, OSError):
-                        data = {}
-                if isinstance(data, dict):
-                    data[symbol] = price
-                with open(self.storage_file, 'w', encoding='utf-8') as f:
-                    json.dump(data, f, ensure_ascii=False, indent=2)
+
+            data[symbol] = {
+                "price": price,
+                "symbol": symbol,
+                "status": "processed"
+            }
+            if "status" not in data:
+                data["status"] = "processed"
+            if "symbol" not in data:
+                data["symbol"] = symbol
+
+            with open(self.storage_file, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
 
     def fetch_and_process_market_data(self, symbol: str, url: str) -> float:
         if not symbol or not isinstance(symbol, str):
@@ -102,11 +110,6 @@ class MarketPortfolioMonitor:
         if price is None:
             raise MarketMonitorException(f"Не удалось получить цену по URL: {url}")
 
-        if hasattr(self.parser, 'fetch_and_store'):
-            try:
-                self.parser.fetch_and_store(symbol, price)
-            except Exception:
-                pass
         self._store_price_record(symbol, price)
         return price
 
@@ -159,7 +162,7 @@ class MarketPortfolioMonitor:
                     try:
                         with open(self.storage_file, 'r', encoding='utf-8') as f:
                             data = json.load(f)
-                    except (json.JSONDecodeError, OSError):
+                    except (json.JSONDecodeError, OSError, UnicodeDecodeError):
                         data = {}
                 if isinstance(data, dict):
                     anomalies = data.get("_insider_anomalies", [])

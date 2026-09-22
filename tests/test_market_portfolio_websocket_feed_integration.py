@@ -1,16 +1,17 @@
 import unittest
 import os
+import json
 import uuid
 import random
-from skills.market_portfolio_websocket_feed import MarketWebSocketFeed
+from skills.market_portfolio_websocket_feed import MarketWebSocketFeed, start_new
 
 class TestMarketPortfolioWebsocketFeedIntegration(unittest.TestCase):
 
     def setUp(self):
-        self.storage_file = f"test_market_storage_{uuid.uuid4().hex}.json"
-        self.symbol = f"SYM_{random.randint(1000, 9999)}"
-        self.test_url = f"wss://echo.websocket.events/?id={uuid.uuid4().hex}"
-        self.feed = MarketWebSocketFeed(self.storage_file)
+        self.storage_file = f"test_market_storage_{uuid.uuid4()}.json"
+        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
+        self.price = round(random.uniform(10.0, 5000.0), 2)
+        self.feed = MarketWebSocketFeed(storage_file=self.storage_file)
 
     def tearDown(self):
         if os.path.exists(self.storage_file):
@@ -19,20 +20,24 @@ class TestMarketPortfolioWebsocketFeedIntegration(unittest.TestCase):
             except OSError:
                 pass
 
-    def test_websocket_feed_integration_real_handling(self):
-        random_price = round(random.uniform(10.0, 1500.0), 2)
+    def test_process_incoming_data_real_storage(self):
+        result = self.feed.process_incoming_data(self.symbol, self.price)
         
-        try:
-            self.feed.connect_and_stream(self.test_url, self.symbol, max_messages=1)
-        except Exception as e:
-            self.assertIsNotNone(e, "Exception should propagate safely without suppression if connection fails")
+        self.assertIn("price", result)
+        self.assertEqual(result["price"], self.price)
 
-        if hasattr(self.feed, "process_incoming_data"):
-            result = self.feed.process_incoming_data(self.symbol, random_price)
-            self.assertIsNotNone(result)
+        self.assertTrue(os.path.exists(self.storage_file))
+        
+        with open(self.storage_file, 'r', encoding='utf-8') as f:
+            stored_data = json.load(f)
 
-        if os.path.exists(self.storage_file):
-            self.assertTrue(os.path.getsize(self.storage_file) >= 0)
+        self.assertIn(self.symbol, stored_data)
+        self.assertEqual(stored_data[self.symbol]["price"], self.price)
+
+    def test_websocket_feed_class_methods(self):
+        ws_feed = MarketWebSocketFeed(storage_file=self.storage_file)
+        updated_data = ws_feed.process_incoming_data(self.symbol, self.price)
+        self.assertEqual(updated_data["price"], self.price)
 
 if __name__ == '__main__':
     unittest.main()

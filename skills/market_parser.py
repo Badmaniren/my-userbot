@@ -9,11 +9,16 @@ class MarketParser:
     def __init__(self, storage_file=None):
         self.storage_file = storage_file
 
-    def fetch_price(self, url):
+    def fetch_price(self, url, symbol=None):
         try:
             response = requests.get(url, timeout=10)
             try:
                 data = response.json()
+                if isinstance(data, dict):
+                    if symbol and symbol in data:
+                        return data[symbol]
+                    elif "price" in data:
+                        return data["price"]
                 return data
             except ValueError as e:
                 return {"error": str(e)}
@@ -50,10 +55,17 @@ class MarketParser:
             except (json.JSONDecodeError, OSError):
                 data = {}
 
-        data[symbol] = {
-            "price": price,
-            "record_id": record_id
-        }
+        if not isinstance(data, dict):
+            data = {}
+
+        if symbol in data and isinstance(data[symbol], dict):
+            data[symbol]["price"] = price
+            data[symbol]["record_id"] = record_id
+        else:
+            data[symbol] = {
+                "price": price,
+                "record_id": record_id
+            }
 
         if self.storage_file:
             with open(self.storage_file, 'w', encoding='utf-8') as f:

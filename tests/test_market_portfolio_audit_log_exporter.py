@@ -1,103 +1,126 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, mock_open
+import json
+import os
 import random
 import uuid
 import string
 import io
-import json
-import os
+from skills.market_portfolio_audit_log_exporter import PortfolioAuditLogExporter, MarketPortfolioAuditLogExporter
 
-from skills.market_portfolio_audit_log_exporter import (
-    PortfolioAuditLogExporter
-)
 
 class TestMarketPortfolioAuditLogExporter(unittest.TestCase):
 
     def setUp(self):
-        self.random_storage_file = f"{uuid.uuid4().hex}.json"
-        self.random_export_path = f"{uuid.uuid4().hex}_audit.log"
-        self.random_symbol = ''.join(random.choices(string.ascii_uppercase, k=5))
-        self.random_price = round(random.uniform(10.0, 5000.0), 2)
-        self.random_timestamp = uuid.uuid4().hex
+        self.storage_file = f"{uuid.uuid4().hex}.json"
+        self.export_path = f"{uuid.uuid4().hex}_export.json"
+        self.exporter = PortfolioAuditLogExporter(self.storage_file)
+        self.adapter = MarketPortfolioAuditLogExporter(self.storage_file)
 
     def tearDown(self):
-        for fpath in [self.random_storage_file, self.random_export_path]:
-            if os.path.exists(fpath):
+        for f in [self.storage_file, self.export_path]:
+            if os.path.exists(f):
                 try:
-                    os.remove(fpath)
+                    os.remove(f)
                 except OSError:
                     pass
 
-    def test_exporter_initialization(self):
-        exporter = PortfolioAuditLogExporter(self.random_storage_file)
-        self.assertEqual(exporter.storage_file, self.random_storage_file)
-
-    def test_export_audit_logs_success(self):
-        mock_data = json.dumps([
-            {"symbol": self.random_symbol, "price": self.random_price, "event": uuid.uuid4().hex}
-        ])
-
-        with patch("builtins.open", unittest.mock.mock_open(read_data=mock_data)) as mock_file:
-            exporter = PortfolioAuditLogExporter(self.random_storage_file)
-            result = exporter.export_audit_logs(self.random_export_path)
-
-            self.assertTrue(result)
-            mock_file.assert_any_call(self.random_storage_file, 'r', encoding='utf-8')
-            mock_file.assert_any_call(self.random_export_path, 'w', encoding='utf-8')
-
-    def test_export_audit_logs_empty_storage(self):
-        with patch("builtins.open", unittest.mock.mock_open(read_data="[]")) as mock_file:
-            exporter = PortfolioAuditLogExporter(self.random_storage_file)
-            result = exporter.export_audit_logs(self.random_export_path)
-            self.assertTrue(result)
-
-    def test_export_audit_logs_io_exception(self):
-        with patch("builtins.open", side_effect=IOError(uuid.uuid4().hex)):
-            exporter = PortfolioAuditLogExporter(self.random_storage_file)
-            result = exporter.export_audit_logs(self.random_export_path)
-            self.assertFalse(result)
-
-    def test_get_audit_stream_summary(self):
-        event_id = uuid.uuid4().hex
-        mock_data = json.dumps([
-            {"symbol": self.random_symbol, "price": self.random_price, "event_id": event_id}
-        ])
-
-        with patch("builtins.open", unittest.mock.mock_open(read_data=mock_data)):
-            exporter = PortfolioAuditLogExporter(self.random_storage_file)
-            summary = exporter.get_audit_stream_summary()
-
-            self.assertIsInstance(summary, dict)
-            self.assertIn("total_records", summary)
-            self.assertEqual(summary["total_records"], 1)
-
-    def test_stream_log_export_malformed_json(self):
-        corrupted_data = "{" + uuid.uuid4().hex + ": " + uuid.uuid4().hex + "}}"
-        with patch("builtins.open", unittest.mock.mock_open(read_data=corrupted_data)):
-            exporter = PortfolioAuditLogExporter(self.random_storage_file)
-            result = exporter.export_audit_logs(self.random_export_path)
-            self.assertFalse(result)
-
-    def test_verify_log_integrity(self):
-        record_hash = uuid.uuid4().hex
-        mock_data = json.dumps([
-            {"symbol": self.random_symbol, "hash": record_hash}
-        ])
-
-        with patch("builtins.open", unittest.mock.mock_open(read_data=mock_data)):
-            exporter = PortfolioAuditLogExporter(self.random_storage_file)
-            integrity = exporter.verify_log_integrity()
-            self.assertIsInstance(integrity, bool)
-
-    def test_stream_binary_io_handling(self):
-        binary_garbage = bytes(random.getrandbits(8) for _ in range(64))
-        mock_stream = io.BytesIO(binary_garbage)
+    def test_read_storage_success(self):
+        random_key = uuid.uuid4().hex
+        random_val = uuid.uuid4().hex
+        data = [{random_key: random_val}]
 
         with patch("os.path.exists", return_value=True), \
-             patch("builtins.open", return_value=mock_stream):
-            exporter = PortfolioAuditLogExporter(self.random_storage_file)
-            summary = exporter.get_audit_stream_summary()
-            self.assertIsInstance(summary, dict)
+             patch("builtins.open", mock_open(read_data=json.dumps(data))):
+            res = self.exporter._read_storage()
+            self.assertEqual(res, data)
 
-if __name__ == '__main__':
-    unittest.main()
+    def test_read_storage_not_exists(self):
+        with patch("os.path.exists", return_value=False):
+            res = self.exporter._read_storage()
+            self.assertEqual(res, [])
+
+    def test_read_storage_empty_content(self):
+        with patch("os.path.exists", return_value=True), \
+             patch("builtins.open", mock_open(read_data="   \n")):
+            res = self.exporter._read_storage()
+            self.assertEqual(res, [])
+
+    def test_read_storage_decode_error(self):
+        bad_data = "".join(random.choices(string.ascii_letters, k=10))
+        with patch("os.path.exists", return_value=True), \
+             patch("builtins.open", mock_open(read_data=bad_data)):
+            with self.assertRaises((json.JSONDecodeError, ValueError)):
+                self.exporter._read_storage()
+
+    def test_export_audit_logs_filtered_severity(self):
+        sev1 = uuid.uuid4().hex
+        sev2 = uuid.uuid4().hex
+        id1 = uuid.uuid4().hex
+        id2 = uuid.uuid4().hex
+
+        records = [
+            {"id": id1, "severity": sev1},
+            {"id": id2, "level": sev2}
+        ]
+
+        mock_file = mock_open(read_data=json.dumps(records))
+        with patch("builtins.open", mock_file):
+            result = self.exporter.export_audit_logs(self.export_path, severity_level=sev1)
+            self.assertTrue(result)
+
+    def test_export_audit_logs_dict_data(self):
+        sev = uuid.uuid4().hex
+        record = {"severity": sev, "data": uuid.uuid4().hex}
+
+        mock_file = mock_open(read_data=json.dumps(record))
+        with patch("builtins.open", mock_file):
+            result = self.exporter.export_audit_logs(self.export_path, severity_level=uuid.uuid4().hex)
+            self.assertTrue(result)
+
+    def test_export_audit_logs_exception(self):
+        with patch("builtins.open", side_effect=Exception(uuid.uuid4().hex)):
+            result = self.exporter.export_audit_logs(self.export_path)
+            self.assertFalse(result)
+
+    def test_get_audit_stream_summary_list(self):
+        count = random.randint(1, 10)
+        records = [{"id": uuid.uuid4().hex} for _ in range(count)]
+
+        with patch("builtins.open", mock_open(read_data=json.dumps(records))):
+            summary = self.exporter.get_audit_stream_summary()
+            self.assertEqual(summary.get("total_records"), count)
+
+    def test_get_audit_stream_summary_single(self):
+        record = {"id": uuid.uuid4().hex}
+        with patch("builtins.open", mock_open(read_data=json.dumps(record))):
+            summary = self.exporter.get_audit_stream_summary()
+            self.assertEqual(summary.get("total_records"), 1)
+
+    def test_get_audit_stream_summary_error(self):
+        with patch("builtins.open", side_effect=Exception(uuid.uuid4().hex)):
+            summary = self.exporter.get_audit_stream_summary()
+            self.assertEqual(summary.get("total_records"), 0)
+
+    def test_verify_log_integrity_valid(self):
+        data = {uuid.uuid4().hex: uuid.uuid4().hex}
+        with patch("builtins.open", mock_open(read_data=json.dumps(data))):
+            self.assertTrue(self.exporter.verify_log_integrity())
+
+    def test_verify_log_integrity_invalid(self):
+        with patch("builtins.open", mock_open(read_data="{invalid_json")):
+            self.assertFalse(self.exporter.verify_log_integrity())
+
+    def test_adapter_generate_audit_log(self):
+        sev = uuid.uuid4().hex
+        records = [{"severity": sev}]
+        with patch("builtins.open", mock_open(read_data=json.dumps(records))):
+            res = self.adapter.generate_audit_log(self.export_path, severity_level=sev)
+            self.assertTrue(res)
+
+    def test_adapter_process_audit_stream(self):
+        sev = uuid.uuid4().hex
+        records = [{"level": sev}]
+        with patch("builtins.open", mock_open(read_data=json.dumps(records))):
+            res = self.adapter.process_audit_stream(self.export_path, severity_level=sev)
+            self.assertTrue(res)

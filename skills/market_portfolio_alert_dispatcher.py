@@ -51,5 +51,9 @@ def process_stream_alert(alert_id):
     """
     if market_report_generator is not None:
         generator_instance = market_report_generator.MarketReportGenerator()
-        return generator_instance.get_raw_stream_dump(alert_id)
+        if hasattr(generator_instance, "get_raw_stream_dump"):
+            try:
+                return generator_instance.get_raw_stream_dump(alert_id)
+            except TypeError:
+                return generator_instance.get_raw_stream_dump()
     return io.BytesIO(b"")

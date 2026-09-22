@@ -192,8 +192,21 @@ def coordinate_intelligence_streams(
 
 
 class EventIntelligenceHub:
+    _events = []
+
     def __init__(self, storage_file=None):
         self.storage_file = storage_file
+        self.events = []
+
+    def record_event(self, event):
+        self.events.append(event)
+        EventIntelligenceHub._events.append(event)
+
+    def get_recent_events(self, source=None):
+        all_events = self.events if self.events else EventIntelligenceHub._events
+        if source:
+            return [e for e in all_events if e.get("source") == source]
+        return list(all_events)
 
     def process_intelligence(self, **kwargs):
         if "storage_file" not in kwargs or kwargs["storage_file"] is None:

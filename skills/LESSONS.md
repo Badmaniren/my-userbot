@@ -3,12 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- main
-
-## market_parser (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_telegram_pipeline (refactor) — раундов: 4
+legram_pipeline (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -325,3 +320,6 @@
 ## market_report_generator (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: AssertionError: 1 not greater than or equal to 2
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_reporter (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

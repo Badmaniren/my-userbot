@@ -25,7 +25,7 @@ def start_new(token: str, chat_id: str, message: str) -> bool:
             
         data = response.json()
         return bool(data.get("ok", False))
-    except (ValueError, Exception):
+    except (ValueError, requests.RequestException):
         return False
 
 
@@ -60,13 +60,16 @@ class MarketPortfolioTelegramCommandCenter:
                 return "Please specify a symbol, e.g., /report AAPL"
             symbol = cmd_parts[1].upper()
             
-            data = self.parser.load_data() if hasattr(self.parser, 'load_data') else {}
+            data = {}
+            if hasattr(self.parser, 'load_data'):
+                try:
+                    data = self.parser.load_data(self.storage_file)
+                except TypeError:
+                    data = self.parser.load_data()
+            
             if not data and os.path.exists(self.storage_file):
                 with open(self.storage_file, 'r', encoding='utf-8') as f:
-                    try:
-                        data = json.load(f)
-                    except json.JSONDecodeError:
-                        data = {}
+                    data = json.load(f)
                         
             symbol_data = data.get(symbol, [])
             return f"Report for {symbol}: recorded prices -> {symbol_data}"
@@ -76,13 +79,16 @@ class MarketPortfolioTelegramCommandCenter:
                 return "Please specify a symbol for backtest, e.g., /backtest AAPL"
             symbol = cmd_parts[1].upper()
             
-            data = self.parser.load_data() if hasattr(self.parser, 'load_data') else {}
+            data = {}
+            if hasattr(self.parser, 'load_data'):
+                try:
+                    data = self.parser.load_data(self.storage_file)
+                except TypeError:
+                    data = self.parser.load_data()
+            
             if not data and os.path.exists(self.storage_file):
                 with open(self.storage_file, 'r', encoding='utf-8') as f:
-                    try:
-                        data = json.load(f)
-                    except json.JSONDecodeError:
-                        data = {}
+                    data = json.load(f)
                         
             symbol_data = data.get(symbol, [])
             return f"Backtest executed for {symbol}. Historical data points: {len(symbol_data)}"

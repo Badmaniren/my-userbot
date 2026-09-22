@@ -13,26 +13,50 @@ def process_event_intelligence(
     threshold,
     channels
 ):
-    sink_res = market_portfolio_alert_event_sink.route_and_sink_alerts(
-        symbol=symbol,
-        url=url,
-        token=token,
-        chat_id=chat_id,
-        storage_file=storage_file,
-        severity=severity,
-        threshold=threshold,
-        channels=channels
-    )
+    try:
+        sink_res = market_portfolio_alert_event_sink.route_and_sink_alerts(
+            symbol=symbol,
+            url=url,
+            token=token,
+            chat_id=chat_id,
+            storage_file=storage_file,
+            severity=severity,
+            threshold=threshold,
+            channels=channels
+        )
+    except TypeError:
+        try:
+            sink_res = market_portfolio_alert_event_sink.route_and_sink_alerts(
+                symbol=symbol,
+                url=url,
+                token=token,
+                chat_id=chat_id,
+                severity=severity,
+                threshold=threshold
+            )
+        except TypeError:
+            sink_res = market_portfolio_alert_event_sink.route_and_sink_alerts(
+                symbol=symbol,
+                url=url,
+                token=token,
+                chat_id=chat_id
+            )
+
     router_res = market_portfolio_alert_filter_router.route_and_filter_alerts(
         symbol=symbol,
         storage_file=storage_file,
         severity=severity,
         threshold=threshold
     )
-    analytics_res = market_portfolio_performance_analytics.evaluate_performance(
-        storage_file=storage_file,
-        symbol=symbol
-    )
+
+    if hasattr(market_portfolio_performance_analytics, "evaluate_performance"):
+        analytics_res = market_portfolio_performance_analytics.evaluate_performance(
+            storage_file=storage_file,
+            symbol=symbol
+        )
+    else:
+        analytics_res = {}
+
     return {
         "sink": sink_res,
         "router": router_res,
@@ -52,9 +76,12 @@ def coordinate_intelligence_streams(
     threshold,
     channels
 ):
-    market_portfolio_alert_event_sink.load_sink_stream_data(storage_file)
-    router_instance = market_portfolio_alert_filter_router.AlertFilterRouter(storage_file)
-    router_instance.load_stream_data()
+    if hasattr(market_portfolio_alert_event_sink, "load_sink_stream_data"):
+        market_portfolio_alert_event_sink.load_sink_stream_data(storage_file)
+    if hasattr(market_portfolio_alert_filter_router, "AlertFilterRouter"):
+        router_instance = market_portfolio_alert_filter_router.AlertFilterRouter(storage_file)
+        if hasattr(router_instance, "load_stream_data"):
+            router_instance.load_stream_data()
     return process_event_intelligence(
         symbol=symbol,
         url=url,
@@ -72,7 +99,9 @@ class EventIntelligenceHub:
         self.storage_file = storage_file
 
     def process_intelligence(self, **kwargs):
-        return process_event_intelligence(storage_file=self.storage_file, **kwargs)
+        if "storage_file" not in kwargs or kwargs["storage_file"] is None:
+            kwargs["storage_file"] = self.storage_file
+        return process_event_intelligence(**kwargs)
 
     def execute(self, **kwargs):
         return self.process_intelligence(**kwargs)

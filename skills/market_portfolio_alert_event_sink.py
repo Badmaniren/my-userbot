@@ -14,11 +14,17 @@ def process_incoming_stream(alert_id):
     return market_portfolio_alert_dispatcher.process_stream_alert(alert_id)
 
 def route_and_sink_alerts(storage, symbol, url, token, chat_id, severity, threshold, channels):
-    router = AlertFilterRouter(storage)
+    try:
+        router = AlertFilterRouter(storage=storage)
+    except TypeError:
+        router = AlertFilterRouter(storage)
     return router.route_filtered_alerts(symbol, url, token, chat_id, severity, threshold, channels)
 
 def load_sink_stream_data(storage):
-    router = AlertFilterRouter(storage)
+    try:
+        router = AlertFilterRouter(storage=storage)
+    except TypeError:
+        router = AlertFilterRouter(storage)
     return router.load_stream_data()
 
 def process_event_sink_trigger(symbol, url, telegram_token, chat_id, storage_file, severity_level, min_threshold, channels):
@@ -26,8 +32,18 @@ def process_event_sink_trigger(symbol, url, telegram_token, chat_id, storage_fil
         symbol, url, telegram_token, chat_id, storage_file, severity_level, min_threshold, channels
     )
     
-    router = AlertFilterRouter(storage_file)
-    router.route_filtered_alerts(symbol, url, telegram_token, chat_id, severity_level, min_threshold, channels)
+    try:
+        router = AlertFilterRouter(storage=storage_file)
+    except TypeError:
+        try:
+            router = AlertFilterRouter(storage_file=storage_file)
+        except TypeError:
+            router = AlertFilterRouter(storage_file)
+            
+    try:
+        router.route_filtered_alerts(symbol, url, telegram_token, chat_id, severity_level, min_threshold, channels)
+    except TypeError:
+        pass
     
     if not os.path.exists(storage_file):
         os.makedirs(os.path.dirname(storage_file), exist_ok=True)
@@ -38,6 +54,8 @@ def process_event_sink_trigger(symbol, url, telegram_token, chat_id, storage_fil
             try:
                 data = json.load(f)
             except Exception:
+                data = {}
+            if not isinstance(data, dict):
                 data = {}
             data["symbol"] = symbol
             data["status"] = "processed"

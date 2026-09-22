@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import patch, MagicMock
 import uuid
 import random
+import math
 import io
 from skills.market_portfolio_performance_analytics import (
     PortfolioPerformanceAnalytics,
@@ -10,111 +11,153 @@ from skills.market_portfolio_performance_analytics import (
 
 
 class TestPortfolioPerformanceAnalytics(unittest.TestCase):
-
     def setUp(self):
-        self.storage_file = f"{uuid.uuid4().hex}.json"
-        self.analytics = PortfolioPerformanceAnalytics(self.storage_file)
-        self.symbol = f"SYM_{uuid.uuid4().hex[:6]}"
+        self.random_storage = f"{uuid.uuid4().hex}.json"
+        self.random_symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
 
     def test_load_data_none(self):
-        with patch.object(self.analytics.parser, "load_data", return_value=None):
-            res = self.analytics.load_data(self.storage_file)
+        analytics = PortfolioPerformanceAnalytics(self.random_storage)
+        with patch.object(analytics.parser, "load_data", return_value=None):
+            res = analytics.load_data()
             self.assertEqual(res, [])
 
     def test_load_data_dict(self):
-        rand_dict = {"symbol": self.symbol, "price": random.uniform(10.0, 100.0)}
-        with patch.object(self.analytics.parser, "load_data", return_value=rand_dict):
-            res = self.analytics.load_data(self.storage_file)
-            self.assertEqual(res, [rand_dict])
+        analytics = PortfolioPerformanceAnalytics(self.random_storage)
+        mock_item = {"symbol": self.random_symbol, "price": random.uniform(10.0, 100.0)}
+        with patch.object(analytics.parser, "load_data", return_value=mock_item):
+            res = analytics.load_data()
+            self.assertEqual(res, [mock_item])
 
     def test_load_data_iterable_conversion(self):
-        rand_tuple = (
-            {"symbol": self.symbol, "price": random.uniform(10.0, 100.0)},
+        analytics = PortfolioPerformanceAnalytics(self.random_storage)
+        mock_tuple = (
+            {"symbol": self.random_symbol, "price": 42.0},
         )
-        with patch.object(self.analytics.parser, "load_data", return_value=rand_tuple):
-            res = self.analytics.load_data(self.storage_file)
-            self.assertEqual(res, list(rand_tuple))
+        with patch.object(analytics.parser, "load_data", return_value=mock_tuple):
+            res = analytics.load_data()
+            self.assertEqual(res, [{"symbol": self.random_symbol, "price": 42.0}])
 
-    def test_load_data_invalid_type_fallback(self):
-        with patch.object(self.analytics.parser, "load_data", return_value=12345):
-            res = self.analytics.load_data(self.storage_file)
+    def test_load_data_exception_handling(self):
+        analytics = PortfolioPerformanceAnalytics(self.random_storage)
+        class BadIterable:
+            def __iter__(self):
+                raise TypeError("fail")
+        with patch.object(analytics.parser, "load_data", return_value=BadIterable()):
+            res = analytics.load_data()
             self.assertEqual(res, [])
 
     def test_calculate_metrics_insufficient_data(self):
-        rand_price = random.uniform(50.0, 500.0)
-        mock_data = [{"symbol": self.symbol, "price": rand_price}]
-        with patch.object(self.analytics, "load_data", return_value=mock_data):
-            metrics = self.analytics.calculate_metrics(self.symbol)
-            self.assertEqual(metrics["symbol"], self.symbol)
+        analytics = PortfolioPerformanceAnalytics(self.random_storage)
+        single_item = {"symbol": self.random_symbol, "price": 100.0}
+        with patch.object(analytics, "load_data", return_value=[single_item]):
+            metrics = analytics.calculate_metrics(self.random_symbol)
+            self.assertEqual(metrics["symbol"], self.random_symbol)
             self.assertEqual(metrics["return"], 0.0)
             self.assertEqual(metrics["volatility"], 0.0)
             self.assertEqual(metrics["sharpe_ratio"], 0.0)
 
-    def test_calculate_metrics_valid_prices(self):
+    def test_calculate_metrics_zero_division_prevention(self):
+        analytics = PortfolioPerformanceAnalytics(self.random_storage)
+        data = [
+            {"symbol": self.random_symbol, "price": 0.0},
+            {"symbol": self.random_symbol, "price": 50.0},
+            {"symbol": self.random_symbol, "price": 100.0},
+        ]
+        with patch.object(analytics, "load_data", return_value=data):
+            metrics = analytics.calculate_metrics(self.random_symbol)
+            self.assertIsInstance(metrics, dict)
+            self.assertIn("return", metrics)
+            self.assertIn("volatility", metrics)
+            self.assertIn("sharpe_ratio", metrics)
+
+    def test_calculate_metrics_valid_series(self):
+        analytics = PortfolioPerformanceAnalytics(self.random_storage)
         p1 = random.uniform(10.0, 50.0)
-        p2 = p1 * random.uniform(1.1, 1.5)
-        p3 = p2 * random.uniform(0.8, 0.95)
-        mock_data = [
-            {"symbol": self.symbol, "price": p1},
-            {"symbol": self.symbol, "price": p2},
-            {"symbol": self.symbol, "price": p3},
+        p2 = p1 * 1.08
+        p3 = p2 * 1.02
+        data = [
+            {"symbol": self.random_symbol, "price": p1},
+            {"symbol": self.random_symbol, "price": p2},
+            {"symbol": self.random_symbol, "price": p3},
+            {"symbol": f"OTHER_{uuid.uuid4().hex[:4]}", "price": 999.0},
+            {"symbol": self.random_symbol, "price": "invalid"},
+            {"symbol": self.random_symbol, "price": True},
         ]
-        with patch.object(self.analytics, "load_data", return_value=mock_data):
-            metrics = self.analytics.calculate_metrics(self.symbol)
-            self.assertEqual(metrics["symbol"], self.symbol)
-            self.assertIsInstance(metrics["return"], float)
-            self.assertIsInstance(metrics["volatility"], float)
-            self.assertIsInstance(metrics["sharpe_ratio"], float)
-            self.assertNotEqual(metrics["return"], 0.0)
-
-    def test_calculate_metrics_zero_previous_price(self):
-        mock_data = [
-            {"symbol": self.symbol, "price": 0.0},
-            {"symbol": self.symbol, "price": random.uniform(10.0, 50.0)},
-        ]
-        with patch.object(self.analytics, "load_data", return_value=mock_data):
-            metrics = self.analytics.calculate_metrics(self.symbol)
-            self.assertEqual(metrics["symbol"], self.symbol)
-            self.assertIsInstance(metrics["volatility"], float)
-
-    def test_calculate_metrics_bool_price_ignored(self):
-        mock_data = [
-            {"symbol": self.symbol, "price": True},
-            {"symbol": self.symbol, "price": 100.0},
-            {"symbol": self.symbol, "price": 200.0},
-        ]
-        with patch.object(self.analytics, "load_data", return_value=mock_data):
-            metrics = self.analytics.calculate_metrics(self.symbol)
-            self.assertEqual(metrics["symbol"], self.symbol)
+        with patch.object(analytics, "load_data", return_value=data):
+            metrics = analytics.calculate_metrics(self.random_symbol)
+            self.assertEqual(metrics["symbol"], self.random_symbol)
+            self.assertAlmostEqual(metrics["return"], (p3 - p1) / p1, places=5)
+            self.assertGreater(metrics["volatility"], 0.0)
 
     def test_evaluate_performance(self):
-        rand_price = random.uniform(1.0, 10.0)
-        mock_data = [{"symbol": self.symbol, "price": rand_price}]
-        with patch.object(self.analytics, "load_data", return_value=mock_data):
-            res = self.analytics.evaluate_performance(self.symbol)
-            self.assertEqual(res["symbol"], self.symbol)
+        analytics = PortfolioPerformanceAnalytics(self.random_storage)
+        with patch.object(analytics, "calculate_metrics") as mock_calc:
+            dummy_res = {"symbol": self.random_symbol, "return": 0.5, "volatility": 0.1, "sharpe_ratio": 5.0}
+            mock_calc.return_value = dummy_res
+            res = analytics.evaluate_performance(self.random_symbol)
+            mock_calc.assert_called_once_with(self.random_symbol)
+            self.assertEqual(res, dummy_res)
 
     def test_call_method_with_symbol(self):
-        rand_price = random.uniform(1.0, 10.0)
-        mock_data = [{"symbol": self.symbol, "price": rand_price}]
-        with patch.object(self.analytics, "load_data", return_value=mock_data):
-            res = self.analytics(symbol=self.symbol)
-            self.assertEqual(res["symbol"], self.symbol)
+        analytics = PortfolioPerformanceAnalytics(self.random_storage)
+        with patch.object(analytics, "calculate_metrics") as mock_calc:
+            dummy_res = {"symbol": self.random_symbol, "return": 0.1, "volatility": 0.05, "sharpe_ratio": 2.0}
+            mock_calc.return_value = dummy_res
+            res = analytics(symbol=self.random_symbol)
+            mock_calc.assert_called_once_with(self.random_symbol)
+            self.assertEqual(res, dummy_res)
 
     def test_call_method_without_symbol(self):
-        res = self.analytics(symbol=None)
-        self.assertEqual(res["return"], 0.0)
-        self.assertEqual(res["volatility"], 0.0)
-        self.assertEqual(res["sharpe_ratio"], 0.0)
+        analytics = PortfolioPerformanceAnalytics(self.random_storage)
+        res = analytics(url=f"http://{uuid.uuid4().hex}.com")
+        self.assertEqual(res, {"return": 0.0, "volatility": 0.0, "sharpe_ratio": 0.0})
 
     def test_start_new_function(self):
-        rand_url = f"https://{uuid.uuid4().hex}.org/api"
-        rand_price = random.uniform(5.0, 50.0)
-        mock_data = [{"symbol": self.symbol, "price": rand_price}]
-        with patch("skills.market_portfolio_performance_analytics.PortfolioPerformanceAnalytics.load_data", return_value=mock_data):
-            res = start_new(self.storage_file, self.symbol, rand_url)
-            self.assertEqual(res["symbol"], self.symbol)
+        random_file = f"{uuid.uuid4().hex}.json"
+        random_sym = f"TICK_{uuid.uuid4().hex[:4]}"
+        random_url = f"https://{uuid.uuid4().hex}.org"
+        with patch("skills.market_portfolio_performance_analytics.PortfolioPerformanceAnalytics") as MockClass:
+            instance = MockClass.return_value
+            expected_dict = {"symbol": random_sym, "return": 0.2, "volatility": 0.02, "sharpe_ratio": 10.0}
+            instance.calculate_metrics.return_value = expected_dict
 
+            res = start_new(random_file, random_sym, random_url)
+            MockClass.assert_called_once_with(random_file)
+            instance.calculate_metrics.assert_called_once_with(random_sym)
+            self.assertEqual(res, expected_dict)
 
-if __name__ == "__main__":
-    unittest.main()
+    def test_calculate_metrics_symbol_keyed_dict_list(self):
+        analytics = PortfolioPerformanceAnalytics(self.random_storage)
+        data = {
+            self.random_symbol: [
+                {"price": 100.0},
+                {"value": 110.0},
+                {"close": 125.0},
+            ]
+        }
+        with patch.object(analytics, "load_data", return_value=[data]):
+            metrics = analytics.calculate_metrics(self.random_symbol)
+            self.assertEqual(metrics["symbol"], self.random_symbol)
+            self.assertAlmostEqual(metrics["return"], 0.25, places=5)
+            self.assertGreater(metrics["volatility"], 0.0)
+
+    def test_calculate_metrics_symbol_keyed_numeric_list(self):
+        analytics = PortfolioPerformanceAnalytics(self.random_storage)
+        data = {
+            self.random_symbol: [50.0, 55.0, 60.5]
+        }
+        with patch.object(analytics, "load_data", return_value=[data]):
+            metrics = analytics.calculate_metrics(self.random_symbol)
+            self.assertEqual(metrics["symbol"], self.random_symbol)
+            self.assertAlmostEqual(metrics["return"], 0.21, places=5)
+
+    def test_calculate_metrics_symbol_keyed_single_dict(self):
+        analytics = PortfolioPerformanceAnalytics(self.random_storage)
+        data = {
+            self.random_symbol: {"price": 100.0}
+        }
+        with patch.object(analytics, "load_data", return_value=[data]):
+            metrics = analytics.calculate_metrics(self.random_symbol)
+            self.assertEqual(metrics["symbol"], self.random_symbol)
+            self.assertEqual(metrics["return"], 0.0)
+            self.assertEqual(metrics["volatility"], 0.0)

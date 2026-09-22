@@ -23,15 +23,39 @@ class PortfolioPerformanceAnalytics:
 
     def calculate_metrics(self, symbol: str) -> dict:
         data = self.load_data(self.storage_file)
-        filtered_prices = [
-            item.get("price")
-            for item in data
-            if isinstance(item, dict)
-            and item.get("symbol") == symbol
-            and "price" in item
-            and isinstance(item.get("price"), (int, float))
-            and not isinstance(item.get("price"), bool)
-        ]
+        filtered_prices = []
+
+        def _extract_price(val):
+            if isinstance(val, (int, float)) and not isinstance(val, bool):
+                return float(val)
+            if isinstance(val, dict):
+                for key in ("price", "value", "close"):
+                    if key in val:
+                        v = val.get(key)
+                        if isinstance(v, (int, float)) and not isinstance(v, bool):
+                            return float(v)
+            return None
+
+        items_to_check = data if isinstance(data, list) else [data]
+        for item in items_to_check:
+            if not isinstance(item, dict):
+                continue
+
+            if item.get("symbol") == symbol:
+                p = _extract_price(item)
+                if p is not None:
+                    filtered_prices.append(p)
+            elif symbol in item:
+                val = item[symbol]
+                if isinstance(val, list):
+                    for elem in val:
+                        p = _extract_price(elem)
+                        if p is not None:
+                            filtered_prices.append(p)
+                else:
+                    p = _extract_price(val)
+                    if p is not None:
+                        filtered_prices.append(p)
 
         if not filtered_prices or len(filtered_prices) == 1:
             return {
@@ -63,6 +87,7 @@ class PortfolioPerformanceAnalytics:
             volatility = math.sqrt(variance)
         else:
             volatility = 0.0
+            mean_return = 0.0
 
         risk_free_rate = 0.0
         if volatility > 0:

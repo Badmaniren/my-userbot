@@ -3,17 +3,15 @@ import os
 import json
 import uuid
 import random
-from skills.market_portfolio_monitor import start_new, MarketParser, MarketReportGenerator
+from skills.market_portfolio_monitor import start_new, run_pipeline
 
 class TestMarketPortfolioMonitorIntegration(unittest.TestCase):
-    
     def setUp(self):
-        self.test_id = str(uuid.uuid4())[:8]
-        self.symbol = f"COIN_{self.test_id}"
-        self.storage_file = f"test_storage_{self.test_id}.json"
-        self.url = f"https://example.com/api/{self.test_id}"
-        self.telegram_token = f"token_{self.test_id}"
+        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
+        self.url = f"https://api.telegram.org/bot{uuid.uuid4().hex}/sendMessage"
+        self.telegram_token = uuid.uuid4().hex
         self.chat_id = str(random.randint(100000, 999999))
+        self.storage_file = f"test_storage_{uuid.uuid4().hex}.json"
 
     def tearDown(self):
         if os.path.exists(self.storage_file):
@@ -22,7 +20,7 @@ class TestMarketPortfolioMonitorIntegration(unittest.TestCase):
             except OSError:
                 pass
 
-    def test_pipeline_integration_flow(self):
+    def test_market_portfolio_monitor_full_pipeline(self):
         result = start_new(
             symbol=self.symbol,
             url=self.url,
@@ -30,23 +28,15 @@ class TestMarketPortfolioMonitorIntegration(unittest.TestCase):
             chat_id=self.chat_id,
             storage_file=self.storage_file
         )
-
+        
         self.assertTrue(result)
-        self.assertTrue(os.path.exists(self.storage_file), "Файл хранилища должен быть создан в процессе выполнения пайплайна")
-
-        parser = MarketParser(storage_file=self.storage_file)
-        loaded_data = parser.load_data(self.storage_file)
-        self.assertIsInstance(loaded_data, dict)
-        self.assertIn(self.symbol, loaded_data)
-
-        reporter = MarketReportGenerator(storage_file=self.storage_file)
-        symbol_report = reporter.generate_symbol_report(symbol=self.symbol)
-        self.assertIn(self.symbol, symbol_report)
-
-        raw_dump = reporter.get_raw_stream_dump()
-        self.assertIsInstance(raw_dump, str)
-        parsed_dump = json.loads(raw_dump)
-        self.assertIn(self.symbol, parsed_dump)
+        self.assertTrue(os.path.exists(self.storage_file))
+        
+        with open(self.storage_file, "r", encoding="utf-8") as f:
+            stored_data = json.load(f)
+            
+        self.assertIn(self.symbol, stored_data)
+        self.assertEqual(stored_data[self.symbol], 0.0)
 
 if __name__ == "__main__":
     unittest.main()

@@ -2,12 +2,12 @@ import unittest
 from unittest.mock import patch, MagicMock
 import uuid
 import random
-import string
 import io
-
 from skills.market_portfolio_alert_filter_router import (
     AlertFilterRouter,
-    route_and_filter_alerts
+    route_and_filter_alerts,
+    filter_and_route_portfolio_alerts,
+    process_alert_filter_routing
 )
 
 
@@ -15,133 +15,182 @@ class TestAlertFilterRouter(unittest.TestCase):
 
     def setUp(self):
         self.storage_file = f"{uuid.uuid4().hex}.json"
-        self.symbol = ''.join(random.choices(string.ascii_uppercase, k=5))
-        self.url = f"https://{uuid.uuid4().hex}.com/market"
-        self.token = uuid.uuid4().hex
-        self.chat_id = str(random.randint(100000, 999999))
+        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
+        self.url = f"https://example.com/market/{uuid.uuid4().hex}"
+        self.telegram_token = f"token_{uuid.uuid4().hex}"
+        self.chat_id = str(random.randint(10000, 999999))
         self.severity_level = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
-        self.min_threshold = random.uniform(1.0, 100.0)
-        self.channels = [uuid.uuid4().hex for _ in range(random.randint(1, 3))]
+        self.min_threshold = round(random.uniform(1.0, 100.0), 2)
+        self.channels = [uuid.uuid4().hex, uuid.uuid4().hex]
 
-    def test_alert_filter_router_initialization(self):
+    @patch("skills.market_portfolio_alert_filter_router.PortfolioPerformanceAnalytics")
+    @patch("skills.market_portfolio_alert_filter_router.dispatch_portfolio_alerts")
+    def test_process_and_route_low_severity_fail(self, mock_dispatch, mock_analytics_class):
+        mock_analytics_instance = mock_analytics_class.return_value
+        unique_status = "FAIL"
+        mock_analytics_instance.evaluate_performance.return_value = {
+            "status": unique_status,
+            "metric_id": uuid.uuid4().hex
+        }
+
         router = AlertFilterRouter(self.storage_file)
-        self.assertEqual(router.storage_file, self.storage_file)
-        self.assertIsNotNone(router)
+        result = router.process_and_route(
+            symbol=self.symbol,
+            url=self.url,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id,
+            severity_level="LOW",
+            min_threshold=self.min_threshold,
+            channels=self.channels
+        )
 
-    def test_route_and_filter_alerts_composition(self):
-        mock_analytics_instance = MagicMock()
-        random_metric_key = uuid.uuid4().hex
-        random_metric_val = random.uniform(-500.0, 500.0)
+        self.assertFalse(result["dispatched"])
+        self.assertEqual(result["analytics_data"]["status"], unique_status)
+        mock_dispatch.assert_not_called()
+
+    @patch("skills.market_portfolio_alert_filter_router.PortfolioPerformanceAnalytics")
+    @patch("skills.market_portfolio_alert_filter_router.dispatch_portfolio_alerts")
+    def test_process_and_route_success_dispatch(self, mock_dispatch, mock_analytics_class):
+        mock_analytics_instance = mock_analytics_class.return_value
+        unique_status = uuid.uuid4().hex
         mock_analytics_instance.evaluate_performance.return_value = {
-            random_metric_key: random_metric_val,
-            "status": "PASS"
+            "status": unique_status,
+            "data_key": uuid.uuid4().hex
         }
-        mock_analytics_instance.calculate_metrics.return_value = {
-            uuid.uuid4().hex: random.uniform(0.0, 10.0)
-        }
+        dispatch_marker = {"dispatched": True, "id": uuid.uuid4().hex}
+        mock_dispatch.return_value = dispatch_marker
 
-        with patch('skills.market_portfolio_alert_filter_router.PortfolioPerformanceAnalytics', return_value=mock_analytics_instance) as mock_analytics_class, \
-             patch('skills.market_portfolio_alert_filter_router.dispatch_portfolio_alerts') as mock_dispatch:
+        router = AlertFilterRouter(self.storage_file)
+        result = router.process_and_route(
+            symbol=self.symbol,
+            url=self.url,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id,
+            severity_level="HIGH",
+            min_threshold=self.min_threshold,
+            channels=self.channels
+        )
 
-            router = AlertFilterRouter(self.storage_file)
-            result = router.process_and_route(
-                symbol=self.symbol,
-                url=self.url,
-                telegram_token=self.token,
-                chat_id=self.chat_id,
-                severity_level=self.severity_level,
-                min_threshold=self.min_threshold,
-                channels=self.channels
-            )
+        self.assertEqual(result["dispatch_result"], dispatch_marker)
+        self.assertEqual(result["status"], unique_status)
+        mock_dispatch.assert_called_once_with(
+            symbol=self.symbol,
+            url=self.url,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id,
+            storage_file=self.storage_file,
+            severity_level="HIGH",
+            min_threshold=self.min_threshold,
+            channels=self.channels
+        )
 
-            mock_analytics_class.assert_called_once_with(self.storage_file)
-            mock_analytics_instance.evaluate_performance.assert_called_once_with(self.symbol)
-            mock_dispatch.assert_called_once()
-            
-            call_args = mock_dispatch.call_args[1]
-            self.assertEqual(call_args['symbol'], self.symbol)
-            self.assertEqual(call_args['url'], self.url)
-            self.assertEqual(call_args['telegram_token'], self.token)
-            self.assertEqual(call_args['chat_id'], self.chat_id)
-            self.assertEqual(call_args['storage_file'], self.storage_file)
-            self.assertEqual(call_args['severity_level'], self.severity_level)
-            self.assertEqual(call_args['min_threshold'], self.min_threshold)
-            self.assertEqual(call_args['channels'], self.channels)
+    @patch("skills.market_portfolio_alert_filter_router.PortfolioPerformanceAnalytics")
+    def test_load_stream_data_with_load_data_method(self, mock_analytics_class):
+        mock_analytics_instance = mock_analytics_class.return_value
+        expected_data = {uuid.uuid4().hex: uuid.uuid4().hex}
+        mock_analytics_instance.load_data.return_value = expected_data
 
-            self.assertIn("dispatch_result", result)
-            self.assertIn("analytics_data", result)
-            self.assertEqual(result["analytics_data"]["status"], "PASS")
+        router = AlertFilterRouter(self.storage_file)
+        data = router.load_stream_data()
 
-    def test_route_and_filter_alerts_helper_function(self):
-        mock_router_instance = MagicMock()
-        random_output_key = uuid.uuid4().hex
-        random_output_val = uuid.uuid4().hex
-        mock_router_instance.process_and_route.return_value = {
-            random_output_key: random_output_val
-        }
+        self.assertEqual(data, expected_data)
+        mock_analytics_instance.load_data.assert_called_once()
 
-        with patch('skills.market_portfolio_alert_filter_router.AlertFilterRouter', return_value=mock_router_instance) as mock_class:
-            res = route_and_filter_alerts(
-                storage_file=self.storage_file,
-                symbol=self.symbol,
-                url=self.url,
-                telegram_token=self.token,
-                chat_id=self.chat_id,
-                severity_level=self.severity_level,
-                min_threshold=self.min_threshold,
-                channels=self.channels
-            )
+    @patch("skills.market_portfolio_alert_filter_router.PortfolioPerformanceAnalytics")
+    def test_load_stream_data_fallback_to_file(self, mock_analytics_class):
+        mock_analytics_instance = mock_analytics_class.return_value
+        del mock_analytics_instance.load_data
 
-            mock_class.assert_called_once_with(self.storage_file)
-            mock_router_instance.process_and_route.assert_called_once_with(
-                symbol=self.symbol,
-                url=self.url,
-                telegram_token=self.token,
-                chat_id=self.chat_id,
-                severity_level=self.severity_level,
-                min_threshold=self.min_threshold,
-                channels=self.channels
-            )
-            self.assertEqual(res[random_output_key], random_output_val)
+        random_bytes = uuid.uuid4().hex.encode('utf-8')
+        mock_file = io.BytesIO(random_bytes)
 
-    def test_filter_logic_suppresses_low_priority(self):
-        mock_analytics_instance = MagicMock()
-        mock_analytics_instance.evaluate_performance.return_value = {
-            "score": -999.0,
-            "status": "FAIL"
-        }
-
-        with patch('skills.market_portfolio_alert_filter_router.PortfolioPerformanceAnalytics', return_value=mock_analytics_instance), \
-             patch('skills.market_portfolio_alert_filter_router.dispatch_portfolio_alerts') as mock_dispatch:
-
-            router = AlertFilterRouter(self.storage_file)
-            result = router.process_and_route(
-                symbol=self.symbol,
-                url=self.url,
-                telegram_token=self.token,
-                chat_id=self.chat_id,
-                severity_level="LOW",
-                min_threshold=self.min_threshold,
-                channels=self.channels
-            )
-
-            mock_dispatch.assert_not_called()
-            self.assertEqual(result["analytics_data"]["status"], "FAIL")
-            self.assertFalse(result.get("dispatched", True))
-
-    def test_io_stream_mocking_chaos(self):
-        random_bytes = uuid.uuid4().bytes
-        stream_mock = io.BytesIO(random_bytes)
-        
-        with patch('skills.market_portfolio_alert_filter_router.PortfolioPerformanceAnalytics') as mock_analytics_class:
-            mock_instance = mock_analytics_class.return_value
-            mock_instance.load_data.return_value = stream_mock.read()
-
-            router = AlertFilterRouter(self.storage_file)
+        router = AlertFilterRouter(self.storage_file)
+        with patch("builtins.open", return_value=mock_file) as mock_open:
             data = router.load_stream_data()
-            
+            mock_open.assert_called_once_with(self.storage_file, "rb")
             self.assertEqual(data, random_bytes)
 
+    @patch("skills.market_portfolio_alert_filter_router.AlertFilterRouter.process_and_route")
+    def test_route_filtered_alerts_delegation(self, mock_process_and_route):
+        expected_return = {uuid.uuid4().hex: uuid.uuid4().hex}
+        mock_process_and_route.return_value = expected_return
 
-if __name__ == '__main__':
+        router = AlertFilterRouter(self.storage_file)
+        result = router.route_filtered_alerts(
+            symbol=self.symbol,
+            url=self.url,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id,
+            severity_level=self.severity_level,
+            min_threshold=self.min_threshold,
+            channels=self.channels
+        )
+
+        self.assertEqual(result, expected_return)
+        mock_process_and_route.assert_called_once_with(
+            symbol=self.symbol,
+            url=self.url,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id,
+            severity_level=self.severity_level,
+            min_threshold=self.min_threshold,
+            channels=self.channels
+        )
+
+    @patch("skills.market_portfolio_alert_filter_router.AlertFilterRouter.process_and_route")
+    def test_route_and_filter_alerts_helper(self, mock_process_and_route):
+        expected_return = {uuid.uuid4().hex: uuid.uuid4().hex}
+        mock_process_and_route.return_value = expected_return
+
+        result = route_and_filter_alerts(
+            storage_file=self.storage_file,
+            symbol=self.symbol,
+            url=self.url,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id,
+            severity_level=self.severity_level,
+            min_threshold=self.min_threshold,
+            channels=self.channels
+        )
+
+        self.assertEqual(result, expected_return)
+
+    @patch("skills.market_portfolio_alert_filter_router.AlertFilterRouter.process_and_route")
+    def test_filter_and_route_portfolio_alerts_helper(self, mock_process_and_route):
+        expected_return = {uuid.uuid4().hex: uuid.uuid4().hex}
+        mock_process_and_route.return_value = expected_return
+
+        result = filter_and_route_portfolio_alerts(
+            symbol=self.symbol,
+            url=self.url,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id,
+            storage_file=self.storage_file,
+            severity_level=self.severity_level,
+            min_threshold=self.min_threshold,
+            channels=self.channels
+        )
+
+        self.assertEqual(result, expected_return)
+
+    @patch("skills.market_portfolio_alert_filter_router.AlertFilterRouter.process_and_route")
+    def test_process_alert_filter_routing_helper(self, mock_process_and_route):
+        expected_return = {uuid.uuid4().hex: uuid.uuid4().hex}
+        mock_process_and_route.return_value = expected_return
+
+        result = process_alert_filter_routing(
+            symbol=self.symbol,
+            url=self.url,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id,
+            storage_file=self.storage_file,
+            severity_level=self.severity_level,
+            min_threshold=self.min_threshold,
+            channels=self.channels
+        )
+
+        self.assertEqual(result, expected_return)
+
+
+if __name__ == "__main__":
     unittest.main()

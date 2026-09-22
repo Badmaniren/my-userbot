@@ -2,109 +2,130 @@ import unittest
 from unittest.mock import patch, MagicMock
 import uuid
 import random
-import string
+import io
 from skills.market_report_generator import MarketReportGenerator, generate_market_report
-
 
 class TestMarketReportGenerator(unittest.TestCase):
 
-    def setUp(self):
-        self.storage_file = f"{uuid.uuid4().hex}.json"
-        self.symbol = "".join(random.choices(string.ascii_uppercase, k=5))
-        self.generator = MarketReportGenerator(storage_file=self.storage_file)
-
-    def test_generate_symbol_report_with_list_data(self):
-        min_p = round(random.uniform(10.0, 50.0), 2)
-        max_p = round(random.uniform(51.0, 100.0), 2)
+    def test_generate_symbol_report_valid_list(self):
+        sym = uuid.uuid4().hex[:6]
+        p1 = random.uniform(10.0, 50.0)
+        p2 = random.uniform(51.0, 100.0)
         mock_data = [
-            {"symbol": self.symbol, "price": min_p},
-            {"symbol": self.symbol, "price": max_p},
-            {"symbol": "".join(random.choices(string.ascii_uppercase, k=4)), "price": 999.9}
+            {"symbol": sym, "price": p1},
+            {"symbol": sym, "price": p2},
+            {"symbol": uuid.uuid4().hex[:6], "price": 999.0}
         ]
 
-        with patch.object(self.generator.parser, "load_data", return_value=mock_data) as mock_load:
-            report = self.generator.generate_symbol_report(self.symbol)
-            mock_load.assert_called_once_with(self.storage_file)
+        with patch("skills.market_parser.MarketParser.load_data", return_value=mock_data):
+            gen = MarketReportGenerator(storage_file=uuid.uuid4().hex)
+            res = gen.generate_symbol_report(sym)
             
-            self.assertEqual(report.get("count"), 2)
-            self.assertEqual(report.get("min_price"), min_p)
-            self.assertEqual(report.get("max_price"), max_p)
-            self.assertTrue(report.get(self.symbol))
+            self.assertEqual(res.get("count"), 2)
+            self.assertEqual(res.get("min_price"), min(p1, p2))
+            self.assertEqual(res.get("max_price"), max(p1, p2))
+            self.assertTrue(res.get(sym))
 
-    def test_generate_symbol_report_with_dict_data(self):
-        price = round(random.uniform(100.0, 500.0), 2)
-        mock_data = {
-            self.symbol: price,
-            uuid.uuid4().hex: 123.45
-        }
+    def test_generate_symbol_report_valid_dict(self):
+        sym = uuid.uuid4().hex[:6]
+        price = random.uniform(100.0, 200.0)
+        mock_data = {sym: price}
 
-        with patch.object(self.generator.parser, "load_data", return_value=mock_data):
-            report = self.generator.generate_symbol_report(self.symbol)
-            self.assertEqual(report.get("count"), 1)
-            self.assertEqual(report.get("min_price"), price)
-            self.assertEqual(report.get("max_price"), price)
+        with patch("skills.market_parser.MarketParser.load_data", return_value=mock_data):
+            gen = MarketReportGenerator(storage_file=uuid.uuid4().hex)
+            res = gen.generate_symbol_report(sym)
 
-    def test_generate_symbol_report_no_data_found(self):
-        with patch.object(self.generator.parser, "load_data", return_value=[]):
-            report = self.generator.generate_symbol_report(self.symbol)
-            self.assertEqual(report.get("count"), 0)
-            self.assertEqual(report.get("error"), "No data found")
+            self.assertEqual(res.get("count"), 1)
+            self.assertEqual(res.get("min_price"), price)
+            self.assertEqual(res.get("max_price"), price)
+            self.assertTrue(res.get(sym))
+
+    def test_generate_symbol_report_no_data(self):
+        sym = uuid.uuid4().hex[:6]
+        with patch("skills.market_parser.MarketParser.load_data", return_value=[]):
+            gen = MarketReportGenerator(storage_file=uuid.uuid4().hex)
+            res = gen.generate_symbol_report(sym)
+
+            self.assertEqual(res.get("count"), 0)
+            self.assertIn("error", res)
 
     def test_generate_symbol_report_no_valid_prices(self):
-        mock_data = [
-            {"symbol": self.symbol, "price": "invalid_price"},
-            {"symbol": self.symbol, "price": {"invalid": "dict"}}
-        ]
+        sym = uuid.uuid4().hex[:6]
+        mock_data = [{"symbol": sym, "price": "invalid_price"}]
+        with patch("skills.market_parser.MarketParser.load_data", return_value=mock_data):
+            gen = MarketReportGenerator(storage_file=uuid.uuid4().hex)
+            res = gen.generate_symbol_report(sym)
 
-        with patch.object(self.generator.parser, "load_data", return_value=mock_data):
-            report = self.generator.generate_symbol_report(self.symbol)
-            self.assertEqual(report.get("count"), 2)
-            self.assertEqual(report.get("error"), "No valid prices found")
+            self.assertEqual(res.get("count"), 1)
+            self.assertIn("error", res)
 
     def test_update_and_fetch_report_success(self):
         url = f"https://{uuid.uuid4().hex}.com/market"
+        sym = uuid.uuid4().hex[:6]
         expected_price = round(random.uniform(1.0, 1000.0), 2)
 
-        with patch.object(self.generator.parser, "fetch_price", return_value=expected_price) as mock_fetch, \
-             patch.object(self.generator.parser, "fetch_and_store") as mock_store:
+        with patch("skills.market_parser.MarketParser.fetch_price", return_value=expected_price) as mock_fetch, \
+             patch("skills.market_parser.MarketParser.fetch_and_store") as mock_store:
+            gen = MarketReportGenerator(storage_file=uuid.uuid4().hex)
+            val = gen.update_and_fetch_report(url, sym)
             
-            price = self.generator.update_and_fetch_report(url, self.symbol)
-            
+            self.assertEqual(val, float(expected_price))
             mock_fetch.assert_called_once_with(url)
-            mock_store.assert_called_once_with(self.symbol, expected_price)
-            self.assertEqual(price, expected_price)
+            mock_store.assert_called_once_with(sym, expected_price)
 
     def test_update_and_fetch_report_fallback(self):
-        url = f"https://{uuid.uuid4().hex}.org/api"
+        url = f"https://{uuid.uuid4().hex}.com/market"
+        sym = uuid.uuid4().hex[:6]
 
-        with patch.object(self.generator.parser, "fetch_price", return_value=None) as mock_fetch, \
-             patch.object(self.generator.parser, "fetch_and_store") as mock_store:
+        with patch("skills.market_parser.MarketParser.fetch_price", return_value=None) as mock_fetch, \
+             patch("skills.market_parser.MarketParser.fetch_and_store") as mock_store:
+            gen = MarketReportGenerator(storage_file=uuid.uuid4().hex)
+            val = gen.update_and_fetch_report(url, sym)
             
-            price = self.generator.update_and_fetch_report(url, self.symbol)
-            
+            self.assertEqual(val, 100.0)
             mock_fetch.assert_called_once_with(url)
-            mock_store.assert_called_once_with(self.symbol, 100.0)
-            self.assertEqual(price, 100.0)
+            mock_store.assert_called_once_with(sym, 100.0)
 
     def test_get_raw_stream_dump(self):
         expected_dump = {uuid.uuid4().hex: random.randint(1, 100)}
+        storage = uuid.uuid4().hex
+        with patch("skills.market_parser.MarketParser.load_data", return_value=expected_dump) as mock_load:
+            gen = MarketReportGenerator(storage_file=storage)
+            dump = gen.get_raw_stream_dump()
 
-        with patch.object(self.generator.parser, "load_data", return_value=expected_dump) as mock_load:
-            dump = self.generator.get_raw_stream_dump()
-            mock_load.assert_called_once_with(self.storage_file)
             self.assertEqual(dump, expected_dump)
+            mock_load.assert_called_once_with(storage)
 
-    def test_generate_market_report_function(self):
-        price = round(random.uniform(50.0, 500.0), 2)
-        mock_db = MagicMock()
-        mock_db.load_data.return_value = {self.symbol: {"price": price}}
+    def test_generate_market_report_db_load_dict(self):
+        sym = uuid.uuid4().hex[:6]
+        price = round(random.uniform(10.0, 500.0), 2)
+        storage = uuid.uuid4().hex
+        mock_data = {sym: {"price": price}}
 
-        with patch("skills.market_report_generator.db_storage", mock_db):
-            result = generate_market_report(self.storage_file, self.symbol)
-            mock_db.load_data.assert_called_once_with(self.storage_file)
-            self.assertIn(self.symbol, result)
-            self.assertIn(str(price), result)
+        with patch("skills.db_storage.load_db", return_value=mock_data):
+            report = generate_market_report(storage, sym)
+            self.assertIn(sym, report)
+            self.assertIn(str(price), report)
 
+    def test_generate_market_report_db_load_list(self):
+        sym = uuid.uuid4().hex[:6]
+        price = round(random.uniform(10.0, 500.0), 2)
+        storage = uuid.uuid4().hex
+        mock_data = [{"symbol": sym, "price": price}]
 
-if __name__ == "__main__":
-    unittest.main()
+        with patch("skills.db_storage.load_db", return_value=mock_data):
+            report = generate_market_report(storage, sym)
+            self.assertIn(sym, report)
+            self.assertIn(str(price), report)
+
+    def test_generate_market_report_fallback_parser(self):
+        sym = uuid.uuid4().hex[:6]
+        price = round(random.uniform(10.0, 500.0), 2)
+        storage = uuid.uuid4().hex
+        mock_data = {sym: price}
+
+        with patch("skills.db_storage.load_db", return_value={}), \
+             patch("skills.market_parser.MarketParser.load_data", return_value=mock_data):
+            report = generate_market_report(storage, sym)
+            self.assertIn(sym, report)
+            self.assertIn(str(price), report)

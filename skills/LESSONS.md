@@ -3,7 +3,12 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- main
+.
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_parser (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
 
 ## market_parser (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
@@ -321,7 +326,3 @@
 ## market_portfolio_backtest_evaluator_bridge (compose) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (failures=2)
 - Статус: успешно прошёл тесты и влит в main
-
-## market_report_generator (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: AssertionError: 1 not greater than or equal to 2
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

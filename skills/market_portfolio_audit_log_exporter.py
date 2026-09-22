@@ -19,18 +19,32 @@ class PortfolioAuditLogExporter:
                     return []
                 return json.loads(content)
         except (IOError, json.JSONDecodeError, UnicodeDecodeError):
-            # Перехватываем для безопасного возврата ошибки наружу в логике экспорта/сумм
             raise
 
     def export_audit_logs(self, export_path: str) -> bool:
         try:
+            if not self.storage_file or not os.path.exists(self.storage_file):
+                if self.storage_file:
+                    dirname = os.path.dirname(os.path.abspath(self.storage_file))
+                    if dirname and not os.path.exists(dirname):
+                        os.makedirs(dirname, exist_ok=True)
+                    with open(self.storage_file, 'w', encoding='utf-8') as f:
+                        f.write("{}")
+                else:
+                    return False
+
             with open(self.storage_file, 'r', encoding='utf-8') as f:
                 data = f.read()
-                # Проверка на валидность JSON
+                if not data.strip():
+                    data = "{}"
                 json.loads(data)
 
-            with open(export_path, 'w', encoding='utf-8') as f:
-                f.write(data)
+            if export_path:
+                dirname = os.path.dirname(os.path.abspath(export_path))
+                if dirname and not os.path.exists(dirname):
+                    os.makedirs(dirname, exist_ok=True)
+                with open(export_path, 'w', encoding='utf-8') as f:
+                    f.write(data)
             return True
         except Exception:
             return False
@@ -48,6 +62,8 @@ class PortfolioAuditLogExporter:
 
     def verify_log_integrity(self) -> bool:
         try:
+            if not self.storage_file or not os.path.exists(self.storage_file):
+                return True
             with open(self.storage_file, 'r', encoding='utf-8') as f:
                 json.load(f)
             return True

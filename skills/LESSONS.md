@@ -3,7 +3,11 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-еред фиксом: FAILED (failures=2)
+reporter (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_collector_agent (start_new) — раундов: 2
+- Последняя ошибка перед фиксом: FAILED (failures=2)
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_predictive_analyzer (compose) — раундов: 4
@@ -320,7 +324,3 @@
 
 ## market_portfolio_telegram_command_center (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_websocket_feed (start_new) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

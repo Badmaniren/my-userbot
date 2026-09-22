@@ -3,6 +3,7 @@ import io
 
 from skills import market_portfolio_monitor
 from skills import market_portfolio_valuation
+
 try:
     from skills import market_report_generator
 except ImportError:
@@ -15,10 +16,40 @@ def send_telegram_notification(token, chat_id, message):
     """
     return True
 
-def dispatch_portfolio_alerts(symbol, url, telegram_token, chat_id, storage_file):
+def dispatch_portfolio_alerts(
+    symbol, 
+    url, 
+    telegram_token, 
+    chat_id, 
+    storage_file, 
+    severity_level="MEDIUM", 
+    min_threshold=None, 
+    channels=None
+):
     """
-    Связывает мониторинг портфеля, оценку стоимости и телеграм-уведомления.
+    Связывает мониторинг портфеля, оценку стоимости и телеграм-уведомления
+    с учетом фильтрации по критичности и настраиваемых каналов отправки.
     """
+    if channels is None:
+        channels = ["telegram"]
+
+    # Таблица весов для сравнения уровней критичности
+    severity_weights = {
+        "LOW": 10,
+        "MEDIUM": 20,
+        "HIGH": 30,
+        "CRITICAL": 40
+    }
+
+    # Фильтрация по уровню критичности, если задан порог (min_threshold)
+    if min_threshold is not None:
+        current_weight = severity_weights.get(str(severity_level).upper(), 20)
+        threshold_weight = severity_weights.get(str(min_threshold).upper(), 20)
+        if current_weight < threshold_weight:
+            return {
+                "status": "filtered_out"
+            }
+
     # 1. Запуск пайплайна мониторинга портфеля
     market_portfolio_monitor.run_pipeline(symbol, url, telegram_token, chat_id, storage_file)
     
@@ -35,9 +66,10 @@ def dispatch_portfolio_alerts(symbol, url, telegram_token, chat_id, storage_file
         with open(storage_file, 'w') as f:
             f.write('{}')
 
-    # 3. Формирование и отправка уведомления
-    message = f"Portfolio Alert:\n{summary}\nPNL: {pnl}"
-    send_telegram_notification(telegram_token, chat_id, message)
+    # 3. Формирование и отправка уведомления (если канал 'telegram' активен)
+    if "telegram" in channels:
+        message = f"Portfolio Alert:\n{summary}\nPNL: {pnl}"
+        send_telegram_notification(telegram_token, chat_id, message)
     
     return {
         "summary": summary,

@@ -42,7 +42,7 @@ class MarketPortfolioTelegramCommandCenter:
     def handle_command(self, command: str, chat_id: int | str):
         cmd_parts = command.strip().split()
         if not cmd_parts:
-            return "Unknown command. Type /start for help."
+            return f"Unknown command: {command}. Type /start for available options."
             
         action = cmd_parts[0].lower()
         

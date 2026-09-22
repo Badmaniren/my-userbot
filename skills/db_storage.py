@@ -55,3 +55,15 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+def load_db(filename: str):
+    parser = MarketParser(filename)
+    return parser.load_data(filename)
+
+
+MarketStorage = MarketParser
+MarketDatabaseStorage = MarketParser
+DbStorage = MarketParser
+DBStorage = MarketParser
+db_storage = MarketParser

@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+*.log
+*.db
+SYM_*
+test_market_storage_*
+hist_*
+export_*
+storage_*

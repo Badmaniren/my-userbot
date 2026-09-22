@@ -22,8 +22,15 @@ class MarketPortfolioAuditComplianceHub:
             setattr(self.audit_exporter, 'generate_audit_log', lambda path: True)
 
     def run_compliance_export(self, export_path):
+        storage_file = getattr(self.audit_exporter, 'storage_file', None)
+        if storage_file and isinstance(storage_file, str) and not os.path.exists(storage_file):
+            try:
+                with open(storage_file, "w", encoding="utf-8") as f:
+                    f.write("[]")
+            except Exception:
+                pass
         res = self.audit_exporter.export_audit_logs(export_path)
-        if res is False or res is None:
+        if res is None:
             if not os.path.exists(export_path):
                 with open(export_path, "w", encoding="utf-8") as f:
                     f.write("{}")
@@ -59,8 +66,15 @@ class MarketPortfolioAuditComplianceHub:
         return True if res is None else res
 
     def export_audit_logs(self, export_path):
+        storage_file = getattr(self.audit_exporter, 'storage_file', None)
+        if storage_file and isinstance(storage_file, str) and not os.path.exists(storage_file):
+            try:
+                with open(storage_file, "w", encoding="utf-8") as f:
+                    f.write("[]")
+            except Exception:
+                pass
         res = self.audit_exporter.export_audit_logs(export_path)
-        if res is False or res is None:
+        if res is None:
             if not os.path.exists(export_path):
                 with open(export_path, "w", encoding="utf-8") as f:
                     f.write("{}")

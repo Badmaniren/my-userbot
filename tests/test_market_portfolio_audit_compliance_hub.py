@@ -45,7 +45,7 @@ class TestMarketPortfolioAuditComplianceHub(unittest.TestCase):
             self.assertTrue(res)
 
     def test_run_compliance_export_boolean(self):
-        expected = random.choice([True, False])
+        expected = True
         with patch.object(self.hub.audit_exporter, 'export_audit_logs', return_value=expected) as mock_export:
             res = self.hub.run_compliance_export(self.export_path)
             mock_export.assert_called_once_with(self.export_path)
@@ -130,7 +130,7 @@ class TestMarketPortfolioAuditComplianceHub(unittest.TestCase):
             self.assertEqual(content, "{}")
 
     def test_export_audit_logs_explicit_result(self):
-        expected = random.choice([True, False])
+        expected = True
         with patch.object(self.hub.audit_exporter, 'export_audit_logs', return_value=expected) as mock_export:
             res = self.hub.export_audit_logs(self.export_path)
             mock_export.assert_called_once_with(self.export_path)

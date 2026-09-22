@@ -34,6 +34,20 @@ class PortfolioScenarioSimulator:
         if not target:
             raise KeyError(f"Symbol {symbol} not found")
 
+        if isinstance(target, list):
+            if target:
+                last_item = target[-1]
+                if isinstance(last_item, dict):
+                    target = last_item
+                elif isinstance(last_item, (int, float)):
+                    target = {"price": float(last_item)}
+                else:
+                    target = {}
+            else:
+                target = {}
+        elif isinstance(target, (int, float)):
+            target = {"price": float(target)}
+
         current_price = target.get("current_price") or target.get("price") or 0.0
         quantity = target.get("quantity") or target.get("shares") or 0.0
         

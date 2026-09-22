@@ -12,11 +12,14 @@ def run_pipeline(symbol, url, telegram_token, chat_id, storage_file):
     """Запуск основного пайплайна сбора и обработки данных."""
     parser = MarketParser(storage_file)
     valuation = PortfolioValuation(storage_file)
-    
+
+    if hasattr(parser, "load_data"):
+        parser.load_data(storage_file)
+
     summary = valuation.get_total_summary(url)
     if not summary:
         return None
-    
+
     return {
         "status": "success",
         "symbol": symbol,

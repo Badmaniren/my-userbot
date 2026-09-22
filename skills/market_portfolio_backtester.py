@@ -49,12 +49,17 @@ class MarketPortfolioBacktester:
                 "pnl_percentage": 0.0
             }
 
+        if isinstance(symbol_data, dict):
+            symbol_data = [symbol_data]
+        elif not isinstance(symbol_data, list):
+            symbol_data = []
+
         cash = initial_capital
         holding = 0.0
         total_trades = 0
 
         for item in symbol_data:
-            price = item.get("price", 0.0)
+            price = item.get("price", 0.0) if isinstance(item, dict) else (item if isinstance(item, (int, float)) else 0.0)
             if price <= 0:
                 continue
             if price <= buy_threshold and cash >= price:
@@ -66,7 +71,9 @@ class MarketPortfolioBacktester:
                 holding = 0.0
                 total_trades += 1
 
-        final_portfolio_value = cash + holding * symbol_data[-1].get("price", 0.0)
+        last_item = symbol_data[-1] if symbol_data else {}
+        last_price = last_item.get("price", 0.0) if isinstance(last_item, dict) else (last_item if isinstance(last_item, (int, float)) else 0.0)
+        final_portfolio_value = cash + holding * last_price
         pnl_percentage = ((final_portfolio_value - initial_capital) / initial_capital) * 100.0 if initial_capital > 0 else 0.0
 
         return {
@@ -91,20 +98,29 @@ class MarketPortfolioBacktester:
 
     def simulate_historical_trades(self, symbol, allocation):
         symbol_data = self.data.get(symbol, [])
+        if isinstance(symbol_data, dict):
+            symbol_data = [symbol_data]
+        elif not isinstance(symbol_data, list):
+            symbol_data = []
         trades = []
         for i, item in enumerate(symbol_data):
-            price = item.get("price", 0.0)
+            price = item.get("price", 0.0) if isinstance(item, dict) else (item if isinstance(item, (int, float)) else 0.0)
+            timestamp = item.get("timestamp", 0) if isinstance(item, dict) else 0
             action = "BUY" if i % 2 == 0 else "SELL"
             trades.append({
                 "action": action,
                 "price": price,
                 "allocation": allocation,
-                "timestamp": item.get("timestamp", 0)
+                "timestamp": timestamp
             })
         return trades
 
     def get_backtest_summary(self, symbol):
         symbol_data = self.data.get(symbol, [])
+        if isinstance(symbol_data, dict):
+            symbol_data = [symbol_data]
+        elif not isinstance(symbol_data, list):
+            symbol_data = []
         return {
             "symbol": symbol,
             "total_records": len(symbol_data),

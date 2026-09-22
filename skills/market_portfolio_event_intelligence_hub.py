@@ -87,23 +87,44 @@ def process_event_intelligence(
     try:
         router_res = market_portfolio_alert_filter_router.route_and_filter_alerts(
             symbol=symbol,
-            storage_file=storage_file,
-            severity=severity,
-            threshold=threshold
+            url=url,
+            telegram_token=token,
+            chat_id=chat_id,
+            severity_level=severity,
+            min_threshold=threshold,
+            channels=channels,
+            storage_file=storage_file
         )
     except TypeError:
         try:
             router_res = market_portfolio_alert_filter_router.route_and_filter_alerts(
                 symbol=symbol,
-                storage=storage_file,
+                url=url,
+                token=token,
+                chat_id=chat_id,
                 severity=severity,
-                threshold=threshold
-            )
-        except TypeError:
-            router_res = market_portfolio_alert_filter_router.route_and_filter_alerts(
-                symbol=symbol,
+                threshold=threshold,
+                channels=channels,
                 storage_file=storage_file
             )
+        except TypeError:
+            try:
+                router_res = market_portfolio_alert_filter_router.route_and_filter_alerts(
+                    symbol=symbol,
+                    storage_file=storage_file,
+                    severity=severity,
+                    threshold=threshold
+                )
+            except TypeError:
+                try:
+                    router_res = market_portfolio_alert_filter_router.route_and_filter_alerts(
+                        symbol=symbol,
+                        storage=storage_file
+                    )
+                except TypeError:
+                    router_res = market_portfolio_alert_filter_router.route_and_filter_alerts(
+                        symbol
+                    )
 
     if hasattr(market_portfolio_performance_analytics, "evaluate_performance"):
         try:

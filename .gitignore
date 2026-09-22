@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.db
+*.json
+*.log
+SYM_*
+export_*
+storage_*
+report_*

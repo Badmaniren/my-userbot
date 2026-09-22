@@ -37,12 +37,23 @@ class PortfolioVisualizer:
     def __init__(self, storage_file):
         self.storage_file = storage_file
 
-    def load_data(self, file_path):
-        with open(file_path, 'r', encoding='utf-8') as f:
-            try:
+    def load_data(self, file_path=None):
+        target = file_path if file_path is not None else self.storage_file
+        try:
+            with open(target, 'r', encoding='utf-8') as f:
                 return json.load(f)
-            except Exception:
-                return []
+        except Exception:
+            return []
+
+    def generate_ascii_chart(self, symbol):
+        data = self.load_data(self.storage_file)
+        if isinstance(data, list):
+            prices = [item.get("price") for item in data if isinstance(item, dict) and "price" in item]
+        else:
+            prices = []
+        if not prices:
+            return ""
+        return generate_ascii_chart(prices)
 
     def build_text_report(self, symbol):
         data = self.load_data(self.storage_file)
@@ -59,13 +70,6 @@ class PortfolioVisualizer:
         send_telegram_notification(token, chat_id, report)
 
 class MarketPortfolioVisualizer(PortfolioVisualizer):
-    def generate_ascii_chart(self, symbol):
-        data = self.load_data(self.storage_file)
-        prices = [item.get("price", 100.0) for item in data if isinstance(item, dict)]
-        if not prices:
-            prices = [100.0, 150.0]
-        return generate_ascii_chart(prices)
-
     def visualize_pnl(self, symbol):
         return format_pnl_notification(symbol, 10.0, 1.5)
 

@@ -3,12 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_backtester (create) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_monte_carlo (create) — раундов: 4
+ket_portfolio_monte_carlo (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -334,3 +329,7 @@
 ## market_portfolio_monitor (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_monitor (refactor) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: успешно прошёл тесты и влит в main

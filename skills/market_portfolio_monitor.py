@@ -36,7 +36,9 @@ class MarketParser:
         data = {}
         if os.path.exists(self.storage_file):
             with open(self.storage_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
+                content = f.read()
+                if content:
+                    data = json.loads(content)
         
         data[symbol] = price
         with open(self.storage_file, "w", encoding="utf-8") as f:
@@ -46,7 +48,10 @@ class MarketParser:
         if not os.path.exists(storage_file):
             return None
         with open(storage_file, "r", encoding="utf-8") as f:
-            return json.load(f)
+            content = f.read()
+            if not content:
+                return None
+            return json.loads(content)
 
 
 class MarketReportGenerator:
@@ -55,14 +60,17 @@ class MarketReportGenerator:
 
     def generate_symbol_report(self, symbol):
         data = MarketParser(self.storage_file).load_data(self.storage_file)
-        if data and symbol in data:
+        if data and isinstance(data, dict) and symbol in data:
             return f"Report for {symbol}: {data[symbol]}"
         return f"Report for {symbol}: No data"
 
     def get_raw_stream_dump(self):
         if os.path.exists(self.storage_file):
             with open(self.storage_file, "r", encoding="utf-8") as f:
-                return f.read()
+                content = f.read()
+                if isinstance(content, bytes):
+                    return content.decode("utf-8", errors="ignore")
+                return str(content)
         return "{}"
 
 
@@ -74,9 +82,8 @@ def generate_market_report(storage_file, symbol):
 def run_market_telegram_pipeline(storage_file, symbol, chat_id, url, telegram_token):
     parser = MarketParser(storage_file=storage_file)
     data = parser.load_data(storage_file)
-    price = data.get(symbol, 0.0) if isinstance(data, dict) else 0.0
+    price = data.get(symbol, 0.0) if isinstance(data, dict) and data else 0.0
     
-    # Имитация отправки в Telegram и работы конвейера
     return {
         "status": "success",
         "symbol": symbol,

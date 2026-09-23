@@ -1,5 +1,56 @@
 import json
 import os
+from skills.db_storage import MarketParser as DBMarketParser
+
+
+class MarketParser(DBMarketParser):
+    """
+    Расширение MarketParser для работы с JSON/SQLite хранилищем в мониторе портфеля.
+    Сохраняет совместимость с сигнатурами db_storage.
+    """
+    def __init__(self, storage_file="market_data.db"):
+        super().__init__(storage_file=storage_file)
+
+    def fetch_and_store(self, symbol, price):
+        if self.storage_file.endswith(".db"):
+            super().fetch_and_store(symbol, price)
+            return
+
+        data = {}
+        if os.path.exists(self.storage_file):
+            try:
+                with open(self.storage_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except (FileNotFoundError, json.JSONDecodeError):
+                data = {}
+            except IOError as exc:
+                raise IOError(f"Failed to read storage file {self.storage_file}: {exc}") from exc
+
+        if not isinstance(data, dict):
+            data = {}
+
+        data[symbol] = price
+        try:
+            with open(self.storage_file, "w", encoding="utf-8") as f:
+                json.dump(data, f)
+        except IOError as exc:
+            raise IOError(f"Failed to write storage file {self.storage_file}: {exc}") from exc
+
+    def load_data(self, storage_file):
+        if storage_file.endswith(".db"):
+            return super().load_data(storage_file)
+
+        if not os.path.exists(storage_file):
+            return None
+
+        try:
+            with open(storage_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Failed to decode storage JSON from {storage_file}: {exc}") from exc
+        except IOError as exc:
+            raise IOError(f"Failed to read storage file {storage_file}: {exc}") from exc
+
 
 def run_pipeline(symbol, url, telegram_token, chat_id, storage_file):
     """Выполняет основной конвейер мониторинга портфеля."""
@@ -26,27 +77,6 @@ def start_new(symbol, url, telegram_token, chat_id, storage_file):
         chat_id=chat_id,
         storage_file=storage_file
     )
-
-
-class MarketParser:
-    def __init__(self, storage_file):
-        self.storage_file = storage_file
-
-    def fetch_and_store(self, symbol, price):
-        data = {}
-        if os.path.exists(self.storage_file):
-            with open(self.storage_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        
-        data[symbol] = price
-        with open(self.storage_file, "w", encoding="utf-8") as f:
-            json.dump(data, f)
-
-    def load_data(self, storage_file):
-        if not os.path.exists(storage_file):
-            return None
-        with open(storage_file, "r", encoding="utf-8") as f:
-            return json.load(f)
 
 
 class MarketReportGenerator:

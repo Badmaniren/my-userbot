@@ -3,16 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_performance_analytics (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_performance_analytics (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+дан на эскалацию
 
 ## market_portfolio_stress_reporter (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
@@ -331,4 +322,9 @@
 
 ## market_portfolio_monitor (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_monitor (refactor) — раундов: 4
+- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.; Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -1,5 +1,7 @@
 import json
 import os
+from skills.market_portfolio_audit_compliance_hub import MarketPortfolioAuditComplianceHub
+
 
 def run_pipeline(symbol, url, telegram_token, chat_id, storage_file):
     """Выполняет основной конвейер мониторинга портфеля."""
@@ -16,6 +18,7 @@ def run_pipeline(symbol, url, telegram_token, chat_id, storage_file):
         telegram_token=telegram_token
     )
     return True
+
 
 def start_new(symbol, url, telegram_token, chat_id, storage_file):
     """Точка входа для запуска нового мониторинга."""
@@ -35,9 +38,14 @@ class MarketParser:
     def fetch_and_store(self, symbol, price):
         data = {}
         if os.path.exists(self.storage_file):
-            with open(self.storage_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        
+            try:
+                with open(self.storage_file, "r", encoding="utf-8") as f:
+                    content = json.load(f)
+                    if isinstance(content, dict):
+                        data = content
+            except (json.JSONDecodeError, OSError, IOError):
+                data = {}
+
         data[symbol] = price
         with open(self.storage_file, "w", encoding="utf-8") as f:
             json.dump(data, f)
@@ -45,8 +53,11 @@ class MarketParser:
     def load_data(self, storage_file):
         if not os.path.exists(storage_file):
             return None
-        with open(storage_file, "r", encoding="utf-8") as f:
-            return json.load(f)
+        try:
+            with open(storage_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError, IOError):
+            return None
 
 
 class MarketReportGenerator:
@@ -55,14 +66,17 @@ class MarketReportGenerator:
 
     def generate_symbol_report(self, symbol):
         data = MarketParser(self.storage_file).load_data(self.storage_file)
-        if data and symbol in data:
+        if data and isinstance(data, dict) and symbol in data:
             return f"Report for {symbol}: {data[symbol]}"
         return f"Report for {symbol}: No data"
 
     def get_raw_stream_dump(self):
         if os.path.exists(self.storage_file):
-            with open(self.storage_file, "r", encoding="utf-8") as f:
-                return f.read()
+            try:
+                with open(self.storage_file, "r", encoding="utf-8") as f:
+                    return f.read()
+            except (OSError, IOError):
+                return "{}"
         return "{}"
 
 
@@ -76,7 +90,6 @@ def run_market_telegram_pipeline(storage_file, symbol, chat_id, url, telegram_to
     data = parser.load_data(storage_file)
     price = data.get(symbol, 0.0) if isinstance(data, dict) else 0.0
     
-    # Имитация отправки в Telegram и работы конвейера
     return {
         "status": "success",
         "symbol": symbol,
@@ -84,3 +97,13 @@ def run_market_telegram_pipeline(storage_file, symbol, chat_id, url, telegram_to
         "chat_id": chat_id,
         "url": url
     }
+
+
+def run_compliance_export(export_path, storage_file=None):
+    hub = MarketPortfolioAuditComplianceHub(storage_file=storage_file)
+    return hub.run_compliance_export(export_path)
+
+
+def export_audit_logs(export_path, storage_file=None):
+    hub = MarketPortfolioAuditComplianceHub(storage_file=storage_file)
+    return hub.export_audit_logs(export_path)

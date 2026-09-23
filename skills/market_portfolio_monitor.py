@@ -4,7 +4,12 @@ import os
 def run_pipeline(symbol, url, telegram_token, chat_id, storage_file):
     """Выполняет основной конвейер мониторинга портфеля."""
     parser = MarketParser(storage_file=storage_file)
-    parser.fetch_and_store(symbol=symbol, price=0.0)
+    data = parser.load_data(storage_file)
+    current_price = 0.0
+    if isinstance(data, dict) and symbol in data:
+        current_price = data[symbol]
+
+    parser.fetch_and_store(symbol=symbol, price=current_price)
     report_gen = MarketReportGenerator(storage_file=storage_file)
     report_gen.generate_symbol_report(symbol=symbol)
     generate_market_report(storage_file=storage_file, symbol=symbol)
@@ -36,9 +41,21 @@ class MarketParser:
         data = {}
         if os.path.exists(self.storage_file):
             with open(self.storage_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
+                content = f.read()
+                if content.strip():
+                    try:
+                        data = json.loads(content)
+                    except json.JSONDecodeError:
+                        data = {}
         
-        data[symbol] = price
+        if not isinstance(data, dict):
+            data = {}
+
+        if symbol in data and price == 0.0:
+            pass
+        else:
+            data[symbol] = price
+
         with open(self.storage_file, "w", encoding="utf-8") as f:
             json.dump(data, f)
 
@@ -46,7 +63,10 @@ class MarketParser:
         if not os.path.exists(storage_file):
             return None
         with open(storage_file, "r", encoding="utf-8") as f:
-            return json.load(f)
+            content = f.read()
+            if not content.strip():
+                return {}
+            return json.loads(content)
 
 
 class MarketReportGenerator:
@@ -55,14 +75,17 @@ class MarketReportGenerator:
 
     def generate_symbol_report(self, symbol):
         data = MarketParser(self.storage_file).load_data(self.storage_file)
-        if data and symbol in data:
+        if data and isinstance(data, dict) and symbol in data:
             return f"Report for {symbol}: {data[symbol]}"
         return f"Report for {symbol}: No data"
 
     def get_raw_stream_dump(self):
         if os.path.exists(self.storage_file):
             with open(self.storage_file, "r", encoding="utf-8") as f:
-                return f.read()
+                content = f.read()
+                if hasattr(content, "decode"):
+                    return content.decode("utf-8", errors="ignore")
+                return content
         return "{}"
 
 

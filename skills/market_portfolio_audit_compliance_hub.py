@@ -22,13 +22,7 @@ class MarketPortfolioAuditComplianceHub:
             setattr(self.audit_exporter, 'generate_audit_log', lambda path: True)
 
     def run_compliance_export(self, export_path):
-        res = self.audit_exporter.export_audit_logs(export_path)
-        if res is False or res is None:
-            if not os.path.exists(export_path):
-                with open(export_path, "w", encoding="utf-8") as f:
-                    f.write("{}")
-            return True
-        return res
+        return self.export_audit_logs(export_path)
 
     def check_compliance_integrity(self):
         res = self.audit_exporter.verify_log_integrity()
@@ -60,7 +54,7 @@ class MarketPortfolioAuditComplianceHub:
 
     def export_audit_logs(self, export_path):
         res = self.audit_exporter.export_audit_logs(export_path)
-        if res is False or res is None:
+        if res is None:
             if not os.path.exists(export_path):
                 with open(export_path, "w", encoding="utf-8") as f:
                     f.write("{}")

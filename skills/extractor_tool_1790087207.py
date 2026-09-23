@@ -58,3 +58,6 @@ class ExtractorTool:
             f.write(f"--- End of Report ---\n")
             
         return file_path
+
+
+ExtractorTool1790087207 = ExtractorTool

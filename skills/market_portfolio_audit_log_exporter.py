@@ -11,7 +11,7 @@ class PortfolioAuditLogExporter:
 
     def _read_storage(self):
         try:
-            if not os.path.exists(self.storage_file):
+            if not self.storage_file or not os.path.exists(self.storage_file):
                 return []
             with open(self.storage_file, 'r', encoding='utf-8') as f:
                 content = f.read()
@@ -19,15 +19,19 @@ class PortfolioAuditLogExporter:
                     return []
                 return json.loads(content)
         except (IOError, json.JSONDecodeError, UnicodeDecodeError):
-            # Перехватываем для безопасного возврата ошибки наружу в логике экспорта/сумм
             raise
 
     def export_audit_logs(self, export_path: str) -> bool:
         try:
-            with open(self.storage_file, 'r', encoding='utf-8') as f:
-                data = f.read()
-                # Проверка на валидность JSON
-                json.loads(data)
+            if not self.storage_file or not os.path.exists(self.storage_file):
+                data = "{}"
+            else:
+                with open(self.storage_file, 'r', encoding='utf-8') as f:
+                    data = f.read()
+                    if not data.strip():
+                        data = "{}"
+                    else:
+                        json.loads(data)
 
             with open(export_path, 'w', encoding='utf-8') as f:
                 f.write(data)
@@ -37,6 +41,8 @@ class PortfolioAuditLogExporter:
 
     def get_audit_stream_summary(self) -> dict:
         try:
+            if not self.storage_file or not os.path.exists(self.storage_file):
+                return {"total_records": 0}
             with open(self.storage_file, 'r', encoding='utf-8') as f:
                 content = f.read()
                 data = json.loads(content)
@@ -48,6 +54,8 @@ class PortfolioAuditLogExporter:
 
     def verify_log_integrity(self) -> bool:
         try:
+            if not self.storage_file or not os.path.exists(self.storage_file):
+                return True
             with open(self.storage_file, 'r', encoding='utf-8') as f:
                 json.load(f)
             return True

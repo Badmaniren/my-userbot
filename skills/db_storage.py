@@ -55,3 +55,24 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+class DBStorage:
+    """Storage manager for metadata records and error logs."""
+
+    def __init__(self, db_path: str = ":memory:"):
+        self.db_path = db_path
+        self._metadata = {}
+        self._error_logs = set()
+
+    def save_metadata_record(self, session_id: str, record: dict):
+        self._metadata[session_id] = record
+
+    def get_metadata_record(self, session_id: str):
+        return self._metadata.get(session_id)
+
+    def log_error(self, trace_id: str, error_message: str = ""):
+        self._error_logs.add(trace_id)
+
+    def check_error_log(self, trace_id: str) -> bool:
+        return trace_id in self._error_logs

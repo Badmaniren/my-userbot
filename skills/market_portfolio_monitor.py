@@ -76,7 +76,6 @@ def run_market_telegram_pipeline(storage_file, symbol, chat_id, url, telegram_to
     data = parser.load_data(storage_file)
     price = data.get(symbol, 0.0) if isinstance(data, dict) else 0.0
     
-    # Имитация отправки в Telegram и работы конвейера
     return {
         "status": "success",
         "symbol": symbol,

@@ -92,3 +92,18 @@ def process_stream_alert(alert_id):
                 except TypeError:
                     return io.BytesIO(b"")
     return io.BytesIO(b"")
+
+
+class MarketPortfolioAlertDispatcher:
+    def __init__(self):
+        self.sent_alerts = []
+
+    def dispatch(self, alert_event):
+        if isinstance(alert_event, dict):
+            self.sent_alerts.append(alert_event)
+        else:
+            self.sent_alerts.append({"event_id": alert_event})
+        return True
+
+    def get_sent_alerts_by_request(self, request_id):
+        return [alert for alert in self.sent_alerts if alert.get("request_id") == request_id]

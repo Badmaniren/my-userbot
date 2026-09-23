@@ -16,6 +16,9 @@ class MarketInsiderActivityTracker:
 
 
 class MarketInsiderActivityTrackerModuleAPI:
+    def __init__(self, *args, **kwargs):
+        pass
+
     @staticmethod
     def track_activity(payload):
         ticker_id = payload.get("ticker_id")
@@ -32,4 +35,4 @@ class MarketInsiderActivityTrackerModuleAPI:
         }
 
 
-market_insider_activity_tracker = MarketInsiderActivityTrackerModuleIdempotentProxy = MarketInsiderActivityTrackerModuleAPI()
+market_insider_activity_tracker = MarketInsiderActivityTrackerModuleIdempotentProxy = MarketInsiderActivityTrackerModuleAPI

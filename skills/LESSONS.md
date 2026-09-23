@@ -3,7 +3,12 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-arket_portfolio_websocket_feed (create) — раундов: 4
+успешно прошёл тесты и влит в main
+
+## market_portfolio_autonomous_sentinel (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_websocket_feed (create) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
@@ -326,7 +331,3 @@ arket_portfolio_websocket_feed (create) — раундов: 4
 ## extractor_tool_1790181511 (create) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main
-
-## extractor_tool_1790183859 (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=3)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -35,8 +35,11 @@ class MarketParser:
     def fetch_and_store(self, symbol, price):
         data = {}
         if os.path.exists(self.storage_file):
-            with open(self.storage_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
+            try:
+                with open(self.storage_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except (json.JSONDecodeError, IOError):
+                data = {}
         
         data[symbol] = price
         with open(self.storage_file, "w", encoding="utf-8") as f:
@@ -45,8 +48,11 @@ class MarketParser:
     def load_data(self, storage_file):
         if not os.path.exists(storage_file):
             return None
-        with open(storage_file, "r", encoding="utf-8") as f:
-            return json.load(f)
+        try:
+            with open(storage_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            return None
 
 
 class MarketReportGenerator:
@@ -61,8 +67,11 @@ class MarketReportGenerator:
 
     def get_raw_stream_dump(self):
         if os.path.exists(self.storage_file):
-            with open(self.storage_file, "r", encoding="utf-8") as f:
-                return f.read()
+            try:
+                with open(self.storage_file, "r", encoding="utf-8") as f:
+                    return f.read()
+            except IOError:
+                return "{}"
         return "{}"
 
 
@@ -83,3 +92,15 @@ def run_market_telegram_pipeline(storage_file, symbol, chat_id, url, telegram_to
         "chat_id": chat_id,
         "url": url
     }
+
+
+def export_audit_logs(storage_file=None):
+    """Экспорт аудиторских логов с явным возвратом результата."""
+    if storage_file and os.path.exists(storage_file):
+        try:
+            with open(storage_file, "r", encoding="utf-8") as f:
+                content = f.read()
+                return bool(content)
+        except IOError:
+            return False
+    return False

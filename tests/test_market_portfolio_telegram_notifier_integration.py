@@ -1,21 +1,28 @@
 import unittest
 import uuid
 import random
-from skills.market_portfolio_telegram_notifier import start_new, send_telegram_notification
+from skills.market_portfolio_telegram_notifier import send_telegram_notification, start_new
 
 class TestMarketPortfolioTelegramNotifierIntegration(unittest.TestCase):
-    def test_telegram_notifier_with_random_payload(self):
-        random_token = f"{random.randint(100000, 999999)}:AAG{uuid.uuid4().hex[:6]}"
-        random_chat_id = str(random.randint(10000000, 99999999))
-        random_message = f"Integration Test Message ID: {uuid.uuid4()}"
+    def test_telegram_notifier_integration_with_invalid_and_random_data(self):
+        random_token_prefix = str(uuid.uuid4())
+        fake_token = f"{random.randint(100000, 999999)}:{random_token_prefix}"
+        fake_chat_id = str(random.randint(10000000, 99999999))
+        random_message = f"Integration Test Digest ID: {uuid.uuid4()}"
 
-        result_start_new = start_new(random_token, random_chat_id, random_message)
-        result_alias = send_telegram_notification(random_token, random_chat_id, random_message)
+        result_start = start_new(fake_token, fake_chat_id, random_message)
+        self.assertIsInstance(result_start, bool)
 
-        self.assertIsInstance(result_start_new, bool)
+        result_alias = send_telegram_notification(fake_token, fake_chat_id, random_message)
         self.assertIsInstance(result_alias, bool)
-        
-        self.assertEqual(result_start_new, result_alias)
+
+        invalid_token = ""
+        invalid_chat_id = "   "
+        invalid_message = None
+
+        self.assertFalse(start_new(invalid_token, fake_chat_id, random_message))
+        self.assertFalse(send_telegram_notification(fake_token, invalid_chat_id, random_message))
+        self.assertFalse(start_new(fake_token, fake_chat_id, invalid_message))
 
 if __name__ == "__main__":
     unittest.main()

@@ -29,3 +29,6 @@ def start_new(token: str, chat_id: str, message: str) -> bool:
 def send_telegram_notification(token: str, chat_id: str, message: str) -> bool:
     """Алиас для отправки уведомлений, используемый в интеграционных тестах."""
     return start_new(token, chat_id, message)
+
+
+send_telegram_notifier = send_telegram_notification

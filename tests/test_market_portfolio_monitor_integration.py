@@ -8,19 +8,16 @@ from skills.market_portfolio_monitor import start_new, run_pipeline
 class TestMarketPortfolioMonitorIntegration(unittest.TestCase):
     def setUp(self):
         self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
-        self.url = f"https://api.telegram.org/bot{uuid.uuid4().hex}/sendMessage"
-        self.telegram_token = uuid.uuid4().hex
-        self.chat_id = str(random.randint(100000, 999999))
+        self.url = f"https://api.example.com/v1/{uuid.uuid4().hex[:8]}"
+        self.telegram_token = f"{random.randint(100000, 999999)}:AA{uuid.uuid4().hex[:10]}"
+        self.chat_id = str(random.randint(10000000, 99999999))
         self.storage_file = f"test_storage_{uuid.uuid4().hex}.json"
 
     def tearDown(self):
         if os.path.exists(self.storage_file):
-            try:
-                os.remove(self.storage_file)
-            except OSError:
-                pass
+            os.remove(self.storage_file)
 
-    def test_market_portfolio_monitor_full_pipeline(self):
+    def test_integration_pipeline_execution_and_storage(self):
         result = start_new(
             symbol=self.symbol,
             url=self.url,
@@ -33,10 +30,24 @@ class TestMarketPortfolioMonitorIntegration(unittest.TestCase):
         self.assertTrue(os.path.exists(self.storage_file))
         
         with open(self.storage_file, "r", encoding="utf-8") as f:
-            stored_data = json.load(f)
-            
-        self.assertIn(self.symbol, stored_data)
-        self.assertEqual(stored_data[self.symbol], 0.0)
+            content = f.read()
+            data = json.loads(content)
+            self.assertIn(self.symbol, data)
+
+    def test_integration_run_pipeline_data_flow(self):
+        pipeline_result = run_pipeline(
+            symbol=self.symbol,
+            url=self.url,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id,
+            storage_file=self.storage_file
+        )
+
+        self.assertTrue(pipeline_itude := pipeline_result)
+
+        with open(self.storage_file, "r", encoding="utf-8") as f:
+            persisted_data = json.load(f)
+            self.assertEqual(persisted_data.get(self.symbol), 0.0)
 
 if __name__ == "__main__":
     unittest.main()

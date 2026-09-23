@@ -1,21 +1,54 @@
 import unittest
 import uuid
 import random
-from skills.market_portfolio_telegram_notifier import start_new, send_telegram_notification
+from skills.market_portfolio_telegram_notifier import start_new
 
-class TestMarketPortfolioTelegramNotifierIntegration(unittest.TestCase):
-    def test_telegram_notifier_with_random_payload(self):
-        random_token = f"{random.randint(100000, 999999)}:AAG{uuid.uuid4().hex[:6]}"
-        random_chat_id = str(random.randint(10000000, 99999999))
-        random_message = f"Integration Test Message ID: {uuid.uuid4()}"
+class TestTelegramNotifierIntegration(unittest.TestCase):
+    """
+    Интеграционный тест для проверки взаимодействия с Telegram API.
+    Использует реальные сетевые вызовы без моков.
+    """
 
-        result_start_new = start_new(random_token, random_chat_id, random_message)
-        result_alias = send_telegram_notification(random_token, random_chat_id, random_message)
+    def setUp(self):
+        # Генерируем случайные данные для каждого запуска, чтобы избежать кэширования и хардкода
+        self.test_token = f"123456:ABC-DEF{uuid.uuid4().hex[:10]}"
+        self.test_chat_id = str(random.randint(1000000, 9999999))
+        self.test_message = f"Integration test message: {uuid.uuid4()}"
 
-        self.assertIsInstance(result_start_new, bool)
-        self.assertIsInstance(result_alias, bool)
+    def test_telegram_notification_flow(self):
+        """
+        Проверка реального взаимодействия с API Telegram.
+        Ожидается получение ошибки от API (404), так как токен сгенерирован случайно.
+        Важно: проверяем, что модуль корректно обрабатывает исключения и возвращает False,
+        а не падает с ошибкой, согласно требованиям стабильности.
+        """
         
-        self.assertEqual(result_start_new, result_alias)
+        # Вызов функции модуля
+        result = start_new(
+            token=self.test_token,
+            chat_id=self.test_chat_id,
+            message=self.test_message
+        )
 
-if __name__ == "__main__":
+        # Проверка: метод должен вернуть False при невалидном токене, не выбрасывая исключение наружу
+        self.assertIsInstance(result, bool, "Функция должна возвращать булево значение")
+        self.assertFalse(result, "При использовании случайного токена API должно вернуть ошибку (False)")
+
+    def test_invalid_input_handling(self):
+        """
+        Проверка устойчивости к некорректным входным данным.
+        """
+        bad_inputs = [
+            ("", "123", "msg"),
+            ("token", "", "msg"),
+            ("token", "123", ""),
+            (None, None, None)
+        ]
+
+        for token, chat_id, msg in bad_inputs:
+            with self.subTest(token=token, chat_id=chat_id, msg=msg):
+                result = start_new(token, chat_id, msg)
+                self.assertFalse(result, "Функция должна возвращать False при передаче пустых или некорректных данных")
+
+if __name__ == '__main__':
     unittest.main()

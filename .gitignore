@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+SYM_*
+storage_*.json
+export_*.json
+hist_*.json
+test_storage_*.json
+audit_export_*.json

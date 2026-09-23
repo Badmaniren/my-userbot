@@ -5,6 +5,7 @@ from skills.market_portfolio_audit_log_exporter import PortfolioAuditLogExporter
 
 class MarketPortfolioAuditComplianceHub:
     def __init__(self, storage_file=None, db_storage=None, audit_exporter=None):
+        self.storage_file = storage_file
         if db_storage is not None:
             self.db_storage = db_storage
         else:
@@ -21,9 +22,24 @@ class MarketPortfolioAuditComplianceHub:
         if not hasattr(self.audit_exporter, 'generate_audit_log'):
             setattr(self.audit_exporter, 'generate_audit_log', lambda path: True)
 
+    def _ensure_storage_file(self):
+        storage = getattr(self, 'storage_file', None)
+        if not storage:
+            storage = getattr(getattr(self, 'audit_exporter', None), 'storage_file', None)
+        if storage and isinstance(storage, str) and not os.path.exists(storage):
+            try:
+                dirname = os.path.dirname(storage)
+                if dirname:
+                    os.makedirs(dirname, exist_ok=True)
+                with open(storage, "w", encoding="utf-8") as f:
+                    f.write("{}")
+            except OSError:
+                pass
+
     def run_compliance_export(self, export_path):
+        self._ensure_storage_file()
         res = self.audit_exporter.export_audit_logs(export_path)
-        if res is False or res is None:
+        if res is None:
             if not os.path.exists(export_path):
                 with open(export_path, "w", encoding="utf-8") as f:
                     f.write("{}")
@@ -59,8 +75,9 @@ class MarketPortfolioAuditComplianceHub:
         return True if res is None else res
 
     def export_audit_logs(self, export_path):
+        self._ensure_storage_file()
         res = self.audit_exporter.export_audit_logs(export_path)
-        if res is False or res is None:
+        if res is None:
             if not os.path.exists(export_path):
                 with open(export_path, "w", encoding="utf-8") as f:
                     f.write("{}")

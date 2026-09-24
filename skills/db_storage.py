@@ -1,6 +1,18 @@
+import json
 import sqlite3
 import requests
 from bs4 import BeautifulSoup
+
+
+def db_storage(data=None, *args, **kwargs):
+    if isinstance(data, dict):
+        unique_id = data.get("extracted_id") or data.get("id")
+        if unique_id:
+            file_path = f"data_{unique_id}.json"
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(data, f)
+            return file_path
+    return True
 
 
 class MarketParser:

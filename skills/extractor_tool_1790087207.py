@@ -16,8 +16,12 @@ class ExtractorTool:
         Парсит входящую разметку и извлекает ключи метаданных.
         Добавляет системные поля: timestamp, version и уникальный operation_id.
         """
-        # Очистка и парсинг XML-строки
-        root = ET.fromstring(markup_data.strip())
+        if not markup_data or not markup_data.strip().startswith('<'):
+            return {}
+        try:
+            root = ET.fromstring(markup_data.strip())
+        except Exception:
+            return {}
         
         extracted_metadata = {}
         
@@ -58,3 +62,8 @@ class ExtractorTool:
             f.write(f"--- End of Report ---\n")
             
         return file_path
+
+
+def extractor_tool_1790087207(markup: str) -> dict:
+    tool = ExtractorTool()
+    return tool.extract_metadata_from_markup(markup)

@@ -3,11 +3,7 @@ import io
 
 from skills import market_portfolio_monitor
 from skills import market_portfolio_valuation
-
-try:
-    from skills import market_report_generator
-except ImportError:
-    market_report_generator = None
+from skills import market_report_generator
 
 def send_telegram_notification(token, chat_id, message):
     """

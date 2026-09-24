@@ -27,6 +27,16 @@ def start_new(symbol, url, telegram_token, chat_id, storage_file):
         storage_file=storage_file
     )
 
+def start_ened(symbol, url, telegram_token, chat_id, storage_file):
+    """Алиас для интеграционного теста."""
+    return start_new(
+        symbol=symbol,
+        url=url,
+        telegram_token=telegram_token,
+        chat_id=chat_id,
+        storage_file=storage_file
+    )
+
 
 class MarketParser:
     def __init__(self, storage_file):

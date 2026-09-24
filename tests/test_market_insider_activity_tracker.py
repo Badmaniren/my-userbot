@@ -1,102 +1,148 @@
-import unittest
-from unittest.mock import patch
 import io
-import uuid
 import random
+import unittest
+import uuid
+from unittest.mock import patch
+
 from skills.market_insider_activity_tracker import (
     MarketInsiderActivityTracker,
     MarketInsiderActivityTrackerModuleAPI,
+    market_insider_activity_tracker,
     MarketInsiderActivityTrackerModuleIdempotentProxy
 )
 
 class TestMarketInsiderActivityTracker(unittest.TestCase):
+
     def setUp(self):
-        self.dep_key_1 = uuid.uuid4().hex
-        self.dep_val_1 = uuid.uuid4().hex
-        self.tracker = MarketInsiderActivityTracker(**{self.dep_key_1: self.dep_val_1})
+        self.random_dep_key_1 = f"dep_{uuid.uuid4().hex}"
+        self.random_dep_val_1 = uuid.uuid4().hex
+        self.random_dep_key_2 = f"dep_{uuid.uuid4().hex}"
+        self.random_dep_val_2 = uuid.uuid4().hex
+        
+        self.tracker = MarketInsiderActivityTracker(**{
+            self.random_dep_key_1: self.random_dep_val_1,
+            self.random_dep_key_2: self.random_dep_val_2
+        })
 
-    def test_analyze_activity_normal(self):
-        rand_word = uuid.uuid4().hex
-        stream_content = f"market data payload {rand_word}".encode('utf-8')
-        mock_stream = io.BytesIO(stream_content)
+    def test_initialization_dependencies(self):
+        self.assertEqual(self.tracker.deps[self.random_dep_key_1], self.random_dep_val_1)
+        self.assertEqual(self.tracker.deps[self.random_dep_key_2], self.random_dep_val_2)
+
+    def test_analyze_activity_empty_stream_raises_value_error(self):
+        empty_stream = io.BytesIO(b"")
+        with self.assertRaises(ValueError) as context:
+            self.tracker.analyze_activity(empty_stream)
+        self.assertEqual(str(context.exception), "Empty stream")
+
+    def test_analyze_activity_normal_stream(self):
+        random_normal_bytes = bytes(random.choices(range(65, 90), k=random.randint(10, 50)))
+        stream = io.BytesIO(random_normal_bytes)
         
-        result = self.tracker.analyze_activity(mock_stream)
-        
+        random_uuid = uuid.uuid4()
+        with patch('uuid.uuid4', return_value=random_uuid):
+            result = self.tracker.analyze_activity(stream)
+            
         self.assertEqual(result["status"], "NORMAL")
-        self.assertIn("signature", result)
-        self.assertTrue(isinstance(result["signature"], str))
-        self.assertEqual(len(result["signature"]), 32)
+        self.assertEqual(result["signature"], random_uuid.hex)
 
-    def test_analyze_activity_anomaly(self):
-        rand_anomaly_word = uuid.uuid4().hex
-        stream_content = f"critical anomaly detected {rand_anomaly_word}".encode('utf-8')
-        mock_stream = io.BytesIO(stream_content)
+    def test_analyze_activity_anomaly_stream(self):
+        prefix = bytes(random.choices(range(65, 90), k=random.randint(5, 20)))
+        suffix = bytes(random.choices(range(65, 90), k=random.randint(5, 20)))
+        anomaly_bytes = prefix + b"anomaly" + suffix
+        stream = io.BytesIO(anomaly_bytes)
         
-        result = self.tracker.analyze_activity(mock_stream)
-        
+        random_uuid = uuid.uuid4()
+        with patch('uuid.uuid4', return_value=random_uuid):
+            result = self.tracker.analyze_activity(stream)
+            
         self.assertEqual(result["status"], "ALERT")
-        self.assertIn("signature", result)
-        self.assertTrue(isinstance(result["signature"], str))
+        self.assertEqual(result["signature"], random_uuid.hex)
 
-    def test_analyze_activity_empty_stream(self):
-        mock_stream = io.BytesIO(b"")
-        
-        with self.assertRaises(ValueError) as ctx:
-            self.tracker.analyze_activity(mock_stream)
-        
-        self.assertEqual(str(ctx.exception), "Empty stream")
 
-    def test_track_activity_normal(self):
-        ticker = uuid.uuid4().hex[:8].upper()
-        volume = float(random.randint(100, 499999))
-        multiplier = round(random.uniform(0.1, 4.9), 2)
+class TestMarketInsiderActivityTrackerModuleAPI(unittest.TestCase):
+
+    def test_track_activity_normal_case(self):
+        random_ticker = f"TICKER_{uuid.uuid4().hex[:6].upper()}"
+        random_volume = random.uniform(0.0, 500000.0)
+        random_multiplier = random.uniform(0.0, 5.0)
         
         payload = {
-            "ticker_id": ticker,
-            "volume": volume,
-            "anomaly_multiplier": multiplier
+            "ticker_id": random_ticker,
+            "volume": random_volume,
+            "anomaly_multiplier": random_multiplier
         }
         
-        result = MarketInsiderActivityTrackerModuleAPI.track_activity(payload)
-        
+        random_uuid = uuid.uuid4()
+        with patch('uuid.uuid4', return_value=random_uuid):
+            result = MarketInsiderActivityTrackerModuleAPI.track_activity(payload)
+            
         self.assertFalse(result["anomaly_detected"])
-        self.assertEqual(result["ticker_id"], ticker)
-        self.assertEqual(result["volume"], volume)
-        self.assertIn("signature", result)
+        self.assertEqual(result["ticker_id"], random_ticker)
+        self.assertEqual(result["volume"], random_volume)
+        self.assertEqual(result["signature"], random_uuid.hex)
 
     def test_track_activity_anomaly_by_volume(self):
-        ticker = uuid.uuid4().hex[:8].upper()
-        volume = float(random.randint(500001, 2000000))
-        multiplier = round(random.uniform(0.1, 4.9), 2)
+        random_ticker = f"TICKER_{uuid.uuid4().hex[:6].upper()}"
+        random_volume = random.uniform(500000.01, 10000000.0)
+        random_multiplier = random.uniform(0.0, 5.0)
         
         payload = {
-            "ticker_id": ticker,
-            "volume": volume,
-            "anomaly_multiplier": multiplier
+            "ticker_id": random_ticker,
+            "volume": random_volume,
+            "anomaly_multiplier": random_multiplier
         }
         
-        result = MarketInsiderActivityTrackerModuleAPI.track_activity(payload)
-        
+        random_uuid = uuid.uuid4()
+        with patch('uuid.uuid4', return_value=random_uuid):
+            result = MarketInsiderActivityTrackerModuleAPI.track_activity(payload)
+            
         self.assertTrue(result["anomaly_detected"])
-        self.assertEqual(result["ticker_id"], ticker)
-        self.assertEqual(result["volume"], volume)
+        self.assertEqual(result["ticker_id"], random_ticker)
+        self.assertEqual(result["volume"], random_volume)
+        self.assertEqual(result["signature"], random_uuid.hex)
 
     def test_track_activity_anomaly_by_multiplier(self):
-        ticker = uuid.uuid4().hex[:8].upper()
-        volume = float(random.randint(100, 499999))
-        multiplier = round(random.uniform(5.1, 20.0), 2)
+        random_ticker = f"TICKER_{uuid.uuid4().hex[:6].upper()}"
+        random_volume = random.uniform(0.0, 500000.0)
+        random_multiplier = random.uniform(5.01, 100.0)
         
         payload = {
-            "ticker_id": ticker,
-            "volume": volume,
-            "anomaly_multiplier": multiplier
+            "ticker_id": random_ticker,
+            "volume": random_volume,
+            "anomaly_multiplier": random_multiplier
         }
         
-        result = MarketInsiderActivityTrackerModuleAPI.track_activity(payload)
-        
+        random_uuid = uuid.uuid4()
+        with patch('uuid.uuid4', return_value=random_uuid):
+            result = MarketInsiderActivityTrackerModuleAPI.track_activity(payload)
+            
         self.assertTrue(result["anomaly_detected"])
-        self.assertEqual(result["ticker_id"], ticker)
-        self.assertEqual(result["volume"], volume)
+        self.assertEqual(result["ticker_id"], random_ticker)
+        self.assertEqual(result["volume"], random_volume)
+        self.assertEqual(result["signature"], random_uuid.hex)
 
-    def test_proxy_reference(self):
+    def test_track_activity_defaults(self):
+        random_ticker = f"TICKER_{uuid.uuid4().hex[:6].upper()}"
+        payload = {
+            "ticker_id": random_ticker
+        }
+        
+        random_uuid = uuid.uuid4()
+        with patch('uuid.uuid4', return_value=random_uuid):
+            result = MarketInsiderActivityTrackerModuleAPI.track_activity(payload)
+            
+        self.assertFalse(result["anomaly_detected"])
+        self.assertEqual(result["ticker_id"], random_ticker)
+        self.assertEqual(result["volume"], 0)
+        self.assertEqual(result["signature"], random_uuid.hex)
+
+
+class TestModuleAliases(unittest.TestCase):
+
+    def test_aliases_point_to_correct_api_class(self):
+        self.assertIs(market_insider_activity_tracker, MarketInsiderActivityTrackerModuleAPI)
         self.assertIs(MarketInsiderActivityTrackerModuleIdempotentProxy, MarketInsiderActivityTrackerModuleAPI)
+
+
+if __name__ == "__main__":
+    unittest.main()

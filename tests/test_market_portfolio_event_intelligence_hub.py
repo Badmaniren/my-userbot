@@ -23,6 +23,10 @@ class TestMarketPortfolioEventIntelligenceHub(unittest.TestCase):
         self.channels = [uuid.uuid4().hex, uuid.uuid4().hex]
         self.alert_id = uuid.uuid4().hex
 
+    def test_direct_module_import(self):
+        from market_portfolio_event_intelligence_hub import process_event_intelligence as direct_process
+        self.assertTrue(callable(direct_process))
+
     def test_intelligence_hub_composition_and_execution(self):
         expected_sink_result = {uuid.uuid4().hex: random.choice([True, False])}
         expected_router_result = {uuid.uuid4().hex: uuid.uuid4().hex}
@@ -78,6 +82,27 @@ class TestMarketPortfolioEventIntelligenceHub(unittest.TestCase):
                 market_portfolio_event_intelligence_hub.process_incoming_stream(self.alert_id)
             else:
                 pass
+
+    def test_process_event_intelligence_keyword_aliases(self):
+        with patch("skills.market_portfolio_event_intelligence_hub.market_portfolio_alert_event_sink") as mock_sink, \
+             patch("skills.market_portfolio_event_intelligence_hub.market_portfolio_alert_filter_router") as mock_router:
+
+            mock_sink.route_and_sink_alerts.return_value = {"status": "ok"}
+            mock_router.route_and_filter_alerts.return_value = {"status": "ok"}
+
+            from market_portfolio_event_intelligence_hub import process_event_intelligence
+            res = process_event_intelligence(
+                symbol=self.symbol,
+                url=self.url,
+                telegram_token=self.token,
+                chat_id=self.chat_id,
+                storage=self.storage_file,
+                severity_level=self.severity,
+                min_threshold=self.threshold,
+                channels=self.channels
+            )
+            self.assertEqual(res["status"], "success")
+            self.assertEqual(res["processed_symbol"], self.symbol)
 
 
 if __name__ == '__main__':

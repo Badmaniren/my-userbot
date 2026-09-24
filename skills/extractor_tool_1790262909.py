@@ -163,3 +163,12 @@ def extract_metadata(text: str, custom_tags: Optional[List[str]] = None) -> Dict
     Convenience function to extract metadata from markup.
     """
     return MarkupMetadataExtractor.extract_all(text, custom_tags)
+
+
+def extractor_tool_1790262909(meta1: Any = None, meta2: Any = None) -> Dict[str, Any]:
+    res = {}
+    if isinstance(meta1, dict):
+        res.update(meta1)
+    if isinstance(meta2, dict):
+        res.update(meta2)
+    return res

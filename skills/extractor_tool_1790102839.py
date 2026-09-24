@@ -57,3 +57,7 @@ def extract_metadata(markup: str) -> Dict[str, Any]:
     """Вспомогательная функция для быстрой инициализации и извлечения."""
     tool = ExtractorTool()
     return tool.extract(markup)
+
+
+def extractor_tool_1790102839(markup: str) -> Dict[str, Any]:
+    return extract_metadata(markup)

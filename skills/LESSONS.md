@@ -3,10 +3,6 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_alert_dispatcher (refactor) — раундов: 3
-- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_alert_dispatcher (refactor) — раундов: 1
@@ -342,4 +338,8 @@
 
 ## market_portfolio_alert_dispatcher (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: Ran 254 tests in 1.693s
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_anomaly_detector (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

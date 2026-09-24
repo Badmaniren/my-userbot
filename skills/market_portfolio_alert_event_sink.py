@@ -5,6 +5,25 @@ from skills import market_portfolio_alert_dispatcher
 
 AlertFilterRouter = market_portfolio_alert_filter_router.AlertFilterRouter
 
+
+class MarketPortfolioAlertEventSink:
+    def __init__(self):
+        self.events = []
+
+    def emit(self, event):
+        self.events.append(event)
+        return event
+
+    def get_last_event_by_type(self, event_type):
+        for ev in reversed(self.events):
+            if ev.get("type") == event_type:
+                return ev
+        return None
+
+
+market_portfolio_alert_event_sink = MarketPortfolioAlertEventSink()
+
+
 def handle_portfolio_alert_event(symbol, url, token, chat_id, storage, severity, threshold, channels):
     return market_portfolio_alert_dispatcher.dispatch_portfolio_alerts(
         symbol, url, token, chat_id, storage, severity, threshold, channels
@@ -46,7 +65,7 @@ def process_event_sink_trigger(symbol, url, telegram_token, chat_id, storage_fil
         pass
     
     if not os.path.exists(storage_file):
-        os.makedirs(os.path.dirname(storage_file), exist_ok=True)
+        os.makedirs(os.path.dirname(storage_file) or ".", exist_ok=True)
         with open(storage_file, "w", encoding="utf-8") as f:
             json.dump({"symbol": symbol, "status": "processed"}, f)
     else:

@@ -3,8 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-# market_portfolio_live_execution_bridge (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
+AILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_telegram_command_center (start_new) — раундов: 4
@@ -332,3 +331,6 @@
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## extractor_tool_1790260984 (create) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

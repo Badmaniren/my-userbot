@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-formance_analytics (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_backtester (refactor) — раундов: 4
+rtfolio_backtester (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -335,4 +331,8 @@ formance_analytics (refactor) — раундов: 4
 ## market_portfolio_alert_dispatcher (refactor) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_anomaly_score_calculator (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

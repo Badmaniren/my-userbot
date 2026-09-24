@@ -3,12 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-
-## market_portfolio_backtest_evaluator_bridge (compose) — раундов: 3
-- Последняя ошибка перед фиксом: FAILED (failures=2)
-- Статус: успешно прошёл тесты и влит в main
-
-## market_report_generator (refactor) — раундов: 4
+market_report_generator (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: AssertionError: 1 not greater than or equal to 2
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -338,4 +333,8 @@
 ## market_anomaly_score_calculator (create) — раундов: 4
 - Античит поймал: ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'db_storage'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.db_storage import ...'
 - Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_alert_dispatcher (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

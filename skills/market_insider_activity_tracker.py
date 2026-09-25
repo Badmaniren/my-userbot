@@ -1,16 +1,17 @@
 import uuid
 import sqlite3
 import os
+from typing import Optional, Dict, Any, Union
 
 class MarketInsiderActivityTracker:
     """
     Tracker for market insider activity analyzing raw data streams.
     """
-    def __init__(self, **kwargs):
-        self.deps = kwargs
-        self.db_storage = kwargs.get("db_storage")
+    def __init__(self, **kwargs: Any) -> None:
+        self.deps: Dict[str, Any] = kwargs
+        self.db_storage: Optional[Any] = kwargs.get("db_storage")
 
-    def analyze_activity(self, raw_data_stream):
+    def analyze_activity(self, raw_data_stream: Any) -> Dict[str, str]:
         if raw_data_stream is None:
             raise ValueError("Empty stream")
         
@@ -28,11 +29,11 @@ class MarketInsiderActivityTrackerModuleAPI:
     """
     API for tracking market insider activity based on payload data.
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         pass
 
     @staticmethod
-    def track_activity(payload):
+    def track_activity(payload: Any) -> Dict[str, Any]:
         if not isinstance(payload, dict):
             payload = {}
             
@@ -64,11 +65,11 @@ class DBStorage:
     """
     Database storage implementation for market insider activity tracking.
     """
-    def __init__(self, db_path="test_integration.db"):
+    def __init__(self, db_path: str = "test_integration.db") -> None:
         self.db_path = db_path
         self._init_db()
 
-    def _init_db(self):
+    def _init_db(self) -> None:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute("""
@@ -82,7 +83,7 @@ class DBStorage:
         conn.commit()
         conn.close()
 
-    def save_activity(self, ticker, is_anomaly, signature):
+    def save_activity(self, ticker: str, is_anomaly: bool, signature: str) -> None:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute(
@@ -92,7 +93,7 @@ class DBStorage:
         conn.commit()
         conn.close()
 
-    def get_last_activity(self, ticker):
+    def get_last_activity(self, ticker: str) -> Optional[Dict[str, Any]]:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute(

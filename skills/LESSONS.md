@@ -3,12 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ошёл тесты и влит в main
-
-## market_portfolio_telegram_command_center (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_telegram_command_center (refactor) — раундов: 1
+_command_center (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_websocket_feed (start_new) — раундов: 4
@@ -341,3 +336,7 @@
 ## market_anomaly_detector (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_insider_activity_tracker (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
+- Статус: успешно прошёл тесты и влит в main

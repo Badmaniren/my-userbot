@@ -11,3 +11,4 @@
 - market_insider_activity_tracker: Рефакторинг и стабилизация market_insider_activity_tracker для углубленного анализа инсайдерских сделок в рамках текущего эпика мониторинга.
 - market_insider_activity_tracker: Проведение глубокого рефакторинга market_insider_activity_tracker для окончательной стабилизации модуля и продвижения текущего эпика.
 - market_portfolio_monitor: Исправление и стабилизация market_portfolio_monitor для закрытия всех оставшихся тест-кейсов и успешного завершения эпика мониторинга инсайдерской активности и рыночных аномалий.
+- market_insider_activity_tracker: Проведение детального рефакторинга market_insider_activity_tracker для окончательной стабилизации и закрепления результатов эпика мониторинга инсайдерской активности.

@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-market_portfolio_alert_filter_router (compose) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_alert_filter_router (refactor) — раундов: 1
+ раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_alert_event_sink (compose) — раундов: 3
@@ -340,5 +337,9 @@ market_portfolio_alert_filter_router (compose) — раундов: 1
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_alert_dispatcher (refactor) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## market_insider_activity_tracker (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main

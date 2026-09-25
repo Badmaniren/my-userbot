@@ -35,7 +35,12 @@ class MarketInsiderActivityTrackerModuleAPI:
     @staticmethod
     def track_activity(payload: Any) -> Dict[str, Any]:
         if not isinstance(payload, dict):
-            payload = {}
+            return {
+                "anomaly_detected": False,
+                "ticker_id": None,
+                "volume": 0.0,
+                "signature": uuid.uuid4().hex
+            }
             
         ticker_id = payload.get("ticker_id")
         raw_volume = payload.get("volume", 0)

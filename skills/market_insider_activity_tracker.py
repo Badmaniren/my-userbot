@@ -1,4 +1,5 @@
 import uuid
+import io
 
 class MarketInsiderActivityTracker:
     """
@@ -16,7 +17,7 @@ class MarketInsiderActivityTracker:
             raise ValueError("Empty stream")
         
         signature = uuid.uuid4().hex
-        if b"anomaly" in content:
+        if b"anomaly" in content.lower() or b"anomaly_detected" in content.lower():
             return {"status": "ALERT", "signature": signature}
         return {"status": "NORMAL", "signature": signature}
 
@@ -58,5 +59,3 @@ class MarketInsiderActivityTrackerModuleAPI:
 
 
 MarketInsiderActivityTrackerModuleIdempotentProxy = MarketInsiderActivityTrackerModuleAPI
-
-globals()["market_insider_activity_tracker"] = MarketInsiderActivityTrackerModuleAPI

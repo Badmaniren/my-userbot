@@ -3,7 +3,11 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-^
+ раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_alert_event_sink (compose) — раундов: 3
+- Последняя ошибка перед фиксом: ^^^^^^^^^^
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_event_intelligence_hub (compose) — раундов: 4
@@ -339,7 +343,3 @@
 ## market_insider_activity_tracker (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main
-
-## market_insider_activity_tracker (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

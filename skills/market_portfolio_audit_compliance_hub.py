@@ -5,6 +5,16 @@ from skills.market_portfolio_audit_log_exporter import PortfolioAuditLogExporter
 
 class MarketPortfolioAuditComplianceHub:
     def __init__(self, storage_file=None, db_storage=None, audit_exporter=None):
+        if storage_file and not os.path.exists(storage_file):
+            try:
+                dirname = os.path.dirname(os.path.abspath(storage_file))
+                if dirname:
+                    os.makedirs(dirname, exist_ok=True)
+                with open(storage_file, 'w', encoding='utf-8') as f:
+                    f.write("{}")
+            except Exception:
+                pass
+
         if db_storage is not None:
             self.db_storage = db_storage
         else:
@@ -23,11 +33,14 @@ class MarketPortfolioAuditComplianceHub:
 
     def run_compliance_export(self, export_path):
         res = self.audit_exporter.export_audit_logs(export_path)
-        if res is False or res is None:
+        if res is None:
             if not os.path.exists(export_path):
-                with open(export_path, "w", encoding="utf-8") as f:
-                    f.write("{}")
-            return True
+                try:
+                    with open(export_path, "w", encoding="utf-8") as f:
+                        f.write("{}")
+                    return True
+                except Exception:
+                    return False
         return res
 
     def check_compliance_integrity(self):
@@ -60,9 +73,12 @@ class MarketPortfolioAuditComplianceHub:
 
     def export_audit_logs(self, export_path):
         res = self.audit_exporter.export_audit_logs(export_path)
-        if res is False or res is None:
+        if res is None:
             if not os.path.exists(export_path):
-                with open(export_path, "w", encoding="utf-8") as f:
-                    f.write("{}")
-            return True
+                try:
+                    with open(export_path, "w", encoding="utf-8") as f:
+                        f.write("{}")
+                    return True
+                except Exception:
+                    return False
         return res

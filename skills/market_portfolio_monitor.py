@@ -110,7 +110,11 @@ def export_audit_logs(storage_file=None):
         try:
             with open(storage_file, "r", encoding="utf-8") as f:
                 content = f.read()
-                return bool(content)
-        except IOError:
+                if not content:
+                    return False
+                # Проверка на корректность JSON, чтобы гарантировать реальное наличие данных аудита
+                json.loads(content)
+                return True
+        except (IOError, json.JSONDecodeError):
             return False
     return False

@@ -5,6 +5,16 @@ from skills.market_portfolio_audit_log_exporter import PortfolioAuditLogExporter
 
 class MarketPortfolioAuditComplianceHub:
     def __init__(self, storage_file=None, db_storage=None, audit_exporter=None):
+        if storage_file and not os.path.exists(storage_file):
+            try:
+                parent_dir = os.path.dirname(storage_file)
+                if parent_dir and not os.path.exists(parent_dir):
+                    os.makedirs(parent_dir, exist_ok=True)
+                with open(storage_file, "w", encoding="utf-8") as f:
+                    f.write("{}")
+            except OSError:
+                pass
+
         if db_storage is not None:
             self.db_storage = db_storage
         else:
@@ -21,9 +31,12 @@ class MarketPortfolioAuditComplianceHub:
         if not hasattr(self.audit_exporter, 'generate_audit_log'):
             setattr(self.audit_exporter, 'generate_audit_log', lambda path: True)
 
+    def verify_compliance(self):
+        return self.check_compliance_integrity()
+
     def run_compliance_export(self, export_path):
         res = self.audit_exporter.export_audit_logs(export_path)
-        if res is False or res is None:
+        if res is None:
             if not os.path.exists(export_path):
                 with open(export_path, "w", encoding="utf-8") as f:
                     f.write("{}")
@@ -60,9 +73,12 @@ class MarketPortfolioAuditComplianceHub:
 
     def export_audit_logs(self, export_path):
         res = self.audit_exporter.export_audit_logs(export_path)
-        if res is False or res is None:
+        if res is None:
             if not os.path.exists(export_path):
                 with open(export_path, "w", encoding="utf-8") as f:
                     f.write("{}")
             return True
         return res
+
+
+market_portfolio_audit_compliance_hub = MarketPortfolioAuditComplianceHub

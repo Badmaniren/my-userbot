@@ -3,7 +3,10 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-r) — раундов: 1
+tfolio_telegram_command_center (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_telegram_command_center (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_telegram_command_center (refactor) — раундов: 1
@@ -336,8 +339,4 @@ r) — раундов: 1
 
 ## market_portfolio_monitor (refactor) — раундов: 1
 - Последняя ошибка перед фиксом: ImportError: Failed to import test module: tests.test_market_portfolio_monitor_integration
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_monitor (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

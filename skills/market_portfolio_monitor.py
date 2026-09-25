@@ -78,8 +78,11 @@ class MarketReportGenerator:
     def get_raw_stream_dump(self):
         if os.path.exists(self.storage_file):
             try:
-                with open(self.storage_file, "r", encoding="utf-8") as f:
-                    return f.read()
+                with open(self.storage_file, "rb") as f:
+                    content = f.read()
+                    if isinstance(content, bytes):
+                        return content.decode("utf-8", errors="ignore")
+                    return str(content)
             except IOError:
                 return "{}"
         return "{}"
@@ -105,12 +108,22 @@ def run_market_telegram_pipeline(storage_file, symbol, chat_id, url, telegram_to
 
 
 def export_audit_logs(storage_file=None):
-    """Экспорт аудиторских логов с явным возвратом результата."""
-    if storage_file and os.path.exists(storage_file):
-        try:
-            with open(storage_file, "r", encoding="utf-8") as f:
-                content = f.read()
-                return bool(content)
-        except IOError:
-            return False
-    return False
+    """Экспорт аудиторских логов с учетом требований комплаенс-хука."""
+    if not storage_file or not os.path.exists(storage_file):
+        return False
+    try:
+        with open(storage_file, "r", encoding="utf-8") as f:
+            content = f.read()
+            if not content:
+                return False
+            try:
+                data = json.loads(content)
+                if isinstance(data, dict):
+                    if len(data) == 0:
+                        return False
+                    return True
+            except json.JSONDecodeError:
+                pass
+            return True
+    except IOError:
+        return False

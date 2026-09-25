@@ -3,14 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-в: 4
-- Последняя ошибка перед фиксом: FAILED (failures=2)
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_scenario_matrix (create) — раундов: 4
-- Античит поймал: АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'db_storage' глобальной переменной!
-- Последняя ошибка перед фиксом: FAILED (failures=2, errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+нгой, передан на эскалацию
 
 ## market_portfolio_anomaly_detector (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
@@ -334,4 +327,9 @@
 ## extractor_tool_1790359254 (create) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid character '—' (U+2014) (<unknown>, line 66); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/tests/test_market_portfolio_audit_compliance_hub.py", line 52, in test_run_compliance_export_boolean
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_anomaly_detector (create) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

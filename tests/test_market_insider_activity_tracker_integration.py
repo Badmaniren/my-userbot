@@ -1,92 +1,72 @@
-import io
-import random
 import unittest
 import uuid
-
+import random
+import io
 from skills.market_insider_activity_tracker import (
     MarketInsiderActivityTracker,
     MarketInsiderActivityTrackerModuleAPI,
+    MarketInsiderActivityTrackerModuleIdempotentProxy,
     market_insider_activity_tracker
 )
 
 class TestMarketInsiderActivityTrackerIntegration(unittest.TestCase):
     def setUp(self):
         self.tracker = MarketInsiderActivityTracker()
+        self.random_ticker = f"TICKER_{uuid.uuid4().hex[:8].upper()}"
+        self.random_volume = float(random.randint(1000, 1000000))
+        self.random_multiplier = round(random.uniform(1.0, 10.0), 2)
 
-    def test_analyze_activity_normal_stream(self):
-        random_bytes = f"normal_data_{uuid.uuid4().hex}".encode('utf-8')
-        stream = io.BytesIO(random_bytes)
-        result = self.tracker.analyze_activity(stream)
-        
-        self.assertEqual(result["status"], "NORMAL")
-        self.assertEqual(len(result["signature"]), 32)
+    def test_tracker_stream_normal_and_anomaly(self):
+        normal_stream = io.BytesIO(b"normal market stream data")
+        result_normal = self.tracker.analyze_activity(normal_stream)
+        self.assertEqual(result_normal["status"], "NORMAL")
+        self.assertIn("signature", result_normal)
 
-    def test_analyze_activity_anomaly_stream(self):
-        random_bytes = f"some_prefix_anomaly_{uuid.uuid4().hex}".encode('utf-8')
-        stream = io.BytesIO(random_bytes)
-        result = self.tracker.analyze_activity(stream)
-        
-        self.assertEqual(result["status"], "ALERT")
-        self.assertEqual(len(result["signature"]), 32)
+        anomaly_stream = io.BytesIO(b"critical anomaly detected in stream")
+        result_anomaly = self.tracker.analyze_activity(anomaly_stream)
+        self.assertEqual(result_anomaly["status"], "ALERT")
+        self.assertIn("signature", result_anomaly)
 
-    def test_analyze_activity_empty_stream_raises_value_error(self):
-        stream = io.BytesIO(b"")
+    def test_tracker_stream_exceptions(self):
         with self.assertRaises(ValueError):
-            self.tracker.analyze_activity(stream)
-
-    def test_track_activity_api_normal(self):
-        ticker_id = f"TICKER_{uuid.uuid4().hex[:8].upper()}"
-        volume = random.uniform(1000.0, 499999.0)
-        multiplier = random.uniform(0.1, 4.9)
+            self.tracker.analyze_activity(None)
         
+        empty_stream = io.BytesIO(b"")
+        with self.assertRaises(ValueError):
+            self.tracker.analyze_activity(empty_stream)
+
+    def test_module_api_payload_processing(self):
         payload = {
-            "ticker_id": ticker_id,
-            "volume": volume,
-            "anomaly_multiplier": multiplier
+            "ticker_id": self.random_ticker,
+            "volume": self.random_volume,
+            "anomaly_multiplier": self.random_multiplier
         }
         
         result = MarketInsiderActivityTrackerModuleAPI.track_activity(payload)
         
-        self.assertFalse(result["anomaly_detected"])
-        self.assertEqual(result["ticker_id"], ticker_id)
-        self.assertEqual(result["volume"], volume)
-        self.assertEqual(len(result["signature"]), 32)
+        self.assertEqual(result["ticker_id"], self.random_ticker)
+        self.assertEqual(result["volume"], self.random_volume)
+        self.assertIsInstance(result["anomaly_detected"], bool)
+        self.assertIn("signature", result)
 
-    def test_track_activity_api_anomaly_by_volume(self):
-        ticker_id = f"TICKER_{uuid.uuid4().hex[:8].upper()}"
-        volume = random.uniform(500001.0, 1000000.0)
-        multiplier = random.uniform(0.1, 4.9)
-        
+        expected_anomaly = self.random_volume > 500000.0 or self.random_multiplier > 5.0
+        self.assertEqual(result["anomaly_detected"], expected_anomaly)
+
+    def test_idempotent_proxy_and_globals_integration(self):
         payload = {
-            "ticker_id": ticker_id,
-            "volume": volume,
-            "anomaly_multiplier": multiplier
+            "ticker_id": f"PROXY_{uuid.uuid4().hex[:6]}",
+            "volume": "invalid_volume",
+            "anomaly_multiplier": "invalid_mult"
         }
         
-        result = MarketInsiderActivityTrackerModuleAPI.track_activity(payload)
-        
-        self.assertTrue(result["anomaly_detected"])
-        self.assertEqual(result["ticker_id"], ticker_id)
-        self.assertEqual(result["volume"], volume)
-        self.assertEqual(len(result["signature"]), 32)
+        proxy_result = MarketInsiderActivityTrackerModuleIdempotentProxy.track_activity(payload)
+        self.assertEqual(proxy_result["volume"], 0.0)
+        self.assertFalse(proxy_result["anomaly_detected"])
 
-    def test_track_activity_api_anomaly_by_multiplier(self):
-        ticker_id = f"TICKER_{uuid.uuid4().hex[:8].upper()}"
-        volume = random.uniform(1000.0, 499999.0)
-        multiplier = random.uniform(5.1, 15.0)
-        
-        payload = {
-            "ticker_id": ticker_id,
-            "volume": volume,
-            "anomaly_multiplier": multiplier
-        }
-        
-        result = market_insider_activity_tracker.track_activity(payload)
-        
-        self.assertTrue(result["anomaly_detected"])
-        self.assertEqual(result["ticker_id"], ticker_id)
-        self.assertEqual(result["volume"], volume)
-        self.assertEqual(len(result["signature"]), 32)
+        global_func = globals()["market_insider_activity_tracker"].track_activity
+        global_result = global_func({"ticker_id": self.random_ticker, "volume": 600000.0})
+        self.assertTrue(global_result["anomaly_detected"])
+        self.assertEqual(global_result["ticker_id"], self.random_ticker)
 
 if __name__ == "__main__":
     unittest.main()

@@ -7,20 +7,33 @@ class MarketParser:
         self.storage_file = storage_file
 
     def fetch_and_store(self, symbol: str, price: float) -> None:
-        data = []
+        data = None
         if os.path.exists(self.storage_file):
             try:
                 with open(self.storage_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
             except Exception:
-                data = []
-        
+                data = None
+
         entry = {
             "symbol": symbol,
             "price": price,
             "timestamp": datetime.utcnow().isoformat()
         }
-        data.append(entry)
+
+        if isinstance(data, list):
+            data.append(entry)
+        elif isinstance(data, dict):
+            if symbol not in data:
+                data[symbol] = []
+            if isinstance(data[symbol], list):
+                data[symbol].append({"price": price, "timestamp": datetime.utcnow().isoformat()})
+            elif isinstance(data[symbol], dict):
+                data[symbol]["price"] = price
+            else:
+                data[symbol] = entry
+        else:
+            data = [entry]
         
         with open(self.storage_file, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)

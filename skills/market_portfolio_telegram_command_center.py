@@ -1,7 +1,16 @@
 import os
+import sys
 import json
 import requests
-from skills.market_parser import MarketParser
+
+skills_dir = os.path.dirname(os.path.abspath(__file__))
+if skills_dir not in sys.path:
+    sys.path.insert(0, skills_dir)
+
+try:
+    from skills.market_parser import MarketParser
+except ImportError:
+    from market_parser import MarketParser
 
 
 def start_new(token: str, chat_id: str, message: str) -> bool:

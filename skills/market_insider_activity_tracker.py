@@ -1,6 +1,5 @@
 import uuid
 import sqlite3
-import os
 from typing import Optional, Dict, Any, Union
 
 class MarketInsiderActivityTracker:

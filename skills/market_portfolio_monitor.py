@@ -1,5 +1,6 @@
 import json
 import os
+from skills.db_storage import MarketParser as DBMarketParser
 
 def run_pipeline(symbol, url, telegram_token, chat_id, storage_file):
     """Выполняет основной конвейер мониторинга портфеля."""
@@ -41,6 +42,7 @@ def start_ened(symbol, url, telegram_token, chat_id, storage_file):
 class MarketParser:
     def __init__(self, storage_file):
         self.storage_file = storage_file
+        self.db = DBMarketParser(storage_file)
 
     def fetch_and_store(self, symbol, price):
         data = {}
@@ -55,11 +57,12 @@ class MarketParser:
         with open(self.storage_file, "w", encoding="utf-8") as f:
             json.dump(data, f)
 
-    def load_data(self, storage_file):
-        if not os.path.exists(storage_file):
+    def load_data(self, storage_file=None):
+        file_to_load = storage_file or self.storage_file
+        if not file_to_load or not os.path.exists(file_to_load):
             return None
         try:
-            with open(storage_file, "r", encoding="utf-8") as f:
+            with open(file_to_load, "r", encoding="utf-8") as f:
                 return json.load(f)
         except (json.JSONDecodeError, IOError):
             return None
@@ -68,6 +71,7 @@ class MarketParser:
 class MarketReportGenerator:
     def __init__(self, storage_file):
         self.storage_file = storage_file
+        self.db = DBMarketParser(storage_file)
 
     def generate_symbol_report(self, symbol):
         data = MarketParser(self.storage_file).load_data(self.storage_file)
@@ -102,6 +106,11 @@ def run_market_telegram_pipeline(storage_file, symbol, chat_id, url, telegram_to
         "chat_id": chat_id,
         "url": url
     }
+
+
+def run_compliance_export(storage_file=None):
+    """Выполняет экспорт соответствия требованиям."""
+    return export_audit_logs(storage_file)
 
 
 def export_audit_logs(storage_file=None):

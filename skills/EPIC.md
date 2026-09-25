@@ -9,3 +9,4 @@
 - market_portfolio_monitor: Дорабатываем market_portfolio_monitor для закрытия всех ошибок и успешного прохождения проверок в рамках эпика.
 - market_portfolio_alert_dispatcher: Исправление и стабилизация market_portfolio_alert_dispatcher для продвижения эпика мониторинга инсайдерской активности и рыночных аномалий.
 - market_insider_activity_tracker: Рефакторинг и стабилизация market_insider_activity_tracker для углубленного анализа инсайдерских сделок в рамках текущего эпика мониторинга.
+- market_insider_activity_tracker: Проведение глубокого рефакторинга market_insider_activity_tracker для окончательной стабилизации модуля и продвижения текущего эпика.

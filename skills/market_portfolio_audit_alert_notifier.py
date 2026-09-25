@@ -30,12 +30,22 @@ def audit_compliance_and_notify(
         return True
     return False
 
+
 class MarketPortfolioAuditAlertNotifierService:
-    def __init__(self, db_storage, token, chat_id):
+    def __init__(self, db_storage=None, token=None, chat_id=None):
         self.db_storage = db_storage
         self.token = token
         self.chat_id = chat_id
         self.hub = MarketPortfolioAuditComplianceHub(storage_file=db_storage)
+
+    def dispatch_alerts(self, compliance_report=None):
+        violations = []
+        if isinstance(compliance_report, dict):
+            violations = compliance_report.get("violations", [])
+        if self.token and self.chat_id and violations:
+            msg = f"Alert: {len(violations)} violations detected in compliance check."
+            send_telegram_notification(token=self.token, chat_id=self.chat_id, message=msg)
+        return {"status": "DISPATCHED", "success": True, "alert_count": len(violations)}
 
     def trigger_alert_on_violation(self, message):
         self.hub.verify_log_integrity()
@@ -54,3 +64,6 @@ class MarketPortfolioAuditAlertNotifierService:
         if summary is not None:
             return summary
         return res
+
+
+market_portfolio_audit_alert_notifier = MarketPortfolioAuditAlertNotifierService

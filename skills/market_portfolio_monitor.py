@@ -61,7 +61,7 @@ class MarketParser:
         try:
             with open(storage_file, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except (json.JSONDecodeError, IOError):
+        except (json.JSONDecodeError, IOError, UnicodeDecodeError):
             return None
 
 
@@ -80,7 +80,7 @@ class MarketReportGenerator:
             try:
                 with open(self.storage_file, "r", encoding="utf-8") as f:
                     return f.read()
-            except IOError:
+            except (IOError, UnicodeDecodeError):
                 return "{}"
         return "{}"
 
@@ -111,9 +111,8 @@ def export_audit_logs(storage_file=None):
             with open(storage_file, "r", encoding="utf-8") as f:
                 content = f.read()
                 if not content:
-                    return True
-                # Если файл не пустой, принимаем контент за корректный лог (проходим compliance check)
+                    return False
                 return True
-        except (IOError, json.JSONDecodeError):
+        except (IOError, json.JSONDecodeError, UnicodeDecodeError):
             return False
     return False

@@ -7,3 +7,4 @@
 - market_insider_activity_tracker: Создаем специализированный модуль трекинга инсайдерской активности, развивая текущий эпик мониторинга.
 - market_insider_activity_tracker: Доработка модуля market_insider_activity_tracker для закрепления результатов эпика мониторинга инсайдерской активности и прохождения проверок античита.
 - market_portfolio_monitor: Дорабатываем market_portfolio_monitor для закрытия всех ошибок и успешного прохождения проверок в рамках эпика.
+- market_portfolio_alert_dispatcher: Исправление и стабилизация market_portfolio_alert_dispatcher для продвижения эпика мониторинга инсайдерской активности и рыночных аномалий.

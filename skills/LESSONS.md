@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_monitor (refactor) — раундов: 1
-- Последняя ошибка перед фиксом: ImportError: Failed to import test module: tests.test_market_portfolio_event_intelligence_hub
+t module: tests.test_market_portfolio_event_intelligence_hub
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_monitor (refactor) — раундов: 4
@@ -328,4 +325,8 @@
 ## market_portfolio_insider_exposure_report (create) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_insider_notifier (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -39,6 +39,9 @@ class MarketSentimentRiskHub:
             "anomaly_score": anomaly_score
         }
 
+    def calculate_risk(self, asset):
+        return self.evaluate_risk(ticker=asset)
+
     def process_stream(self, stream_source):
         if hasattr(self.sentiment_analyzer, "batch_analyze_stream"):
             try:
@@ -58,6 +61,10 @@ class MarketSentimentRiskHub:
         with open(filename, "w", encoding="utf-8") as f:
             f.write(f"Risk Audit Report for {ticker}\n")
         return True
+
+
+market_sentiment_risk_hub = MarketSentimentRiskHub()
+
 
 def compute_market_risk_index(ticker=None, exchange=None):
     hub = MarketSentimentRiskHub()

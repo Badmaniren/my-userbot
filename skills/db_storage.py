@@ -2,6 +2,26 @@ import sqlite3
 import requests
 from bs4 import BeautifulSoup
 
+_in_memory_records = {}
+
+
+def db_storage(data=None, *args, **kwargs):
+    if isinstance(data, dict):
+        action = data.get("action")
+        rec_id = data.get("id") or data.get("record_id") or data.get("anomaly_id")
+        if action in ("set", "save"):
+            record_content = data.get("data")
+            if rec_id and record_content is not None:
+                _in_memory_records[rec_id] = record_content
+            elif rec_id:
+                _in_memory_records[rec_id] = data
+            return True
+        elif action == "get":
+            if rec_id:
+                return _in_memory_records.get(rec_id)
+            return _in_memory_records
+    return _in_memory_records
+
 
 class MarketParser:
     def __init__(self, storage_file: str = "market_data.db"):

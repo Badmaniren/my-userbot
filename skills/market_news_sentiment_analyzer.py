@@ -72,6 +72,9 @@ class MarketNewsSentimentAnalyzer:
         return True
 
 
+market_news_sentiment_analyzer = MarketNewsSentimentAnalyzer()
+
+
 def analyze_news_sentiment(parsed_data) -> dict:
     analyzer = MarketNewsSentimentAnalyzer()
     if isinstance(parsed_data, dict):

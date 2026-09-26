@@ -1,8 +1,44 @@
 import json
 import os
 import uuid
+import io
 import requests
 from bs4 import BeautifulSoup
+
+
+class ParserClient:
+    _mock_data = {}
+    _mock_raw_streams = {}
+
+    def set_mock_data(self, url, content):
+        ParserClient._mock_data[url] = content
+
+    def set_mock_raw_stream(self, url, raw_bytes):
+        ParserClient._mock_raw_streams[url] = raw_bytes
+
+    def fetch_feed(self, url):
+        if url in ParserClient._mock_data:
+            data = ParserClient._mock_data[url]
+            if isinstance(data, str):
+                data = data.encode('utf-8')
+            return io.BytesIO(data)
+        try:
+            response = requests.get(url, timeout=10)
+            return io.BytesIO(response.content)
+        except Exception:
+            return io.BytesIO(b"")
+
+    def fetch_raw_stream(self, url):
+        if url in ParserClient._mock_raw_streams:
+            data = ParserClient._mock_raw_streams[url]
+            if isinstance(data, str):
+                data = data.encode('utf-8')
+            return io.BytesIO(data)
+        try:
+            response = requests.get(url, timeout=10)
+            return io.BytesIO(response.content)
+        except Exception:
+            return io.BytesIO(b"")
 
 
 class MarketParser:

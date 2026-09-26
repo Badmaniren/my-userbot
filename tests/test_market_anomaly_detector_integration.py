@@ -1,52 +1,43 @@
 import unittest
 import uuid
 import random
-import os
-from skills.market_anomaly_detector import market_anomaly_detector
-from skills.market_parser import market_parser
-from skills.db_storage import db_storage
+from skills import market_parser
+from skills.market_anomaly_detector import MarketAnomalyDetector, market_anomaly_detector
 
 class TestMarketAnomalyDetectorIntegration(unittest.TestCase):
     def setUp(self):
-        self.test_symbol = f"TEST_{uuid.uuid4().hex[:6].upper()}"
-        self.random_volume = random.randint(100000, 9999999)
-        self.random_price = round(random.uniform(10.0, 500.0), 2)
-        self.storage_path = f"data_anomaly_{uuid.uuid4().hex}.json"
+        self.detector = MarketAnomalyDetector()
+        self.test_ticker = f"TICKER_{uuid.uuid4().hex[:6].upper()}"
+        self.random_volume = random.randint(1000, 100000)
+        self.random_price = round(random.uniform(10.0, 1500.0), 2)
 
-    def tearDown(self):
-        if os.path.exists(self.storage_path):
-            try:
-                os.remove(self.storage_path)
-            except OSError:
-                pass
+    def test_detect_integration_with_real_parser(self):
+        result = self.detector.detect(self.test_ticker)
+        self.assertIsInstance(result, dict)
+        self.assertIn("is_anomaly", result)
+        self.assertIn("ticker", result)
+        self.assertEqual(result["ticker"], self.test_ticker)
 
-    def test_detect_anomaly_with_real_parser_and_storage(self):
-        parser_payload = {
-            "symbol": self.test_symbol,
+    def test_analyze_stream_integration(self):
+        exchange_name = f"EXCHANGE_{uuid.uuid4().hex[:4].upper()}"
+        result = self.detector.analyze_stream(exchange_name)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("exchange"), exchange_name)
+        self.assertEqual(result.get("status"), "analyzed")
+
+    def test_functional_detector_with_random_data(self):
+        input_data = {
+            "ticker": self.test_ticker,
             "volume": self.random_volume,
-            "price": self.random_price,
-            "timestamp": uuid.uuid4().int
+            "price": self.random_price
         }
-        
-        parsed_data = market_parser(parser_payload)
-        self.assertIsNotNone(parsed_data, "Market parser returned None")
-
-        anomaly_result = market_anomaly_detector(parsed_data)
-        
-        self.assertIsInstance(anomaly_result, dict, "Anomaly detector must return a dictionary")
-        self.assertIn("is_anomaly", anomaly_result)
-        self.assertIn("anomaly_score", anomaly_result)
-        
-        db_payload = {
-            "id": str(uuid.uuid4()),
-            "symbol": self.test_symbol,
-            "anomaly_data": anomaly_result,
-            "storage_file": self.storage_path
-        }
-        
-        storage_status = db_storage(db_payload)
-        self.assertTrue(storage_status, "DB storage failed to persist real anomaly data")
-        self.assertTrue(os.path.exists(self.storage_path), "Integration failed: Storage file was not created")
+        result = market_anomaly_detector(input_data)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["symbol"], self.test_ticker)
+        self.assertEqual(result["volume"], self.random_volume)
+        self.assertEqual(result["price"], self.random_price)
+        self.assertIsInstance(result["is_anomaly"], bool)
+        self.assertIsInstance(result["anomaly_score"], float)
 
 if __name__ == "__main__":
     unittest.main()

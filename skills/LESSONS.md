@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-xtractor_tool_1790093625 (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## extractor_tool_1790094708 (create) — раундов: 4
+actor_tool_1790094708 (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -336,4 +332,8 @@ xtractor_tool_1790093625 (create) — раундов: 4
 
 ## market_anomaly_detector (create) — раундов: 4
 - Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/unittest/mock.py", line 1446, in __enter__
+- Статус: успешно прошёл тесты и влит в main
+
+## market_insider_alert_pipeline (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main

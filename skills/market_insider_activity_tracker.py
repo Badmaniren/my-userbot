@@ -9,19 +9,52 @@ class MarketInsiderActivityTracker:
     def __init__(self, **kwargs: Any) -> None:
         self.deps: Dict[str, Any] = kwargs
         self.db_storage: Optional[Any] = kwargs.get("db_storage")
+        if not self.db_storage and kwargs.get("db_path"):
+            self.db_storage = DBStorage(db_path=kwargs.get("db_path"))
 
-    def analyze_activity(self, raw_data_stream: Any) -> Dict[str, str]:
+    def analyze_activity(self, raw_data_stream: Any) -> Dict[str, Any]:
         if raw_data_stream is None:
             raise ValueError("Empty stream")
-        
-        content = raw_data_stream.read()
+
+        signature = uuid.uuid4().hex
+
+        if isinstance(raw_data_stream, dict):
+            ticker = raw_data_stream.get("ticker") or raw_data_stream.get("ticker_id") or "UNKNOWN"
+            is_anomaly = bool(
+                raw_data_stream.get("is_anomaly")
+                or raw_data_stream.get("anomaly_detected")
+                or (isinstance(raw_data_stream.get("anomaly_score"), (int, float)) and raw_data_stream.get("anomaly_score", 0) > 0.5)
+            )
+            api_res = MarketInsiderActivityTrackerModuleAPI.track_activity(raw_data_stream)
+            if api_res.get("anomaly_detected"):
+                is_anomaly = True
+
+            status = "ANOMALY_DETECTED" if is_anomaly else "NORMAL"
+
+            if self.db_storage and ticker:
+                self.db_storage.save_activity(ticker=ticker, is_anomaly=is_anomaly, signature=signature)
+
+            return {
+                "ticker": ticker,
+                "status": status,
+                "is_anomaly": is_anomaly,
+                "signature": signature
+            }
+
+        if hasattr(raw_data_stream, "read"):
+            content = raw_data_stream.read()
+        elif isinstance(raw_data_stream, bytes):
+            content = raw_data_stream
+        else:
+            content = str(raw_data_stream).encode("utf-8")
+
         if not content:
             raise ValueError("Empty stream")
-        
-        signature = uuid.uuid4().hex
-        if b"anomaly" in content:
-            return {"status": "ALERT", "signature": signature}
-        return {"status": "NORMAL", "signature": signature}
+
+        status = "ALERT" if b"anomaly" in content else "NORMAL"
+        is_anomaly = status == "ALERT"
+
+        return {"status": status, "is_anomaly": is_anomaly, "signature": signature}
 
 
 class MarketInsiderActivityTrackerModuleAPI:

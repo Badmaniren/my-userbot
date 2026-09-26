@@ -55,3 +55,16 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+class DatabaseConnection:
+    _articles = {}
+
+    def save_article(self, content):
+        import uuid
+        article_id = str(uuid.uuid4())
+        self._articles[article_id] = content
+        return article_id
+
+    def get_article(self, article_id):
+        return self._articles.get(article_id)

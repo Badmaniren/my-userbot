@@ -66,3 +66,47 @@ class MarketParser:
             with open(filename, 'r', encoding='utf-8') as f:
                 return json.load(f)
         return {}
+
+
+class ParserClient:
+    _mock_data = {}
+    _mock_raw_streams = {}
+
+    @classmethod
+    def set_mock_data(cls, url, content):
+        cls._mock_data[url] = content
+
+    @classmethod
+    def set_mock_raw_stream(cls, url, raw_bytes):
+        cls._mock_raw_streams[url] = raw_bytes
+
+    def fetch_feed(self, url):
+        import io
+        if url in self._mock_data:
+            content = self._mock_data[url]
+            if isinstance(content, str):
+                return io.BytesIO(content.encode('utf-8'))
+            elif isinstance(content, bytes):
+                return io.BytesIO(content)
+        try:
+            resp = requests.get(url, timeout=5)
+            return io.BytesIO(resp.content)
+        except Exception:
+            return io.BytesIO(b"")
+
+    def fetch_raw_stream(self, url):
+        import io
+        if url in self._mock_raw_streams:
+            raw = self._mock_raw_streams[url]
+            return io.BytesIO(raw)
+        if url in self._mock_data:
+            content = self._mock_data[url]
+            if isinstance(content, str):
+                return io.BytesIO(content.encode('utf-8'))
+            elif isinstance(content, bytes):
+                return io.BytesIO(content)
+        try:
+            resp = requests.get(url, timeout=5)
+            return io.BytesIO(resp.content)
+        except Exception:
+            return io.BytesIO(b"")

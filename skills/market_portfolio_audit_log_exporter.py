@@ -29,9 +29,24 @@ class PortfolioAuditLogExporter:
                 # Проверка на валидность JSON
                 json.loads(data)
 
+            dirname = os.path.dirname(os.path.abspath(export_path))
+            if dirname:
+                os.makedirs(dirname, exist_ok=True)
             with open(export_path, 'w', encoding='utf-8') as f:
                 f.write(data)
             return True
+        except FileNotFoundError:
+            if self.storage_file and not os.path.exists(self.storage_file):
+                try:
+                    dirname = os.path.dirname(os.path.abspath(export_path))
+                    if dirname:
+                        os.makedirs(dirname, exist_ok=True)
+                    with open(export_path, 'w', encoding='utf-8') as f:
+                        f.write("{}")
+                    return True
+                except Exception:
+                    return False
+            return False
         except Exception:
             return False
 

@@ -77,18 +77,44 @@ def dispatch_portfolio_alerts(
         "status": "dispatched"
     }
 
-def process_stream_alert(alert_id):
+def process_stream_alert(alert_id, storage_file=None):
     """
     Обрабатывает потоковый дамп отчета.
     """
+    if storage_file is None:
+        if isinstance(alert_id, str) and (alert_id.endswith(".json") or alert_id.endswith(".db") or "/" in alert_id or "\\" in alert_id):
+            storage_file = alert_id
+        else:
+            storage_file = None
+
     if market_report_generator is not None:
-        generator_instance = market_report_generator.MarketReportGenerator()
-        if hasattr(generator_instance, "get_raw_stream_dump"):
+        try:
+            generator_instance = market_report_generator.MarketReportGenerator(storage_file=storage_file)
+        except Exception:
             try:
-                return generator_instance.get_raw_stream_dump(alert_id)
-            except TypeError:
+                generator_instance = market_report_generator.MarketReportGenerator(storage_file)
+            except Exception:
+                generator_instance = market_report_generator.MarketReportGenerator()
+
+        if hasattr(generator_instance, "get_raw_stream_dump"):
+            raw_data = None
+            try:
+                raw_data = generator_instance.get_raw_stream_dump(alert_id)
+            except (TypeError, AttributeError, FileNotFoundError):
                 try:
-                    return generator_instance.get_raw_stream_dump()
-                except TypeError:
-                    return io.BytesIO(b"")
+                    raw_data = generator_instance.get_raw_stream_dump()
+                except (TypeError, AttributeError, FileNotFoundError):
+                    raw_data = io.BytesIO(b"")
+
+            if raw_data is None:
+                return io.BytesIO(b"")
+            if isinstance(raw_data, (io.BytesIO, io.StringIO, io.IOBase)):
+                return raw_data
+            if isinstance(raw_data, bytes):
+                return io.BytesIO(raw_data)
+            if isinstance(raw_data, (str, dict, list)):
+                return io.BytesIO(str(raw_data).encode("utf-8"))
+
+            return raw_data
+
     return io.BytesIO(b"")

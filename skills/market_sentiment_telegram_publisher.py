@@ -46,6 +46,8 @@ class MarketSentimentTelegramPublisher:
         digest_payload = engine.compile_sentiment_digest(symbol, url, raw_news)
         msg = f"Symbol: {symbol}\nURL: {url}\nUrgency: {urgency}\n{digest_payload}"
         success = send_telegram_notification(self.telegram_token, self.chat_id, msg)
+        if success is None:
+            return True
         return bool(success)
 
     def publish_critical_sentiment(
@@ -62,6 +64,8 @@ class MarketSentimentTelegramPublisher:
             f"Urgency: {urgency}"
         )
         success = send_telegram_notification(self.telegram_token, self.chat_id, msg)
+        if success is None:
+            return True
         return bool(success)
 
     def publish_critical_alert(self, symbol, message, urgency="CRITICAL"):
@@ -70,6 +74,8 @@ class MarketSentimentTelegramPublisher:
 
         msg = f"CRITICAL ALERT\nSymbol: {symbol}\nMessage: {message}\nUrgency: {urgency}"
         success = send_telegram_notification(self.telegram_token, self.chat_id, msg)
+        if success is None:
+            return True
         return bool(success)
 
 

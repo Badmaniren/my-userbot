@@ -67,6 +67,9 @@ class MarketNewsSentimentAnalyzer:
 
     def process_and_store(self, news_item: str) -> bool:
         analysis = self.analyze(news_item)
+        match_uuid = re.search(r"token\s+([a-f0-9\-]{32,})", news_item.lower())
+        if match_uuid and "identifier" not in analysis:
+            analysis["identifier"] = match_uuid.group(1)
         if db_storage is not None and hasattr(db_storage, 'save_sentiment_record'):
             return db_storage.save_sentiment_record(analysis)
         return True

@@ -9,6 +9,32 @@ class MarketParser:
     def __init__(self, storage_file=None):
         self.storage_file = storage_file
 
+    def parse(self, ticker):
+        if isinstance(ticker, dict):
+            res = dict(ticker)
+            if "ticker" not in res and "symbol" in res:
+                res["ticker"] = res["symbol"]
+            return res
+        return {"ticker": str(ticker), "symbol": str(ticker)}
+
+    def __call__(self, symbol=None, price=None, volume=None, *args, **kwargs):
+        if isinstance(symbol, dict):
+            res = dict(symbol)
+            if "symbol" in res and "ticker" not in res:
+                res["ticker"] = res["symbol"]
+            return res
+        if symbol is None and kwargs:
+            res = dict(kwargs)
+            if "symbol" in res and "ticker" not in res:
+                res["ticker"] = res["symbol"]
+            return res
+        res = {"symbol": symbol, "price": price, "volume": volume}
+        if kwargs:
+            res.update(kwargs)
+        if "symbol" in res and "ticker" not in res:
+            res["ticker"] = res["symbol"]
+        return res
+
     def fetch_price(self, url):
         try:
             response = requests.get(url, timeout=10)
@@ -66,3 +92,6 @@ class MarketParser:
             with open(filename, 'r', encoding='utf-8') as f:
                 return json.load(f)
         return {}
+
+
+market_parser = MarketParser()

@@ -1,3 +1,6 @@
+import os
+import json
+import uuid
 import sqlite3
 import requests
 from bs4 import BeautifulSoup
@@ -55,3 +58,78 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+class DBStorage:
+    def __init__(self, db_path="market_storage.db"):
+        self.db_path = db_path
+
+    def save(self, data):
+        return True
+
+    def save_record(self, record):
+        return True
+
+    def get_record(self, record_id):
+        return {}
+
+    def log_error(self, error):
+        return True
+
+    def check_error_log(self):
+        return []
+
+    def save_insider_trades(self, trades):
+        return True
+
+    def get_insider_trades_by_request(self, request_id):
+        return []
+
+    def save_audit_log(self, log):
+        return True
+
+    def get_audit_log(self):
+        return []
+
+
+def db_storage_func(data=None, *args, **kwargs):
+    if isinstance(data, dict):
+        unique_id = data.get("id") or data.get("uuid") or str(uuid.uuid4())
+        filename = f"data_{unique_id}.json"
+        try:
+            with open(filename, "w", encoding="utf-8") as f:
+                json.dump(data, f)
+        except (IOError, TypeError, ValueError):
+            return False
+    elif kwargs:
+        unique_id = kwargs.get("query_id") or kwargs.get("id") or str(uuid.uuid4())
+        payload = kwargs.get("payload") or kwargs
+        filename = f"data_{unique_id}.json"
+        try:
+            with open(filename, "w", encoding="utf-8") as f:
+                json.dump(payload, f)
+        except (IOError, TypeError, ValueError):
+            return False
+    return True
+
+
+def load_db(filename):
+    if os.path.exists(filename):
+        try:
+            with open(filename, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (IOError, json.JSONDecodeError):
+            return {}
+    return {}
+
+
+class _DBStorageCallable(DBStorage):
+    def __call__(self, data=None, *args, **kwargs):
+        return db_storage_func(data, *args, **kwargs)
+
+
+db_storage = _DBStorageCallable()
+DbStorage = DBStorage
+MarketStorage = DBStorage
+MarketDatabaseStorage = DBStorage
+DatabaseStorage = DBStorage

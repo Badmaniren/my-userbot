@@ -1,5 +1,7 @@
 from skills.market_insider_alert_pipeline import MarketInsiderAlertPipeline
 from skills.market_portfolio_telegram_notifier import send_telegram_notification, start_new
+import io
+import json
 
 
 class MarketInsiderNotifier:
@@ -18,7 +20,11 @@ class MarketInsiderNotifier:
         }
 
     def handle_stream_event(self, ticker, raw_stream_data):
-        return self.pipeline.process_alert_stream(ticker, raw_stream_data)
+        # Если передан словарь, а пайплайн ожидает поток с методом .read(), превратим его в BytesIO
+        stream_data = raw_stream_data
+        if isinstance(raw_stream_data, dict):
+            stream_data = io.BytesIO(json.dumps(raw_stream_data).encode("utf-8"))
+        return self.pipeline.process_alert_stream(ticker, stream_data)
 
     def dispatch_notification(self, message_body, token=None, chat_id=None):
         t = token if token is not None else self.token
@@ -29,14 +35,10 @@ class MarketInsiderNotifier:
             return self.telegram_sender(t, c, message_body)
 
     def process_and_notify(self, ticker, raw_stream_data, min_criticality=None, token=None, chat_id=None):
-        # Если передан поток байтов или объект с .read(), используем process_alert_stream
+        # Если передан поток байтов или объект с .read(), используем process_alert_stream напрямую,
+        # иначе обрабатываем через handle_stream_event, который корректно сериализует словари в поток.
         if hasattr(raw_stream_data, "read"):
             processed = self.pipeline.process_alert_stream(ticker, raw_stream_data)
-        elif isinstance(raw_stream_data, dict):
-            # Если это словарь, но пайплайн ожидает стрим (или может обрабатывать словарь),
-            # проверим, есть ли у пайплайна проблемы сdict. На всякий случай передаем как есть или оборачиваем, 
-            # но здесь пайплайн вызывается стандартно:
-            processed = self.handle_stream_event(ticker, raw_stream_data)
         else:
             processed = self.handle_stream_event(ticker, raw_stream_data)
         

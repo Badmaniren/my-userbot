@@ -4,8 +4,6 @@ import uuid
 
 from skills import db_storage
 from skills import market_parser
-from skills.db_storage import save_record, get_record
-from skills.market_parser import parse_market_data
 
 
 def generate_insider_exposure_report(portfolio_id_or_key):

@@ -1,10 +1,7 @@
 import re
 import io
 
-try:
-    from skills import db_storage
-except ImportError:
-    db_storage = None
+from skills import db_storage
 
 
 class MarketNewsSentimentAnalyzer:

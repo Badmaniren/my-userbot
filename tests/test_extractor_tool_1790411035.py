@@ -1,75 +1,112 @@
 import unittest
 from unittest.mock import patch, MagicMock
-import random
-import uuid
-import string
 import io
 import json
-
+import uuid
+import random
+import string
+import requests
 from skills.extractor_tool_1790411035 import (
     ExtractorTool1790411035,
-    MetadataExtractionError
+    MetadataExtractionError,
+    extractor_tool_1790411035
 )
 
 class TestExtractorTool1790411035(unittest.TestCase):
 
     def setUp(self):
         self.tool = ExtractorTool1790411035()
-        self.random_tag = ''.join(random.choices(string.ascii_lowercase, k=10))
-        self.random_attr = uuid.uuid4().hex
-        self.random_value = uuid.uuid4().hex
-        self.random_html = f"<{self.random_tag} data-meta='{self.random_value}' id='{self.random_attr}'>Content</{self.random_tag}>"
+        self.rand_str = uuid.uuid4().hex
+        self.rand_key = uuid.uuid4().hex[:8]
+        self.rand_val = uuid.uuid4().hex[:8]
 
-    def test_extract_metadata_success(self):
-        target_html = f"<html><body>{self.random_html}</body></html>"
-        stream = io.BytesIO(target_html.encode('utf-8'))
+    def test_parse_stream_success(self):
+        html_content = f"<{self.rand_key} {self.rand_key}='{self.rand_val}'>Test</{self.rand_key}>".encode('utf-8')
+        stream = io.BytesIO(html_content)
+        result = self.tool.parse_stream(stream)
+        self.assertIsInstance(result, dict)
+        self.assertIn(self.rand_key, result)
+        self.assertEqual(result[self.rand_key][self.rand_key], self.rand_val)
 
-        with patch('skills.extractor_tool_1790411035.requests.get') as mock_get:
-            mock_response = MagicMock()
-            mock_response.content = stream.read()
-            mock_response.status_code = 200
-            mock_get.return_value = mock_response
+    def test_parse_stream_exception(self):
+        mock_stream = MagicMock()
+        mock_stream.read.side_effect = Exception(self.rand_str)
+        with self.assertRaises(MetadataExtractionError) as ctx:
+            self.tool.parse_stream(mock_stream)
+        self.assertIn(self.rand_str, str(ctx.exception))
 
-            random_url = f"https://{uuid.uuid4().hex}.com/{uuid.uuid4().hex}"
-            result = self.tool.extract_from_url(random_url)
+    def test_parse_stream_metadata_extraction_error_passthrough(self):
+        mock_stream = MagicMock()
+        mock_stream.read.side_effect = MetadataExtractionError(self.rand_str)
+        with self.assertRaises(MetadataExtractionError) as ctx:
+            self.tool.parse_stream(mock_stream)
+        self.assertEqual(str(ctx.exception), self.rand_str)
 
-            self.assertIsInstance(result, dict)
-            self.assertIn(self.random_attr, str(result))
+    @patch('skills.extractor_tool_1790411035.requests.get')
+    def test_extract_from_url(self, mock_get):
+        url = f"https://{self.rand_str}.com/{uuid.uuid4().hex}"
+        html_content = f"<div id='{self.rand_key}'></div>".encode('utf-8')
+        mock_response = MagicMock()
+        mock_response.content = html_content
+        mock_get.return_value = mock_response
 
-    def test_extract_metadata_malformed_html(self):
-        chaos_bytes = bytes(random.getrandbits(8) for _ in range(64))
-        stream = io.BytesIO(chaos_bytes)
+        result = self.tool.extract_from_url(url)
+        mock_get.assert_called_once_with(url)
+        self.assertIn('div', result)
+        self.assertEqual(result['div']['id'], self.rand_key)
 
-        with patch('skills.extractor_tool_1790411035.bs4.BeautifulSoup') as mock_bs:
-            instance = mock_bs.return_value
-            instance.find_all.side_effect = Exception(uuid.uuid4().hex)
-
-            with self.assertRaises(MetadataExtractionError):
-                self.tool.parse_stream(stream)
-
-    def test_database_storage_integration_mock(self):
+    def test_persist_metadata_with_storage(self):
         mock_db = MagicMock()
         self.tool.db_storage = mock_db
+        record_id = random.randint(1, 100000)
+        payload = {self.rand_key: self.rand_val}
+        
+        self.tool.persist_metadata(record_id, payload)
+        mock_db.save.assert_called_once_with(record_id, payload)
 
-        random_record_id = str(uuid.uuid4())
-        payload = {
-            uuid.uuid4().hex: uuid.uuid4().hex,
-            "metric": random.randint(1000, 9999)
-        }
+    def test_persist_metadata_without_storage(self):
+        self.tool.db_storage = None
+        record_id = random.randint(1, 100000)
+        payload = {self.rand_key: self.rand_val}
+        try:
+            self.tool.persist_metadata(record_id, payload)
+        except Exception as e:
+            self.fail(f"persist_metadata raised exception without db_storage: {e}")
 
-        self.tool.persist_metadata(random_record_id, payload)
-        mock_db.save.assert_called_once()
-        args, _ = mock_db.save.call_args
-        self.assertIn(random_record_id, str(args))
-
-    def test_pipeline_anomaly_trigger(self):
-        anomaly_flag = random.choice([True, False])
+    def test_process_stream_with_anomaly_check_dict(self):
+        data_dict = {self.rand_key: self.rand_val}
+        stream = io.BytesIO(json.dumps(data_dict).encode('utf-8'))
+        
         mock_anomaly = MagicMock()
-        mock_anomaly.check.return_value = anomaly_flag
+        mock_anomaly.check.return_value = True
         self.tool.market_anomaly_detector = mock_anomaly
 
-        random_data_chunk = json.dumps({uuid.uuid4().hex: random.random()})
-        stream = io.BytesIO(random_data_chunk.encode('utf-8'))
+        res = self.tool.process_stream_with_anomaly_check(stream)
+        mock_anomaly.check.assert_called_once()
+        self.assertIsInstance(res, dict)
+        self.assertEqual(res[self.rand_key], self.rand_val)
+        self.assertTrue(res['anomaly_detected'])
 
-        result = self.tool.process_stream_with_anomaly_check(stream)
-        self.assertEqual(result.get('anomaly_detected'), anomaly_flag)
+    def test_process_stream_with_anomaly_check_non_dict(self):
+        data_list = [self.rand_str, random.randint(1, 100)]
+        stream = io.BytesIO(json.dumps(data_list).encode('utf-8'))
+        
+        mock_anomaly = MagicMock()
+        mock_anomaly.check.return_value = False
+        self.tool.market_anomaly_detector = mock_anomaly
+
+        res = self.tool.process_stream_with_anomaly_check(stream)
+        mock_anomaly.check.assert_called_once()
+        self.assertIsInstance(res, dict)
+        self.assertEqual(res['data'], data_list)
+        self.assertFalse(res['anomaly_detected'])
+
+    def test_extractor_tool_helper_dict(self):
+        input_dict = {self.rand_key: self.rand_val}
+        res = extractor_tool_1790411035(input_dict)
+        self.assertEqual(res, input_dict)
+
+    def test_extractor_tool_helper_non_dict(self):
+        input_val = ''.join(random.choices(string.ascii_letters, k=10))
+        res = extractor_tool_1790411035(input_val)
+        self.assertEqual(res, {"metadata": {}})

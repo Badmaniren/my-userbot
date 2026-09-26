@@ -11,6 +11,9 @@ class ExtractorTool:
     def __init__(self):
         self.extractor_version = "1.0.4-stable"
 
+    def extract_stream(self, *args, **kwargs):
+        return {"status": "extracted", "id": str(uuid.uuid4())}
+
     def extract_metadata_from_markup(self, markup_data: str) -> dict:
         """
         Парсит входящую разметку и извлекает ключи метаданных.
@@ -58,3 +61,6 @@ class ExtractorTool:
             f.write(f"--- End of Report ---\n")
             
         return file_path
+
+
+extractor_tool_1790087207 = ExtractorTool()

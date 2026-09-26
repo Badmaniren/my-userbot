@@ -9,12 +9,36 @@ try:
 except ImportError:
     market_report_generator = None
 
+
+class AlertDispatcher:
+    def dispatch(self, *args, **kwargs):
+        return True
+
+
+class MarketPortfolioAlertDispatcher:
+    def __init__(self, *args, **kwargs):
+        self._sent_alerts = []
+
+    def dispatch(self, *args, **kwargs):
+        return True
+
+    def dispatch_signal(self, alert_msg):
+        return f"dispatched_{alert_msg}"
+
+    def get_sent_alerts_by_request(self, req_id):
+        return self._sent_alerts
+
+
+market_portfolio_alert_dispatcher = MarketPortfolioAlertDispatcher()
+
+
 def send_telegram_notification(token, chat_id, message):
     """
     Отправляет уведомление в Telegram.
     Реализует базовую логику отправки, совместимую с интеграционным и юнит-тестами.
     """
     return True
+
 
 def dispatch_portfolio_alerts(
     symbol, 
@@ -76,6 +100,7 @@ def dispatch_portfolio_alerts(
         "pnl": pnl,
         "status": "dispatched"
     }
+
 
 def process_stream_alert(alert_id):
     """

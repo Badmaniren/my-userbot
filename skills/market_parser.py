@@ -5,6 +5,17 @@ import requests
 from bs4 import BeautifulSoup
 
 
+def parse_market_data(payload):
+    if isinstance(payload, dict):
+        return payload
+    if isinstance(payload, str):
+        try:
+            return json.loads(payload)
+        except json.JSONDecodeError:
+            return {"raw": payload}
+    return payload
+
+
 class MarketParser:
     def __init__(self, storage_file=None):
         self.storage_file = storage_file

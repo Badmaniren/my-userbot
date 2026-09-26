@@ -3,6 +3,16 @@ import requests
 from bs4 import BeautifulSoup
 
 
+_in_memory_records = {}
+
+def save_record(key, record):
+    _in_memory_records[key] = record
+    return key
+
+def get_record(key):
+    return _in_memory_records.get(key)
+
+
 class MarketParser:
     def __init__(self, storage_file: str = "market_data.db"):
         self.storage_file = storage_file

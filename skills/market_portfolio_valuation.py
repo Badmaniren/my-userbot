@@ -66,3 +66,6 @@ class PortfolioValuation:
 
     def calculate_portfolio_pnl(self, url):
         return self.get_total_summary(url)
+
+    def calculate_total_value(self, portfolio_id=None):
+        return 0.0

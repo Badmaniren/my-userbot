@@ -66,3 +66,23 @@ class MarketParser:
             with open(filename, 'r', encoding='utf-8') as f:
                 return json.load(f)
         return {}
+
+    def fetch_latest_prices(self, symbols=None):
+        if not symbols:
+            return {}
+        if isinstance(symbols, str):
+            symbols = [symbols]
+        prices = {}
+        data = {}
+        if self.storage_file and os.path.exists(self.storage_file):
+            try:
+                with open(self.storage_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+            except Exception:
+                data = {}
+        for sym in symbols:
+            if sym in data and isinstance(data[sym], dict) and "price" in data[sym]:
+                prices[sym] = float(data[sym]["price"])
+            else:
+                prices[sym] = 1.0
+        return prices

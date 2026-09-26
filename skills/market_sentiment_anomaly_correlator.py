@@ -26,6 +26,11 @@ class MarketSentimentAnomalyCorrelator:
             # Simple correlation index calculation based on anomaly score and sentiment
             anomaly_score = anomaly_result.get("anomaly_score", anomaly_result.get("score", 1.0)) if isinstance(anomaly_result, dict) else 1.0
             sentiment_score = sentiment_result.get("sentiment", sentiment_result.get("score", 0.0)) if isinstance(sentiment_result, dict) else 0.0
+            
+            if isinstance(sentiment_score, str):
+                sentiment_map = {"bullish": 1.0, "bearish": -1.0, "neutral": 0.0, "positive": 0.8, "negative": -0.8}
+                sentiment_score = sentiment_map.get(sentiment_score.lower(), 0.0)
+
             correlation_index = round(float(anomaly_score) * abs(float(sentiment_score)), 4)
 
             return {
@@ -74,6 +79,10 @@ def market_sentiment_anomaly_correlator(correlation_input):
     
     anomaly_score = anomaly.get("anomaly_score", anomaly.get("score", 1.0)) if anomaly else 1.0
     sentiment_score = sentiment.get("sentiment", sentiment.get("score", 0.0)) if sentiment else 0.0
+    
+    if isinstance(sentiment_score, str):
+        sentiment_map = {"bullish": 1.0, "bearish": -1.0, "neutral": 0.0, "positive": 0.8, "negative": -0.8}
+        sentiment_score = sentiment_map.get(sentiment_score.lower(), 0.0)
     
     correlation_index = round(float(anomaly_score) * abs(float(sentiment_score)), 4)
     

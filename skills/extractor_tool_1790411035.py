@@ -55,4 +55,6 @@ class ExtractorTool1790411035:
 
 
 def extractor_tool_1790411035(parsed_data):
-    return parsed_data
+    if isinstance(parsed_data, dict):
+        return parsed_data
+    return {"metadata": {}}

@@ -4,7 +4,12 @@ import os
 def run_pipeline(symbol, url, telegram_token, chat_id, storage_file):
     """Выполняет основной конвейер мониторинга портфеля."""
     parser = MarketParser(storage_file=storage_file)
-    parser.fetch_and_store(symbol=symbol, price=0.0)
+    data = parser.load_data(storage_file)
+    current_price = 0.0
+    if isinstance(data, dict) and symbol in data:
+        current_price = data[symbol]
+    
+    parser.fetch_and_store(symbol=symbol, price=current_price)
     report_gen = MarketReportGenerator(storage_file=storage_file)
     report_gen.generate_symbol_report(symbol=symbol)
     generate_market_report(storage_file=storage_file, symbol=symbol)
@@ -47,7 +52,9 @@ class MarketParser:
         if os.path.exists(self.storage_file):
             try:
                 with open(self.storage_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
+                    content = f.read()
+                    if content.strip():
+                        data = json.loads(content)
             except (json.JSONDecodeError, IOError):
                 data = {}
         
@@ -60,7 +67,10 @@ class MarketParser:
             return None
         try:
             with open(storage_file, "r", encoding="utf-8") as f:
-                return json.load(f)
+                content = f.read()
+                if not content.strip():
+                    return {}
+                return json.loads(content)
         except (json.JSONDecodeError, IOError, UnicodeDecodeError):
             return None
 
@@ -71,7 +81,7 @@ class MarketReportGenerator:
 
     def generate_symbol_report(self, symbol):
         data = MarketParser(self.storage_file).load_data(self.storage_file)
-        if data and symbol in data:
+        if data and isinstance(data, dict) and symbol in data:
             return f"Report for {symbol}: {data[symbol]}"
         return f"Report for {symbol}: No data"
 
@@ -110,7 +120,7 @@ def export_audit_logs(storage_file=None):
         try:
             with open(storage_file, "r", encoding="utf-8") as f:
                 content = f.read()
-                if not content:
+                if not content.strip():
                     return False
                 return True
         except (IOError, json.JSONDecodeError, UnicodeDecodeError):

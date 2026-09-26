@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- эскалацию
-
-## market_portfolio_monitor (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=3)
+FAILED (failures=3)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_monitor (refactor) — раундов: 4
@@ -329,6 +326,9 @@
 ## market_insider_notifier (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_anomaly_detector (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
 
 ## market_anomaly_detector (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

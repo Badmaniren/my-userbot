@@ -62,3 +62,13 @@ def market_anomaly_detector(data):
         "volume": volume,
         "price": price
     }
+
+
+def detect_market_anomalies(data=None, *args, **kwargs):
+    if data is None:
+        data = kwargs
+    elif not isinstance(data, dict) and kwargs:
+        data = kwargs
+    elif not isinstance(data, dict):
+        data = {"ticker": data}
+    return market_anomaly_detector(data)

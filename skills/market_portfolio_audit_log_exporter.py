@@ -26,12 +26,21 @@ class PortfolioAuditLogExporter:
         try:
             with open(self.storage_file, 'r', encoding='utf-8') as f:
                 data = f.read()
-                # Проверка на валидность JSON
-                json.loads(data)
+                if not data.strip():
+                    data = "{}"
+                else:
+                    json.loads(data)
 
             with open(export_path, 'w', encoding='utf-8') as f:
                 f.write(data)
             return True
+        except FileNotFoundError:
+            try:
+                with open(export_path, 'w', encoding='utf-8') as f:
+                    f.write("{}")
+                return True
+            except Exception:
+                return False
         except Exception:
             return False
 

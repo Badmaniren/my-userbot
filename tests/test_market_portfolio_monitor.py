@@ -28,11 +28,12 @@ class TestMarketPortfolioMonitor(unittest.TestCase):
         self.storage_file = f"storage_{uuid.uuid4().hex[:8]}.json"
 
     def tearDown(self):
-        if os.path.exists(self.storage_file):
-            try:
-                os.remove(self.storage_file)
-            except OSError:
-                pass
+        for fpath in [self.storage_file, self.symbol, f"{self.symbol}.db", f"{self.symbol}.json"]:
+            if os.path.exists(fpath):
+                try:
+                    os.remove(fpath)
+                except OSError:
+                    pass
 
     def test_market_parser_fetch_and_load(self):
         parser = MarketParser(storage_file=self.storage_file)

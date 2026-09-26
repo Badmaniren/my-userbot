@@ -15,8 +15,12 @@ class TestMarketPortfolioAuditLogExporterIntegration(unittest.TestCase):
         parser.fetch_and_store(self.symbol, self.price)
 
     def tearDown(self):
-        if os.path.exists(self.storage_file):
-            os.remove(self.storage_file)
+        for fpath in [self.storage_file, self.symbol]:
+            if os.path.exists(fpath):
+                try:
+                    os.remove(fpath)
+                except OSError:
+                    pass
 
     def test_audit_log_exporter_integration(self):
         exporter = MarketPortfolioAuditLogExporter(self.storage_file)

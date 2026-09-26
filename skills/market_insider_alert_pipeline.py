@@ -33,9 +33,12 @@ def market_insider_alert_pipeline(raw_data):
     
     ticker = raw_data.get("ticker")
     
-    # Ensure raw_data can be handled whether it's a dict or a stream
+    # Handle the case where raw_data contains a "stream" key or is a dict without a stream attribute
     if isinstance(raw_data, dict):
-        stream_arg = io.BytesIO(str(raw_data).encode('utf-8'))
+        if "stream" in raw_data and raw_data["stream"] is not None:
+            stream_arg = raw_data["stream"]
+        else:
+            stream_arg = io.BytesIO(str(raw_data).encode('utf-8'))
     else:
         stream_arg = raw_data
         

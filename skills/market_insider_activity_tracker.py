@@ -115,6 +115,12 @@ class DBStorage:
         return None
 
 
+def track_insider_activity(payload: Optional[Any] = None, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+    if payload is None and kwargs:
+        payload = kwargs
+    return MarketInsiderActivityTrackerModuleAPI.track_activity(payload)
+
+
 MarketInsiderActivityTrackerModuleIdempotentProxy = MarketInsiderActivityTrackerModuleAPI
 
 globals()["market_insider_activity_tracker"] = MarketInsiderActivityTrackerModuleAPI

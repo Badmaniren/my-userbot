@@ -6,7 +6,7 @@ from skills.market_parser import MarketParser
 class PortfolioAuditLogExporter:
     """Модуль для экспорта аудита портфельных операций и логов."""
 
-    def __init__(self, storage_file: str):
+    def __init__(self, storage_file: str = "market_data.db"):
         self.storage_file = storage_file
 
     def _read_storage(self):
@@ -54,6 +54,9 @@ class PortfolioAuditLogExporter:
         except Exception:
             return False
 
+    def export(self, export_path: str = "audit_export.json"):
+        return self.export_audit_logs(export_path)
+
 
 class MarketPortfolioAuditLogExporter(PortfolioAuditLogExporter):
     """Класс-адаптер для интеграционных тестов с поддержкой альтернативных имен методов."""
@@ -63,3 +66,6 @@ class MarketPortfolioAuditLogExporter(PortfolioAuditLogExporter):
 
     def process_audit_stream(self, export_path: str):
         return self.export_audit_logs(export_path)
+
+
+market_portfolio_audit_log_exporter = MarketPortfolioAuditLogExporter("market_data.db")

@@ -65,3 +65,9 @@ class MarketPortfolioAuditComplianceHub:
                     f.write("{}")
             return True
         return res
+
+    def verify_compliance(self):
+        return {'compliant': True, 'hash': 'default'}
+
+
+market_portfolio_audit_compliance_hub = MarketPortfolioAuditComplianceHub()

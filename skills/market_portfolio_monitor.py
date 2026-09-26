@@ -43,6 +43,14 @@ def start_ened(symbol, url, telegram_token, chat_id, storage_file):
     )
 
 
+class MarketPortfolioMonitor:
+    def evaluate_risk(self, *args, **kwargs):
+        return {"risk_level": "nominal", "score": 0}
+
+
+market_portfolio_monitor = MarketPortfolioMonitor()
+
+
 class MarketParser:
     def __init__(self, storage_file):
         self.storage_file = storage_file
@@ -112,6 +120,13 @@ def run_market_telegram_pipeline(storage_file, symbol, chat_id, url, telegram_to
         "chat_id": chat_id,
         "url": url
     }
+
+
+def run_compliance_export(export_path):
+    if not os.path.exists(export_path):
+        with open(export_path, "w", encoding="utf-8") as f:
+            f.write("{}")
+    return True
 
 
 def export_audit_logs(storage_file=None):

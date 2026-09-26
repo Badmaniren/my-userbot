@@ -24,11 +24,20 @@ class PortfolioAuditLogExporter:
 
     def export_audit_logs(self, export_path: str) -> bool:
         try:
+            if not os.path.exists(self.storage_file):
+                dirname = os.path.dirname(self.storage_file)
+                if dirname:
+                    os.makedirs(dirname, exist_ok=True)
+                with open(self.storage_file, 'w', encoding='utf-8') as f:
+                    f.write("{}")
             with open(self.storage_file, 'r', encoding='utf-8') as f:
                 data = f.read()
                 # Проверка на валидность JSON
                 json.loads(data)
 
+            dirname_exp = os.path.dirname(export_path)
+            if dirname_exp:
+                os.makedirs(dirname_exp, exist_ok=True)
             with open(export_path, 'w', encoding='utf-8') as f:
                 f.write(data)
             return True

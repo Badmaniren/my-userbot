@@ -15,7 +15,6 @@ class MarketPortfolioAuditComplianceHub:
         else:
             self.audit_exporter = PortfolioAuditLogExporter(storage_file)
 
-        # Обеспечиваем наличие методов на экспортере, если их там нет по умолчанию в реальном классе
         if not hasattr(self.audit_exporter, 'process_audit_stream'):
             setattr(self.audit_exporter, 'process_audit_stream', lambda path, stream: True)
         if not hasattr(self.audit_exporter, 'generate_audit_log'):

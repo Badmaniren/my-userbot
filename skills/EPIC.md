@@ -14,3 +14,4 @@
 - market_insider_activity_tracker: Проведение детального рефакторинга market_insider_activity_tracker для окончательной стабилизации и закрепления результатов эпика мониторинга инсайдерской активности.
 - market_insider_activity_tracker: Проведение чистого рефакторинга market_insider_activity_tracker с полным соблюдением стандартов античита (без заглушек и глушения ошибок) для окончательного завершения эпика.
 - market_insider_activity_tracker: Доработка market_insider_activity_tracker для окончательной стабилизации и безупречного прохождения тестов античита
+- market_portfolio_audit_compliance_hub: Стабилизация и рефакторинг market_portfolio_audit_compliance_hub для исправления ошибки run_compliance_export и разблокировки комплаенс-аудита подозрительных операций

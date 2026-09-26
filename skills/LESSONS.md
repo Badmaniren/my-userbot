@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-нгой, передан на эскалацию
-
-## market_anomaly_detector (create) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: invalid character '—' (U+2014) (<unknown>, line 89); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+шибка в коде: invalid character '—' (U+2014) (<unknown>, line 89); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -339,3 +336,6 @@
 ## market_portfolio_monitor (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_audit_compliance_hub (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

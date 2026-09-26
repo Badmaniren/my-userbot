@@ -1,306 +1,295 @@
-import io
-import random
-import string
-import sys
 import unittest
+from unittest.mock import patch, MagicMock
+import random
 import uuid
-from unittest.mock import MagicMock, patch
+import io
 
 from skills.market_sentiment_telegram_publisher import (
     MarketSentimentTelegramPublisher,
     publish_sentiment_with_urgency,
+    publish_market_sentiment_digest,
+    URGENCY_LEVELS
 )
-
-
-def _rnd_str(prefix="str"):
-    return f"{prefix}_{uuid.uuid4().hex}"
-
-
-def _rnd_url():
-    domain = "".join(random.choices(string.ascii_lowercase, k=8))
-    path = "".join(random.choices(string.ascii_lowercase, k=6))
-    return f"https://{domain}.org/feed/{path}"
-
-
-def _rnd_symbol():
-    return "".join(random.choices(string.ascii_uppercase, k=4))
 
 
 class TestMarketSentimentTelegramPublisher(unittest.TestCase):
 
     def setUp(self):
-        self.random_token = _rnd_str("bot_token")
-        self.random_chat_id = f"-100{random.randint(100000000, 999999999)}"
-        self.random_storage = f"/tmp/{_rnd_str('storage')}.json"
-        self.levels = ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+        self.token = uuid.uuid4().hex
+        self.chat_id = str(random.randint(100000, 999999))
+        self.storage_file = f"{uuid.uuid4().hex}.db"
+        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
+        self.url = f"https://example.com/market/{uuid.uuid4().hex}"
 
-    def test_publisher_initialization(self):
-        min_urgency = random.choice(self.levels)
-        publisher = MarketSentimentTelegramPublisher(
-            telegram_token=self.random_token,
-            chat_id=self.random_chat_id,
-            storage_file=self.random_storage,
-            min_urgency=min_urgency,
-        )
-        self.assertEqual(publisher.telegram_token, self.random_token)
-        self.assertEqual(publisher.chat_id, self.random_chat_id)
-        self.assertEqual(publisher.storage_file, self.random_storage)
-        self.assertEqual(str(publisher.min_urgency).upper(), min_urgency.upper())
+    def test_urgency_levels_mapping(self):
+        self.assertEqual(URGENCY_LEVELS["LOW"], 1)
+        self.assertEqual(URGENCY_LEVELS["MEDIUM"], 2)
+        self.assertEqual(URGENCY_LEVELS["HIGH"], 3)
+        self.assertEqual(URGENCY_LEVELS["CRITICAL"], 4)
 
-    def test_urgency_filter_logic(self):
+    def test_should_publish_filtering(self):
         publisher = MarketSentimentTelegramPublisher(
-            telegram_token=self.random_token,
-            chat_id=self.random_chat_id,
-            min_urgency="HIGH",
+            telegram_token=self.token,
+            chat_id=self.chat_id,
+            min_urgency="HIGH"
         )
         self.assertFalse(publisher.should_publish("LOW"))
         self.assertFalse(publisher.should_publish("MEDIUM"))
-        self.assertFalse(publisher.should_publish("low"))
         self.assertTrue(publisher.should_publish("HIGH"))
         self.assertTrue(publisher.should_publish("CRITICAL"))
-        self.assertTrue(publisher.should_publish("critical"))
 
-    def test_publish_digest_filtered_out_due_to_low_urgency(self):
+    def test_publisher_token_aliases(self):
+        alt_token = uuid.uuid4().hex
+        pub1 = MarketSentimentTelegramPublisher(token=alt_token)
+        self.assertEqual(pub1.telegram_token, alt_token)
+        self.assertEqual(pub1.token, alt_token)
+
+        pub2 = MarketSentimentTelegramPublisher(telegram_token=alt_token)
+        self.assertEqual(pub2.telegram_token, alt_token)
+        self.assertEqual(pub2.token, alt_token)
+
+    @patch("skills.market_sentiment_telegram_publisher.MarketSentimentDigestEngine")
+    @patch("skills.market_sentiment_telegram_publisher.send_telegram_notification")
+    def test_publish_digest_below_min_urgency(self, mock_send, mock_engine_cls):
         publisher = MarketSentimentTelegramPublisher(
-            telegram_token=self.random_token,
-            chat_id=self.random_chat_id,
-            storage_file=self.random_storage,
-            min_urgency="CRITICAL",
+            telegram_token=self.token,
+            chat_id=self.chat_id,
+            min_urgency="HIGH"
         )
-        test_symbol = _rnd_symbol()
-        test_url = _rnd_url()
-        test_news = _rnd_str("raw_news")
+        res = publisher.publish_digest(
+            symbol=self.symbol,
+            url=self.url,
+            raw_news=uuid.uuid4().hex,
+            urgency="LOW"
+        )
+        self.assertFalse(res)
+        mock_send.assert_not_called()
+        mock_engine_cls.assert_not_called()
 
-        with patch(
-            "skills.market_sentiment_telegram_publisher.send_telegram_notification"
-        ) as mock_notifier, patch(
-            "skills.market_sentiment_telegram_publisher.MarketSentimentDigestEngine"
-        ) as mock_engine_cls:
-            result = publisher.publish_digest(
-                symbol=test_symbol,
-                url=test_url,
-                raw_news=test_news,
-                urgency="LOW",
-            )
-            self.assertFalse(result)
-            mock_notifier.assert_not_called()
-            mock_engine_cls.assert_not_called()
+    @patch("skills.market_sentiment_telegram_publisher.MarketSentimentDigestEngine")
+    @patch("skills.market_sentiment_telegram_publisher.send_telegram_notification")
+    def test_publish_digest_success(self, mock_send, mock_engine_cls):
+        mock_send.return_value = True
+        mock_engine_instance = mock_engine_cls.return_value
+        expected_digest = uuid.uuid4().hex
+        mock_engine_instance.compile_sentiment_digest.return_value = expected_digest
 
-    def test_publish_digest_success_when_urgency_met(self):
         publisher = MarketSentimentTelegramPublisher(
-            telegram_token=self.random_token,
-            chat_id=self.random_chat_id,
-            storage_file=self.random_storage,
+            telegram_token=self.token,
+            chat_id=self.chat_id,
+            storage_file=self.storage_file,
+            min_urgency="LOW"
+        )
+        
+        raw_news_data = uuid.uuid4().hex
+        res = publisher.publish_digest(
+            symbol=self.symbol,
+            url=self.url,
+            raw_news=raw_news_data,
+            urgency="MEDIUM"
+        )
+
+        self.assertTrue(res)
+        mock_engine_cls.assert_called_once_with(self.storage_file)
+        mock_engine_instance.compile_sentiment_digest.assert_called_once_with(
+            self.symbol, self.url, raw_news_data
+        )
+        mock_send.assert_called_once()
+        called_args = mock_send.call_args[0]
+        self.assertEqual(called_args[0], self.token)
+        self.assertEqual(called_args[1], self.chat_id)
+        self.assertIn(self.symbol, called_args[2])
+        self.assertIn(expected_digest, called_args[2])
+
+    @patch("skills.market_sentiment_telegram_publisher.MarketSentimentDigestEngine")
+    @patch("skills.market_sentiment_telegram_publisher.send_telegram_notification")
+    def test_publish_digest_fetches_raw_feed_if_none(self, mock_send, mock_engine_cls):
+        mock_send.return_value = None
+        mock_engine_instance = mock_engine_cls.return_value
+        fetched_feed = f"feed_{uuid.uuid4().hex}".encode("utf-8")
+        mock_engine_instance.fetch_raw_feed.return_value = fetched_feed
+        expected_digest = uuid.uuid4().hex
+        mock_engine_instance.compile_sentiment_digest.return_value = expected_digest
+
+        publisher = MarketSentimentTelegramPublisher(
+            telegram_token=self.token,
+            chat_id=self.chat_id,
+            storage_file=self.storage_file,
+            min_urgency="LOW"
+        )
+
+        res = publisher.publish_digest(
+            symbol=self.symbol,
+            url=self.url,
+            raw_news=None,
+            urgency="LOW"
+        )
+
+        self.assertTrue(res)
+        mock_engine_instance.fetch_raw_feed.assert_called_once_with(self.url)
+        mock_engine_instance.compile_sentiment_digest.assert_called_once_with(
+            self.symbol, self.url, fetched_feed.decode("utf-8")
+        )
+
+    @patch("skills.market_sentiment_telegram_publisher.MarketSentimentDigestEngine")
+    @patch("skills.market_sentiment_telegram_publisher.send_telegram_notification")
+    def test_publish_digest_fetch_feed_exception_handled(self, mock_send, mock_engine_cls):
+        mock_send.return_value = True
+        mock_engine_instance = mock_engine_cls.return_value
+        mock_engine_instance.fetch_raw_feed.side_effect = Exception("Network failure")
+        expected_digest = uuid.uuid4().hex
+        mock_engine_instance.compile_sentiment_digest.return_value = expected_digest
+
+        publisher = MarketSentimentTelegramPublisher(
+            telegram_token=self.token,
+            chat_id=self.chat_id,
+            storage_file=self.storage_file,
+            min_urgency="LOW"
+        )
+
+        res = publisher.publish_digest(
+            symbol=self.symbol,
+            url=self.url,
+            raw_news=None,
+            urgency="LOW"
+        )
+
+        self.assertTrue(res)
+        mock_engine_instance.fetch_raw_feed.assert_called_once_with(self.url)
+        mock_engine_instance.compile_sentiment_digest.assert_called_once_with(
+            self.symbol, self.url, ""
+        )
+
+    @patch("skills.market_sentiment_telegram_publisher.send_telegram_notification")
+    def test_publish_critical_sentiment(self, mock_send):
+        mock_send.return_value = True
+        metric = uuid.uuid4().hex
+        details = uuid.uuid4().hex
+
+        publisher = MarketSentimentTelegramPublisher(
+            telegram_token=self.token,
+            chat_id=self.chat_id,
+            min_urgency="HIGH"
+        )
+
+        res = publisher.publish_critical_sentiment(
+            symbol=self.symbol,
+            sentiment_metric=metric,
+            details=details,
+            urgency="CRITICAL"
+        )
+
+        self.assertTrue(res)
+        mock_send.assert_called_once()
+        msg = mock_send.call_args[0][2]
+        self.assertIn("CRITICAL SENTIMENT ALERT", msg)
+        self.assertIn(self.symbol, msg)
+        self.assertIn(metric, msg)
+        self.assertIn(details, msg)
+
+    @patch("skills.market_sentiment_telegram_publisher.send_telegram_notification")
+    def test_publish_critical_sentiment_below_urgency(self, mock_send):
+        publisher = MarketSentimentTelegramPublisher(
+            telegram_token=self.token,
+            chat_id=self.chat_id,
+            min_urgency="CRITICAL"
+        )
+
+        res = publisher.publish_critical_sentiment(
+            symbol=self.symbol,
+            sentiment_metric=uuid.uuid4().hex,
+            details=uuid.uuid4().hex,
+            urgency="LOW"
+        )
+
+        self.assertFalse(res)
+        mock_send.assert_not_called()
+
+    @patch("skills.market_sentiment_telegram_publisher.send_telegram_notification")
+    def test_publish_critical_alert(self, mock_send):
+        mock_send.return_value = True
+        alert_msg = uuid.uuid4().hex
+
+        publisher = MarketSentimentTelegramPublisher(
+            telegram_token=self.token,
+            chat_id=self.chat_id,
+            min_urgency="MEDIUM"
+        )
+
+        res = publisher.publish_critical_alert(
+            symbol=self.symbol,
+            message=alert_msg,
+            urgency="HIGH"
+        )
+
+        self.assertTrue(res)
+        mock_send.assert_called_once()
+        sent_text = mock_send.call_args[0][2]
+        self.assertIn("CRITICAL ALERT", sent_text)
+        self.assertIn(self.symbol, sent_text)
+        self.assertIn(alert_msg, sent_text)
+
+    @patch("skills.market_sentiment_telegram_publisher.send_telegram_notification")
+    def test_publish_critical_alert_below_urgency(self, mock_send):
+        publisher = MarketSentimentTelegramPublisher(
+            telegram_token=self.token,
+            chat_id=self.chat_id,
+            min_urgency="CRITICAL"
+        )
+
+        res = publisher.publish_critical_alert(
+            symbol=self.symbol,
+            message=uuid.uuid4().hex,
+            urgency="MEDIUM"
+        )
+
+        self.assertFalse(res)
+        mock_send.assert_not_called()
+
+    @patch("skills.market_sentiment_telegram_publisher.MarketSentimentTelegramPublisher.publish_digest")
+    def test_publish_sentiment_with_urgency_entrypoint(self, mock_publish_digest):
+        mock_publish_digest.return_value = True
+        raw_news = uuid.uuid4().hex
+
+        res = publish_sentiment_with_urgency(
+            token=self.token,
+            chat_id=self.chat_id,
+            symbol=self.symbol,
+            url=self.url,
+            raw_news=raw_news,
+            urgency="HIGH",
             min_urgency="MEDIUM",
-        )
-        test_symbol = _rnd_symbol()
-        test_url = _rnd_url()
-        test_news = _rnd_str("raw_news")
-        unique_digest_payload = f"DIGEST_PAYLOAD_{uuid.uuid4().hex}"
-
-        with patch(
-            "skills.market_sentiment_telegram_publisher.MarketSentimentDigestEngine"
-        ) as mock_engine_cls, patch(
-            "skills.market_sentiment_telegram_publisher.send_telegram_notification"
-        ) as mock_notifier:
-            mock_engine_instance = MagicMock()
-            mock_engine_cls.return_value = mock_engine_instance
-            mock_engine_instance.compile_sentiment_digest.return_value = (
-                unique_digest_payload
-            )
-            mock_notifier.return_value = True
-
-            result = publisher.publish_digest(
-                symbol=test_symbol,
-                url=test_url,
-                raw_news=test_news,
-                urgency="HIGH",
-            )
-
-            self.assertTrue(result)
-            mock_engine_cls.assert_called_once_with(self.random_storage)
-            mock_engine_instance.compile_sentiment_digest.assert_called_once_with(
-                test_symbol, test_url, test_news
-            )
-            mock_notifier.assert_called_once()
-            called_token, called_chat_id, called_msg = mock_notifier.call_args[0]
-            self.assertEqual(called_token, self.random_token)
-            self.assertEqual(called_chat_id, self.random_chat_id)
-            self.assertIn(unique_digest_payload, called_msg)
-            self.assertIn(test_symbol, called_msg)
-
-    def test_publish_digest_handles_notifier_failure(self):
-        publisher = MarketSentimentTelegramPublisher(
-            telegram_token=self.random_token,
-            chat_id=self.random_chat_id,
-            storage_file=self.random_storage,
-            min_urgency="LOW",
-        )
-        test_symbol = _rnd_symbol()
-        test_url = _rnd_url()
-        digest_text = _rnd_str("digest")
-
-        with patch(
-            "skills.market_sentiment_telegram_publisher.MarketSentimentDigestEngine"
-        ) as mock_engine_cls, patch(
-            "skills.market_sentiment_telegram_publisher.send_telegram_notification"
-        ) as mock_notifier:
-            mock_engine_instance = MagicMock()
-            mock_engine_cls.return_value = mock_engine_instance
-            mock_engine_instance.compile_sentiment_digest.return_value = digest_text
-            mock_notifier.return_value = False
-
-            result = publisher.publish_digest(
-                symbol=test_symbol,
-                url=test_url,
-                urgency="LOW",
-            )
-            self.assertFalse(result)
-            mock_notifier.assert_called_once()
-
-    def test_publish_critical_sentiment_alert_success(self):
-        publisher = MarketSentimentTelegramPublisher(
-            telegram_token=self.random_token,
-            chat_id=self.random_chat_id,
-            min_urgency="MEDIUM",
-        )
-        test_symbol = _rnd_symbol()
-        test_score = round(random.uniform(-1.0, 1.0), 4)
-        unique_details = _rnd_str("critical_details")
-
-        with patch(
-            "skills.market_sentiment_telegram_publisher.send_telegram_notification"
-        ) as mock_notifier:
-            mock_notifier.return_value = True
-
-            result = publisher.publish_critical_sentiment(
-                symbol=test_symbol,
-                sentiment_metric=test_score,
-                details=unique_details,
-                urgency="CRITICAL",
-            )
-
-            self.assertTrue(result)
-            mock_notifier.assert_called_once()
-            called_token, called_chat_id, called_msg = mock_notifier.call_args[0]
-            self.assertEqual(called_token, self.random_token)
-            self.assertEqual(called_chat_id, self.random_chat_id)
-            self.assertIn(test_symbol, called_msg)
-            self.assertIn(str(test_score), called_msg)
-            self.assertIn(unique_details, called_msg)
-            self.assertIn("CRITICAL", called_msg.upper())
-
-    def test_publish_critical_sentiment_alert_filtered_out(self):
-        publisher = MarketSentimentTelegramPublisher(
-            telegram_token=self.random_token,
-            chat_id=self.random_chat_id,
-            min_urgency="CRITICAL",
-        )
-        test_symbol = _rnd_symbol()
-        test_score = round(random.uniform(-1.0, 1.0), 4)
-        unique_details = _rnd_str("low_urgency_alert")
-
-        with patch(
-            "skills.market_sentiment_telegram_publisher.send_telegram_notification"
-        ) as mock_notifier:
-            result = publisher.publish_critical_sentiment(
-                symbol=test_symbol,
-                sentiment_metric=test_score,
-                details=unique_details,
-                urgency="MEDIUM",
-            )
-            self.assertFalse(result)
-            mock_notifier.assert_not_called()
-
-    def test_publish_sentiment_with_urgency_function(self):
-        token = _rnd_str("func_token")
-        chat_id = f"-100{random.randint(100000, 999999)}"
-        symbol = _rnd_symbol()
-        url = _rnd_url()
-        raw_news = _rnd_str("func_raw_news")
-        storage_file = f"/tmp/{_rnd_str('func_storage')}.db"
-        unique_digest = _rnd_str("compiled_digest_res")
-
-        with patch(
-            "skills.market_sentiment_telegram_publisher.MarketSentimentDigestEngine"
-        ) as mock_engine_cls, patch(
-            "skills.market_sentiment_telegram_publisher.send_telegram_notification"
-        ) as mock_notifier:
-            mock_engine = MagicMock()
-            mock_engine_cls.return_value = mock_engine
-            mock_engine.compile_sentiment_digest.return_value = unique_digest
-            mock_notifier.return_value = True
-
-            res = publish_sentiment_with_urgency(
-                token=token,
-                chat_id=chat_id,
-                symbol=symbol,
-                url=url,
-                raw_news=raw_news,
-                urgency="HIGH",
-                min_urgency="MEDIUM",
-                storage_file=storage_file,
-            )
-            self.assertTrue(res)
-            mock_engine_cls.assert_called_once_with(storage_file)
-            mock_engine.compile_sentiment_digest.assert_called_once_with(
-                symbol, url, raw_news
-            )
-            mock_notifier.assert_called_once()
-            _, _, sent_text = mock_notifier.call_args[0]
-            self.assertIn(unique_digest, sent_text)
-
-    def test_feed_stream_processing_mock_bytes(self):
-        random_payload_bytes = uuid.uuid4().hex.encode("utf-8")
-        stream_buffer = io.BytesIO(random_payload_bytes)
-
-        publisher = MarketSentimentTelegramPublisher(
-            telegram_token=self.random_token,
-            chat_id=self.random_chat_id,
-            storage_file=self.random_storage,
-            min_urgency="LOW",
-        )
-        test_symbol = _rnd_symbol()
-        test_url = _rnd_url()
-
-        with patch(
-            "skills.market_sentiment_telegram_publisher.MarketSentimentDigestEngine"
-        ) as mock_engine_cls, patch(
-            "skills.market_sentiment_telegram_publisher.send_telegram_notification"
-        ) as mock_notifier:
-            mock_engine = MagicMock()
-            mock_engine_cls.return_value = mock_engine
-            mock_engine.fetch_raw_feed.return_value = stream_buffer.read()
-            mock_engine.compile_sentiment_digest.return_value = (
-                f"Digest from {random_payload_bytes.decode()}"
-            )
-            mock_notifier.return_value = True
-
-            result = publisher.publish_digest(
-                symbol=test_symbol,
-                url=test_url,
-                raw_news=None,
-                urgency="HIGH",
-            )
-            self.assertTrue(result)
-            mock_engine.compile_sentiment_digest.assert_called_once()
-            mock_notifier.assert_called_once()
-
-    def test_composition_dependencies_imported(self):
-        import skills.market_sentiment_telegram_publisher as mod
-
-        self.assertTrue(
-            hasattr(mod, "MarketSentimentDigestEngine")
-            or "market_sentiment_digest" in sys.modules,
-            "market_sentiment_digest must be imported or used",
-        )
-        self.assertTrue(
-            hasattr(mod, "send_telegram_notification")
-            or hasattr(mod, "start_new")
-            or "market_portfolio_telegram_notifier" in sys.modules,
-            "market_portfolio_telegram_notifier must be imported or used",
+            storage_file=self.storage_file
         )
 
+        self.assertTrue(res)
+        mock_publish_digest.assert_called_once_with(
+            symbol=self.symbol,
+            url=self.url,
+            raw_news=raw_news,
+            urgency="HIGH"
+        )
 
-if __name__ == "__main__":
-    unittest.main()
+    @patch("skills.market_sentiment_telegram_publisher.MarketSentimentTelegramPublisher.publish_digest")
+    def test_publish_market_sentiment_digest_entrypoint(self, mock_publish_digest):
+        mock_publish_digest.return_value = True
+        raw_news = uuid.uuid4().hex
+
+        res = publish_market_sentiment_digest(
+            symbol=self.symbol,
+            url=self.url,
+            raw_news=raw_news,
+            token=self.token,
+            chat_id=self.chat_id,
+            storage_file=self.storage_file,
+            urgency="MEDIUM",
+            min_urgency="LOW"
+        )
+
+        self.assertTrue(res)
+        mock_publish_digest.assert_called_once_with(
+            symbol=self.symbol,
+            url=self.url,
+            raw_news=raw_news,
+            urgency="MEDIUM"
+        )

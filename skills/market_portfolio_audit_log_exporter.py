@@ -7,7 +7,7 @@ class PortfolioAuditLogExporter:
     """Модуль для экспорта аудита портфельных операций и логов."""
 
     def __init__(self, storage_file: str):
-        self.storage_file = storage_file
+        self.storage_file = storage_file or "market_data.db"
 
     def _read_storage(self):
         try:
@@ -19,15 +19,29 @@ class PortfolioAuditLogExporter:
                     return []
                 return json.loads(content)
         except (IOError, json.JSONDecodeError, UnicodeDecodeError):
-            # Перехватываем для безопасного возврата ошибки наружу в логике экспорта/сумм
             raise
 
     def export_audit_logs(self, export_path: str) -> bool:
         try:
-            with open(self.storage_file, 'r', encoding='utf-8') as f:
-                data = f.read()
-                # Проверка на валидность JSON
+            try:
+                with open(self.storage_file, 'r', encoding='utf-8') as f:
+                    data = f.read()
+            except (IOError, FileNotFoundError):
+                parent_dir = os.path.dirname(self.storage_file)
+                if parent_dir:
+                    os.makedirs(parent_dir, exist_ok=True)
+                with open(self.storage_file, 'w', encoding='utf-8') as f:
+                    f.write("{}")
+                data = "{}"
+
+            if data.strip():
                 json.loads(data)
+            else:
+                data = "{}"
+
+            export_dir = os.path.dirname(export_path)
+            if export_dir:
+                os.makedirs(export_dir, exist_ok=True)
 
             with open(export_path, 'w', encoding='utf-8') as f:
                 f.write(data)

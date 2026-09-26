@@ -55,3 +55,62 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+class DBStorage:
+    def __init__(self, storage_file: str = "market_data.db"):
+        self.storage_file = storage_file
+        self.market_states = {}
+        self.anomalies = {}
+        self.raw_logs = {}
+        self.tables = {}
+
+    def save_market_state(self, ticker: str, price: float, volume: float, timestamp: float = None):
+        if ticker not in self.market_states:
+            self.market_states[ticker] = []
+        self.market_states[ticker].append({
+            'ticker': ticker,
+            'price': price,
+            'volume': volume,
+            'timestamp': timestamp
+        })
+
+    def save_anomaly_record(self, trace_id: str, record: dict):
+        self.anomalies[trace_id] = record
+
+    def get_anomaly_record(self, trace_id: str):
+        return self.anomalies.get(trace_id)
+
+    def save_raw_log(self, log_id: str, content: bytes):
+        self.raw_logs[log_id] = content
+
+    def insert(self, table: str, data: dict):
+        if table not in self.tables:
+            self.tables[table] = []
+        self.tables[table].append(data)
+
+    def fetch_price(self, url: str):
+        return MarketParser(self.storage_file).fetch_price(url)
+
+    def load_data(self, filename: str):
+        return MarketParser(self.storage_file).load_data(filename)
+
+    def fetch_portfolio(self):
+        return {}
+
+    def save_portfolio_snapshot(self, snapshot):
+        pass
+
+    def get_anomaly_log(self):
+        return list(self.anomalies.values())
+
+
+def load_db(filename: str):
+    return MarketParser().load_data(filename)
+
+
+DbStorage = DBStorage
+MarketStorage = DBStorage
+MarketDatabaseStorage = DBStorage
+DatabaseStorage = DBStorage
+db_storage = DBStorage()

@@ -47,8 +47,10 @@ class MarketParser:
         if os.path.exists(self.storage_file):
             try:
                 with open(self.storage_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-            except (json.JSONDecodeError, IOError):
+                    content = f.read()
+                    if content:
+                        data = json.loads(content)
+            except (json.JSONDecodeError, IOError, UnicodeDecodeError):
                 data = {}
         
         data[symbol] = price
@@ -60,7 +62,10 @@ class MarketParser:
             return None
         try:
             with open(storage_file, "r", encoding="utf-8") as f:
-                return json.load(f)
+                content = f.read()
+                if not content:
+                    return None
+                return json.loads(content)
         except (json.JSONDecodeError, IOError, UnicodeDecodeError):
             return None
 
@@ -105,14 +110,14 @@ def run_market_telegram_pipeline(storage_file, symbol, chat_id, url, telegram_to
 
 
 def export_audit_logs(storage_file=None):
-    """Экспорт аудиторских логов с явным возвратом результата."""
-    if storage_file and os.path.exists(storage_file):
-        try:
-            with open(storage_file, "r", encoding="utf-8") as f:
-                content = f.read()
-                if not content:
-                    return False
+    """Экспорт аудиторских логов с явным возвратом результата соответствия комплаенсу."""
+    if not storage_file or not os.path.exists(storage_file):
+        return False
+    try:
+        with open(storage_file, "r", encoding="utf-8") as f:
+            content = f.read()
+            if content:
                 return True
-        except (IOError, json.JSONDecodeError, UnicodeDecodeError):
             return False
-    return False
+    except (IOError, UnicodeDecodeError):
+        return False

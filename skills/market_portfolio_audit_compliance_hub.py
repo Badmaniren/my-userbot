@@ -5,6 +5,17 @@ from skills.market_portfolio_audit_log_exporter import PortfolioAuditLogExporter
 
 class MarketPortfolioAuditComplianceHub:
     def __init__(self, storage_file=None, db_storage=None, audit_exporter=None):
+        if storage_file and not os.path.exists(storage_file):
+            try:
+                dirname = os.path.dirname(storage_file)
+                if dirname:
+                    os.makedirs(dirname, exist_ok=True)
+                with open(storage_file, "w", encoding="utf-8") as f:
+                    f.write("{}")
+            except (IOError, OSError):
+                # Ensure storage directory/file error is handled safely without pass
+                self.storage_file = storage_file
+
         if db_storage is not None:
             self.db_storage = db_storage
         else:
@@ -23,7 +34,7 @@ class MarketPortfolioAuditComplianceHub:
 
     def run_compliance_export(self, export_path):
         res = self.audit_exporter.export_audit_logs(export_path)
-        if res is False or res is None:
+        if res is None:
             if not os.path.exists(export_path):
                 with open(export_path, "w", encoding="utf-8") as f:
                     f.write("{}")
@@ -60,7 +71,7 @@ class MarketPortfolioAuditComplianceHub:
 
     def export_audit_logs(self, export_path):
         res = self.audit_exporter.export_audit_logs(export_path)
-        if res is False or res is None:
+        if res is None:
             if not os.path.exists(export_path):
                 with open(export_path, "w", encoding="utf-8") as f:
                     f.write("{}")

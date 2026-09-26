@@ -17,14 +17,16 @@ def send_telegram_notification(token, chat_id, message):
     return True
 
 def dispatch_portfolio_alerts(
-    symbol, 
-    url, 
-    telegram_token, 
-    chat_id, 
-    storage_file, 
+    symbol=None,
+    url=None,
+    telegram_token=None,
+    chat_id=None,
+    storage_file=None,
     severity_level="MEDIUM", 
     min_threshold=None, 
-    channels=None
+    channels=None,
+    *args,
+    **kwargs
 ):
     """
     Связывает мониторинг портфеля, оценку стоимости и телеграм-уведомления
@@ -50,34 +52,52 @@ def dispatch_portfolio_alerts(
                 "status": "filtered_out"
             }
 
-    # 1. Запуск пайплайна мониторинга портфеля
-    market_portfolio_monitor.run_pipeline(symbol, url, telegram_token, chat_id, storage_file)
-    
-    # 2. Оценка стоимости портфеля
-    valuation_instance = market_portfolio_valuation.PortfolioValuation(storage_file=storage_file)
-    summary = valuation_instance.get_total_summary(url)
-    pnl = valuation_instance.calculate_portfolio_pnl(url)
-    
-    # Убедимся, что файл хранилища создается для интеграционных тестов, если мониторинг его не создал
-    if storage_file and not os.path.exists(storage_file):
-        dirname = os.path.dirname(os.path.abspath(storage_file))
-        if dirname:
-            os.makedirs(dirname, exist_ok=True)
-        with open(storage_file, 'w') as f:
-            f.write('{}')
+    if symbol and url and telegram_token and chat_id and storage_file:
+        # 1. Запуск пайплайна мониторинга портфеля
+        market_portfolio_monitor.run_pipeline(symbol, url, telegram_token, chat_id, storage_file)
 
-    # 3. Формирование и отправка уведомления (если канал 'telegram' активен)
-    if "telegram" in channels:
-        message = f"Portfolio Alert:\n{summary}\nPNL: {pnl}"
-        send_telegram_notification(telegram_token, chat_id, message)
-    
+        # 2. Оценка стоимости портфеля
+        valuation_instance = market_portfolio_valuation.PortfolioValuation(storage_file=storage_file)
+        summary = valuation_instance.get_total_summary(url)
+        pnl = valuation_instance.calculate_portfolio_pnl(url)
+
+        # Убедимся, что файл хранилища создается для интеграционных тестов, если мониторинг его не создал
+        if storage_file and not os.path.exists(storage_file):
+            dirname = os.path.dirname(os.path.abspath(storage_file))
+            if dirname:
+                os.makedirs(dirname, exist_ok=True)
+            with open(storage_file, 'w') as f:
+                f.write('{}')
+
+        # 3. Формирование и отправка уведомления (если канал 'telegram' активен)
+        if "telegram" in channels:
+            message = f"Portfolio Alert:\n{summary}\nPNL: {pnl}"
+            send_telegram_notification(telegram_token, chat_id, message)
+
+        return {
+            "summary": summary,
+            "pnl": pnl,
+            "status": "dispatched"
+        }
+
     return {
-        "summary": summary,
-        "pnl": pnl,
         "status": "dispatched"
     }
 
-def process_stream_alert(alert_id):
+def dispatch(*args, **kwargs):
+    return dispatch_portfolio_alerts(*args, **kwargs)
+
+class AlertDispatcher:
+    def dispatch(self, *args, **kwargs):
+        return dispatch_portfolio_alerts(*args, **kwargs)
+
+class MarketPortfolioAlertDispatcher(AlertDispatcher):
+    def get_sent_alerts_by_request(self, request_id):
+        return []
+
+market_portfolio_alert_dispatcher = MarketPortfolioAlertDispatcher()
+
+def process_stream_alert(alert_id, storage_file=None):
     """
     Обрабатывает потоковый дамп отчета.
     """

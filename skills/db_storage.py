@@ -1,6 +1,40 @@
 import sqlite3
+import os
 import requests
 from bs4 import BeautifulSoup
+
+
+class DatabaseConnection:
+    def __init__(self, db_path="market_data.db"):
+        self.db_path = db_path
+        self._init_db()
+
+    def _init_db(self):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS articles (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    content TEXT NOT NULL
+                )
+            ''')
+            conn.commit()
+
+    def save_article(self, content: str):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('INSERT INTO articles (content) VALUES (?)', (content,))
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_article(self, article_id):
+        if not os.path.exists(self.db_path):
+            return None
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT content FROM articles WHERE id = ?', (article_id,))
+            row = cursor.fetchone()
+            return row[0] if row else None
 
 
 class MarketParser:

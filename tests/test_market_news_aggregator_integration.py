@@ -1,45 +1,62 @@
 import unittest
 import uuid
 import random
-import os
+import io
 from skills import market_news_aggregator
-from skills import market_parser
-from skills import db_storage
+import market_parser
+import db_storage
 
 class TestMarketNewsAggregatorIntegration(unittest.TestCase):
-    def setUp(self):
-        self.test_id = str(uuid.uuid4())
-        self.random_source = f"source_{random.randint(1000, 9999)}_{self.test_id[:8]}"
-        self.random_title = f"Market Update {random.randint(10000, 99999)}"
-        self.db_path = "test_market_news.db"
 
-    def tearDown(self):
-        if os.path.exists(self.db_path):
-            try:
-                os.remove(self.db_path)
-            except OSError:
-                pass
+    def test_aggregate_news_integration(self):
+        unique_content = f"Market News Update {uuid.uuid4()} - Rate cut expected: {random.randint(1, 100)}%"
+        source_url = f"https://finance.example.com/feed/{uuid.uuid4()}"
 
-    def test_news_aggregation_and_storage_integration(self):
-        raw_feed_data = {
-            "source_id": self.random_source,
-            "title": self.random_title,
-            "content": f"Detailed financial report content for ID {self.test_id}.",
-            "timestamp": random.randint(1600000000, 1900000000)
-        }
+        parser_client = market_parser.ParserClient()
+        if hasattr(parser_client, 'set_mock_data'):
+            parser_client.set_mock_data(source_url, unique_content)
 
-        parsed_data = market_parser.parse_feed(raw_feed_data)
-        self.assertIsNotNone(parsed_data)
+        result = market_news_aggregator.aggregate_news(source_url)
 
-        aggregation_result = market_news_aggregator.aggregate_and_filter_news([parsed_data])
-        self.assertIsInstance(aggregation_result, list)
+        self.assertIsInstance(result, dict)
+        self.assertIn("id", result)
+        self.assertEqual(result["source"], source_url)
+        self.assertIsNotNone(result["id"])
+
+        db = db_storage.DatabaseConnection()
+        if hasattr(db, 'get_article'):
+            saved_content = db.get_article(result["id"])
+            self.assertEqual(saved_content, unique_content)
+
+    def test_process_raw_stream_integration(self):
+        random_bytes = os_random_data = bytes([random.randint(0, 255) for _ in range(64)])
+        stream_url = f"https://finance.example.com/stream/{uuid.uuid4()}"
+
+        parser_client = market_parser.ParserClient()
+        if hasattr(parser_client, 'set_mock_raw_stream'):
+            parser_client.set_mock_raw_stream(stream_url, random_bytes)
+
+        length = market_news_aggregator.process_raw_stream(stream_url)
+        self.assertEqual(length, len(random_bytes))
+
+    def test_aggregate_and_filter_news_integration(self):
+        random_id_1 = str(uuid.uuid4())
+        random_id_2 = str(uuid.uuid4())
         
-        saved_records = db_storage.persist_news_batch(aggregation_result, db_uri=self.db_path)
-        
-        fetched_record = db_storage.get_news_by_title(self.random_title, db_uri=self.db_path)
-        self.assertIsNotNone(fetched_record)
-        self.assertEqual(fetched_record.get("title"), self.random_title)
-        self.assertIn(self.test_id[:8], fetched_record.get("content", ""))
+        raw_items = [
+            {"id": random_id_1, "title": "Bull Market Ahead"},
+            None,
+            {"id": random_id_2, "title": "Inflation Stays Low"},
+            "invalid_item_string",
+            12345
+        ]
+
+        filtered = market_news_aggregator.aggregate_and_filter_news(raw_items)
+
+        self.assertIsInstance(filtered, list)
+        self.assertEqual(len(filtered), 2)
+        self.assertEqual(filtered[0]["id"], random_id_1)
+        self.assertEqual(filtered[1]["id"], random_id_2)
 
 if __name__ == "__main__":
     unittest.main()

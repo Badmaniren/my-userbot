@@ -1,11 +1,5 @@
 from skills.market_insider_alert_pipeline import MarketInsiderAlertPipeline
-from skills.market_portfolio_telegram_notifier import send_telegram_notification
-
-# Совместимость с юнит-тестами, где start_new импортируется напрямую или выступает оберткой
-try:
-    from skills.market_portfolio_telegram_notifier import start_new
-except ImportError:
-    start_new = send_telegram_notification
+from skills.market_portfolio_telegram_notifier import send_telegram_notification, start_new
 
 
 class MarketInsiderNotifier:
@@ -35,12 +29,16 @@ class MarketInsiderNotifier:
             return self.telegram_sender(t, c, message_body)
 
     def process_and_notify(self, ticker, raw_stream_data, min_criticality=None, token=None, chat_id=None):
-        processed = self.handle_stream_event(ticker, raw_stream_data)
+        # Если передали поток байтов или объект с .read(), отдаем его пайплайну напрямую
+        if hasattr(raw_stream_data, "read"):
+            processed = self.pipeline.process_alert_stream(ticker, raw_stream_data)
+        else:
+            processed = self.handle_stream_event(ticker, raw_stream_data)
         
         # Определение уровня критичности
         sev = "LOW"
         if isinstance(processed, dict):
-            sev = processed.get("severity", raw_stream_data.get("severity", "LOW"))
+            sev = processed.get("severity", "LOW")
         elif isinstance(raw_stream_data, dict):
             sev = raw_stream_data.get("severity", "LOW")
 
@@ -62,7 +60,9 @@ class MarketInsiderNotifier:
         return self.pipeline.evaluate_market_stream(exchange_name)
 
     def consume_stream_bytes(self, byte_stream):
-        return byte_stream.read()
+        if hasattr(byte_stream, "read"):
+            return byte_stream.read()
+        return byte_stream
 
 
 def notify_market_insider(token, chat_id, message):

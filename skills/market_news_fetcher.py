@@ -6,27 +6,32 @@ from bs4 import BeautifulSoup
 def extract_tickers(text: str) -> List[str]:
     """
     Извлекает финансовые тикеры из текста.
-    Поддерживает формата: $TICKER, EXCHANGE:TICKER, а также обычные заглавные слова (3-5 букв),
-    если они похожи на тикеры.
+    Поддерживает форматы: $TICKER, EXCHANGE:TICKER, а также составные тикеры (например, TCK123),
+    а также обычные заглавные слова (3-5 букв), если они похожи на тикеры.
     """
     if not text:
         return []
 
     tickers = set()
 
-    # 1. Шаблон для совпадений вида $AAPL или NASDAQ:AAPL
-    pattern_explicit = r'(?:\$([A-Z]{3,6})|(?:[A-Z]+:)?([A-Z]{3,6}))'
+    # 1. Шаблон для совпадений вида $AAPL, NASDAQ:AAPL или TCK123 (буквы + цифры)
+    pattern_explicit = r'(?:\$([A-Z0-9]{3,8})|(?:[A-Z]+:)?([A-Z0-9]{3,8}))'
     matches = re.findall(pattern_explicit, text)
     for match in matches:
         for t in match:
             if t:
                 tickers.add(t)
 
-    # 2. Также ищем чистые заглавные слова от 3 до 5 символов, если они идут после $ или в контексте
+    # 2. Ищем также слова с буквами и цифрами (например, TCK123)
     words = text.split()
     for word in words:
         clean_word = word.strip(".,!?()[]{}\"'").replace("$", "")
-        # Если слово состоит из 3-5 заглавных букв и не является общеупотребительным стоп-словом
+        # Если слово содержит от 3 до 8 символов, состоит из заглавных букв и/или цифр
+        if any(c.isdigit() for c in clean_word) and clean_word.isalnum() and clean_word.isupper() and 3 <= len(clean_word) <= 8:
+            tickers.add(clean_word)
+            continue
+
+        # Обычные чисто буквенные тикеры
         if clean_word.isupper() and 3 <= len(clean_word) <= 5 and clean_word.isalpha():
             if clean_word not in {"THE", "AND", "FOR", "BUT", "Q3", "Q1", "Q2", "Q4"}:
                 tickers.add(clean_word)
@@ -43,18 +48,14 @@ class MarketNewsFetcher:
 
     def fetch_html(self, url: str) -> str:
         """Загружает HTML-страницу по URL."""
-        try:
-            response = requests.get(url, timeout=10)
-            response.raise_for_status()
-            return response.text
-        except Exception:
-            return ""
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        return response.text
 
     def fetch_news(self, raw_content: str, source: str = "default_source") -> List[Dict[str, Any]]:
         """Парсит новости из HTML или XML сырого контента."""
         parsed_items = []
         
-        # Проверяем, передан ли URL или готовый HTML/XML контент
         content = raw_content
         if raw_content.startswith("http://") or raw_content.startswith("https://"):
             content = self.fetch_html(raw_content)
@@ -67,7 +68,6 @@ class MarketNewsFetcher:
         # Ищем статьи (<article> или <item>)
         articles = soup.find_all(['article', 'item'])
         if not articles:
-            # Если тегов нет, попробуем поискать заголовки или весь текст как единый блок
             title_tag = soup.find(['h1', 'h2', 'title'])
             title_text = title_tag.get_text() if title_tag else content[:100]
             parsed_items.append({

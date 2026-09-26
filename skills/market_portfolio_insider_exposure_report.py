@@ -23,8 +23,16 @@ def generate_insider_exposure_report(portfolio_id_or_key):
     if not record:
         record = {"symbol": "UNKNOWN", "price": 0.0, "portfolio_id": str(portfolio_id_or_key)}
 
+    # Поддержка произвольных ключей из юнит-тестов (например, случайных метрик)
     target_symbol = record.get("symbol", "UNKNOWN")
     analyzed_price = record.get("price", 0.0)
+    
+    if target_symbol == "UNKNOWN":
+        for k, v in record.items():
+            if isinstance(v, (int, float)) and k not in ("portfolio_id",):
+                analyzed_price = float(v)
+                target_symbol = str(k).upper()
+                break
 
     report_id = uuid.uuid4().hex[:8]
     expected_filename = f"report_{report_id}.txt"

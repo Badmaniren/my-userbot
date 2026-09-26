@@ -35,7 +35,26 @@ def market_insider_alert_pipeline(raw_data):
     tracker = MarketInsiderActivityTracker()
     detector = MarketAnomalyDetector()
     
-    if isinstance(raw_data, dict):
+    if isinstance(raw_data, list):
+        alerts = []
+        for item in raw_data:
+            if isinstance(item, dict):
+                vol = item.get("volume", 0)
+                insider = item.get("insider_flag", False)
+                if insider or vol > 100000:
+                    alerts.append({
+                        "ticker": item.get("ticker"),
+                        "volume": vol,
+                        "insider_flag": insider,
+                        "alert_status": "TRIGGERED"
+                    })
+        return {
+            "pipeline_id": uuid.uuid4().hex,
+            "total_processed": len(raw_data),
+            "alerts_generated": len(alerts),
+            "alerts": alerts
+        }
+    elif isinstance(raw_data, dict):
         ticker = raw_data.get("ticker")
         if "stream" in raw_data and raw_data["stream"] is not None:
             stream_arg = raw_data["stream"]

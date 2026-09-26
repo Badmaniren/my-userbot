@@ -48,17 +48,27 @@ class MarketAnomalyDetector:
 
 
 def market_anomaly_detector(data):
-    volume = data.get("volume", 0)
-    price = data.get("price", 0.0)
-    symbol = data.get("symbol") or data.get("ticker", "UNKNOWN")
-    
-    is_anomaly = volume > 50000
-    anomaly_score = float(volume) / 10000.0 if is_anomaly else 0.1
+    if isinstance(data, list):
+        anomalies = []
+        for item in data:
+            if isinstance(item, dict):
+                vol = item.get("volume", 0)
+                if vol > 50000:
+                    anomalies.append(item)
+        return anomalies
+    elif isinstance(data, dict):
+        volume = data.get("volume", 0)
+        price = data.get("price", 0.0)
+        symbol = data.get("symbol") or data.get("ticker", "UNKNOWN")
 
-    return {
-        "is_anomaly": is_anomaly,
-        "anomaly_score": anomaly_score,
-        "symbol": symbol,
-        "volume": volume,
-        "price": price
-    }
+        is_anomaly = volume > 50000
+        anomaly_score = float(volume) / 10000.0 if is_anomaly else 0.1
+
+        return {
+            "is_anomaly": is_anomaly,
+            "anomaly_score": anomaly_score,
+            "symbol": symbol,
+            "volume": volume,
+            "price": price
+        }
+    return []

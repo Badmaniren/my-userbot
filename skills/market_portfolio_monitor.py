@@ -114,6 +114,16 @@ def run_market_telegram_pipeline(storage_file, symbol, chat_id, url, telegram_to
     }
 
 
+def market_portfolio_monitor(raw_data):
+    """Сбор и анализ транзакций."""
+    if isinstance(raw_data, list):
+        processed = [tx for tx in raw_data if isinstance(tx, dict)]
+        return {"processed_count": len(processed), "status": "analyzed", "transactions": processed}
+    elif isinstance(raw_data, dict):
+        return {"processed_count": 1, "status": "analyzed", "transactions": [raw_data]}
+    return {"processed_count": 0, "status": "empty", "transactions": []}
+
+
 def export_audit_logs(storage_file=None):
     """Экспорт аудиторских логов с явным возвратом результата."""
     if storage_file and os.path.exists(storage_file):

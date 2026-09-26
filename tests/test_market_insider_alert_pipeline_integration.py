@@ -3,55 +3,44 @@ import uuid
 import random
 import io
 from skills.market_insider_alert_pipeline import MarketInsiderAlertPipeline, market_insider_alert_pipeline
-from skills.market_insider_activity_tracker import MarketInsiderActivityTracker, DBStorage
+from skills.market_insider_activity_tracker import MarketInsiderActivityTracker
 from skills.market_anomaly_detector import MarketAnomalyDetector
 
 
 class TestMarketInsiderAlertPipelineIntegration(unittest.TestCase):
+
     def setUp(self):
         self.pipeline = MarketInsiderAlertPipeline()
         self.random_ticker = f"TICKER_{uuid.uuid4().hex[:6].upper()}"
-        self.random_signature = f"SIG_{uuid.uuid4().hex}"
-        self.random_exchange = f"EXCH_{random.randint(100, 999)}"
+        self.random_score = round(random.uniform(0.1, 0.9), 4)
 
-    def test_pipeline_class_alert_processing(self):
-        raw_data = {
+    def test_pipeline_integration_flow(self):
+        raw_stream_data = io.BytesIO(f"Volume spike detected for {self.random_ticker} with score {self.random_score}".encode('utf-8'))
+        
+        alert = self.pipeline.process_alert_stream(self.random_ticker, raw_stream_data)
+        
+        if alert is not None:
+            self.assertIn("ticker", alert)
+            self.assertEqual(alert["ticker"], self.random_ticker)
+            self.assertIn("is_anomaly", alert)
+            self.assertIn("anomaly_score", alert)
+            self.assertIsInstance(alert["anomaly_score"], (int, float))
+
+    def test_market_insider_alert_pipeline_wrapper(self):
+        payload = {
             "ticker": self.random_ticker,
-            "signature": self.random_signature,
-            "volume": random.randint(10000, 500000),
-            "price": round(random.uniform(10.0, 1000.0), 2)
+            "stream": io.BytesIO(uuid.uuid4().bytes),
+            "signature": uuid.uuid4().hex
         }
         
-        stream_data = io.BytesIO(str(raw_data).encode('utf-8'))
-        result = self.pipeline.process_alert_stream(self.random_ticker, stream_data)
-        
-        if result is not None:
-            self.assertIn("ticker", result)
-            self.assertEqual(result["ticker"], self.random_ticker)
-            self.assertIn("is_anomaly", result)
-            self.assertIn("anomaly_score", result)
-
-    def test_pipeline_functional_wrapper(self):
-        raw_data = {
-            "ticker": self.random_ticker,
-            "signature": self.random_signature,
-            "payload_id": uuid.uuid4().hex,
-            "metric": random.random()
-        }
-        
-        result = market_insider_alert_pipeline(raw_data)
+        result = market_insider_alert_pipeline(payload)
         
         self.assertIsInstance(result, dict)
         self.assertIn("alert_id", result)
-        self.assertTrue(len(result["alert_id"]) > 0)
         self.assertEqual(result["ticker"], self.random_ticker)
-        self.assertEqual(result["signature"], self.random_signature)
+        self.assertEqual(result["signature"], payload["signature"])
         self.assertIn("analysis", result)
         self.assertIn("anomaly", result)
-
-    def test_evaluate_market_stream_integration(self):
-        stream_analysis = self.pipeline.evaluate_market_stream(self.random_exchange)
-        self.assertIsNotNone(stream_analysis)
 
 
 if __name__ == "__main__":

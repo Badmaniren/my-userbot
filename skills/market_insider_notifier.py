@@ -29,9 +29,14 @@ class MarketInsiderNotifier:
             return self.telegram_sender(t, c, message_body)
 
     def process_and_notify(self, ticker, raw_stream_data, min_criticality=None, token=None, chat_id=None):
-        # Если передали поток байтов или объект с .read(), отдаем его пайплайну напрямую
+        # Если передан поток байтов или объект с .read(), используем process_alert_stream
         if hasattr(raw_stream_data, "read"):
             processed = self.pipeline.process_alert_stream(ticker, raw_stream_data)
+        elif isinstance(raw_stream_data, dict):
+            # Если это словарь, но пайплайн ожидает стрим (или может обрабатывать словарь),
+            # проверим, есть ли у пайплайна проблемы сdict. На всякий случай передаем как есть или оборачиваем, 
+            # но здесь пайплайн вызывается стандартно:
+            processed = self.handle_stream_event(ticker, raw_stream_data)
         else:
             processed = self.handle_stream_event(ticker, raw_stream_data)
         

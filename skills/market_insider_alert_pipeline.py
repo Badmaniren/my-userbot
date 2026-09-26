@@ -11,9 +11,13 @@ class MarketInsiderAlertPipeline:
 
     def process_alert_stream(self, ticker, raw_stream_data):
         activity_result = self.tracker.analyze_activity(raw_stream_data)
+        
+        if activity_result.get("status") != "suspicious":
+            return None
+
         anomaly_result = self.detector.detect(ticker)
 
-        if activity_result.get("status") == "suspicious" and anomaly_result.get("is_anomaly"):
+        if anomaly_result.get("is_anomaly"):
             alert = {
                 "ticker": activity_result.get("ticker", ticker),
                 "signature": activity_result.get("signature"),
@@ -33,7 +37,6 @@ def market_insider_alert_pipeline(raw_data):
     
     ticker = raw_data.get("ticker")
     
-    # Handle the case where raw_data contains a "stream" key or is a dict without a stream attribute
     if isinstance(raw_data, dict):
         if "stream" in raw_data and raw_data["stream"] is not None:
             stream_arg = raw_data["stream"]

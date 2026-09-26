@@ -3,8 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-а перед фиксом: ImportError: Failed to import test module: tests.test_market_portfolio_audit_alert_notifier_integration
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+ю
 
 ## market_portfolio_monitor (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=2)
@@ -329,3 +328,7 @@
 
 ## market_insider_alert_pipeline (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_insider_exposure_report (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

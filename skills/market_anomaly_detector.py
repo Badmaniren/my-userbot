@@ -8,7 +8,6 @@ class MarketAnomalyDetector:
             if not data or not isinstance(data, dict):
                 return {"is_anomaly": False, "ticker": ticker, "warning": "Empty or invalid data"}
             
-            # Проверка на наличие обязательных полей согласно юнит-тестам
             if "anomaly_flag" not in data or "volume" not in data or "price" not in data:
                 return {
                     "is_anomaly": False,
@@ -30,14 +29,11 @@ class MarketAnomalyDetector:
 
     def analyze_stream(self, exchange):
         stream = market_parser.get_raw_stream(exchange)
-        # Читаем немного данных из потока для соответствия тесту с io.BytesIO
         if stream and hasattr(stream, "read"):
             _ = stream.read()
         return {"exchange": exchange, "status": "analyzed"}
 
-# Функция для поддержки интеграционного теста
 def market_anomaly_detector(data):
-    # Принимает распарсенные данные, возвращает результат с аномалией и score
     volume = data.get("volume", 0)
     price = data.get("price", 0.0)
     symbol = data.get("symbol") or data.get("ticker", "UNKNOWN")

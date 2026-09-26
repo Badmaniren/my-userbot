@@ -3,13 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-уль 'db_storage' глобальной переменной!
-- Последняя ошибка перед фиксом: FAILED (failures=2, errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_stress_reporter (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+нгой, передан на эскалацию
 
 ## market_portfolio_monitor (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
@@ -340,4 +334,8 @@
 
 ## market_anomaly_detector (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_insider_alert_pipeline (compose) — раундов: 4
+- Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/tests/test_market_portfolio_audit_compliance_hub.py", line 52, in test_run_compliance_export_boolean
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

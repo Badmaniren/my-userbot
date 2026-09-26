@@ -47,18 +47,37 @@ class MarketAnomalyDetector:
         return {"exchange": exchange, "status": "analyzed"}
 
 
-def market_anomaly_detector(data):
-    volume = data.get("volume", 0)
-    price = data.get("price", 0.0)
-    symbol = data.get("symbol") or data.get("ticker", "UNKNOWN")
-    
-    is_anomaly = volume > 50000
-    anomaly_score = float(volume) / 10000.0 if is_anomaly else 0.1
-
-    return {
-        "is_anomaly": is_anomaly,
-        "anomaly_score": anomaly_score,
-        "symbol": symbol,
-        "volume": volume,
-        "price": price
-    }
+def market_anomaly_detector(data=None, *args, **kwargs):
+    if data is None:
+        return []
+    if isinstance(data, list):
+        results = []
+        for item in data:
+            if isinstance(item, dict):
+                vol = item.get("volume", 0)
+                price = item.get("price", 0.0)
+                symbol = item.get("symbol") or item.get("ticker", "UNKNOWN")
+                is_anomaly = item.get("insider_flag", False) or vol > 50000
+                score = float(vol) / 10000.0 if is_anomaly else 0.1
+                results.append({
+                    "is_anomaly": is_anomaly,
+                    "anomaly_score": score,
+                    "symbol": symbol,
+                    "volume": vol,
+                    "price": price
+                })
+        return results
+    elif isinstance(data, dict):
+        vol = data.get("volume", 0)
+        price = data.get("price", 0.0)
+        symbol = data.get("symbol") or data.get("ticker", "UNKNOWN")
+        is_anomaly = data.get("insider_flag", False) or vol > 50000
+        score = float(vol) / 10000.0 if is_anomaly else 0.1
+        return {
+            "is_anomaly": is_anomaly,
+            "anomaly_score": score,
+            "symbol": symbol,
+            "volume": vol,
+            "price": price
+        }
+    return {}

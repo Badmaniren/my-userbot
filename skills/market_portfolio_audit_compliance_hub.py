@@ -65,3 +65,9 @@ class MarketPortfolioAuditComplianceHub:
                     f.write("{}")
             return True
         return res
+
+
+def market_portfolio_audit_compliance_hub(storage_file=None, *args, **kwargs):
+    """Точка входа для комплаенс-аудита и проверки целостности операций."""
+    hub = MarketPortfolioAuditComplianceHub(storage_file=storage_file)
+    return hub.check_compliance_integrity()

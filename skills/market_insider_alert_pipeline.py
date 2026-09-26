@@ -31,28 +31,49 @@ class MarketInsiderAlertPipeline:
         return self.detector.analyze_stream(exchange)
 
 
-def market_insider_alert_pipeline(raw_data):
-    tracker = MarketInsiderActivityTracker()
-    detector = MarketAnomalyDetector()
-    
-    if isinstance(raw_data, dict):
+def market_insider_alert_pipeline(raw_data=None, *args, **kwargs):
+    if raw_data is None:
+        return []
+    if isinstance(raw_data, list):
+        alerts = []
+        for item in raw_data:
+            if isinstance(item, dict):
+                vol = item.get("volume", 0)
+                is_anomaly = item.get("insider_flag", False) or vol > 50000
+                alerts.append({
+                    "alert_id": uuid.uuid4().hex,
+                    "ticker": item.get("ticker"),
+                    "volume": vol,
+                    "is_anomaly": is_anomaly,
+                    "timestamp": item.get("timestamp")
+                })
+        return alerts
+    elif isinstance(raw_data, dict):
         ticker = raw_data.get("ticker")
         if "stream" in raw_data and raw_data["stream"] is not None:
             stream_arg = raw_data["stream"]
         else:
             stream_arg = io.BytesIO(str(raw_data).encode('utf-8'))
+        tracker = MarketInsiderActivityTracker()
+        detector = MarketAnomalyDetector()
+        analysis_result = tracker.analyze_activity(stream_arg)
+        anomaly_result = detector.detect(ticker)
+        return {
+            "alert_id": uuid.uuid4().hex,
+            "ticker": ticker,
+            "signature": raw_data.get("signature"),
+            "analysis": analysis_result,
+            "anomaly": anomaly_result
+        }
     else:
-        ticker = None
-        stream_arg = raw_data
-        
-    analysis_result = tracker.analyze_activity(stream_arg)
-    anomaly_result = detector.detect(ticker)
-    
-    alert_result = {
-        "alert_id": uuid.uuid4().hex,
-        "ticker": ticker,
-        "signature": raw_data.get("signature") if isinstance(raw_data, dict) else None,
-        "analysis": analysis_result,
-        "anomaly": anomaly_result
-    }
-    return alert_result
+        tracker = MarketInsiderActivityTracker()
+        detector = MarketAnomalyDetector()
+        analysis_result = tracker.analyze_activity(raw_data)
+        anomaly_result = detector.detect(None)
+        return {
+            "alert_id": uuid.uuid4().hex,
+            "ticker": None,
+            "signature": None,
+            "analysis": analysis_result,
+            "anomaly": anomaly_result
+        }

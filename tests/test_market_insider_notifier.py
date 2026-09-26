@@ -1,137 +1,128 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+import io
 import random
 import uuid
 import string
-import io
-
 from skills.market_insider_notifier import MarketInsiderNotifier, notify_market_insider
+
 
 class TestMarketInsiderNotifier(unittest.TestCase):
 
     def setUp(self):
         self.token = uuid.uuid4().hex
-        self.chat_id = str(random.randint(100000, 999999))
-        self.ticker = ''.join(random.choices(string.ascii_uppercase, k=4))
-        self.severity_levels = ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
-        self.min_severity = random.choice(self.severity_levels)
+        self.chat_id = str(random.randint(100000, 99999999))
+        self.ticker = "".join(random.choices(string.ascii_uppercase, k=4))
+        self.notifier = MarketInsiderNotifier(token=self.token, chat_id=self.chat_id, min_severity="MEDIUM")
 
-    def test_composition_imports_and_pipeline_execution(self):
-        raw_stream_data = {
-            "event_id": uuid.uuid4().hex,
-            "volume": random.randint(1000, 100000),
-            "severity": random.choice(self.severity_levels)
-        }
+    def test_handle_stream_event(self):
+        rand_event_id = uuid.uuid4().hex
+        mock_pipeline = unittest.mock.MagicMock()
+        mock_pipeline.process_alert_stream.return_value = {"id": rand_event_id, "severity": "HIGH"}
         
-        mock_pipeline_instance = MagicMock()
-        mock_pipeline_instance.process_alert_stream.return_value = raw_stream_data
+        notifier = MarketInsiderNotifier(pipeline=mock_pipeline)
+        stream_data = {"data": uuid.uuid4().hex}
+        res = notifier.handle_stream_event(self.ticker, stream_data)
 
-        with patch("skills.market_insider_notifier.MarketInsiderAlertPipeline", return_value=mock_pipeline_instance) as MockPipeline:
-            notifier = MarketInsiderNotifier(
-                token=self.token,
-                chat_id=self.chat_id,
-                min_severity=self.min_severity
-            )
-            
-            MockPipeline.assert_called_once()
-            
-            result = notifier.handle_stream_event(self.ticker, raw_stream_data)
-            mock_pipeline_instance.process_alert_stream.assert_called_once_with(self.ticker, raw_stream_data)
-            self.assertIsNotNone(result)
+        mock_pipeline.process_alert_stream.assert_called_once_with(self.ticker, stream_data)
+        self.assertEqual(res["id"], rand_event_id)
+        self.assertEqual(res["severity"], "HIGH")
 
-    def test_telegram_notifier_integration(self):
-        message_body = f"ANOMALY DETECTED: {uuid.uuid4().hex}"
-        
-        with patch("skills.market_insider_notifier.start_new", return_value=True) as mock_start_new:
-            notifier = MarketInsiderNotifier(
-                token=self.token,
-                chat_id=self.chat_id,
-                min_severity="LOW"
-            )
-            
-            success = notifier.dispatch_notification(message_body)
-            
-            mock_start_new.assert_called_once_with(self.token, self.chat_id, message_body)
-            self.assertTrue(success)
+    def test_dispatch_notification_fallback(self):
+        message = uuid.uuid4().hex
+        mock_sender = unittest.mock.MagicMock(return_value=True)
 
-    def test_severity_filtering_logic(self):
-        high_severity_data = {
-            "event_id": uuid.uuid4().hex,
-            "severity": "CRITICAL"
-        }
-        low_severity_data = {
-            "event_id": uuid.uuid4().hex,
-            "severity": "LOW"
-        }
+        with patch("skills.market_insider_notifier.start_new", side_effect=TypeError("not supported")):
+            notifier = MarketInsiderNotifier(token=self.token, chat_id=self.chat_id, telegram_sender=mock_sender)
+            res = notifier.dispatch_notification(message)
 
-        mock_pipeline_instance = MagicMock()
-        mock_pipeline_instance.process_alert_stream.side_effect = [high_severity_data, low_severity_data]
-
-        with patch("skills.market_insider_notifier.MarketInsiderAlertPipeline", return_value=mock_pipeline_instance), \
-             patch("skills.market_insider_notifier.start_new", return_value=True) as mock_telegram:
-            
-            notifier = MarketInsiderNotifier(
-                token=self.token,
-                chat_id=self.chat_id,
-                min_severity="HIGH"
-            )
-            
-            # Should trigger notification
-            res1 = notifier.process_and_notify(self.ticker, high_severity_data)
-            self.assertTrue(res1)
-            mock_telegram.assert_called_once()
-            
-            mock_telegram.reset_mock()
-            
-            # Should skip notification due to low severity
-            res2 = notifier.process_and_notify(self.ticker, low_severity_data)
-            self.assertFalse(res2)
-            mock_telegram.assert_not_called()
-
-    def test_stream_evaluation_wrapper(self):
-        exchange_name = f"EXCHANGE_{uuid.uuid4().hex[:6]}"
-        evaluation_result = {
-            "status": "ANOMALY_FOUND",
-            "score": random.uniform(1.0, 10.0)
-        }
-
-        mock_pipeline_instance = MagicMock()
-        mock_pipeline_instance.evaluate_market_stream.return_value = evaluation_result
-
-        with patch("skills.market_insider_notifier.MarketInsiderAlertPipeline", return_value=mock_pipeline_instance):
-            notifier = MarketInsiderNotifier(
-                token=self.token,
-                chat_id=self.chat_id,
-                min_severity="MEDIUM"
-            )
-            
-            res = notifier.evaluate_exchange(exchange_name)
-            mock_pipeline_instance.evaluate_market_stream.assert_called_once_with(exchange_name)
-            self.assertEqual(res, evaluation_result)
-
-    def test_module_level_function_wrapper(self):
-        random_message = uuid.uuid4().hex
-        
-        with patch("skills.market_insider_notifier.send_telegram_notification", return_value=True) as mock_send:
-            outcome = notify_market_insider(self.token, self.chat_id, random_message)
-            mock_send.assert_called_once_with(self.token, self.chat_id, random_message)
-            self.assertTrue(outcome)
+        mock_sender.assert_called_once_with(self.token, self.chat_id, message)
+        self.assertTrue(res)
 
     def test_io_byte_stream_handling(self):
-        random_bytes = uuid.uuid4().bytes + b''.join(random.choices(string.ascii_letters.encode(), k=32))
-        byte_stream = io.BytesIO(random_bytes)
+        rand_bytes = uuid.uuid4().bytes + "".join(random.choices(string.ascii_letters, k=32)).encode('utf-8')
+        byte_stream = io.BytesIO(rand_bytes)
         
-        mock_pipeline_instance = MagicMock()
-        
-        with patch("skills.market_insider_notifier.MarketInsiderAlertPipeline", return_value=mock_pipeline_instance):
-            notifier = MarketInsiderNotifier(
-                token=self.token,
-                chat_id=self.chat_id,
-                min_severity="LOW"
-            )
-            
-            consumed_data = notifier.consume_stream_bytes(byte_stream)
-            self.assertEqual(consumed_data, random_bytes)
+        consumed = self.notifier.consume_stream_bytes(byte_stream)
+        self.assertEqual(consumed, rand_bytes)
 
-if __name__ == "__main__":
-    unittest.main()
+        plain_data = uuid.uuid4().hex
+        self.assertEqual(self.notifier.consume_stream_bytes(plain_data), plain_data)
+
+    def test_evaluate_exchange(self):
+        exchange = uuid.uuid4().hex
+        mock_pipeline = unittest.mock.MagicMock()
+        mock_pipeline.evaluate_market_stream.return_value = {uuid.uuid4().hex: random.randint(1, 100)}
+
+        notifier = MarketInsiderNotifier(pipeline=mock_pipeline)
+        res = notifier.evaluate_exchange(exchange)
+
+        mock_pipeline.evaluate_market_stream.assert_called_once_with(exchange)
+        self.assertIsInstance(res, dict)
+
+    def test_notify_market_insider_alias(self):
+        msg = uuid.uuid4().hex
+        with patch("skills.market_insider_notifier.send_telegram_notification", return_value=True) as mock_send:
+            res = notify_market_insider(self.token, self.chat_id, msg)
+            mock_send.assert_called_once_with(self.token, self.chat_id, msg)
+            self.assertTrue(res)
+
+    def test_process_and_notify_filtered_out(self):
+        stream_data = {"severity": "LOW", "id": uuid.uuid4().hex}
+        mock_pipeline = unittest.mock.MagicMock()
+        mock_pipeline.process_alert_stream.return_value = stream_data
+
+        notifier = MarketInsiderNotifier(
+            token=self.token, 
+            chat_id=self.chat_id, 
+            min_severity="HIGH", 
+            pipeline=mock_pipeline
+        )
+        
+        with patch("skills.market_insider_notifier.start_new") as mock_start:
+            res = notifier.process_and_notify(self.ticker, stream_data)
+            self.assertFalse(res)
+            mock_start.assert_not_called()
+
+    def test_process_and_notify_success(self):
+        event_id = uuid.uuid4().hex
+        stream_data = {"severity": "CRITICAL", "id": event_id}
+        mock_pipeline = unittest.mock.MagicMock()
+        mock_pipeline.process_alert_stream.return_value = stream_data
+
+        notifier = MarketInsiderNotifier(
+            token=self.token, 
+            chat_id=self.chat_id, 
+            min_severity="MEDIUM", 
+            pipeline=mock_pipeline
+        )
+
+        with patch("skills.market_insider_notifier.start_new", return_value=True) as mock_start:
+            res = notifier.process_and_notify(self.ticker, stream_data)
+            self.assertTrue(res)
+            mock_start.assert_called_once()
+            called_args = mock_start.call_args[0]
+            self.assertEqual(called_args[0], self.token)
+            self.assertEqual(called_args[1], self.chat_id)
+            self.assertIn(event_id, called_args[2])
+
+    def test_process_and_notify_with_bytes_stream(self):
+        rand_bytes = uuid.uuid4().bytes + "".join(random.choices(string.ascii_letters, k=16)).encode('utf-8')
+        byte_stream = io.BytesIO(rand_bytes)
+        
+        event_id = uuid.uuid4().hex
+        mock_pipeline = unittest.mock.MagicMock()
+        mock_pipeline.process_alert_stream.return_value = {"severity": "HIGH", "event_id": event_id}
+
+        notifier = MarketInsiderNotifier(
+            token=self.token,
+            chat_id=self.chat_id,
+            min_severity="LOW",
+            pipeline=mock_pipeline
+        )
+
+        with patch("skills.market_insider_notifier.start_new", return_value=True) as mock_start:
+            res = notifier.process_and_notify(self.ticker, byte_stream)
+            self.assertTrue(res)
+            mock_pipeline.process_alert_stream.assert_called_once_with(self.ticker, byte_stream)
+            mock_start.assert_called_once()

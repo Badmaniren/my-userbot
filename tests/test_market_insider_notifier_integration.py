@@ -3,78 +3,81 @@ import uuid
 import random
 from skills.market_insider_notifier import MarketInsiderNotifier
 from skills.market_insider_alert_pipeline import MarketInsiderAlertPipeline
-from skills.market_portfolio_telegram_notifier import send_telegram_notification
+
 
 class TestMarketInsiderNotifierIntegration(unittest.TestCase):
     def setUp(self):
-        self.test_ticker = f"TICKER_{uuid.uuid4().hex[:6].upper()}"
-        self.test_token = "TEST_BOT_TOKEN"
-        self.test_chat_id = "123456789"
-        self.criticality_levels = ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
-        
+        self.token = f"test_token_{uuid.uuid4()}"
+        self.chat_id = f"test_chat_{random.randint(10000, 99999)}"
         self.pipeline = MarketInsiderAlertPipeline()
         self.notifier = MarketInsiderNotifier(
-            pipeline=self.pipeline,
-            telegram_sender=send_telegram_notification
+            token=self.token,
+            chat_id=self.chat_id,
+            min_severity="LOW",
+            pipeline=self.pipeline
         )
 
-    def test_end_to_end_anomaly_notification_flow(self):
-        # Генерируем случайные данные для имитации рыночной аномалии
-        anomaly_id = str(uuid.uuid4())
+    def test_integration_pipeline_and_notifier(self):
+        ticker = f"TICK_{uuid.uuid4().hex[:6].upper()}"
+        event_id = str(uuid.uuid4())
+        severities = ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+        selected_severity = random.choice(severities)
+
         raw_data = {
-            "id": anomaly_id,
-            "price_change": random.uniform(5.0, 25.0),
-            "volume_spike": random.choice([True, False]),
-            "timestamp": random.randint(1600000000, 1700000000)
+            "id": event_id,
+            "severity": selected_severity,
+            "description": f"Integration test anomaly {uuid.uuid4()}"
         }
-        
-        # Выбираем случайный уровень критичности для фильтрации
-        target_level = random.choice(self.criticality_levels)
-        
-        # Выполняем интеграционный вызов:
-        # 1. Pipeline обрабатывает поток данных
-        # 2. Notifier фильтрует и отправляет через Telegram
+
+        # Mocking or replacing the telegram sender to avoid real network calls while keeping actual internal execution flow
+        notifications_sent = []
+
+        def mock_telegram_sender(token, chat_id, message):
+            notifications_sent.append({
+                "token": token,
+                "chat_id": chat_id,
+                "message": message
+            })
+            return True
+
+        self.notifier.telegram_sender = mock_telegram_sender
+
         result = self.notifier.process_and_notify(
-            ticker=self.test_ticker,
+            ticker=ticker,
             raw_stream_data=raw_data,
-            min_criticality=target_level,
-            token=self.test_token,
-            chat_id=self.test_chat_id
+            min_criticality="LOW"
         )
-        
-        # Проверяем, что процесс завершился успешно
-        self.assertTrue(result, "Notifier failed to process and dispatch the alert.")
-        
-        # Проверяем, что данные были корректно переданы в pipeline
-        # (Проверка через состояние объекта, если pipeline сохраняет последнее состояние)
-        processed_data = self.pipeline.process_alert_stream(self.test_ticker, raw_data)
-        self.assertIsNotNone(processed_data, "Pipeline failed to process the generated anomaly data.")
-        
-        # Проверяем, что Telegram-нотификатор вернул True (успешная отправка)
-        # Используем реальный вызов функции, как того требует интеграционный тест
-        telegram_status = send_telegram_notification(
-            token=self.test_token,
-            chat_id=self.test_chat_id,
-            message=f"Alert for {self.test_ticker}: {anomaly_id} with level {target_level}"
-        )
-        self.assertTrue(telegram_status, "Telegram notifier failed to send the message.")
 
-    def test_filtering_logic_integrity(self):
-        # Проверка того, что фильтрация работает: 
-        # если уровень ниже требуемого, нотификация не должна уходить
-        low_level_data = {"id": str(uuid.uuid4()), "severity": "LOW"}
+        self.assertTrue(result)
+        self.assertEqual(len(notifications_sent), 1)
+        self.assertIn(ticker, notifications_sent[0]["message"])
+        self.assertIn(event_id, notifications_sent[0]["message"])
+        self.assertEqual(notifications_sent[0]["token"], self.token)
+        self.assertEqual(notifications_sent[0]["chat_id"], self.chat_id)
+
+    def test_integration_filtering_severity(self):
+        ticker = f"TICK_{uuid.uuid4().hex[:6].upper()}"
+        event_id = str(uuid.uuid4())
         
-        # Попытка отправить с фильтром CRITICAL
+        raw_data = {
+            "id": event_id,
+            "severity": "LOW",
+            "description": "Low severity event"
+        }
+
+        notifications_sent = []
+        self.notifier.telegram_sender = lambda t, c, m: notifications_sent.append(m) or True
+
+        # Устанавливаем минимальный порог HIGH, при этом событие имеет LOW -> уведомление не должно уйти
         result = self.notifier.process_and_notify(
-            ticker=self.test_ticker,
-            raw_stream_data=low_level_data,
-            min_criticality="CRITICAL",
-            token=self.test_token,
-            chat_id=self.test_chat_id
+            ticker=ticker,
+            raw_stream_data=raw_data,
+            min_criticality="HIGH"
         )
-        
-        # Ожидаем False, так как фильтр отсек данные
-        self.assertFalse(result, "Notifier allowed low-criticality data through strict filter.")
 
-if __name__ == '__main__':
+        self.assertFalse(result)
+        self.assertEqual(len(notifications_sent), 0)
+
+
+if __name__ == "__main__":
     unittest.main()

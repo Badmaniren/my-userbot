@@ -3,8 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-t module: tests.test_market_portfolio_event_intelligence_hub
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+ эскалацию
 
 ## market_portfolio_monitor (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=3)
@@ -330,3 +329,6 @@ t module: tests.test_market_portfolio_event_intelligence_hub
 ## market_insider_notifier (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_anomaly_detector (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

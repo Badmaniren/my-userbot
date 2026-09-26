@@ -16,3 +16,4 @@
 - market_insider_activity_tracker: Доработка market_insider_activity_tracker для окончательной стабилизации и безупречного прохождения тестов античита
 - market_portfolio_audit_compliance_hub: Стабилизация и рефакторинг market_portfolio_audit_compliance_hub для исправления ошибки run_compliance_export и разблокировки комплаенс-аудита подозрительных операций
 - market_portfolio_monitor: Проведение точечного рефакторинга market_portfolio_monitor без нарушения античита для успешного прохождения тестов и продвижения эпика инсайдерского мониторинга.
+- market_anomaly_detector: Создание модуля market_anomaly_detector без античит-нарушений для интеграции с инсайдерским мониторингом в рамках эпика

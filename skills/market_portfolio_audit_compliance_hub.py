@@ -60,7 +60,7 @@ class MarketPortfolioAuditComplianceHub:
 
     def export_audit_logs(self, export_path):
         res = self.audit_exporter.export_audit_logs(export_path)
-        if res is False or res is None:
+        if res is None:
             if not os.path.exists(export_path):
                 with open(export_path, "w", encoding="utf-8") as f:
                     f.write("{}")

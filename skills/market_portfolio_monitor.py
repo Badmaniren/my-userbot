@@ -106,13 +106,11 @@ def run_market_telegram_pipeline(storage_file, symbol, chat_id, url, telegram_to
 
 def export_audit_logs(storage_file=None):
     """Экспорт аудиторских логов с явным возвратом результата."""
-    if storage_file and os.path.exists(storage_file):
-        try:
-            with open(storage_file, "r", encoding="utf-8") as f:
-                content = f.read()
-                if not content:
-                    return False
-                return True
-        except (IOError, json.JSONDecodeError, UnicodeDecodeError):
-            return False
-    return False
+    if not storage_file or not os.path.exists(storage_file):
+        return False
+    try:
+        with open(storage_file, "r", encoding="utf-8") as f:
+            content = f.read()
+            return bool(content and content.strip())
+    except (IOError, UnicodeDecodeError):
+        return False

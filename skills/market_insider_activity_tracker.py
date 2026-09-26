@@ -115,7 +115,18 @@ class DBStorage:
         return None
 
 
-MarketInsiderActivityTrackerModuleIdempotentProxy = MarketInsiderActivityTrackerModuleAPI
+def market_insider_activity_tracker(raw_data):
+    """Отслеживание инсайдерской активности."""
+    if isinstance(raw_data, list):
+        insider_trades = []
+        for item in raw_data:
+            if isinstance(item, dict) and (item.get("insider_flag") or item.get("volume", 0) > 100000):
+                insider_trades.append(item)
+        return insider_trades
+    elif isinstance(raw_data, dict):
+        res = MarketInsiderActivityTrackerModuleAPI.track_activity(raw_data)
+        return [raw_data] if res.get("anomaly_detected") else []
+    return []
 
-globals()["market_insider_activity_tracker"] = MarketInsiderActivityTrackerModuleAPI
-globals()["DBStorage"] = DBStorage
+
+MarketInsiderActivityTrackerModuleIdempotentProxy = MarketInsiderActivityTrackerModuleAPI

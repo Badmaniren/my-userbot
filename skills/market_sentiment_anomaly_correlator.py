@@ -14,11 +14,18 @@ class MarketSentimentAnomalyCorrelator:
     def correlate(self, ticker, news_snippet):
         try:
             anomaly_result = self.anomaly_detector.detect(ticker)
-            sentiment_result = self.news_analyzer.analyze(news_snippet)
+            
+            # Ensure news_snippet passed to analyzer is a string
+            if isinstance(news_snippet, dict):
+                news_text = news_snippet.get("text", news_snippet.get("content", str(news_snippet)))
+            else:
+                news_text = str(news_snippet)
+                
+            sentiment_result = self.news_analyzer.analyze(news_text)
             
             # Simple correlation index calculation based on anomaly score and sentiment
-            anomaly_score = anomaly_result.get("anomaly_score", anomaly_result.get("score", 1.0))
-            sentiment_score = sentiment_result.get("sentiment", sentiment_result.get("score", 0.0))
+            anomaly_score = anomaly_result.get("anomaly_score", anomaly_result.get("score", 1.0)) if isinstance(anomaly_result, dict) else 1.0
+            sentiment_score = sentiment_result.get("sentiment", sentiment_result.get("score", 0.0)) if isinstance(sentiment_result, dict) else 0.0
             correlation_index = round(float(anomaly_score) * abs(float(sentiment_score)), 4)
 
             return {
@@ -42,6 +49,8 @@ class MarketSentimentAnomalyCorrelator:
             self.news_analyzer.process_and_store(content)
             return True
         except Exception as e:
+            if isinstance(e, MarketSentimentAnomalyException):
+                raise e
             raise MarketSentimentAnomalyException(str(e))
 
 

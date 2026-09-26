@@ -41,7 +41,15 @@ class MarketSentimentRiskHub:
 
     def process_stream(self, stream_source):
         if hasattr(self.sentiment_analyzer, "batch_analyze_stream"):
-            self.sentiment_analyzer.batch_analyze_stream(stream_source)
+            try:
+                self.sentiment_analyzer.batch_analyze_stream(stream_source)
+            except (TypeError, AttributeError):
+                if hasattr(stream_source, "read"):
+                    stream_source.seek(0)
+                    content = stream_source.read()
+                    if isinstance(content, bytes):
+                        content = content.decode('utf-8', errors='ignore')
+                    self.sentiment_analyzer.analyze(content)
         if hasattr(self.anomaly_detector, "analyze_stream"):
             self.anomaly_detector.analyze_stream(stream_source)
         return {"stream_status": "PROCESSED", "risk_index": 0.0, "risk_score": 0.0}

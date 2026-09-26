@@ -12,7 +12,7 @@ class MarketInsiderAlertPipeline:
     def process_alert_stream(self, ticker, raw_stream_data):
         activity_result = self.tracker.analyze_activity(raw_stream_data)
         
-        if activity_result.get("status") != "suspicious":
+        if activity_result.get("status") not in ("suspicious", "ALERT"):
             return None
 
         anomaly_result = self.detector.detect(ticker)

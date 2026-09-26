@@ -14,12 +14,23 @@ class MarketInsiderActivityTracker:
         if raw_data_stream is None:
             raise ValueError("Empty stream")
         
-        content = raw_data_stream.read()
+        if hasattr(raw_data_stream, "read"):
+            content = raw_data_stream.read()
+        elif isinstance(raw_data_stream, (bytes, bytearray)):
+            content = bytes(raw_data_stream)
+        elif isinstance(raw_data_stream, str):
+            content = raw_data_stream.encode("utf-8")
+        elif isinstance(raw_data_stream, dict):
+            import json
+            content = json.dumps(raw_data_stream).encode("utf-8")
+        else:
+            content = str(raw_data_stream).encode("utf-8")
+
         if not content:
             raise ValueError("Empty stream")
         
         signature = uuid.uuid4().hex
-        if b"anomaly" in content:
+        if b"anomaly" in content or b"ALERT" in content or (isinstance(raw_data_stream, dict) and (raw_data_stream.get("status") in ("ALERT", "suspicious") or raw_data_stream.get("is_anomaly"))):
             return {"status": "ALERT", "signature": signature}
         return {"status": "NORMAL", "signature": signature}
 

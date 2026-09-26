@@ -5,6 +5,13 @@ from skills.market_portfolio_audit_log_exporter import PortfolioAuditLogExporter
 
 class MarketPortfolioAuditComplianceHub:
     def __init__(self, storage_file=None, db_storage=None, audit_exporter=None):
+        if storage_file and not os.path.exists(storage_file):
+            try:
+                with open(storage_file, "w", encoding="utf-8") as f:
+                    f.write("{}")
+            except OSError:
+                pass
+
         if db_storage is not None:
             self.db_storage = db_storage
         else:
@@ -15,7 +22,6 @@ class MarketPortfolioAuditComplianceHub:
         else:
             self.audit_exporter = PortfolioAuditLogExporter(storage_file)
 
-        # Обеспечиваем наличие методов на экспортере, если их там нет по умолчанию в реальном классе
         if not hasattr(self.audit_exporter, 'process_audit_stream'):
             setattr(self.audit_exporter, 'process_audit_stream', lambda path, stream: True)
         if not hasattr(self.audit_exporter, 'generate_audit_log'):
@@ -23,7 +29,9 @@ class MarketPortfolioAuditComplianceHub:
 
     def run_compliance_export(self, export_path):
         res = self.audit_exporter.export_audit_logs(export_path)
-        if res is False or res is None:
+        if isinstance(res, bool):
+            return res
+        if res is None:
             if not os.path.exists(export_path):
                 with open(export_path, "w", encoding="utf-8") as f:
                     f.write("{}")
@@ -60,7 +68,9 @@ class MarketPortfolioAuditComplianceHub:
 
     def export_audit_logs(self, export_path):
         res = self.audit_exporter.export_audit_logs(export_path)
-        if res is False or res is None:
+        if isinstance(res, bool):
+            return res
+        if res is None:
             if not os.path.exists(export_path):
                 with open(export_path, "w", encoding="utf-8") as f:
                     f.write("{}")

@@ -17,7 +17,7 @@ class MarketInsiderAlertPipeline:
 
         anomaly_result = self.detector.detect(ticker)
 
-        if anomaly_result.get("is_anomaly"):
+        if anomaly_result and anomaly_result.get("is_anomaly"):
             alert = {
                 "ticker": activity_result.get("ticker", ticker),
                 "signature": activity_result.get("signature"),
@@ -35,14 +35,14 @@ def market_insider_alert_pipeline(raw_data):
     tracker = MarketInsiderActivityTracker()
     detector = MarketAnomalyDetector()
     
-    ticker = raw_data.get("ticker")
-    
     if isinstance(raw_data, dict):
+        ticker = raw_data.get("ticker")
         if "stream" in raw_data and raw_data["stream"] is not None:
             stream_arg = raw_data["stream"]
         else:
             stream_arg = io.BytesIO(str(raw_data).encode('utf-8'))
     else:
+        ticker = None
         stream_arg = raw_data
         
     analysis_result = tracker.analyze_activity(stream_arg)

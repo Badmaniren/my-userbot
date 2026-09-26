@@ -4,7 +4,11 @@ import db_storage
 def aggregate_news(source_url):
     client = market_parser.ParserClient()
     stream = client.fetch_feed(source_url)
-    content = stream.read().decode('utf-8')
+    raw_data = stream.read()
+    try:
+        content = raw_data.decode('utf-8')
+    except UnicodeDecodeError:
+        content = raw_data.decode('latin-1', errors='ignore')
     db = db_storage.DatabaseConnection()
     article_id = db.save_article(content)
     return {"id": article_id, "source": source_url}

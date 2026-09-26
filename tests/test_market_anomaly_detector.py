@@ -1,101 +1,105 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import random
 import uuid
-import string
 import io
 import requests
-
-from skills.market_anomaly_detector import MarketAnomalyDetector
+from skills.market_anomaly_detector import MarketAnomalyDetector, market_anomaly_detector
 
 class TestMarketAnomalyDetector(unittest.TestCase):
-
     def setUp(self):
         self.detector = MarketAnomalyDetector()
-        self.random_ticker = ''.join(random.choices(string.ascii_uppercase, k=5))
-        self.random_exchange = ''.join(random.choices(string.ascii_uppercase, k=4))
-        self.random_error_msg = uuid.uuid4().hex
-        self.random_volume = random.randint(10000, 99999999)
+        self.random_ticker = f"TICK_{uuid.uuid4().hex[:6].upper()}"
+        self.random_exchange = f"EX_{uuid.uuid4().hex[:6].upper()}"
+        self.random_volume = random.randint(1000, 100000)
         self.random_price = round(random.uniform(1.0, 1000.0), 2)
 
-    def test_detect_anomaly_success(self):
-        mock_market_parser = MagicMock()
-        expected_data = {
+    def test_detect_success(self):
+        mock_data = {
             "ticker": self.random_ticker,
-            "exchange": self.random_exchange,
+            "anomaly_flag": True,
             "volume": self.random_volume,
             "price": self.random_price,
-            "anomaly_flag": True
+            "exchange": self.random_exchange
         }
-        mock_market_parser.fetch_market_data.return_value = expected_data
-
-        with patch('skills.market_anomaly_detector.market_parser', mock_market_parser):
+        with patch("skills.market_anomaly_detector.market_parser.fetch_market_data", return_value=mock_data) as mock_fetch:
             result = self.detector.detect(self.random_ticker)
+            mock_fetch.assert_called_once_with(self.random_ticker)
+            self.assertTrue(result["is_anomaly"])
+            self.assertEqual(result["ticker"], self.random_ticker)
+            self.assertEqual(result["volume"], self.random_volume)
+            self.assertEqual(result["price"], self.random_price)
+            self.assertEqual(result["exchange"], self.random_exchange)
 
-        self.assertTrue(result["is_anomaly"])
-        self.assertEqual(result["ticker"], self.random_ticker)
-        self.assertEqual(result["volume"], self.random_volume)
-        self.assertEqual(result["price"], self.random_price)
-        mock_market_parser.fetch_market_data.assert_called_once_with(self.random_ticker)
+    def test_detect_empty_or_invalid_data(self):
+        for invalid_data in [None, {}, []]:
+            with patch("skills.market_anomaly_detector.market_parser.fetch_market_data", return_value=invalid_data):
+                result = self.detector.detect(self.random_ticker)
+                self.assertFalse(result["is_anomaly"])
+                self.assertEqual(result["ticker"], self.random_ticker)
+                self.assertIn("warning", result)
 
-    def test_detect_anomaly_no_anomaly(self):
-        mock_market_parser = MagicMock()
-        normal_volume = random.randint(100, 5000)
-        expected_data = {
+    def test_detect_missing_fields(self):
+        incomplete_data = {
             "ticker": self.random_ticker,
-            "exchange": self.random_exchange,
-            "volume": normal_volume,
+            "volume": self.random_volume
+        }
+        with patch("skills.market_anomaly_detector.market_parser.fetch_market_data", return_value=incomplete_data):
+            result = self.detector.detect(self.random_ticker)
+            self.assertFalse(result["is_anomaly"])
+            self.assertEqual(result["ticker"], self.random_ticker)
+            self.assertEqual(result["warning"], "Missing required fields")
+
+    def test_detect_request_exception(self):
+        err_msg = f"Network failure {uuid.uuid4().hex[:4]}"
+        with patch("skills.market_anomaly_detector.market_parser.fetch_market_data", side_effect=requests.exceptions.RequestException(err_msg)):
+            result = self.detector.detect(self.random_ticker)
+            self.assertFalse(result["is_anomaly"])
+            self.assertEqual(result["error"], err_msg)
+
+    def test_detect_generic_exception(self):
+        err_msg = f"Fatal error {uuid.uuid4().hex[:4]}"
+        with patch("skills.market_anomaly_detector.market_parser.fetch_market_data", side_effect=Exception(err_msg)):
+            result = self.detector.detect(self.random_ticker)
+            self.assertFalse(result["is_anomaly"])
+            self.assertEqual(result["error"], err_msg)
+
+    def test_analyze_stream(self):
+        random_bytes = f"stream_data_{uuid.uuid4().hex}".encode('utf-8')
+        mock_stream = io.BytesIO(random_bytes)
+        with patch("skills.market_anomaly_detector.market_parser.get_raw_stream", return_value=mock_stream) as mock_get_stream:
+            result = self.detector.analyze_stream(self.random_exchange)
+            mock_get_stream.assert_called_once_with(self.random_exchange)
+            self.assertEqual(result["exchange"], self.random_exchange)
+            self.assertEqual(result["status"], "analyzed")
+
+    def test_market_anomaly_detector_function_high_volume(self):
+        high_vol = random.randint(50001, 200000)
+        data = {
+            "volume": high_vol,
             "price": self.random_price,
-            "anomaly_flag": False
+            "symbol": self.random_ticker
         }
-        mock_market_parser.fetch_market_data.return_value = expected_data
+        result = market_anomaly_detector(data)
+        self.assertTrue(result["is_anomaly"])
+        self.assertEqual(result["symbol"], self.random_ticker)
+        self.assertEqual(result["volume"], high_vol)
+        self.assertEqual(result["price"], self.random_price)
+        self.assertEqual(result["anomaly_score"], float(high_vol) / 10000.0)
 
-        with patch('skills.market_anomaly_detector.market_parser', mock_market_parser):
-            result = self.detector.detect(self.random_ticker)
-
-        self.assertFalse(result["is_anomaly"])
-        self.assertEqual(result["volume"], normal_volume)
-        mock_market_parser.fetch_market_data.assert_called_once_with(self.random_ticker)
-
-    def test_detect_anomaly_parser_error_handling(self):
-        mock_market_parser = MagicMock()
-        mock_market_parser.fetch_market_data.side_effect = requests.exceptions.RequestException(self.random_error_msg)
-
-        with patch('skills.market_anomaly_detector.market_parser', mock_market_parser):
-            result = self.detector.detect(self.random_ticker)
-
-        self.assertIn("error", result)
-        self.assertIn(self.random_error_msg, result["error"])
-        self.assertFalse(result.get("is_anomaly", False))
-
-    def test_stream_volume_spike_detector_with_io(self):
-        mock_market_parser = MagicMock()
-        random_payload = uuid.uuid4().bytes + str(self.random_volume).encode('utf-8')
-        mock_stream = io.BytesIO(random_payload)
-        
-        mock_market_parser.get_raw_stream.return_value = mock_stream
-
-        with patch('skills.market_anomaly_detector.market_parser', mock_market_parser):
-            stream_result = self.detector.analyze_stream(self.random_exchange)
-
-        self.assertIsNotNone(stream_result)
-        self.assertTrue(isinstance(stream_result, dict))
-        mock_market_parser.get_raw_stream.assert_called_once_with(self.random_exchange)
-
-    def test_anomaly_detector_missing_data_fields(self):
-        mock_market_parser = MagicMock()
-        malformed_data = {
-            "ticker": self.random_ticker,
-            "malformed_key": uuid.uuid4().hex
+    def test_market_anomaly_detector_function_low_volume(self):
+        low_vol = random.randint(0, 50000)
+        data = {
+            "volume": low_vol,
+            "price": self.random_price,
+            "ticker": self.random_ticker
         }
-        mock_market_parser.fetch_market_data.return_value = malformed_data
-
-        with patch('skills.market_anomaly_detector.market_parser', mock_market_parser):
-            result = self.detector.detect(self.random_ticker)
-
+        result = market_anomaly_detector(data)
         self.assertFalse(result["is_anomaly"])
-        self.assertEqual(result.get("ticker"), self.random_ticker)
-        self.assertIn("warning", result)
+        self.assertEqual(result["symbol"], self.random_ticker)
+        self.assertEqual(result["volume"], low_vol)
+        self.assertEqual(result["price"], self.random_price)
+        self.assertEqual(result["anomaly_score"], 0.1)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

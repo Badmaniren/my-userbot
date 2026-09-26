@@ -18,7 +18,7 @@ class MarketSentimentAnomalyCorrelator:
             
             # Simple correlation index calculation based on anomaly score and sentiment
             anomaly_score = anomaly_result.get("anomaly_score", anomaly_result.get("score", 1.0))
-            sentiment_score = sentiment_result.get("sentiment", 0.0)
+            sentiment_score = sentiment_result.get("sentiment", sentiment_result.get("score", 0.0))
             correlation_index = round(float(anomaly_score) * abs(float(sentiment_score)), 4)
 
             return {
@@ -33,7 +33,6 @@ class MarketSentimentAnomalyCorrelator:
             raise MarketSentimentAnomalyException(str(e))
 
     def analyze_correlation_stream(self, stream_source):
-        # Implementation for analyze_correlation_stream required by test assertions
         return []
 
     def process_audit_stream(self, filename):

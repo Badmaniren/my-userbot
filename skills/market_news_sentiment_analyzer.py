@@ -94,3 +94,23 @@ def parse_market_news(raw_news_snippet: str) -> dict:
         "identifier": identifier,
         "raw_text": raw_news_snippet
     }
+
+
+def analyze(raw_news_or_id):
+    if isinstance(raw_news_or_id, dict):
+        return float(raw_news_or_id.get("score", 0.0))
+    analyzer = MarketNewsSentimentAnalyzer()
+    res = analyzer.analyze(str(raw_news_or_id))
+    return res.get("score", 0.0)
+
+
+def market_news_sentiment_analyzer(portfolio_id=None, score=0.0, **kwargs):
+    val = float(score) if score is not None else 0.0
+    return {
+        "portfolio_id": portfolio_id,
+        "score": val,
+        "sentiment": "bullish" if val > 0 else ("bearish" if val < 0 else "neutral")
+    }
+
+
+market_news_sentiment_analyzer.analyze = analyze

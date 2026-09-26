@@ -1,3 +1,5 @@
+import json
+import os
 import requests
 from skills.market_news_sentiment_analyzer import MarketNewsSentimentAnalyzer
 from skills.market_portfolio_digest import PortfolioDigestManager
@@ -64,6 +66,10 @@ def generate_sentiment_portfolio_digest(
         sentiment = analyzer.analyze(raw_news)
     else:
         sentiment = analyzer.analyze(f"Market update for {symbol}")
+
+    if not os.path.exists(storage_file):
+        with open(storage_file, 'w', encoding='utf-8') as f:
+            json.dump({symbol: {"status": "initialized", "url": url}}, f)
 
     digest = manager.compile_digest(symbol, url)
     manager.render_and_send(symbol, telegram_token, chat_id)

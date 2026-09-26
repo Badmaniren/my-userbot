@@ -1,5 +1,7 @@
 from skills.market_insider_activity_tracker import MarketInsiderActivityTracker, DBStorage
 from skills.market_anomaly_detector import MarketAnomalyDetector
+import uuid
+import io
 
 
 class MarketInsiderAlertPipeline:
@@ -30,14 +32,20 @@ def market_insider_alert_pipeline(raw_data):
     detector = MarketAnomalyDetector()
     
     ticker = raw_data.get("ticker")
-    analysis_result = tracker.analyze_activity(raw_data)
+    
+    # Ensure raw_data can be handled whether it's a dict or a stream
+    if isinstance(raw_data, dict):
+        stream_arg = io.BytesIO(str(raw_data).encode('utf-8'))
+    else:
+        stream_arg = raw_data
+        
+    analysis_result = tracker.analyze_activity(stream_arg)
     anomaly_result = detector.detect(ticker)
     
-    import uuid
     alert_result = {
         "alert_id": uuid.uuid4().hex,
         "ticker": ticker,
-        "signature": raw_data.get("signature"),
+        "signature": raw_data.get("signature") if isinstance(raw_data, dict) else None,
         "analysis": analysis_result,
         "anomaly": anomaly_result
     }

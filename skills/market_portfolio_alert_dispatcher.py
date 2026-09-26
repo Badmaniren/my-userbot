@@ -1,5 +1,6 @@
 import os
 import io
+import json
 
 from skills import market_portfolio_monitor
 from skills import market_portfolio_valuation
@@ -8,6 +9,11 @@ try:
     from skills import market_report_generator
 except ImportError:
     market_report_generator = None
+
+try:
+    from skills import market_insider_activity_tracker
+except ImportError:
+    market_insider_activity_tracker = None
 
 def send_telegram_notification(token, chat_id, message):
     """
@@ -24,11 +30,12 @@ def dispatch_portfolio_alerts(
     storage_file, 
     severity_level="MEDIUM", 
     min_threshold=None, 
-    channels=None
+    channels=None,
+    **kwargs
 ):
     """
-    Связывает мониторинг портфеля, оценку стоимости и телеграм-уведомления
-    с учетом фильтрации по критичности и настраиваемых каналов отправки.
+    Связывает мониторинг портфеля, оценку стоимости, трекинг инсайдерской активности
+    и телеграм-уведомления с учетом фильтрации по критичности.
     """
     if channels is None:
         channels = ["telegram"]
@@ -63,7 +70,7 @@ def dispatch_portfolio_alerts(
         dirname = os.path.dirname(os.path.abspath(storage_file))
         if dirname:
             os.makedirs(dirname, exist_ok=True)
-        with open(storage_file, 'w') as f:
+        with open(storage_file, 'w', encoding='utf-8') as f:
             f.write('{}')
 
     # 3. Формирование и отправка уведомления (если канал 'telegram' активен)
@@ -71,24 +78,62 @@ def dispatch_portfolio_alerts(
         message = f"Portfolio Alert:\n{summary}\nPNL: {pnl}"
         send_telegram_notification(telegram_token, chat_id, message)
     
-    return {
+    # 4. Проверка инсайдерской активности, если доступен модуль
+    insider_info = None
+    if market_insider_activity_tracker is not None:
+        tracker_api = getattr(market_insider_activity_tracker, "MarketInsiderActivityTrackerModuleAPI", None)
+        if tracker_api is not None and hasattr(tracker_api, "track_activity"):
+            try:
+                insider_info = tracker_api.track_activity({
+                    "ticker_id": symbol,
+                    "volume": kwargs.get("volume", 0),
+                    "anomaly_multiplier": kwargs.get("anomaly_multiplier", 1.0)
+                })
+            except (AttributeError, TypeError, ValueError):
+                insider_info = None
+
+    result = {
         "summary": summary,
         "pnl": pnl,
         "status": "dispatched"
     }
+    if insider_info is not None:
+        result["insider_activity"] = insider_info
 
-def process_stream_alert(alert_id):
+    return result
+
+def process_stream_alert(alert_id=None, storage_file=None):
     """
     Обрабатывает потоковый дамп отчета.
     """
     if market_report_generator is not None:
-        generator_instance = market_report_generator.MarketReportGenerator()
+        try:
+            generator_instance = market_report_generator.MarketReportGenerator(storage_file=storage_file)
+        except TypeError:
+            generator_instance = market_report_generator.MarketReportGenerator()
+
         if hasattr(generator_instance, "get_raw_stream_dump"):
+            dump_data = None
             try:
-                return generator_instance.get_raw_stream_dump(alert_id)
+                dump_data = generator_instance.get_raw_stream_dump(alert_id)
             except TypeError:
                 try:
-                    return generator_instance.get_raw_stream_dump()
+                    dump_data = generator_instance.get_raw_stream_dump()
                 except TypeError:
-                    return io.BytesIO(b"")
+                    dump_data = {}
+
+            if dump_data is not None:
+                if isinstance(dump_data, io.BytesIO):
+                    return dump_data
+                elif isinstance(dump_data, bytes):
+                    return io.BytesIO(dump_data)
+                elif isinstance(dump_data, str):
+                    return io.BytesIO(dump_data.encode("utf-8"))
+                else:
+                    try:
+                        encoded = json.dumps(dump_data, ensure_ascii=False).encode("utf-8")
+                        return io.BytesIO(encoded)
+                    except (TypeError, ValueError):
+                        return io.BytesIO(str(dump_data).encode("utf-8"))
+
     return io.BytesIO(b"")

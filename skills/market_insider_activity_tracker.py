@@ -117,5 +117,16 @@ class DBStorage:
 
 MarketInsiderActivityTrackerModuleIdempotentProxy = MarketInsiderActivityTrackerModuleAPI
 
-globals()["market_insider_activity_tracker"] = MarketInsiderActivityTrackerModuleAPI
+def market_insider_activity_tracker(data=None, *args, **kwargs):
+    if data is None:
+        return []
+    if isinstance(data, list):
+        return [MarketInsiderActivityTrackerModuleAPI.track_activity(item) for item in data if isinstance(item, dict)]
+    elif isinstance(data, dict):
+        return MarketInsiderActivityTrackerModuleAPI.track_activity(data)
+    return MarketInsiderActivityTrackerModuleAPI.track_activity({})
+
+def track_insider_activity(data=None, *args, **kwargs):
+    return market_insider_activity_tracker(data, *args, **kwargs)
+
 globals()["DBStorage"] = DBStorage

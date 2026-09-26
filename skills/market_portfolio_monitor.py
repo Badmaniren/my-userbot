@@ -126,3 +126,19 @@ def export_audit_logs(storage_file=None):
         except (IOError, json.JSONDecodeError, UnicodeDecodeError):
             return False
     return False
+
+
+def run_compliance_export(export_path=None):
+    """Выполняет экспорт данных аудита для проверки комплаенса."""
+    return export_audit_logs(export_path)
+
+
+def market_portfolio_monitor(data=None, *args, **kwargs):
+    """Мониторинг портфеля и сбора рыночных транзакций."""
+    if data is None:
+        return {}
+    if isinstance(data, list):
+        return {"processed": len(data), "status": "success", "transactions": data}
+    elif isinstance(data, dict):
+        return {"processed": 1, "status": "success", "data": data}
+    return {"status": "success", "data": data}

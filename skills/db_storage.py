@@ -55,3 +55,14 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+_risk_assessments = {}
+
+
+def save_risk_assessment(portfolio_id: str, assessment: dict):
+    _risk_assessments[portfolio_id] = assessment
+
+
+def get_risk_assessment(portfolio_id: str):
+    return _risk_assessments.get(portfolio_id)

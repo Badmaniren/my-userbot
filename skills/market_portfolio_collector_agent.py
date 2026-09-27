@@ -97,3 +97,12 @@ def start_new(symbol: str, url: str, telegram_token: str, chat_id: str, storage_
         chat_id,
         storage_file
     )
+
+
+def collect_portfolio_data(portfolio_id, assets=None):
+    if assets is None:
+        assets = []
+    return {
+        "portfolio_id": portfolio_id,
+        "assets": list(assets)
+    }

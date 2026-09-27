@@ -19,6 +19,20 @@ class MarketPortfolioTaxCalculator:
                 return parsed["stream_id"]
         return None
 
+    def evaluate_capital_gains(self, portfolio_id: str = None, ticker: str = None, current_price: float = 0.0) -> dict:
+        gain = 0.0
+        if hasattr(self, 'db_storage') and self.db_storage:
+            pos = self.db_storage.get_portfolio(portfolio_id)
+            if pos:
+                purchase_price = pos.get("purchase_price", 0.0)
+                shares = pos.get("shares", 0)
+                gain = (current_price - purchase_price) * shares
+        return {
+            "portfolio_id": portfolio_id,
+            "ticker": ticker,
+            "gain": gain
+        }
+
 
 def calculate_portfolio_taxes(portfolio_id, user_id, deals, holding_period, dividends):
     total_profit = 0.0
@@ -34,3 +48,6 @@ def calculate_portfolio_taxes(portfolio_id, user_id, deals, holding_period, divi
         "user_id": user_id,
         "total_tax_due": total_tax_due
     }
+
+
+market_portfolio_tax_calculator = MarketPortfolioTaxCalculator()

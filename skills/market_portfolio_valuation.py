@@ -13,6 +13,20 @@ class PortfolioValuation:
             return db_storage.load_data(file_to_load)
         return {}
 
+    def calculate_value(self, portfolio_id: str = None) -> dict:
+        data = self.load_data(portfolio_id)
+        total = 0.0
+        if isinstance(data, dict):
+            for k, v in data.items():
+                if isinstance(v, dict):
+                    qty = v.get("quantity", 0) or v.get("shares", 0)
+                    price = v.get("price", 0) or v.get("buy_price", 0) or v.get("purchase_price", 0)
+                    total += qty * price
+        return {
+            "portfolio_id": portfolio_id,
+            "total_value": total
+        }
+
     def evaluate_portfolio(self, url):
         portfolio = self.load_data(self.storage_file)
         if not portfolio:
@@ -66,3 +80,6 @@ class PortfolioValuation:
 
     def calculate_portfolio_pnl(self, url):
         return self.get_total_summary(url)
+
+
+market_portfolio_valuation = PortfolioValuation()

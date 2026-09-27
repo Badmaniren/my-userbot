@@ -3,7 +3,18 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-гой, передан на эскалацию
+ тесты и влит в main
+
+## market_portfolio_monitor (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_audit_compliance_hub (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_insider_alert_pipeline (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_anomaly_detector (create) — раундов: 4
 - Античит поймал: ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'market_parser'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.market_parser import ...'
@@ -294,9 +305,4 @@
 
 ## market_portfolio_risk_assessment (create) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_macro_indicator (create) — раундов: 4
-- Античит поймал: АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'extractor_tool_1790087207' глобальной переменной!
-- Последняя ошибка перед фиксом: ERROR: test_evaluate_macro_risk (tests.test_market_portfolio_macro_indicator.TestMarketPortfolioMacroIndicator.test_evaluate_macro_risk)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

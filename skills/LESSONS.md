@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_alert_dispatcher (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+, передан на эскалацию
 
 ## market_portfolio_alert_dispatcher (refactor) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (failures=1)
@@ -311,4 +307,8 @@
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_reporter (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_recovery_coordinator_bridge (refactor) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main

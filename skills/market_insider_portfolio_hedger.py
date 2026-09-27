@@ -36,18 +36,18 @@ class DbStorage:
         self._init_db()
 
     def _get_conn(self):
-        if self.connection_string.startswith("sqlite:///"):
-            path_abs = self.connection_string[9:]
-            path_rel = self.connection_string[10:]
-            if os.path.exists(path_abs) or os.path.exists(os.path.dirname(path_abs)):
-                path = path_abs
-            else:
-                path = path_rel
-            return sqlite3.connect(path)
+        if self.connection_string.startswith("sqlite:////"):
+            path = self.connection_string[10:]
         elif self.connection_string.startswith("sqlite://"):
             path = self.connection_string[9:]
-            return sqlite3.connect(path)
-        return sqlite3.connect(self.connection_string)
+            if path.startswith("/") and not os.path.exists(path):
+                rel_path = path[1:]
+                parent_dir = os.path.dirname(rel_path) or "."
+                if os.path.exists(rel_path) or os.path.exists(parent_dir):
+                    path = rel_path
+        else:
+            path = self.connection_string
+        return sqlite3.connect(path)
 
     def _init_db(self):
         conn = self._get_conn()

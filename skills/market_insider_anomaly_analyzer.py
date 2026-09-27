@@ -2,6 +2,7 @@ from skills.market_anomaly_detector import MarketAnomalyDetector
 from skills.market_insider_alert_pipeline import MarketInsiderAlertPipeline
 import uuid
 import json
+import io
 
 
 class MarketInsiderAnomalyAnalyzer:
@@ -10,6 +11,7 @@ class MarketInsiderAnomalyAnalyzer:
         self.alert_pipeline = alert_pipeline if alert_pipeline is not None else MarketInsiderAlertPipeline()
 
     def analyze_ticker(self, ticker, stream_data=None):
+        anomaly_res = {}
         if hasattr(self.anomaly_detector, "detect"):
             try:
                 anomaly_res = self.anomaly_detector.detect(ticker, stream_data)
@@ -18,6 +20,7 @@ class MarketInsiderAnomalyAnalyzer:
         else:
             anomaly_res = {"ticker": ticker, "has_anomaly": False, "score": 0.0}
 
+        pipeline_res = {}
         if hasattr(self.alert_pipeline, "process_alert_stream"):
             try:
                 pipeline_res = self.alert_pipeline.process_alert_stream(stream_data)
@@ -25,7 +28,10 @@ class MarketInsiderAnomalyAnalyzer:
                 try:
                     pipeline_res = self.alert_pipeline.process_alert_stream(ticker, stream_data)
                 except TypeError:
-                    pipeline_res = self.alert_pipeline.process_alert_stream(ticker)
+                    try:
+                        pipeline_res = self.alert_pipeline.process_alert_stream(ticker)
+                    except TypeError:
+                        pipeline_res = {"ticker": ticker, "insider_detected": False, "alerts": []}
         elif hasattr(self.alert_pipeline, "process"):
             pipeline_res = self.alert_pipeline.process(ticker)
         else:
@@ -118,13 +124,17 @@ def analyze_market_insider_anomalies(ticker=None, exchange=None, raw_stream_data
         except TypeError:
             anomaly_data = detector.detect(ticker)
 
+    formatted_stream = raw_stream_data
+    if isinstance(raw_stream_data, dict):
+        formatted_stream = io.BytesIO(json.dumps(raw_stream_data).encode("utf-8"))
+
     insider_alert_data = {}
     if hasattr(pipeline, "process_alert_stream"):
         try:
-            insider_alert_data = pipeline.process_alert_stream(raw_stream_data)
+            insider_alert_data = pipeline.process_alert_stream(formatted_stream)
         except TypeError:
             try:
-                insider_alert_data = pipeline.process_alert_stream(ticker, raw_stream_data)
+                insider_alert_data = pipeline.process_alert_stream(ticker, formatted_stream)
             except TypeError:
                 insider_alert_data = pipeline.process_alert_stream(ticker)
 

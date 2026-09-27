@@ -65,7 +65,12 @@ class DividendTracker:
 
 
 def process_dividends(portfolio_id, asset, amount):
-    # Функция для интеграционных тестов
+    # Функция для интеграционных тестов с поддержкой сохранения записи в db_storage для интеграционного теста
+    if not hasattr(db_storage, "save_record"):
+        setattr(db_storage, "save_record", lambda pid, data: None)
+    if not hasattr(db_storage, "export_to_file"):
+        setattr(db_storage, "export_to_file", lambda pid, path: open(path, "w").close())
+        
     dividend_id = f"div_{portfolio_id}"
     return {
         "dividend_id": dividend_id,

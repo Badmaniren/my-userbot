@@ -1,218 +1,173 @@
-import io
+import unittest
+from unittest.mock import patch, MagicMock
+import uuid
 import random
 import string
-import sys
-import unittest
-from unittest.mock import MagicMock, patch
-import uuid
+import json
+import io
+import os
 
-import skills.market_insider_anomaly_analyzer as analyzer_module
+from skills.market_insider_anomaly_analyzer import (
+    MarketInsiderAnomalyAnalyzer,
+    market_insider_anomaly_analyzer,
+    evaluate_exchange_anomalies,
+    analyze_market_insider_anomalies
+)
 
 
 class TestMarketInsiderAnomalyAnalyzer(unittest.TestCase):
+
     def setUp(self):
-        self.random_ticker = f"TCK_{uuid.uuid4().hex[:6].upper()}"
-        self.random_exchange = f"EXCH_{uuid.uuid4().hex[:8].upper()}"
-        self.random_id = uuid.uuid4().hex
-        self.random_score = round(random.uniform(0.75, 0.99), 4)
-        self.random_volume = random.randint(10000, 5000000)
+        self.ticker = "".join(random.choices(string.ascii_uppercase, k=5))
+        self.exchange = "".join(random.choices(string.ascii_uppercase, k=6))
+        self.stream_data = {
+            "stream_id": uuid.uuid4().hex,
+            "volume": random.randint(1000, 1000000),
+            "price": round(random.uniform(1.0, 500.0), 2)
+        }
 
-    def _get_analyzer_instance(self, detector_mock=None, pipeline_mock=None):
-        if hasattr(analyzer_module, "MarketInsiderAnomalyAnalyzer"):
-            cls = getattr(analyzer_module, "MarketInsiderAnomalyAnalyzer")
-            try:
-                if detector_mock is not None or pipeline_mock is not None:
-                    return cls(anomaly_detector=detector_mock, alert_pipeline=pipeline_mock)
-                return cls()
-            except TypeError:
-                return cls()
-        return None
-
-    def _invoke_ticker_analysis(self, instance, ticker, stream_data=None):
-        if instance is not None:
-            for method_name in ["analyze_ticker", "analyze", "detect", "correlate", "process"]:
-                if hasattr(instance, method_name):
-                    method = getattr(instance, method_name)
-                    try:
-                        return method(ticker, stream_data)
-                    except TypeError:
-                        return method(ticker)
-        if hasattr(analyzer_module, "market_insider_anomaly_analyzer"):
-            func = getattr(analyzer_module, "market_insider_anomaly_analyzer")
-            try:
-                return func(ticker=ticker, raw_stream_data=stream_data)
-            except TypeError:
-                return func({"ticker": ticker, "raw_stream_data": stream_data})
-        raise AttributeError("No ticker analysis method or function found in market_insider_anomaly_analyzer")
-
-    def _invoke_stream_analysis(self, instance, exchange):
-        if instance is not None:
-            for method_name in [
-                "analyze_stream",
-                "evaluate_exchange",
-                "analyze_exchange",
-                "evaluate_market_stream",
-                "correlate_exchange",
-            ]:
-                if hasattr(instance, method_name):
-                    return getattr(instance, method_name)(exchange)
-        if hasattr(analyzer_module, "evaluate_exchange_anomalies"):
-            return getattr(analyzer_module, "evaluate_exchange_anomalies")(exchange)
-        raise AttributeError("No stream analysis method found in market_insider_anomaly_analyzer")
-
-    def test_imports_and_components_exist(self):
-        has_class = hasattr(analyzer_module, "MarketInsiderAnomalyAnalyzer")
-        has_func = hasattr(analyzer_module, "market_insider_anomaly_analyzer")
-        self.assertTrue(
-            has_class or has_func,
-            "Module must provide MarketInsiderAnomalyAnalyzer class or market_insider_anomaly_analyzer function",
-        )
-
-    def test_coordinated_suspicious_activity_detected(self):
-        anomaly_id = f"ANOM_{uuid.uuid4().hex}"
-        alert_id = f"ALERT_{uuid.uuid4().hex}"
-        anomaly_metric = round(random.uniform(0.8, 0.99), 3)
-
-        mock_detector_result = {
-            "ticker": self.random_ticker,
+    def test_analyzer_init_and_coordination_logic(self):
+        mock_detector = MagicMock()
+        anomaly_id = uuid.uuid4().hex
+        mock_detector.detect.return_value = {
             "has_anomaly": True,
-            "anomaly_id": anomaly_id,
-            "score": anomaly_metric,
+            "score": round(random.uniform(0.5, 1.0), 2),
+            "anomaly_id": anomaly_id
         }
-        mock_pipeline_result = {
-            "ticker": self.random_ticker,
+
+        mock_pipeline = MagicMock()
+        alert_id = uuid.uuid4().hex
+        mock_pipeline.process_alert_stream.return_value = {
             "insider_detected": True,
-            "alerts": [{"alert_id": alert_id, "confidence": anomaly_metric, "volume": self.random_volume}],
+            "alerts": [{"alert_id": alert_id, "severity": "HIGH"}]
         }
 
-        with patch("skills.market_insider_anomaly_analyzer.MarketAnomalyDetector") as mock_det_cls, \
-             patch("skills.market_insider_anomaly_analyzer.MarketInsiderAlertPipeline") as mock_pipe_cls:
+        analyzer = MarketInsiderAnomalyAnalyzer(anomaly_detector=mock_detector, alert_pipeline=mock_pipeline)
+        result = analyzer.analyze_ticker(self.ticker, self.stream_data)
 
-            det_instance = mock_det_cls.return_value
-            det_instance.detect.return_value = mock_detector_result
+        self.assertTrue(result["is_coordinated"])
+        self.assertTrue(result["suspicious"])
+        self.assertTrue(result["coordinated_activity"])
+        self.assertEqual(result["ticker"], self.ticker)
+        self.assertEqual(result["anomaly_id"], anomaly_id)
+        self.assertEqual(result["alert_id"], alert_id)
+        self.assertIn("anomaly_data", result)
+        self.assertIn("insider_alert_data", result)
 
-            pipe_instance = mock_pipe_cls.return_value
-            pipe_instance.process_alert_stream.return_value = mock_pipeline_result
+    def test_analyzer_no_anomaly(self):
+        mock_detector = MagicMock()
+        mock_detector.detect.return_value = {"has_anomaly": False, "score": 0.0}
 
-            analyzer = self._get_analyzer_instance(detector_mock=det_instance, pipeline_mock=pipe_instance)
-            raw_payload = io.BytesIO(f"raw_stream_{uuid.uuid4().hex}".encode("utf-8"))
+        mock_pipeline = MagicMock()
+        mock_pipeline.process_alert_stream.return_value = {"insider_detected": False, "alerts": []}
 
-            result = self._invoke_ticker_analysis(analyzer, self.random_ticker, raw_payload)
+        analyzer = MarketInsiderAnomalyAnalyzer(anomaly_detector=mock_detector, alert_pipeline=mock_pipeline)
+        result = analyzer.analyze(self.ticker, self.stream_data)
 
-            self.assertIsNotNone(result)
-            serialized_result = str(result)
-            self.assertIn(
-                self.random_ticker,
-                serialized_result,
-                f"Expected ticker {self.random_ticker} in correlated output",
-            )
+        self.assertFalse(result["is_coordinated"])
+        self.assertFalse(result["suspicious"])
+        self.assertEqual(result["ticker"], self.ticker)
+        self.assertNotIn("anomaly_id", result)
+        self.assertNotIn("alert_id", result)
 
-            is_coordinated = (
-                result.get("is_coordinated")
-                or result.get("suspicious")
-                or result.get("coordinated_activity")
-                or result.get("flagged")
-                or (result.get("status") in ["coordinated", "suspicious", "high_risk", "ALERT"])
-            )
-            self.assertTrue(
-                is_coordinated,
-                "Both anomaly and insider alert present; activity must be flagged as coordinated/suspicious",
-            )
+    def test_analyzer_fallback_methods(self):
+        mock_detector = MagicMock()
+        mock_detector.detect.side_effect = TypeError("Signature mismatch")
+        mock_detector.detect.return_value = {"has_anomaly": True}
 
-            if isinstance(result, dict) and "anomaly_id" in serialized_result:
-                self.assertIn(anomaly_id, serialized_result)
-            if isinstance(result, dict) and "alert_id" in serialized_result:
-                self.assertIn(alert_id, serialized_result)
+        mock_pipeline = MagicMock()
+        mock_pipeline.process.return_value = {"insider_detected": True, "alerts": []}
 
-    def test_benign_activity_when_no_anomalies_or_alerts(self):
-        clean_ticker = f"CLN_{uuid.uuid4().hex[:6].upper()}"
+        analyzer = MarketInsiderAnomalyAnalyzer(anomaly_detector=mock_detector, alert_pipeline=mock_pipeline)
+        
+        for alias_method in [analyzer.detect, analyzer.correlate, analyzer.process]:
+            res = alias_method(self.ticker, self.stream_data)
+            self.assertIsInstance(res, dict)
+            self.assertEqual(res["ticker"], self.ticker)
 
-        mock_detector_result = {
-            "ticker": clean_ticker,
-            "has_anomaly": False,
-            "score": round(random.uniform(0.01, 0.1), 3),
+    def test_analyze_stream_and_aliases(self):
+        mock_detector = MagicMock()
+        random_items = [uuid.uuid4().hex, random.randint(1, 100)]
+        mock_detector.analyze_stream.return_value = random_items
+
+        mock_pipeline = MagicMock()
+        random_insider = {"status": uuid.uuid4().hex}
+        mock_pipeline.evaluate_market_stream.return_value = random_insider
+
+        analyzer = MarketInsiderAnomalyAnalyzer(anomaly_detector=mock_detector, alert_pipeline=mock_pipeline)
+
+        for method in [
+            analyzer.analyze_stream,
+            analyzer.evaluate_exchange,
+            analyzer.analyze_exchange,
+            analyzer.evaluate_market_stream,
+            analyzer.correlate_exchange
+        ]:
+            res = method(self.exchange)
+            self.assertEqual(res["exchange"], self.exchange)
+            self.assertEqual(res["anomaly_items"], random_items)
+            self.assertEqual(res["insider_items"], random_insider)
+
+    def test_helper_market_insider_anomaly_analyzer(self):
+        dict_payload = {
+            "ticker": self.ticker,
+            "raw_stream_data": self.stream_data
         }
-        mock_pipeline_result = {
-            "ticker": clean_ticker,
-            "insider_detected": False,
-            "alerts": [],
-        }
+        with patch("skills.market_insider_anomaly_analyzer.MarketInsiderAnomalyAnalyzer") as MockAnalyzerClass:
+            mock_instance = MockAnalyzerClass.return_value
+            expected_dict = {"ticker": self.ticker, "status": uuid.uuid4().hex}
+            mock_instance.analyze_ticker.return_value = expected_dict
 
-        with patch("skills.market_insider_anomaly_analyzer.MarketAnomalyDetector") as mock_det_cls, \
-             patch("skills.market_insider_anomaly_analyzer.MarketInsiderAlertPipeline") as mock_pipe_cls:
+            res1 = market_insider_anomaly_analyzer(dict_payload)
+            self.assertEqual(res1, expected_dict)
+            mock_instance.analyze_ticker.assert_called_once_with(self.ticker, self.stream_data)
 
-            det_instance = mock_det_cls.return_value
-            det_instance.detect.return_value = mock_detector_result
+            mock_instance.analyze_ticker.reset_mock()
+            res2 = market_insider_anomaly_analyzer(ticker=self.ticker, raw_stream_data=self.stream_data)
+            self.assertEqual(res2, expected_dict)
+            mock_instance.analyze_ticker.assert_called_once_with(self.ticker, self.stream_data)
 
-            pipe_instance = mock_pipe_cls.return_value
-            pipe_instance.process_alert_stream.return_value = mock_pipeline_result
+    def test_evaluate_exchange_anomalies_helper(self):
+        with patch("skills.market_insider_anomaly_analyzer.MarketInsiderAnomalyAnalyzer") as MockAnalyzerClass:
+            mock_instance = MockAnalyzerClass.return_value
+            expected_res = {"exchange": self.exchange, "data": uuid.uuid4().hex}
+            mock_instance.analyze_stream.return_value = expected_res
 
-            analyzer = self._get_analyzer_instance(detector_mock=det_instance, pipeline_mock=pipe_instance)
-            result = self._invoke_ticker_analysis(analyzer, clean_ticker, None)
+            res = evaluate_exchange_anomalies(self.exchange)
+            self.assertEqual(res, expected_res)
+            mock_instance.analyze_stream.assert_called_once_with(self.exchange)
 
-            self.assertIsNotNone(result)
-            is_coordinated = (
-                result.get("is_coordinated")
-                or result.get("suspicious")
-                or result.get("coordinated_activity")
-                or False
+    def test_analyze_market_insider_anomalies_report_generation(self):
+        with patch("skills.market_insider_anomaly_analyzer.MarketAnomalyDetector") as MockDetectorClass, \
+             patch("skills.market_insider_anomaly_analyzer.MarketInsiderAlertPipeline") as MockPipelineClass, \
+             patch("builtins.open", create=True) as mock_open:
+
+            mock_detector = MockDetectorClass.return_value
+            mock_anomaly_data = {"has_anomaly": True, "anomaly_id": uuid.uuid4().hex}
+            mock_detector.detect.return_value = mock_anomaly_data
+
+            mock_pipeline = MockPipelineClass.return_value
+            mock_alert_data = {"insider_detected": True, "alerts": [{"alert_id": uuid.uuid4().hex}]}
+            mock_pipeline.process_alert_stream.return_value = mock_alert_data
+
+            mock_file = MagicMock()
+            mock_open.return_value.__enter__.return_value = mock_file
+
+            result = analyze_market_insider_anomalies(
+                ticker=self.ticker,
+                exchange=self.exchange,
+                raw_stream_data=self.stream_data
             )
-            self.assertFalse(is_coordinated, "Normal trading activity must not be flagged as coordinated")
 
-    def test_exchange_stream_correlation_aggregation(self):
-        stream_token = f"STREAM_{uuid.uuid4().hex}"
-        anomaly_items = [
-            {"ticker": f"TCK_{uuid.uuid4().hex[:4].upper()}", "score": round(random.uniform(0.7, 0.95), 2)}
-            for _ in range(3)
-        ]
-        insider_items = {
-            "exchange": self.random_exchange,
-            "token": stream_token,
-            "events_count": random.randint(5, 50),
-        }
+            self.assertEqual(result["ticker"], self.ticker)
+            self.assertEqual(result["exchange"], self.exchange)
+            self.assertTrue(result["coordinated_activity_detected"])
+            self.assertIn("correlation_id", result)
+            self.assertEqual(result["anomaly_data"], mock_anomaly_data)
+            self.assertEqual(result["insider_alert_data"], mock_alert_data)
 
-        with patch("skills.market_insider_anomaly_analyzer.MarketAnomalyDetector") as mock_det_cls, \
-             patch("skills.market_insider_anomaly_analyzer.MarketInsiderAlertPipeline") as mock_pipe_cls:
-
-            det_instance = mock_det_cls.return_value
-            det_instance.analyze_stream.return_value = anomaly_items
-
-            pipe_instance = mock_pipe_cls.return_value
-            pipe_instance.evaluate_market_stream.return_value = insider_items
-
-            analyzer = self._get_analyzer_instance(detector_mock=det_instance, pipeline_mock=pipe_instance)
-            result = self._invoke_stream_analysis(analyzer, self.random_exchange)
-
-            self.assertIsNotNone(result)
-            res_str = str(result)
-            self.assertIn(self.random_exchange, res_str)
-            det_instance.analyze_stream.assert_called_with(self.random_exchange)
-            pipe_instance.evaluate_market_stream.assert_called_with(self.random_exchange)
-
-    def test_dependency_injection_custom_instances(self):
-        custom_detector = MagicMock()
-        custom_pipeline = MagicMock()
-        ret_val_det = {"score": self.random_score, "has_anomaly": False}
-        ret_val_pipe = {"alerts": [], "insider_detected": False}
-
-        custom_detector.detect.return_value = ret_val_det
-        custom_pipeline.process_alert_stream.return_value = ret_val_pipe
-
-        analyzer = self._get_analyzer_instance(
-            detector_mock=custom_detector,
-            pipeline_mock=custom_pipeline,
-        )
-
-        test_ticker = f"DI_{uuid.uuid4().hex[:5].upper()}"
-        raw_io = io.BytesIO(f"payload_{uuid.uuid4().hex}".encode("latin1"))
-
-        _ = self._invoke_ticker_analysis(analyzer, test_ticker, raw_io)
-
-        custom_detector.detect.assert_called()
-        self.assertTrue(
-            custom_pipeline.process_alert_stream.called or custom_pipeline.evaluate_market_stream.called
-        )
-
-
-if __name__ == "__main__":
-    unittest.main()
+            mock_open.assert_called_once()
+            called_filename = mock_open.call_args[0][0]
+            self.assertTrue(called_filename.startswith("insider_anomaly_report_"))
+            self.assertTrue(called_filename.endswith(".json"))
+            mock_file.write.assert_called()

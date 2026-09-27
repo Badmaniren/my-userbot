@@ -66,3 +66,39 @@ class MarketParser:
             with open(filename, 'r', encoding='utf-8') as f:
                 return json.load(f)
         return {}
+
+
+class ParserClient:
+    def __init__(self):
+        self._mock_data = {}
+        self._mock_raw_stream = None
+
+    def set_mock_data(self, data):
+        self._mock_data = data
+
+    def set_mock_raw_stream(self, stream):
+        self._mock_raw_stream = stream
+
+    def fetch_feed(self, url=None):
+        return self._mock_data
+
+    def fetch_raw_stream(self, url=None):
+        return self._mock_raw_stream
+
+
+def parse_market_data(payload=None, *args, **kwargs):
+    if payload is None:
+        return {}
+    return payload
+
+
+def parse_macro_indicators(payload=None, *args, **kwargs):
+    if payload is None:
+        return {}
+    return payload
+
+
+def market_parser(data=None, *args, **kwargs):
+    if data is None:
+        return {}
+    return data

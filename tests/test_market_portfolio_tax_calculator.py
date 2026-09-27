@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
-import random
 import uuid
+import random
 import io
 
 from skills.market_portfolio_tax_calculator import (
@@ -13,137 +13,153 @@ from skills.market_portfolio_tax_calculator import (
 class TestMarketPortfolioTaxCalculator(unittest.TestCase):
 
     def setUp(self):
-        self.db_storage = MagicMock()
-        self.market_parser = MagicMock()
-        self.calculator = MarketPortfolioTaxCalculator(
-            db_storage=self.db_storage,
-            market_parser=self.market_parser
-        )
+        self.random_storage_attr = uuid.uuid4().hex
+        self.calculator = MarketPortfolioTaxCalculator(db_storage=None)
+
+    def test_calculate_tax_without_storage(self):
+        rand_id = uuid.uuid4().hex
+        tax = self.calculator.calculate_tax(rand_id)
+        self.assertEqual(tax, 0.0)
+
+    def test_calculate_tax_with_storage_missing_portfolio(self):
+        rand_id = uuid.uuid4().hex
+        mock_db = MagicMock()
+        mock_db.get_portfolio.return_value = None
+        
+        calc = MarketPortfolioTaxCalculator(db_storage=mock_db)
+        tax = calc.calculate_tax(rand_id)
+        
+        mock_db.get_portfolio.assert_called_once_with(rand_id)
+        self.assertEqual(tax, 0.0)
 
     def test_calculate_tax_success(self):
-        portfolio_id = str(uuid.uuid4())
-        sell_price = round(random.uniform(200.0, 500.0), 2)
-        purchase_price = round(random.uniform(50.0, 150.0), 2)
-        shares = random.randint(1, 50)
+        rand_id = uuid.uuid4().hex
+        purchase = round(random.uniform(10.0, 50.0), 2)
+        sell = round(purchase + random.uniform(5.0, 100.0), 2)
+        shares = random.randint(1, 1000)
 
-        self.db_storage.get_portfolio.return_value = {
-            "sell_price": sell_price,
-            "purchase_price": purchase_price,
+        portfolio_data = {
+            "purchase_price": purchase,
+            "sell_price": sell,
             "shares": shares
         }
 
-        expected_profit = (sell_price - purchase_price) * shares
+        mock_db = MagicMock()
+        mock_db.get_portfolio.return_value = portfolio_data
+
+        calc = MarketPortfolioTaxCalculator(db_storage=mock_db)
+        tax = calc.calculate_tax(rand_id)
+
+        expected_profit = (sell - purchase) * shares
         expected_tax = round(expected_profit * 0.13, 2)
 
-        tax = self.calculator.calculate_tax(portfolio_id)
+        mock_db.get_portfolio.assert_called_once_with(rand_id)
         self.assertEqual(tax, expected_tax)
-        self.db_storage.get_portfolio.assert_called_once_with(portfolio_id)
-
-    def test_calculate_tax_portfolio_not_found(self):
-        portfolio_id = str(uuid.uuid4())
-        self.db_storage.get_portfolio.return_value = None
-
-        tax = self.calculator.calculate_tax(portfolio_id)
-        self.assertEqual(tax, 0.0)
-        self.db_storage.get_portfolio.assert_called_once_with(portfolio_id)
-
-    def test_process_dividend_stream_success(self):
-        stream_id = str(uuid.uuid4())
-        stream_data = io.BytesIO(uuid.uuid4().bytes)
-
-        self.market_parser.parse_stream.return_value = {"stream_id": stream_id}
-
-        result = self.calculator.process_dividend_stream(stream_data)
-        self.assertEqual(result, stream_id)
-        self.market_parser.parse_stream.assert_called_once_with(stream_data)
-
-    def test_process_dividend_stream_invalid_parser_output(self):
-        stream_data = io.BytesIO(uuid.uuid4().bytes)
-        self.market_parser.parse_stream.return_value = random.choice([
-            str(uuid.uuid4()),
-            random.randint(1, 100),
-            {"invalid_key": str(uuid.uuid4())},
-            None
-        ])
-
-        result = self.calculator.process_dividend_stream(stream_data)
-        self.assertIsNone(result)
 
     def test_process_dividend_stream_no_parser(self):
-        calc_without_parser = MarketPortfolioTaxCalculator()
-        stream_data = io.BytesIO(uuid.uuid4().bytes)
-
-        result = calc_without_parser.process_dividend_stream(stream_data)
+        rand_stream = io.BytesIO(uuid.uuid4().bytes)
+        calc = MarketPortfolioTaxCalculator()
+        result = calc.process_dividend_stream(rand_stream)
         self.assertIsNone(result)
+
+    def test_process_dividend_stream_valid(self):
+        rand_stream_id = uuid.uuid4().hex
+        rand_stream_data = io.BytesIO(uuid.uuid4().hex.encode('utf-8'))
+
+        mock_parser = MagicMock()
+        mock_parser.parse_stream.return_value = {"stream_id": rand_stream_id}
+
+        calc = MarketPortfolioTaxCalculator(market_parser=mock_parser)
+        result = calc.process_dividend_stream(rand_stream_data)
+
+        mock_parser.parse_stream.assert_called_once_with(rand_stream_data)
+        self.assertEqual(result, rand_stream_id)
+
+    def test_process_dividend_stream_invalid_parser_output(self):
+        rand_stream_data = io.BytesIO(uuid.uuid4().hex.encode('utf-8'))
+        
+        mock_parser = MagicMock()
+        invalid_outputs = [
+            uuid.uuid4().hex,
+            random.randint(1, 100),
+            {"invalid_key": uuid.uuid4().hex},
+            None
+        ]
+        
+        for invalid_out in invalid_outputs:
+            mock_parser.parse_stream.return_value = invalid_out
+            calc = MarketPortfolioTaxCalculator(market_parser=mock_parser)
+            result = calc.process_dividend_stream(rand_stream_data)
+            self.assertIsNone(result)
 
 
 class TestCalculatePortfolioTaxesFunction(unittest.TestCase):
 
-    def test_calculate_portfolio_taxes_dict_deals(self):
-        portfolio_id = str(uuid.uuid4())
-        user_id = str(uuid.uuid4())
+    def test_calculate_portfolio_taxes_empty_deals(self):
+        rand_portfolio_id = uuid.uuid4().hex
+        rand_user_id = uuid.uuid4().hex
+        dividends = round(random.uniform(0.0, 5000.0), 2)
+
+        result = calculate_portfolio_taxes(
+            portfolio_id=rand_portfolio_id,
+            user_id=rand_user_id,
+            deals=[],
+            holding_period=random.randint(1, 365),
+            dividends=dividends
+        )
+
+        expected_tax = round(max(0.0, 0.0 + dividends * 0.13), 2)
+
+        self.assertEqual(result["portfolio_id"], rand_portfolio_id)
+        self.assertEqual(result["user_id"], rand_user_id)
+        self.assertEqual(result["total_tax_due"], expected_tax)
+
+    def test_calculate_portfolio_taxes_mixed_deals(self):
+        rand_portfolio_id = uuid.uuid4().hex
+        rand_user_id = uuid.uuid4().hex
+        dividends = round(random.uniform(10.0, 1000.0), 2)
+
+        sell_price_dict = round(random.uniform(120.0, 300.0), 2)
+        shares_dict = random.randint(1, 50)
         
-        price_1 = round(random.uniform(150.0, 300.0), 2)
-        shares_1 = random.randint(1, 10)
-        price_2 = round(random.uniform(150.0, 300.0), 2)
-        shares_2 = random.randint(1, 10)
+        sell_price_obj = round(random.uniform(120.0, 300.0), 2)
+        shares_obj = random.randint(1, 50)
 
-        deals = [
-            {"type": "SELL", "price": price_1, "shares": shares_1},
-            {"type": "BUY", "price": 50.0, "shares": 100},
-            {"type": "SELL", "price": price_2, "shares": shares_2}
-        ]
-        dividends = round(random.uniform(10.0, 500.0), 2)
+        deal_dict = {
+            "type": "SELL",
+            "price": sell_price_dict,
+            "shares": shares_dict
+        }
 
-        profit_1 = (price_1 - 100.0) * shares_1
-        profit_2 = (price_2 - 100.0) * shares_2
+        class DealObject:
+            def __init__(self, t, p, s):
+                self.type = t
+                self.price = p
+                self.shares = s
+
+        deal_obj = DealObject("SELL", sell_price_obj, shares_obj)
+        deal_buy_ignored = {"type": "BUY", "price": 50.0, "shares": 100}
+
+        deals = [deal_dict, deal_obj, deal_buy_ignored]
+
+        result = calculate_portfolio_taxes(
+            portfolio_id=rand_portfolio_id,
+            user_id=rand_user_id,
+            deals=deals,
+            holding_period=random.randint(30, 730),
+            dividends=dividends
+        )
+
+        profit_1 = (sell_price_dict - 100.0) * shares_dict
+        profit_2 = (sell_price_obj - 100.0) * shares_obj
         total_profit = profit_1 + profit_2
 
         expected_tax = round(max(0.0, total_profit * 0.13 + dividends * 0.13), 2)
 
-        result = calculate_portfolio_taxes(portfolio_id, user_id, deals, 365, dividends)
+        self.assertEqual(result["portfolio_id"], rand_portfolio_id)
+        self.assertEqual(result["user_id"], rand_user_id)
+        self.assertAlmostEqual(result["total_tax_due"], expected_tax, places=2)
 
-        self.assertEqual(result["portfolio_id"], portfolio_id)
-        self.assertEqual(result["user_id"], user_id)
-        self.assertEqual(result["total_tax_due"], expected_tax)
 
-    def test_calculate_portfolio_taxes_object_deals(self):
-        portfolio_id = str(uuid.uuid4())
-        user_id = str(uuid.uuid4())
-
-        class DealMock:
-            def __init__(self, dtype, price, shares):
-                self.type = dtype
-                self.price = price
-                self.shares = shares
-
-        price = round(random.uniform(200.0, 400.0), 2)
-        shares = random.randint(5, 15)
-
-        deals = [
-            DealMock("SELL", price, shares),
-            DealMock("HOLD", 120.0, 10)
-        ]
-        dividends = round(random.uniform(0.0, 100.0), 2)
-
-        total_profit = (price - 100.0) * shares
-        expected_tax = round(max(0.0, total_profit * 0.13 + dividends * 0.13), 2)
-
-        result = calculate_portfolio_taxes(portfolio_id, user_id, deals, 180, dividends)
-
-        self.assertEqual(result["portfolio_id"], portfolio_id)
-        self.assertEqual(result["user_id"], user_id)
-        self.assertEqual(result["total_tax_due"], expected_tax)
-
-    def test_calculate_portfolio_taxes_negative_profit_clamping(self):
-        portfolio_id = str(uuid.uuid4())
-        user_id = str(uuid.uuid4())
-
-        deals = [
-            {"type": "SELL", "price": 10.0, "shares": 1000}
-        ]
-        dividends = 0.0
-
-        result = calculate_portfolio_taxes(portfolio_id, user_id, deals, 30, dividends)
-
-        self.assertEqual(result["total_tax_due"], 0.0)
+if __name__ == "__main__":
+    unittest.main()

@@ -1,10 +1,9 @@
 import os
 from skills.market_portfolio_stress_scenario_pipeline import (
     PortfolioStressScenarioPipeline,
-    run_stress_scenario_pipeline,
-    run_pipeline
+    run_stress_scenario_pipeline
 )
-from skills.market_portfolio_monitor import start_new
+from skills.market_portfolio_monitor import start_new, run_pipeline
 
 class StressRecoveryCoordinatorBridge:
     def __init__(self, storage_file: str = "stress_recovery.db"):
@@ -56,10 +55,8 @@ def run_stress_recovery_coordinator_pipeline(
 ) -> dict:
     coordinator = StressRecoveryCoordinatorBridge(storage_file=storage_file)
     
-    # Интеграционный сценарий инициализирует и выполняет пайплайн стресс-тестирования и мониторинга
     stress_result = run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts)
     
-    # Убедимся, что файл хранилища создается (интеграционный тест проверяет это)
     if not os.path.exists(storage_file):
         with open(storage_file, "w") as f:
             f.write("{}")

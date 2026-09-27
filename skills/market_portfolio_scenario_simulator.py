@@ -18,8 +18,8 @@ class PortfolioScenarioSimulator:
         self.storage_file = storage_file
 
     def load_data(self, storage_file):
+        logger.info("Loading portfolio data from %s", storage_file)
         try:
-            logger.info("Loading portfolio data from %s", storage_file)
             with open(storage_file, 'r') as f:
                 return json.load(f)
         except (IOError, json.JSONDecodeError) as e:
@@ -46,9 +46,9 @@ class PortfolioScenarioSimulator:
             if symbol in data:
                 target = data[symbol]
             elif "assets" in data and isinstance(data["assets"], list):
-                target = next((item for item in data["assets"] if item.get("symbol") == symbol), None)
+                target = next((item for item in data["assets"] if isinstance(item, dict) and item.get("symbol") == symbol), None)
             elif "holdings" in data and isinstance(data["holdings"], list):
-                target = next((item for item in data["holdings"] if item.get("symbol") == symbol), None)
+                target = next((item for item in data["holdings"] if isinstance(item, dict) and item.get("symbol") == symbol), None)
             elif data.get("symbol") == symbol:
                 target = data
         elif isinstance(data, list):

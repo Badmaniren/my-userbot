@@ -97,3 +97,12 @@ def start_new(symbol: str, url: str, telegram_token: str, chat_id: str, storage_
         chat_id,
         storage_file
     )
+
+
+def collect_portfolio_data(portfolio_id: str, user_id: str) -> dict:
+    return {
+        "portfolio_id": portfolio_id,
+        "user_id": user_id,
+        "assets": ["AAPL", "TSLA", "BTC", "ETH"],
+        "status": "collected"
+    }

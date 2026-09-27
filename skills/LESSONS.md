@@ -3,7 +3,14 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- тесты и влит в main
+редан на эскалацию
+
+## market_insider_alert_pipeline (compose) — раундов: 4
+- Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/tests/test_market_portfolio_audit_compliance_hub.py", line 52, in test_run_compliance_export_boolean
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_insider_activity_tracker (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_monitor (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=2)
@@ -301,8 +308,4 @@
 ## market_portfolio_risk_engine (create) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_risk_assessment (create) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

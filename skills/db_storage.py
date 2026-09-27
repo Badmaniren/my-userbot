@@ -55,3 +55,13 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+_in_memory_reports = {}
+
+def save_risk_report(report_id: str, report: dict) -> bool:
+    _in_memory_reports[report_id] = report
+    return True
+
+def get_report(report_id: str) -> dict:
+    return _in_memory_reports.get(report_id, {})

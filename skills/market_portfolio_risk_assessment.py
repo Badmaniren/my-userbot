@@ -1,6 +1,6 @@
 import json
+import math
 import uuid
-import numpy as np
 
 try:
     from skills import market_anomaly_detector
@@ -45,7 +45,10 @@ class PortfolioRiskAssessor:
         if not returns:
             return 0.0
 
-        volatility = float(np.std(returns)) if hasattr(np, 'std') else 0.1
+        mean = sum(returns) / len(returns)
+        variance = sum((x - mean) ** 2 for x in returns) / len(returns)
+        volatility = math.sqrt(variance)
+
         risk_score = min(max(volatility * 2.0, 0.0), 1.0)
         return float(risk_score)
 

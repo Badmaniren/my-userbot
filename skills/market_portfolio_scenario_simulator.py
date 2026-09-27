@@ -48,6 +48,8 @@ class PortfolioScenarioSimulator:
         }
 
     def run_stress_test(self, symbol, shifts):
+        if isinstance(shifts, (int, float)):
+            shifts = [shifts]
         report = []
         for shift in shifts:
             try:

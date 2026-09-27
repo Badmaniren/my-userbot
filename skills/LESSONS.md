@@ -3,7 +3,15 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-едан на эскалацию
+(failures=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_monitor (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_anomaly_detector (create) — раундов: 4
+- Последняя ошибка перед фиксом: Traceback (most recent call last):
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_alert_dispatcher (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: Ran 254 tests in 1.693s
@@ -308,8 +316,3 @@
 
 ## market_portfolio_stress_scenario_pipeline (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_recovery_hub (compose) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
-- Последняя ошибка перед фиксом: stream.read()
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

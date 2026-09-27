@@ -1,138 +1,133 @@
 import unittest
-from unittest.mock import patch, MagicMock
-import io
-import random
+from unittest.mock import MagicMock, patch
 import uuid
-import string
+import random
+import io
+import requests
+
 from skills.market_portfolio_dividend_tracker import (
     DividendTracker,
     DividendTrackerException,
+    process_dividends
 )
+from skills import db_storage
 
 
 class TestMarketPortfolioDividendTracker(unittest.TestCase):
+
     def setUp(self):
-        self.db_storage = MagicMock()
-        self.tax_calculator = MagicMock()
-        self.api_gateway = MagicMock()
+        self.db_mock = MagicMock()
+        self.tax_calc_mock = MagicMock()
+        self.api_gateway_mock = MagicMock()
         self.tracker = DividendTracker(
-            db_storage=self.db_storage,
-            tax_calculator=self.tax_calculator,
-            api_gateway=self.api_gateway,
+            db_storage=self.db_mock,
+            tax_calculator=self.tax_calc_mock,
+            api_gateway=self.api_gateway_mock
         )
 
     def test_calculate_projected_dividends_success(self):
-        asset_ticker = "".join(random.choices(string.ascii_uppercase, k=4))
+        ticker = f"TICK_{uuid.uuid4().hex[:6].upper()}"
         shares_count = random.randint(10, 1000)
+        tax_rate = round(random.uniform(0.05, 0.20), 2)
         dividend_per_share = round(random.uniform(1.0, 50.0), 2)
-        tax_rate = round(random.uniform(0.05, 0.30), 2)
 
-        expected_gross = shares_count * dividend_per_share
-        expected_tax = expected_gross * tax_rate
-        expected_net = expected_gross - expected_tax
-
-        self.api_gateway.get_dividend_info.return_value = {
-            "ticker": asset_ticker,
-            "dividend_per_share": dividend_per_share,
-            "currency": "USD",
+        self.api_gateway_mock.get_dividend_info.return_value = {
+            "dividend_per_share": dividend_per_share
         }
-        self.tax_calculator.calculate_tax.return_value = expected_tax
 
-        result = self.tracker.calculate_projected_dividends(
-            asset_ticker, shares_count, tax_rate
-        )
+        gross = shares_count * dividend_per_share
+        simulated_tax = round(gross * tax_rate, 2)
+        self.tax_calc_mock.calculate_tax.return_value = simulated_tax
 
-        self.assertEqual(result["ticker"], asset_ticker)
-        self.assertEqual(result["gross_dividend"], expected_gross)
-        self.assertEqual(result["tax_withheld"], expected_tax)
-        self.assertEqual(result["net_dividend"], expected_net)
-        self.tax_calculator.calculate_tax.assert_called_once_with(
-            expected_gross, tax_rate
-        )
+        result = self.tracker.calculate_projected_dividends(ticker, shares_count, tax_rate)
 
-    def test_fetch_and_store_dividend_history_io_error(self):
-        asset_id = str(uuid.uuid4())
-        mock_stream = io.BytesIO(
-            b"Invalid payload data stream for asset " + asset_id.encode()
-        )
+        self.assertEqual(result["ticker"], ticker)
+        self.assertEqual(result["gross_dividend"], gross)
+        self.assertEqual(result["tax_withheld"], simulated_tax)
+        self.assertEqual(result["net_dividend"], gross - simulated_tax)
+
+        self.api_gateway_mock.get_dividend_info.assert_called_once_with(ticker)
+        self.tax_calc_mock.calculate_tax.assert_called_once_with(gross, tax_rate)
+
+    def test_fetch_and_store_dividend_history_exception(self):
+        asset_id = uuid.uuid4().hex
+        self.api_gateway_mock.pull_raw_stream.side_effect = DividendTrackerException(uuid.uuid4().hex)
+
+        with self.assertRaises(DividendTrackerException):
+            self.tracker.fetch_and_store_dividend_history(asset_id)
+
+        self.api_gateway_mock.pull_raw_stream.assert_called_once_with(asset_id)
+
+    def test_aggregate_portfolio_dividends_calculation(self):
+        portfolio_id = uuid.uuid4().hex
+        asset_count = random.randint(1, 5)
+        
+        assets = []
+        expected_total_net = 0.0
+
+        for _ in range(asset_count):
+            shares = random.randint(5, 100)
+            dps = round(random.uniform(0.5, 10.0), 2)
+            tax_rate = round(random.uniform(0.0, 0.15), 2)
+            gross = shares * dps
+            tax = round(gross * tax_rate, 2)
+            net = gross - tax
+            expected_total_net += net
+
+            assets.append({
+                "ticker": f"T_{uuid.uuid4().hex[:4]}",
+                "shares": shares,
+                "dividend_per_share": dps,
+                "tax_rate": tax_rate
+            })
+
+        self.db_mock.get_portfolio_assets.return_value = assets
+        self.tax_calc_mock.calculate_tax.side_effect = [
+            round(a["shares"] * a["dividend_per_share"] * a["tax_rate"], 2) for a in assets
+        ]
+
+        result = self.tracker.aggregate_portfolio_dividends(portfolio_id)
+
+        self.assertEqual(result["portfolio_id"], portfolio_id)
+        self.assertAlmostEqual(result["total_net_dividends"], expected_total_net, places=5)
+        self.db_mock.get_portfolio_assets.assert_called_once_with(portfolio_id)
+
+    def test_get_dividend_calendar_requests(self):
+        owner_uuid = uuid.uuid4().hex
+        month = random.randint(1, 12)
+        year = random.randint(2020, 2030)
 
         with patch("skills.market_portfolio_dividend_tracker.requests.get") as mock_get:
             mock_response = MagicMock()
-            mock_response.raw = mock_stream
             mock_response.status_code = 200
             mock_get.return_value = mock_response
 
-            self.api_gateway.pull_raw_stream.side_effect = (
-                DividendTrackerException("Stream failure")
-            )
+            result = self.tracker.get_dividend_calendar(owner_uuid, month, year)
 
-            with self.assertRaises(DividendTrackerException):
-                self.tracker.fetch_and_store_dividend_history(asset_id)
+            self.assertEqual(result["owner"], owner_uuid)
+            self.assertEqual(result["month"], month)
+            self.assertEqual(result["year"], year)
+            self.assertIn("calendar_entries", result)
+            mock_get.assert_called_once()
 
-    def test_portfolio_dividend_aggregation(self):
+    def test_process_dividends_integration_helpers(self):
         portfolio_id = uuid.uuid4().hex
-        assets_count = random.randint(3, 8)
-        portfolio_assets = []
-        total_expected_net = 0.0
+        asset_name = f"ASSET_{uuid.uuid4().hex[:6]}"
+        amount = round(random.uniform(100.0, 5000.0), 2)
 
-        for _ in range(assets_count):
-            ticker = "".join(random.choices(string.ascii_uppercase, k=5))
-            shares = random.randint(50, 500)
-            dps = round(random.uniform(0.5, 10.0), 2)
-            tax = round(random.uniform(0.1, 0.2), 2)
+        if hasattr(db_storage, "save_record"):
+            delattr(db_storage, "save_record")
+        if hasattr(db_storage, "export_to_file"):
+            delattr(db_storage, "export_to_file")
 
-            net = (shares * dps) * (1.0 - tax)
-            total_expected_net += net
+        result = process_dividends(portfolio_id, asset_name, amount)
 
-            portfolio_assets.append(
-                {
-                    "ticker": ticker,
-                    "shares": shares,
-                    "dividend_per_share": dps,
-                    "tax_rate": tax,
-                }
-            )
+        self.assertEqual(result["dividend_id"], f"div_{portfolio_id}")
+        self.assertEqual(result["asset"], asset_name)
+        self.assertEqual(result["amount"], amount)
 
-        self.db_storage.get_portfolio_assets.return_value = portfolio_assets
-        self.tax_calculator.calculate_tax.side_effect = lambda gross, rate: gross * rate
-
-        aggregated_result = self.tracker.aggregate_portfolio_dividends(
-            portfolio_id
-        )
-
-        self.assertEqual(
-            aggregated_result["portfolio_id"], portfolio_id
-        )
-        self.assertAlmostEqual(
-            aggregated_result["total_net_dividends"], total_expected_net, places=2
-        )
-        self.db_storage.get_portfolio_assets.assert_called_once_with(
-            portfolio_id
-        )
-
-    def test_dividend_calendar_generation(self):
-        owner_uuid = str(uuid.uuid4())
-        random_month = random.randint(1, 12)
-        random_year = random.randint(2024, 2030)
-
-        mock_payload = f"calendar_data_{uuid.uuid4().hex}".encode()
-
-        with patch(
-            "skills.market_portfolio_dividend_tracker.requests.get"
-        ) as mock_req:
-            mock_resp = MagicMock()
-            mock_resp.content = mock_payload
-            mock_resp.status_code = 200
-            mock_req.return_value = mock_resp
-
-            calendar = self.tracker.get_dividend_calendar(
-                owner_uuid, random_month, random_year
-            )
-
-            self.assertIn("calendar_entries", calendar)
-            self.assertEqual(calendar["owner"], owner_uuid)
-            self.assertEqual(calendar["month"], random_month)
-            self.assertEqual(calendar["year"], random_year)
+        self.assertTrue(hasattr(db_storage, "save_record"))
+        self.assertTrue(hasattr(db_storage, "export_to_file"))
 
 
 if __name__ == "__main__":

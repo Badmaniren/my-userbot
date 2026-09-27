@@ -50,13 +50,10 @@ class MarketParser:
     def fetch_and_store(self, symbol, price):
         data = {}
         if os.path.exists(self.storage_file):
-            try:
-                with open(self.storage_file, "r", encoding="utf-8") as f:
-                    content = f.read()
-                    if content.strip():
-                        data = json.loads(content)
-            except (json.JSONDecodeError, IOError):
-                data = {}
+            with open(self.storage_file, "r", encoding="utf-8") as f:
+                content = f.read()
+                if content.strip():
+                    data = json.loads(content)
         
         data[symbol] = price
         with open(self.storage_file, "w", encoding="utf-8") as f:
@@ -65,14 +62,11 @@ class MarketParser:
     def load_data(self, storage_file):
         if not os.path.exists(storage_file):
             return None
-        try:
-            with open(storage_file, "r", encoding="utf-8") as f:
-                content = f.read()
-                if not content.strip():
-                    return {}
-                return json.loads(content)
-        except (json.JSONDecodeError, IOError, UnicodeDecodeError):
-            return None
+        with open(storage_file, "r", encoding="utf-8") as f:
+            content = f.read()
+            if not content.strip():
+                return {}
+            return json.loads(content)
 
 
 class MarketReportGenerator:
@@ -87,11 +81,8 @@ class MarketReportGenerator:
 
     def get_raw_stream_dump(self):
         if os.path.exists(self.storage_file):
-            try:
-                with open(self.storage_file, "r", encoding="utf-8") as f:
-                    return f.read()
-            except (IOError, UnicodeDecodeError):
-                return "{}"
+            with open(self.storage_file, "r", encoding="utf-8") as f:
+                return f.read()
         return "{}"
 
 
@@ -117,12 +108,9 @@ def run_market_telegram_pipeline(storage_file, symbol, chat_id, url, telegram_to
 def export_audit_logs(storage_file=None):
     """Экспорт аудиторских логов с явным возвратом результата."""
     if storage_file and os.path.exists(storage_file):
-        try:
-            with open(storage_file, "r", encoding="utf-8") as f:
-                content = f.read()
-                if not content.strip():
-                    return False
-                return True
-        except (IOError, json.JSONDecodeError, UnicodeDecodeError):
-            return False
+        with open(storage_file, "r", encoding="utf-8") as f:
+            content = f.read()
+            if not content.strip():
+                return False
+            return True
     return False

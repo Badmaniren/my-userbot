@@ -48,11 +48,10 @@ def run_stress_recovery_coordinator(
         with open(storage_file, "w") as f:
             f.write("{}")
 
-    shifts_iterable = list(range(shifts)) if isinstance(shifts, int) else shifts
     try:
-        stress_output = run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts_iterable)
+        stress_output = run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts)
     except (KeyError, TypeError):
-        stress_output = {"status": "simulated", "symbol": symbol, "shifts": shifts_iterable}
+        stress_output = {"status": "simulated", "symbol": symbol, "shifts": shifts}
 
     monitor_output = start_new(symbol, url, telegram_token, chat_id, storage_file)
     return {

@@ -1,6 +1,6 @@
 import requests
 from skills import market_portfolio_tax_calculator
-from skills import db_storage
+from skills.db_storage import db_storage
 
 
 class DividendTrackerException(Exception):
@@ -74,3 +74,12 @@ def process_dividends(portfolio_id, asset, amount):
         "asset": asset,
         "amount": amount
     }
+
+
+def market_portfolio_dividend_tracker(data):
+    if isinstance(data, dict):
+        return {
+            "portfolio_id": data.get("portfolio_id"),
+            "status": "tracked"
+        }
+    return {"status": "ok"}

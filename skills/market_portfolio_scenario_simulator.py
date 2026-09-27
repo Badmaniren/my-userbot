@@ -14,15 +14,18 @@ if not logger.handlers:
     logger.setLevel(logging.INFO)
 
 class PortfolioScenarioSimulator:
-    def __init__(self, storage_file):
+    def __init__(self, storage_file=None):
         self.storage_file = storage_file
 
-    def load_data(self, storage_file):
+    def load_data(self, storage_file=None):
+        path = storage_file or self.storage_file
+        if not path or not isinstance(path, str):
+            return {}
         try:
-            logger.info("Loading portfolio data from %s", storage_file)
-            with open(storage_file, 'r') as f:
+            logger.info("Loading portfolio data from %s", path)
+            with open(path, 'r') as f:
                 return json.load(f)
-        except (IOError, json.JSONDecodeError) as e:
+        except (IOError, json.JSONDecodeError, TypeError) as e:
             logger.error("Failed to load portfolio data: %s", e)
             return {}
 
@@ -109,3 +112,6 @@ def run_stress_test(storage_file, symbol, range_min, range_max, step):
         "symbol": symbol,
         "scenarios": scenarios
     }
+
+MarketPortfolioScenarioSimulator = PortfolioScenarioSimulator
+market_portfolio_scenario_simulator = PortfolioScenarioSimulator

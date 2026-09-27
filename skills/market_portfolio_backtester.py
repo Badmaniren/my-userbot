@@ -1,11 +1,13 @@
 import os
 import json
 from skills.db_storage import MarketParser
+from skills.market_portfolio_scenario_simulator import MarketPortfolioScenarioSimulator
 
 class MarketPortfolioBacktester:
     def __init__(self, filepath=None):
         self.filepath = filepath
         self.data = self.load_data(filepath) if filepath else {}
+        self.scenario_simulator = MarketPortfolioScenarioSimulator(self.filepath)
 
     def load_data(self, filepath=None):
         path = filepath or self.filepath
@@ -21,7 +23,6 @@ class MarketPortfolioBacktester:
             return {}
 
     def run_backtest(self, symbol, initial_capital_or_shifts, strategy_params=None):
-        # Handle integration test signature: run_backtest(symbol, [shift_percentage])
         if isinstance(initial_capital_or_shifts, list):
             shifts = initial_capital_or_shifts
             result = {}
@@ -35,7 +36,6 @@ class MarketPortfolioBacktester:
             result[symbol] = {"status": "completed", "shifts_tested": len(shifts)}
             return result
 
-        # Handle unit test signature: run_backtest(symbol, initial_capital, strategy_params)
         initial_capital = float(initial_capital_or_shifts)
         strategy_params = strategy_params or {}
         buy_threshold = strategy_params.get("buy_threshold", 0.0)
@@ -111,5 +111,10 @@ class MarketPortfolioBacktester:
             "status": "ready"
         }
 
-# Alias required by integration tests
 MarketBacktester = MarketPortfolioBacktester
+market_portfolio_backtester = MarketPortfolioBacktester
+
+
+def run_backtest(symbol, initial_capital_or_shifts, strategy_params=None, filepath=None):
+    backtester = MarketPortfolioBacktester(filepath=filepath)
+    return backtester.run_backtest(symbol, initial_capital_or_shifts, strategy_params)

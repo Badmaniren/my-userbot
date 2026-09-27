@@ -62,7 +62,7 @@ class PortfolioRiskAssessor:
         return {"event_id": str(uuid.uuid4()), "severity": "low", "value": 0.0}
 
     def export_risk_report(self, path, data):
-        with open(path, 'w', encoding='utf-8') as f:
+        with open(path, 'w') as f:
             json.dump(data, f, indent=2)
 
     def fetch_external_metrics(self):

@@ -4,6 +4,9 @@ from skills.db_storage import MarketParser
 from skills.market_portfolio_valuation import PortfolioValuation
 from skills.market_report_generator import MarketReportGenerator
 
+def fetch():
+    pass
+
 def send_telegram_notification(token, chat_id, message):
     """Отправка уведомления в Telegram (заглушка или реализация)."""
     pass

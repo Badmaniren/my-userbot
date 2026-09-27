@@ -2,10 +2,14 @@ import unittest
 import uuid
 import random
 import os
+import sys
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "skills")))
+
 from skills.market_portfolio_risk_assessment import assess_portfolio_risk
-from market_portfolio_collector_agent import collect_portfolio_data
-from market_portfolio_valuation import calculate_valuation
-from db_storage import save_risk_report
+from skills.market_portfolio_collector_agent import collect_portfolio_data
+from skills.market_portfolio_valuation import calculate_valuation
+from skills.db_storage import save_risk_report
 
 class TestMarketPortfolioRiskAssessmentIntegration(unittest.TestCase):
     def setUp(self):
@@ -40,7 +44,7 @@ class TestMarketPortfolioRiskAssessmentIntegration(unittest.TestCase):
 
         # 5. Проверка физического наличия записи (через проверку ID)
         # Имитация проверки через db_storage (предполагаем наличие метода get)
-        from db_storage import get_report
+        from skills.db_storage import get_report
         persisted_report = get_report(report_id)
 
         self.assertEqual(persisted_report["portfolio_id"], self.portfolio_id)

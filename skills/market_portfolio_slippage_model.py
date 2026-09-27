@@ -138,9 +138,36 @@ class MarketPortfolioSlippageModel:
             storage.save_logs(simulation_id, executions)
         return True
 
+    def apply_slippage(self, price: float, quantity: float = 1.0, side: str = "BUY", volatility: float = 0.2) -> float:
+        """Applies slippage model to calculate adjusted price given price and quantity."""
+        if price is None:
+            return 0.0
+        try:
+            order_data = {
+                "order_id": "sim_order",
+                "symbol": "SIM",
+                "side": side,
+                "quantity": abs(float(quantity or 1.0)),
+                "price": float(price)
+            }
+            market_context = {
+                "adv": 100000,
+                "volatility": float(volatility),
+                "spread_bps": 5.0
+            }
+            res = self.simulate_order_execution(order_data, market_context)
+            return float(res.get("executed_price", price))
+        except Exception:
+            return float(price)
+
     def get_execution_logs(self, simulation_id: str, storage: Any) -> List[Dict[str, Any]]:
         if simulation_id in self._execution_logs:
             return self._execution_logs[simulation_id]
         if storage and hasattr(storage, "get_logs"):
             return storage.get_logs(simulation_id)
         return []
+
+
+# Aliases for backward compatibility and test imports
+SlippageModel = MarketPortfolioSlippageModel
+slippage_model = MarketPortfolioSlippageModel

@@ -4,6 +4,7 @@ import logging
 
 from skills.market_parser import MarketParser
 from skills.market_portfolio_valuation import PortfolioValuation
+from skills.market_portfolio_slippage_model import SlippageModel
 
 logger = logging.getLogger("PortfolioScenarioSimulator")
 if not logger.handlers:
@@ -16,14 +17,22 @@ if not logger.handlers:
 class PortfolioScenarioSimulator:
     def __init__(self, storage_file):
         self.storage_file = storage_file
+        self.parser = MarketParser()
+        self.valuation = PortfolioValuation()
+        self.slippage_model = SlippageModel()
 
     def load_data(self, storage_file):
         logger.info("Loading portfolio data from %s", storage_file)
+        if not storage_file:
+            return {}
         try:
             with open(storage_file, 'r') as f:
                 return json.load(f)
-        except (IOError, json.JSONDecodeError) as e:
-            logger.error("Failed to load portfolio data: %s", e)
+        except (FileNotFoundError, OSError, json.JSONDecodeError) as e:
+            logger.warning("Failed to load portfolio data from %s: %s", storage_file, e)
+            return {}
+        except Exception as e:
+            logger.warning("Unexpected error loading portfolio data from %s: %s", storage_file, e)
             return {}
 
     def simulate_scenario(self, symbol, percentage):
@@ -64,7 +73,13 @@ class PortfolioScenarioSimulator:
         logger.info("Found target for %s: price=%.4f, quantity=%.4f", symbol, current_price, quantity)
         
         simulated_price = current_price * (1 + pct_val / 100.0)
-        pnl_impact = (simulated_price - current_price) * quantity
+
+        try:
+            slippage_adjusted_price = self.slippage_model.apply_slippage(simulated_price, quantity)
+        except Exception:
+            slippage_adjusted_price = simulated_price
+
+        pnl_impact = (slippage_adjusted_price - current_price) * quantity
         
         logger.info("Simulation completed for %s: simulated_price=%.4f, pnl_impact=%.4f", symbol, simulated_price, pnl_impact)
         
@@ -80,6 +95,11 @@ class PortfolioScenarioSimulator:
         report = []
         for shift in shifts:
             try:
+                shift_val = float(shift)
+            except (ValueError, TypeError):
+                shift_val = 0.0
+
+            try:
                 res = self.simulate_scenario(symbol, shift)
                 resulting_valuation = res["simulated_price"]
             except KeyError:
@@ -89,7 +109,7 @@ class PortfolioScenarioSimulator:
                 logger.warning("Stress test step failed for symbol %s at shift %s: value error", symbol, shift)
                 resulting_valuation = 0.0
             report.append({
-                "shift_percentage": float(shift),
+                "shift_percentage": shift_val,
                 "resulting_valuation": resulting_valuation
             })
         logger.info("Stress test completed for symbol: %s", symbol)

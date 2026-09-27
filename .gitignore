@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+storage_*.db
+SYM_*
+test_dir_*/
+test_data_integration/

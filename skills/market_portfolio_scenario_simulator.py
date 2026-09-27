@@ -4,6 +4,7 @@ import logging
 
 from skills.market_parser import MarketParser
 from skills.market_portfolio_valuation import PortfolioValuation
+from skills.db_storage import load_portfolio
 
 logger = logging.getLogger("PortfolioScenarioSimulator")
 if not logger.handlers:
@@ -20,9 +21,13 @@ class PortfolioScenarioSimulator:
     def load_data(self, storage_file):
         logger.info("Loading portfolio data from %s", storage_file)
         try:
+            if storage_file and os.path.exists(storage_file):
+                loaded = load_portfolio(storage_file)
+                if loaded:
+                    return loaded
             with open(storage_file, 'r') as f:
                 return json.load(f)
-        except (IOError, json.JSONDecodeError) as e:
+        except (IOError, json.JSONDecodeError, Exception) as e:
             logger.error("Failed to load portfolio data: %s", e)
             return {}
 

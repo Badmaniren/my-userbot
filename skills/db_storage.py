@@ -1,3 +1,5 @@
+import json
+import os
 import sqlite3
 import requests
 from bs4 import BeautifulSoup
@@ -55,3 +57,49 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+def save_portfolio(data, filepath):
+    if not filepath:
+        return False
+    dirname = os.path.dirname(filepath)
+    if dirname:
+        os.makedirs(dirname, exist_ok=True)
+    if str(filepath).endswith('.db'):
+        conn = sqlite3.connect(filepath)
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS portfolio (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                data TEXT NOT NULL
+            )
+        ''')
+        cursor.execute('INSERT INTO portfolio (data) VALUES (?)', (json.dumps(data),))
+        conn.commit()
+        conn.close()
+    else:
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(data, f)
+    return True
+
+
+def load_portfolio(filepath):
+    if not filepath or not os.path.exists(filepath):
+        return {}
+    if str(filepath).endswith('.db'):
+        conn = sqlite3.connect(filepath)
+        cursor = conn.cursor()
+        try:
+            cursor.execute('CREATE TABLE IF NOT EXISTS portfolio (id INTEGER PRIMARY KEY AUTOINCREMENT, data TEXT NOT NULL)')
+            cursor.execute('SELECT data FROM portfolio ORDER BY id DESC LIMIT 1')
+            row = cursor.fetchone()
+            if row and row[0]:
+                return json.loads(row[0])
+        except sqlite3.Error:
+            pass
+        finally:
+            conn.close()
+        return {}
+    else:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            return json.load(f)

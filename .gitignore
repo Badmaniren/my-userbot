@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+SYM_*
+storage_*.db
+test_market_storage_*

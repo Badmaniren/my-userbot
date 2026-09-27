@@ -22,11 +22,25 @@ class PortfolioValuation:
         result = {}
 
         for symbol, data in portfolio.items():
-            quantity = data.get("quantity", 0.0)
-            buy_price = data.get("buy_price", 0.0)
+            if isinstance(data, dict):
+                quantity = float(data.get("quantity", data.get("shares", 1.0)))
+                buy_price = float(data.get("buy_price", data.get("current_price", data.get("price", 0.0))))
+            elif isinstance(data, (int, float)):
+                quantity = 1.0
+                buy_price = float(data)
+            elif isinstance(data, list):
+                quantity = 1.0
+                buy_price = float(data[0]) if (data and isinstance(data[0], (int, float))) else 0.0
+            else:
+                quantity = 0.0
+                buy_price = 0.0
 
             try:
                 current_price = parser.fetch_price(url, symbol)
+                if isinstance(current_price, dict):
+                    current_price = current_price.get("price", current_price.get(symbol, buy_price))
+                if not isinstance(current_price, (int, float)):
+                    current_price = buy_price
             except Exception as e:
                 result[symbol] = {"error": str(e)}
                 continue

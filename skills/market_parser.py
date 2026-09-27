@@ -63,6 +63,9 @@ class MarketParser:
 
     def load_data(self, filename):
         if filename and os.path.exists(filename):
-            with open(filename, 'r', encoding='utf-8') as f:
-                return json.load(f)
+            try:
+                with open(filename, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, UnicodeDecodeError, OSError):
+                return {}
         return {}

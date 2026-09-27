@@ -1,5 +1,7 @@
 from skills.db_storage import MarketParser
 from skills.market_insider_anomaly_report_bridge import MarketInsiderAnomalyReportBridge
+
+
 from skills.market_report_generator import MarketReportGenerator
 
 

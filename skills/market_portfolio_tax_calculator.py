@@ -3,13 +3,18 @@ class MarketPortfolioTaxCalculator:
         for k, v in kwargs.items():
             setattr(self, k, v)
 
-    def calculate_tax(self, portfolio_id):
-        if not hasattr(self, 'db_storage') or self.db_storage is None:
+    def calculate_tax(self, *args, **kwargs):
+        if len(args) == 2:
+            amount, tax_rate = args
+            return round(amount * tax_rate, 2)
+        portfolio_id = kwargs.get('portfolio_id', args[0] if args else None)
+        if portfolio_id is not None:
+            if hasattr(self, 'db_storage') and self.db_storage and hasattr(self.db_storage, 'get_portfolio'):
+                portfolio = self.db_storage.get_portfolio(portfolio_id)
+                if portfolio:
+                    profit = (portfolio.get("sell_price", 0) - portfolio.get("purchase_price", 0)) * portfolio.get("shares", 0)
+                    return round(profit * 0.13, 2)
             return 0.0
-        portfolio = self.db_storage.get_portfolio(portfolio_id)
-        if portfolio:
-            profit = (portfolio["sell_price"] - portfolio["purchase_price"]) * portfolio["shares"]
-            return round(profit * 0.13, 2)
         return 0.0
 
     def process_dividend_stream(self, stream):

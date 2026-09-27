@@ -25,7 +25,7 @@ class DividendTracker:
         dividend_per_share = dividend_info["dividend_per_share"]
         
         gross_dividend = shares_count * dividend_per_share
-        tax_withheld = self.tax_calculator.calculate_tax(gross_dividend, tax_rate)
+        tax_withheld = self.tax_calculator.calculate_tax(gross_dividend, tax_rate) if self.tax_calculator else round(gross_dividend * tax_rate, 2)
         net_dividend = gross_dividend - tax_withheld
 
         return {
@@ -40,22 +40,29 @@ class DividendTracker:
             self.api_gateway.pull_raw_stream(asset_id)
 
     def aggregate_portfolio_dividends(self, portfolio_id):
-        assets = self.db_storage.get_portfolio_assets(portfolio_id)
+        if not self.db_storage or not hasattr(self.db_storage, 'get_portfolio_assets'):
+            return {
+                "portfolio_id": portfolio_id,
+                "total_dividends": 0.0,
+                "total_net_dividends": 0.0
+            }
+        assets = self.db_storage.get_portfolio_assets(portfolio_id) or []
         total_net_dividends = 0.0
 
         for asset in assets:
-            ticker = asset["ticker"]
-            shares = asset["shares"]
-            dps = asset["dividend_per_share"]
-            tax_rate = asset["tax_rate"]
+            ticker = asset.get("ticker")
+            shares = asset.get("shares", 0)
+            dps = asset.get("dividend_per_share", 0.0)
+            tax_rate = asset.get("tax_rate", 0.0)
 
             gross = shares * dps
-            tax = self.tax_calculator.calculate_tax(gross, tax_rate)
+            tax = self.tax_calculator.calculate_tax(gross, tax_rate) if self.tax_calculator else round(gross * tax_rate, 2)
             net = gross - tax
             total_net_dividends += net
 
         return {
             "portfolio_id": portfolio_id,
+            "total_dividends": total_net_dividends,
             "total_net_dividends": total_net_dividends
         }
 

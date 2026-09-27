@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- main
-
-## market_insider_activity_tracker (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+а эскалацию
 
 ## market_portfolio_monitor (refactor) — раундов: 1
 - Последняя ошибка перед фиксом: ImportError: Failed to import test module: tests.test_market_portfolio_monitor_integration
@@ -311,4 +307,8 @@
 
 ## market_portfolio_strategy_optimizer (refactor) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=2)
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_tax_calculator (create) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main

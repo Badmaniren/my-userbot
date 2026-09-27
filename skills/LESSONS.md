@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-естный импорт: 'from skills.db_storage import ...'
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+с: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_alert_dispatcher (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
@@ -324,4 +322,7 @@
 
 ## market_insider_anomaly_analyzer (refactor) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## market_insider_anomaly_report_bridge (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

@@ -55,3 +55,19 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+class DBStorage:
+    def __init__(self, db_path: str = "market_data.db"):
+        self.db_path = db_path
+        self._portfolios = {}
+
+    def save_portfolio(self, portfolio: dict):
+        if isinstance(portfolio, dict) and "portfolio_id" in portfolio:
+            self._portfolios[portfolio["portfolio_id"]] = portfolio
+
+    def get_portfolio(self, portfolio_id: str):
+        return self._portfolios.get(portfolio_id)
+
+
+db_storage = DBStorage()

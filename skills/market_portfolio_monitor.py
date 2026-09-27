@@ -32,6 +32,9 @@ def start_new(symbol, url, telegram_token, chat_id, storage_file):
         storage_file=storage_file
     )
 
+
+market_portfolio_monitor = start_new
+
 def start_ened(symbol, url, telegram_token, chat_id, storage_file):
     """Алиас для интеграционного теста."""
     return start_new(

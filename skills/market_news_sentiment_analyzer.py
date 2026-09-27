@@ -94,3 +94,6 @@ def parse_market_news(raw_news_snippet: str) -> dict:
         "identifier": identifier,
         "raw_text": raw_news_snippet
     }
+
+
+market_news_sentiment_analyzer = MarketNewsSentimentAnalyzer()

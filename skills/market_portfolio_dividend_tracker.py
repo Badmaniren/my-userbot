@@ -61,6 +61,35 @@ class DividendTracker:
             "calendar_entries": []
         }
 
+    def get_projected_dividends(self, portfolio_id):
+        if self.db_storage and hasattr(self.db_storage, "get_portfolio_assets"):
+            assets = self.db_storage.get_portfolio_assets(portfolio_id)
+            projected = {}
+            for asset in assets:
+                ticker = asset.get("ticker")
+                shares = asset.get("shares", 0)
+                dps = asset.get("dividend_per_share", 0.0)
+                if ticker:
+                    projected[ticker] = shares * dps
+            return projected
+        return {}
+
+
+MarketPortfolioDividendTracker = DividendTracker
+
+
+def market_portfolio_dividend_tracker(payload=None, **kwargs):
+    if payload is None:
+        payload = kwargs
+    if isinstance(payload, dict):
+        portfolio_id = payload.get("portfolio_id")
+        ticker = payload.get("ticker") or payload.get("asset")
+        shares = payload.get("shares", 0)
+        dps = payload.get("dividend_per_share", 0.0)
+        amount = payload.get("amount", shares * dps)
+        return process_dividends(portfolio_id, ticker, amount)
+    return {}
+
 
 def process_dividends(portfolio_id, asset, amount):
     if not hasattr(db_storage, "save_record"):

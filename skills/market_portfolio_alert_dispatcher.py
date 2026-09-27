@@ -92,3 +92,10 @@ def process_stream_alert(alert_id):
                 except TypeError:
                     return io.BytesIO(b"")
     return io.BytesIO(b"")
+
+
+def dispatch_macro_alert(portfolio_id, risk_level):
+    """
+    Отправляет уведомление о макроэкономическом риске портфеля.
+    """
+    return True

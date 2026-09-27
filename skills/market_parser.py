@@ -66,3 +66,9 @@ class MarketParser:
             with open(filename, 'r', encoding='utf-8') as f:
                 return json.load(f)
         return {}
+
+
+def parse_macro_indicators(raw_data):
+    if isinstance(raw_data, dict):
+        return raw_data.copy()
+    return {}

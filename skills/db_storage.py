@@ -55,3 +55,17 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+_MACRO_EVALUATIONS = {}
+
+
+def save_macro_evaluation(evaluation_result: dict) -> None:
+    if isinstance(evaluation_result, dict):
+        eval_id = evaluation_result.get("evaluation_id")
+        if eval_id:
+            _MACRO_EVALUATIONS[eval_id] = evaluation_result.copy()
+
+
+def get_macro_evaluation(evaluation_id: str) -> dict:
+    return _MACRO_EVALUATIONS.get(evaluation_id)

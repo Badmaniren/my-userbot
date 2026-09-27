@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.db
+macro_eval_*.json
+SYM_*
+data_*.json

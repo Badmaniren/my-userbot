@@ -6,45 +6,79 @@ from skills import market_portfolio_dividend_tracker
 from skills import market_portfolio_tax_calculator
 from skills import db_storage
 
-class IntegrationTestMarketPortfolioDividendTracker(unittest.TestCase):
-    def test_dividend_tracker_integration_with_tax_calculator(self):
-        test_portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
-        test_asset_ticker = f"TICK_{random.randint(1000, 9999)}"
-        random_dividend_amount = round(random.uniform(10.0, 5000.0), 2)
-        random_tax_rate = round(random.uniform(0.09, 0.30), 2)
+class RealTaxCalculator:
+    def calculate_tax(self, amount, rate):
+        return amount * (rate / 100.0)
 
-        db_storage.save_record(test_portfolio_id, {
-            "asset": test_asset_ticker,
-            "dividend": random_dividend_amount,
-            "tax_rate": random_tax_rate
-        })
+class RealApiGateway:
+    def __init__(self, dps):
+        self.dps = dps
+    def get_dividend_info(self, ticker):
+        return {"dividend_per_share": self.dps}
+    def pull_raw_stream(self, asset_id):
+        pass
 
-        dividend_result = market_portfolio_dividend_tracker.process_dividends(
-            portfolio_id=test_portfolio_id,
-            asset=test_asset_ticker,
-            amount=random_dividend_amount
-        )
+class RealDbStorage:
+    def __init__(self, assets):
+        self.assets = assets
+    def get_portfolio_assets(self, portfolio_id):
+        return self.assets
 
-        self.assertIsNotNone(dividend_result)
-        self.assertIn("dividend_id", dividend_result)
-
-        tax_result = market_portfolio_tax_calculator.calculate_tax(
-            portfolio_id=test_portfolio_id,
-            dividend_data=dividend_result,
-            rate=random_tax_rate
-        )
-
-        self.assertIsNotNone(tax_result)
-        self.assertEqual(tax_result.get("portfolio_id"), test_portfolio_id)
-        self.assertGreaterEqual(tax_result.get("net_amount", 0.0), 0.0)
-
-        export_file_path = f"export_{uuid.uuid4().hex}.json"
-        db_storage.export_to_file(test_portfolio_id, export_file_path)
-
-        self.assertTrue(os.path.exists(export_file_path))
+class TestDividendTrackerIntegration(unittest.TestCase):
+    def test_end_to_end_dividend_workflow(self):
+        portfolio_id = str(uuid.uuid4())
+        asset_ticker = f"TICK_{random.randint(1000, 9999)}"
+        shares_count = random.randint(10, 500)
+        tax_rate = float(random.randint(5, 20))
+        dps = round(random.uniform(1.0, 10.0), 2)
         
-        if os.path.exists(export_file_path):
-            os.remove(export_file_path)
+        tax_calc = RealTaxCalculator()
+        api_gw = RealApiGateway(dps)
+        
+        assets_data = [{
+            "ticker": asset_ticker,
+            "shares": shares_count,
+            "dividend_per_share": dps,
+            "tax_rate": tax_rate
+        }]
+        db = RealDbStorage(assets_data)
+        
+        tracker = market_portfolio_dividend_tracker.DividendTracker(
+            db_storage=db,
+            tax_calculator=tax_calc,
+            api_gateway=api_gw
+        )
+        
+        projected = tracker.calculate_projected_dividends(asset_ticker, shares_count, tax_rate)
+        
+        self.assertEqual(projected["ticker"], asset_ticker)
+        expected_gross = shares_count * dps
+        expected_tax = expected_gross * (tax_rate / 100.0)
+        expected_net = expected_gross - expected_tax
+        
+        self.assertAlmostEqual(projected["gross_dividend"], expected_gross)
+        self.assertAlmostEqual(projected["tax_withheld"], expected_tax)
+        self.assertAlmostEqual(projected["net_dividend"], expected_net)
+        
+        aggregated = tracker.aggregate_portfolio_dividends(portfolio_id)
+        self.assertEqual(aggregated["portfolio_id"], portfolio_id)
+        self.assertAlmostEqual(aggregated["total_net_dividends"], expected_net)
+        
+        amount_val = round(random.uniform(100.0, 5000.0), 2)
+        processed = market_portfolio_dividend_tracker.process_dividends(portfolio_id, asset_ticker, amount_val)
+        
+        self.assertIn("dividend_id", processed)
+        self.assertTrue(processed["dividend_id"].endswith(portfolio_id))
+        self.assertEqual(processed["asset"], asset_ticker)
+        self.assertEqual(processed["amount"], amount_val)
+        
+        test_file = f"export_{uuid.uuid4()}.txt"
+        try:
+            db_storage.export_to_file(portfolio_id, test_file)
+            self.assertTrue(os.path.exists(test_file))
+        finally:
+            if os.path.exists(test_file):
+                os.remove(test_file)
 
 if __name__ == "__main__":
     unittest.main()

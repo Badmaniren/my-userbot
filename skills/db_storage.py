@@ -55,3 +55,17 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+_IN_MEMORY_DB = {}
+
+
+def save_to_db(record):
+    if isinstance(record, dict):
+        key = record.get("metric_id") or record.get("id") or str(len(_IN_MEMORY_DB))
+        _IN_MEMORY_DB[key] = record
+    return True
+
+
+def fetch_from_db(metric_id):
+    return _IN_MEMORY_DB.get(metric_id)

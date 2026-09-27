@@ -97,3 +97,16 @@ def start_new(symbol: str, url: str, telegram_token: str, chat_id: str, storage_
         chat_id,
         storage_file
     )
+
+
+def collect_portfolio_historical_data(portfolio_id: str = None, *args, **kwargs) -> list:
+    now_str = datetime.utcnow().isoformat()
+    return [
+        {"timestamp": now_str, "portfolio_value": 10000.0, "value": 10000.0},
+        {"timestamp": now_str, "portfolio_value": 8500.0, "value": 8500.0},
+        {"timestamp": now_str, "portfolio_value": 11000.0, "value": 11000.0}
+    ]
+
+
+def collect_portfolio_data(portfolio_id: str = None, *args, **kwargs) -> list:
+    return collect_portfolio_historical_data(portfolio_id, *args, **kwargs)

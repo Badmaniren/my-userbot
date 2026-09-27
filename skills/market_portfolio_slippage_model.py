@@ -35,7 +35,7 @@ class MarketPortfolioSlippageModel:
 
             return round(order_params.volume * order_params.volatility * 0.0001, 6)
         except Exception as e:
-            audit_notifier = getattr(self, "audit_notifier", None)
+            audit_notifier = getattr(self, "audit_notifier", getattr(self, "market_portfolio_audit_alert_notifier", None))
             if audit_notifier:
                 audit_notifier.notify_error(str(e))
             if isinstance(e, SlippageCalculationError):
@@ -43,7 +43,7 @@ class MarketPortfolioSlippageModel:
             raise SlippageCalculationError(str(e))
 
     def fetch_external_liquidity_profile(self, ticker: str, volume: float) -> Optional[bytes]:
-        api_gateway = getattr(self, "api_gateway", None)
+        api_gateway = getattr(self, "api_gateway", getattr(self, "market_portfolio_api_gateway", None))
         try:
             response = requests.get(f"https://api.example.com/liquidity/{ticker}?volume={volume}")
             if api_gateway:

@@ -31,18 +31,22 @@ class MarketInsiderAnomalyAnalyzer:
         else:
             anomaly_res = {"ticker": ticker, "has_anomaly": False, "score": 0.0}
 
+        formatted_stream = stream_data
+        if isinstance(stream_data, dict):
+            formatted_stream = io.BytesIO(json.dumps(stream_data).encode("utf-8"))
+
         pipeline_res = {}
         if hasattr(self.alert_pipeline, "process_alert_stream"):
             processed = False
-            if stream_data is not None:
+            if formatted_stream is not None:
                 try:
-                    pipeline_res = self.alert_pipeline.process_alert_stream(stream_data)
+                    pipeline_res = self.alert_pipeline.process_alert_stream(formatted_stream)
                     processed = True
                 except TypeError:
                     pass
             if not processed:
                 try:
-                    pipeline_res = self.alert_pipeline.process_alert_stream(ticker, stream_data)
+                    pipeline_res = self.alert_pipeline.process_alert_stream(ticker, formatted_stream)
                     processed = True
                 except TypeError:
                     try:
@@ -52,7 +56,7 @@ class MarketInsiderAnomalyAnalyzer:
                         pipeline_res = {"ticker": ticker, "insider_detected": False, "alerts": []}
         elif hasattr(self.alert_pipeline, "process"):
             try:
-                pipeline_res = self.alert_pipeline.process(ticker, stream_data)
+                pipeline_res = self.alert_pipeline.process(ticker, formatted_stream)
             except TypeError:
                 pipeline_res = self.alert_pipeline.process(ticker)
         else:

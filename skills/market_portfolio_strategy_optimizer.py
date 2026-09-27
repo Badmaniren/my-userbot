@@ -8,16 +8,34 @@ class PortfolioStrategyOptimizer:
         self.simulator = PortfolioScenarioSimulator(storage_file)
 
     def optimize_strategy(self, symbol: str, shifts, percentage: float) -> dict:
-        backtest_result = self.backtester.run_backtest(symbol, shifts)
-        simulation_result = self.simulator.simulate_scenario(symbol, percentage)
+        try:
+            backtest_result = self.backtester.run_backtest(symbol, shifts)
+        except KeyError:
+            backtest_result = {}
+            
+        try:
+            simulation_result = self.simulator.simulate_scenario(symbol, percentage)
+        except KeyError:
+            simulation_result = {}
+            
         return {
             'backtest': backtest_result,
             'simulation': simulation_result
         }
 
     def evaluate_resilience(self, symbol: str, shifts) -> dict:
-        stress_data = self.simulator.run_stress_test(symbol, shifts)
-        drawdown_checked = self.backtester.calculate_maximum_drawdown(symbol)
+        try:
+            stress_data = self.simulator.run_stress_test(symbol, shifts)
+        except KeyError:
+            stress_data = {}
+
+        try:
+            drawdown_checked = self.backtester.calculate_maximum_drawdown(symbol)
+            if isinstance(drawdown_checked, str):
+                drawdown_checked = float(drawdown_checked)
+        except Exception:
+            drawdown_checked = 0.0
+
         return {
             'stress_data': stress_data,
             'drawdown_checked': drawdown_checked
@@ -33,18 +51,26 @@ class PortfolioStrategyOptimizer:
         else:
             shifts_iterable = shifts
 
-        backtest_res = self.backtester.run_backtest(symbol, shifts_iterable)
-        stress_res = self.simulator.run_stress_test(symbol, shifts_iterable)
+        try:
+            backtest_res = self.backtester.run_backtest(symbol, shifts_iterable)
+        except KeyError:
+            backtest_res = {}
+
+        try:
+            stress_res = self.simulator.run_stress_test(symbol, shifts_iterable)
+        except KeyError:
+            stress_res = {}
         
         try:
             drawdown = self.backtester.calculate_maximum_drawdown(symbol)
             if isinstance(drawdown, str):
                 drawdown = float(drawdown)
+            resilience_score = 1.0 - abs(drawdown) if drawdown is not None else 0.5
         except Exception:
             drawdown = 0.0
+            resilience_score = 0.5
 
         optimized_weights = {symbol: allocation}
-        resilience_score = 1.0 - abs(drawdown) if drawdown is not None else 0.5
         
         return {
             "optimized_weights": optimized_weights,

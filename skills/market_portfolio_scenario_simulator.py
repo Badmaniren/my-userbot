@@ -89,7 +89,7 @@ class PortfolioScenarioSimulator:
                 logger.warning("Stress test step failed for symbol %s at shift %s: value error", symbol, shift)
                 resulting_valuation = 0.0
             report.append({
-                "shift_percentage": shift,
+                "shift_percentage": float(shift),
                 "resulting_valuation": resulting_valuation
             })
         logger.info("Stress test completed for symbol: %s", symbol)

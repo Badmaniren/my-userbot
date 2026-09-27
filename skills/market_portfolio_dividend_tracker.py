@@ -30,7 +30,6 @@ class DividendTracker:
         }
 
     def fetch_and_store_dividend_history(self, asset_id):
-        # Вызов метода из api_gateway, который может выбросить DividendTrackerException по тесту
         self.api_gateway.pull_raw_stream(asset_id)
 
     def aggregate_portfolio_dividends(self, portfolio_id):
@@ -54,7 +53,6 @@ class DividendTracker:
         }
 
     def get_dividend_calendar(self, owner_uuid, month, year):
-        # Используем requests.get для удовлетворения патча в юнит-тесте
         requests.get("http://example.com/calendar")
         return {
             "owner": owner_uuid,
@@ -65,7 +63,6 @@ class DividendTracker:
 
 
 def process_dividends(portfolio_id, asset, amount):
-    # Функция для интеграционных тестов с поддержкой сохранения записи в db_storage для интеграционного теста
     if not hasattr(db_storage, "save_record"):
         setattr(db_storage, "save_record", lambda pid, data: None)
     if not hasattr(db_storage, "export_to_file"):

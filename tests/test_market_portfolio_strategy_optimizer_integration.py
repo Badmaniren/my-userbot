@@ -1,60 +1,67 @@
 import unittest
 import os
-import tempfile
 import uuid
 import random
-import json
-
 from skills.market_portfolio_strategy_optimizer import PortfolioStrategyOptimizer
 
 class TestPortfolioStrategyOptimizerIntegration(unittest.TestCase):
-    
     def setUp(self):
-        self.test_dir = tempfile.TemporaryDirectory()
-        self.db_fd, self.db_path = tempfile.mkstemp(suffix='.json', dir=self.test_dir.name)
-        os.close(self.db_fd)
-        
-        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
-        self.initial_price = round(random.uniform(100.0, 500.0), 2)
-        
-        dummy_data = {
-            self.symbol: [
-                {"price": self.initial_price, "timestamp": "2023-01-01T00:00:00"},
-                {"price": round(self.initial_price * 1.05, 2), "timestamp": "2023-01-02T00:00:00"},
-                {"price": round(self.initial_price * 0.98, 2), "timestamp": "2023-01-03T00:00:00"},
-                {"price": round(self.initial_price * 1.10, 2), "timestamp": "2023-01-04T00:00:00"}
-            ]
-        }
-        with open(self.db_path, 'w', encoding='utf-8') as f:
-            json.dump(dummy_data, f)
+        self.test_dir = "test_data_integration"
+        os.makedirs(self.test_dir, exist_ok=True)
+        self.storage_file = os.path.join(self.test_dir, f"test_storage_{uuid.uuid4().hex}.db")
+        self.optimizer = PortfolioStrategyOptimizer(self.storage_file)
+        self.symbol = f"TICKER_{random.randint(1000, 9999)}"
+        self.shifts = [random.uniform(-0.1, 0.1), random.uniform(-0.1, 0.1)]
+        self.percentage = random.uniform(5.0, 25.0)
+        self.allocation = random.uniform(0.1, 1.0)
 
     def tearDown(self):
-        self.test_dir.cleanup()
+        if os.path.exists(self.storage_file):
+            os.remove(self.storage_file)
+        if os.path.exists(self.test_dir):
+            try:
+                os.rmdir(self.test_dir)
+            except OSError:
+                pass
 
-    def test_optimizer_composition_integration(self):
-        optimizer = PortfolioStrategyOptimizer(self.db_path)
-        
-        self.assertTrue(
-            hasattr(optimizer, 'backtester') or hasattr(optimizer, 'simulator'),
-            "Optimizer must compose backtester or scenario simulator modules"
-        )
-        
-        shift_val = round(random.uniform(-0.1, 0.1), 3)
-        allocation_param = round(random.uniform(0.5, 1.0), 2)
-        
-        optimization_result = optimizer.optimize_and_evaluate(
-            symbol=self.symbol,
-            allocation=allocation_param,
-            shifts=shift_val
-        )
-        
-        self.assertIsInstance(optimization_result, dict, "Optimization result must be a dictionary")
-        self.assertIn("optimized_weights", optimization_result)
-        self.assertIn("resilience_score", optimization_result)
-        
-        summary = optimizer.get_strategy_summary(self.symbol)
+    def test_optimize_strategy_real_execution(self):
+        result = self.optimizer.optimize_strategy(self.symbol, self.shifts, self.percentage)
+        self.assertIsInstance(result, dict)
+        self.assertIn('backtest', result)
+        self.assertIn('simulation', result)
+
+    def test_evaluate_resilience_real_execution(self):
+        result = self.optimizer.evaluate_resilience(self.symbol, self.shifts)
+        self.assertIsInstance(result, dict)
+        self.assertIn('stress_data', result)
+        self.assertIn('drawdown_checked', result)
+
+    def test_optimize_and_evaluate_real_execution(self):
+        result = self.optimizer.optimize_and_evaluate(self.symbol, self.allocation, self.shifts)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["optimized_weights"][self.symbol], self.allocation)
+        self.assertIn("resilience_score", result)
+        self.assertIn("backtest", result)
+        self.assertIn("stress", result)
+
+    def test_get_strategy_summary_real_execution(self):
+        summary = self.optimizer.get_strategy_summary(self.symbol)
         self.assertIsInstance(summary, dict)
-        self.assertIn(self.symbol, summary or optimization_result)
+        self.assertIn(self.symbol, summary)
+        self.assertEqual(summary[self.symbol]["storage"], self.storage_file)
+
+    def test_load_strategy_stream_real_file(self):
+        stream_path = os.path.join(self.test_dir, f"stream_{uuid.uuid4().hex}.bin")
+        random_bytes = os.urandom(64)
+        with open(stream_path, 'wb') as f:
+            f.write(random_bytes)
+        
+        try:
+            content = self.optimizer.load_strategy_stream(stream_path)
+            self.assertEqual(content, random_bytes)
+        finally:
+            if os.path.exists(stream_path):
+                os.remove(stream_path)
 
 if __name__ == '__main__':
     unittest.main()

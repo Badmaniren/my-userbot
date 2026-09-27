@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-тесты и влит в main
-
-## market_insider_activity_tracker (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1)
-- Статус: успешно прошёл тесты и влит в main
+ main
 
 ## market_insider_activity_tracker (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
@@ -312,3 +308,7 @@
 ## market_portfolio_rebalance_calculator (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_strategy_optimizer (refactor) — раундов: 2
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=2)
+- Статус: успешно прошёл тесты и влит в main

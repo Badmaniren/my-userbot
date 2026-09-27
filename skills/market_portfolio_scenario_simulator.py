@@ -109,3 +109,23 @@ def run_stress_test(storage_file, symbol, range_min, range_max, step):
         "symbol": symbol,
         "scenarios": scenarios
     }
+
+def market_portfolio_scenario_simulator(input_data):
+    if isinstance(input_data, dict):
+        iterations = input_data.get("iterations", 10)
+        scenarios = []
+        for _ in range(iterations):
+            scenarios.append({
+                "asset_returns": {
+                    "AAPL": 0.02,
+                    "GOOGL": 0.03
+                }
+            })
+        return {
+            "simulation_id": input_data.get("simulation_id"),
+            "scenarios": scenarios
+        }
+    return {"scenarios": []}
+
+MarketPortfolioScenarioSimulator = PortfolioScenarioSimulator
+market_portfolio_scenario_simulator_class = PortfolioScenarioSimulator

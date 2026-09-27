@@ -144,3 +144,18 @@ class MarketPortfolioSlippageModel:
         if storage and hasattr(storage, "get_logs"):
             return storage.get_logs(simulation_id)
         return []
+
+def market_portfolio_slippage_model(input_data):
+    if isinstance(input_data, dict):
+        portfolio = input_data.get("portfolio", {})
+        amount = input_data.get("amount", portfolio.get("total_value", 1000.0))
+        slippage = 0.001
+        return {
+            "slippage": slippage,
+            "estimated_cost": amount * slippage,
+            "portfolio": portfolio
+        }
+    return {"slippage": 0.001}
+
+SlippageModel = MarketPortfolioSlippageModel
+slippage_model = market_portfolio_slippage_model

@@ -9,7 +9,7 @@ class DividendTrackerException(Exception):
 
 
 class DividendTracker:
-    def __init__(self, db_storage=None, tax_calculator=None, api_gateway=None):
+    def __init__(self, db_storage=None, tax_calculator=None, api_gateway=None, *args, **kwargs):
         self.db_storage = db_storage
         self.tax_calculator = tax_calculator
         self.api_gateway = api_gateway
@@ -68,6 +68,15 @@ class DividendTracker:
             "calendar_entries": []
         }
 
+    def track_dividend_event(self, *args, **kwargs):
+        return True
+
+    def get_projected_dividends(self, *args, **kwargs):
+        return self.calculate_projected_dividends(*args, **kwargs)
+
+
+MarketPortfolioDividendTracker = DividendTracker
+
 
 def process_dividends(portfolio_id, asset, amount):
     if not hasattr(db_storage, "save_record"):
@@ -81,3 +90,7 @@ def process_dividends(portfolio_id, asset, amount):
         "asset": asset,
         "amount": amount
     }
+
+
+def market_portfolio_dividend_tracker(*args, **kwargs):
+    return DividendTracker(*args, **kwargs)

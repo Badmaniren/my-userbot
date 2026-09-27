@@ -1,11 +1,15 @@
 from skills.market_portfolio_backtester import MarketPortfolioBacktester
 from skills.market_portfolio_scenario_simulator import PortfolioScenarioSimulator
+from skills.market_portfolio_tax_calculator import MarketPortfolioTaxCalculator
+from skills.market_portfolio_dividend_tracker import MarketPortfolioDividendTracker
 
 class PortfolioStrategyOptimizer:
     def __init__(self, storage_file: str):
         self.storage_file = storage_file
         self.backtester = MarketPortfolioBacktester(storage_file)
         self.simulator = PortfolioScenarioSimulator(storage_file)
+        self.tax_calculator = MarketPortfolioTaxCalculator(storage_file)
+        self.dividend_tracker = MarketPortfolioDividendTracker(storage_file)
 
     def optimize_strategy(self, symbol: str, shifts, percentage: float) -> dict:
         try:
@@ -86,3 +90,10 @@ class PortfolioStrategyOptimizer:
                 "storage": self.storage_file
             }
         }
+
+
+MarketPortfolioStrategyOptimizer = PortfolioStrategyOptimizer
+
+
+def market_portfolio_strategy_optimizer(storage_file: str = "portfolio.db", **kwargs):
+    return PortfolioStrategyOptimizer(storage_file)

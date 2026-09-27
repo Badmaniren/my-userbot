@@ -1,5 +1,6 @@
 class MarketPortfolioTaxCalculator:
-    def __init__(self, **kwargs):
+    def __init__(self, db_storage=None, *args, **kwargs):
+        self.db_storage = db_storage
         for k, v in kwargs.items():
             setattr(self, k, v)
 

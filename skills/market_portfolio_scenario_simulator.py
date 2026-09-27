@@ -26,7 +26,7 @@ class PortfolioScenarioSimulator:
             logger.error("Failed to load portfolio data: %s", e)
             return {}
 
-    def simulate_scenario(self, symbol, percentage):
+    def simulate_scenario(self, symbol, percentage, slippage_factor=0.0):
         logger.info("Starting simulation for symbol: %s with percentage shift: %s", symbol, percentage)
         
         if not isinstance(symbol, str) or not symbol.strip():
@@ -63,7 +63,10 @@ class PortfolioScenarioSimulator:
         
         logger.info("Found target for %s: price=%.4f, quantity=%.4f", symbol, current_price, quantity)
         
-        simulated_price = current_price * (1 + pct_val / 100.0)
+        base_simulated_price = current_price * (1 + pct_val / 100.0)
+        slippage_adjustment = base_simulated_price * (float(slippage_factor) / 100.0) if slippage_factor else 0.0
+        simulated_price = base_simulated_price + slippage_adjustment
+        
         pnl_impact = (simulated_price - current_price) * quantity
         
         logger.info("Simulation completed for %s: simulated_price=%.4f, pnl_impact=%.4f", symbol, simulated_price, pnl_impact)

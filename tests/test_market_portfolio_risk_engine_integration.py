@@ -4,7 +4,7 @@ import random
 import os
 from skills.market_portfolio_risk_engine import MarketPortfolioRiskEngine
 from skills.market_portfolio_api_gateway import MarketPortfolioAPIGateway as MarketPortfolioApiGateway
-from skills.db_storage import DBStorage
+from skills.market_insider_activity_tracker import DBStorage
 from skills.market_portfolio_performance_analytics import PortfolioPerformanceAnalytics as MarketPortfolioPerformanceAnalytics
 
 class TestMarketPortfolioRiskEngineIntegration(unittest.TestCase):

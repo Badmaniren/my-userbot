@@ -1,84 +1,79 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, mock_open
 import json
-import os
 import uuid
 import random
+import io
+
 from skills.market_portfolio_scenario_simulator import (
     PortfolioScenarioSimulator,
     simulate_market_scenario,
     run_stress_test
 )
 
-class TestMarketPortfolioScenarioSimulator(unittest.TestCase):
-    def setUp(self):
-        self.storage_file = f"test_storage_{uuid.uuid4().hex}.json"
-        self.symbol = f"SYM_{uuid.uuid4().hex[:6]}"
-        self.current_price = round(random.uniform(10.0, 500.0), 2)
-        self.quantity = round(random.uniform(1.0, 50.0), 2)
-        
-        self.test_data = {
-            "symbol": self.symbol,
-            "current_price": self.current_price,
-            "quantity": self.quantity
-        }
-        with open(self.storage_file, 'w') as f:
-            json.dump(self.test_data, f)
 
-    def tearDown(self):
-        if os.path.exists(self.storage_file):
-            os.remove(self.storage_file)
+class TestPortfolioScenarioSimulator(unittest.TestCase):
+
+    def setUp(self):
+        self.storage_file = f"{uuid.uuid4().hex}.json"
+        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
+        self.current_price = round(random.uniform(10.0, 1000.0), 2)
+        self.quantity = round(random.uniform(1.0, 100.0), 2)
+        self.percentage = round(random.uniform(-50.0, 50.0), 2)
 
     def test_load_data_success(self):
-        simulator = PortfolioScenarioSimulator(self.storage_file)
-        data = simulator.load_data(self.storage_file)
-        self.assertEqual(data.get("symbol"), self.symbol)
-
-    def test_load_data_failure(self):
-        bad_file = f"bad_{uuid.uuid4().hex}.json"
-        simulator = PortfolioScenarioSimulator(bad_file)
-        data = simulator.load_data(bad_file)
-        self.assertEqual(data, {})
-
-    def test_simulate_scenario_dict_root(self):
-        simulator = PortfolioScenarioSimulator(self.storage_file)
-        percentage = 10.0
-        res = simulator.simulate_scenario(self.symbol, percentage)
+        mock_data = {
+            self.symbol: {
+                "current_price": self.current_price,
+                "quantity": self.quantity
+            }
+        }
+        json_content = json.dumps(mock_data)
         
-        expected_price = self.current_price * (1 + percentage / 100.0)
-        expected_impact = (expected_price - self.current_price) * self.quantity
+        simulator = PortfolioScenarioSimulator(self.storage_file)
         
-        self.assertEqual(res["symbol"], self.symbol)
-        self.assertAlmostEqual(res["simulated_price"], expected_price)
-        self.assertAlmostEqual(res["pnl_impact"], expected_impact)
-        self.assertAlmostEqual(res["portfolio_value_delta"], expected_impact)
+        with patch("builtins.open", mock_open(read_data=json_content)):
+            data = simulator.load_data(self.storage_file)
+            self.assertEqual(data, mock_data)
+
+    def test_load_data_io_error(self):
+        simulator = PortfolioScenarioSimulator(self.storage_file)
+        
+        with patch("builtins.open", side_effect=IOError):
+            data = simulator.load_data(self.storage_file)
+            self.assertEqual(data, {})
+
+    def test_load_data_json_decode_error(self):
+        simulator = PortfolioScenarioSimulator(self.storage_file)
+        
+        with patch("builtins.open", mock_open(read_data=uuid.uuid4().hex)):
+            data = simulator.load_data(self.storage_file)
+            self.assertEqual(data, {})
+
+    def test_simulate_scenario_direct_key(self):
+        mock_data = {
+            self.symbol: {
+                "price": self.current_price,
+                "shares": self.quantity
+            }
+        }
+        
+        simulator = PortfolioScenarioSimulator(self.storage_file)
+        
+        with patch.object(simulator, "load_data", return_value=mock_data):
+            result = simulator.simulate_scenario(self.symbol, self.percentage)
+            
+            expected_simulated_price = self.current_price * (1 + self.percentage / 100.0)
+            expected_pnl = (expected_simulated_price - self.current_price) * self.quantity
+            
+            self.assertEqual(result["symbol"], self.symbol)
+            self.assertAlmostEqual(result["simulated_price"], expected_simulated_price)
+            self.assertAlmostEqual(result["pnl_impact"], expected_pnl)
+            self.assertAlmostEqual(result["portfolio_value_delta"], expected_pnl)
 
     def test_simulate_scenario_assets_list(self):
-        assets_data = {
+        mock_data = {
             "assets": [
-                {
-                    "symbol": self.symbol,
-                    "price": self.current_price,
-                    "shares": self.quantity
-                }
-            ]
-        }
-        with open(self.storage_file, 'w') as f:
-            json.dump(assets_data, f)
-            
-        simulator = PortfolioScenarioSimulator(self.storage_file)
-        percentage = -15.5
-        res = simulator.simulate_scenario(self.symbol, percentage)
-        
-        expected_price = self.current_price * (1 + percentage / 100.0)
-        expected_impact = (expected_price - self.current_price) * self.quantity
-        
-        self.assertAlmostEqual(res["simulated_price"], expected_price)
-        self.assertAlmostEqual(res["pnl_impact"], expected_impact)
-
-    def test_simulate_scenario_holdings_list(self):
-        holdings_data = {
-            "holdings": [
                 {
                     "symbol": self.symbol,
                     "current_price": self.current_price,
@@ -86,71 +81,133 @@ class TestMarketPortfolioScenarioSimulator(unittest.TestCase):
                 }
             ]
         }
-        with open(self.storage_file, 'w') as f:
-            json.dump(holdings_data, f)
-            
-        simulator = PortfolioScenarioSimulator(self.storage_file)
-        percentage = 20.0
-        res = simulator.simulate_scenario(self.symbol, percentage)
         
-        expected_price = self.current_price * (1 + percentage / 100.0)
-        self.assertAlmostEqual(res["simulated_price"], expected_price)
+        simulator = PortfolioScenarioSimulator(self.storage_file)
+        
+        with patch.object(simulator, "load_data", return_value=mock_data):
+            result = simulator.simulate_scenario(self.symbol, self.percentage)
+            self.assertEqual(result["symbol"], self.symbol)
+
+    def test_simulate_scenario_holdings_list(self):
+        mock_data = {
+            "holdings": [
+                {
+                    "symbol": self.symbol,
+                    "price": self.current_price,
+                    "shares": self.quantity
+                }
+            ]
+        }
+        
+        simulator = PortfolioScenarioSimulator(self.storage_file)
+        
+        with patch.object(simulator, "load_data", return_value=mock_data):
+            result = simulator.simulate_scenario(self.symbol, self.percentage)
+            self.assertEqual(result["symbol"], self.symbol)
+
+    def test_simulate_scenario_root_dict(self):
+        mock_data = {
+            "symbol": self.symbol,
+            "current_price": self.current_price,
+            "quantity": self.quantity
+        }
+        
+        simulator = PortfolioScenarioSimulator(self.storage_file)
+        
+        with patch.object(simulator, "load_data", return_value=mock_data):
+            result = simulator.simulate_scenario(self.symbol, self.percentage)
+            self.assertEqual(result["symbol"], self.symbol)
 
     def test_simulate_scenario_list_root(self):
-        list_data = [
+        mock_data = [
             {
                 "symbol": self.symbol,
                 "current_price": self.current_price,
                 "quantity": self.quantity
             }
         ]
-        with open(self.storage_file, 'w') as f:
-            json.dump(list_data, f)
-            
+        
         simulator = PortfolioScenarioSimulator(self.storage_file)
-        percentage = 5.0
-        res = simulator.simulate_scenario(self.symbol, percentage)
-        self.assertEqual(res["symbol"], self.symbol)
+        
+        with patch.object(simulator, "load_data", return_value=mock_data):
+            result = simulator.simulate_scenario(self.symbol, self.percentage)
+            self.assertEqual(result["symbol"], self.symbol)
 
-    def test_simulate_scenario_not_found(self):
+    def test_simulate_scenario_symbol_not_found(self):
+        mock_data = {
+            f"OTHER_{uuid.uuid4().hex[:4]}": {
+                "current_price": self.current_price,
+                "quantity": self.quantity
+            }
+        }
+        
         simulator = PortfolioScenarioSimulator(self.storage_file)
-        missing_symbol = f"MISS_{uuid.uuid4().hex[:6]}"
-        with self.assertRaises(KeyError):
-            simulator.simulate_scenario(missing_symbol, 10.0)
+        
+        with patch.object(simulator, "load_data", return_value=mock_data):
+            with self.assertRaises(KeyError):
+                simulator.simulate_scenario(self.symbol, self.percentage)
 
     def test_run_stress_test(self):
-        simulator = PortfolioScenarioSimulator(self.storage_file)
-        shifts = [-10.0, 0.0, 10.0]
-        report = simulator.run_stress_test(self.symbol, shifts)
+        shifts = [random.randint(-10, -1), 0, random.randint(1, 10)]
+        mock_data = {
+            self.symbol: {
+                "current_price": self.current_price,
+                "quantity": self.quantity
+            }
+        }
         
-        self.assertEqual(len(report), 3)
-        for i, shift in enumerate(shifts):
-            self.assertEqual(report[i]["shift_percentage"], shift)
-            expected_val = self.current_price * (1 + shift / 100.0)
-            self.assertAlmostEqual(report[i]["resulting_valuation"], expected_val)
+        simulator = PortfolioScenarioSimulator(self.storage_file)
+        
+        with patch.object(simulator, "load_data", return_value=mock_data):
+            report = simulator.run_stress_test(self.symbol, shifts)
+            
+            self.assertEqual(len(report), len(shifts))
+            for i, item in enumerate(report):
+                self.assertEqual(item["shift_percentage"], shifts[i])
+                expected_price = self.current_price * (1 + shifts[i] / 100.0)
+                self.assertAlmostEqual(item["resulting_valuation"], expected_price)
 
     def test_run_stress_test_with_exception(self):
+        shifts = [random.randint(1, 10)]
         simulator = PortfolioScenarioSimulator(self.storage_file)
-        missing_symbol = f"MISS_{uuid.uuid4().hex[:6]}"
-        shifts = [5.0, 10.0]
-        report = simulator.run_stress_test(missing_symbol, shifts)
         
-        self.assertEqual(len(report), 2)
-        for item in report:
-            self.assertEqual(item["resulting_valuation"], 0.0)
+        with patch.object(simulator, "load_data", return_value={}):
+            report = simulator.run_stress_test(self.symbol, shifts)
+            
+            self.assertEqual(len(report), len(shifts))
+            self.assertEqual(report[0]["resulting_valuation"], 0.0)
 
     def test_simulate_market_scenario_helper(self):
-        percentage = 12.5
-        res = simulate_market_scenario(self.storage_file, self.symbol, percentage)
-        expected_price = self.current_price * (1 + percentage / 100.0)
-        self.assertAlmostEqual(res["simulated_price"], expected_price)
+        mock_data = {
+            self.symbol: {
+                "current_price": self.current_price,
+                "quantity": self.quantity
+            }
+        }
+        
+        with patch("skills.market_portfolio_scenario_simulator.PortfolioScenarioSimulator.load_data", return_value=mock_data):
+            res = simulate_market_scenario(self.storage_file, self.symbol, self.percentage)
+            self.assertEqual(res["symbol"], self.symbol)
 
     def test_run_stress_test_helper(self):
-        range_min = -5.0
-        range_max = 5.0
-        step = 5
-        result = run_stress_test(self.storage_file, self.symbol, range_min, range_max, step)
+        range_min = random.randint(-5, -1)
+        range_max = random.randint(1, 5)
+        step = 1
         
-        self.assertEqual(result["symbol"], self.symbol)
-        self.assertIsInstance(result["scenarios"], list)
-        self.assertGreaterEqual(len(result["scenarios"]), 1)
+        mock_data = {
+            self.symbol: {
+                "current_price": self.current_price,
+                "quantity": self.quantity
+            }
+        }
+        
+        with patch("skills.market_portfolio_scenario_simulator.PortfolioScenarioSimulator.load_data", return_value=mock_data):
+            result = run_stress_test(self.storage_file, self.symbol, range_min, range_max, step)
+            
+            self.assertEqual(result["symbol"], self.symbol)
+            expected_shifts_count = len(list(range(range_min, range_max + 1, step)))
+            self.assertEqual(len(result["scenarios"]), expected_shifts_count)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,6 +1,6 @@
 import requests
 from skills import market_portfolio_tax_calculator
-from skills.db_storage import db_storage
+from skills import db_storage
 
 
 class DividendTrackerException(Exception):

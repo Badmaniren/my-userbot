@@ -11,12 +11,21 @@ class MarketInsiderAnomalyAnalyzer:
 
     def analyze_ticker(self, ticker, stream_data=None):
         if hasattr(self.anomaly_detector, "detect"):
-            anomaly_res = self.anomaly_detector.detect(ticker, stream_data)
+            try:
+                anomaly_res = self.anomaly_detector.detect(ticker, stream_data)
+            except TypeError:
+                anomaly_res = self.anomaly_detector.detect(ticker)
         else:
             anomaly_res = {"ticker": ticker, "has_anomaly": False, "score": 0.0}
 
         if hasattr(self.alert_pipeline, "process_alert_stream"):
-            pipeline_res = self.alert_pipeline.process_alert_stream(stream_data)
+            try:
+                pipeline_res = self.alert_pipeline.process_alert_stream(stream_data)
+            except TypeError:
+                try:
+                    pipeline_res = self.alert_pipeline.process_alert_stream(ticker, stream_data)
+                except TypeError:
+                    pipeline_res = self.alert_pipeline.process_alert_stream(ticker)
         elif hasattr(self.alert_pipeline, "process"):
             pipeline_res = self.alert_pipeline.process(ticker)
         else:
@@ -104,11 +113,20 @@ def analyze_market_insider_anomalies(ticker=None, exchange=None, raw_stream_data
 
     anomaly_data = {}
     if hasattr(detector, "detect"):
-        anomaly_data = detector.detect(ticker, raw_stream_data)
+        try:
+            anomaly_data = detector.detect(ticker, raw_stream_data)
+        except TypeError:
+            anomaly_data = detector.detect(ticker)
 
     insider_alert_data = {}
     if hasattr(pipeline, "process_alert_stream"):
-        insider_alert_data = pipeline.process_alert_stream(raw_stream_data)
+        try:
+            insider_alert_data = pipeline.process_alert_stream(raw_stream_data)
+        except TypeError:
+            try:
+                insider_alert_data = pipeline.process_alert_stream(ticker, raw_stream_data)
+            except TypeError:
+                insider_alert_data = pipeline.process_alert_stream(ticker)
 
     correlation_id = uuid.uuid4().hex
     is_coordinated = bool(

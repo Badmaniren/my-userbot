@@ -144,3 +144,26 @@ class MarketPortfolioSlippageModel:
         if storage and hasattr(storage, "get_logs"):
             return storage.get_logs(simulation_id)
         return []
+
+    def apply_slippage(self, base_price: float, slippage_factor: float = 0.0) -> float:
+        return base_price + (base_price * (float(slippage_factor) / 100.0))
+
+
+SlippageModel = MarketPortfolioSlippageModel
+slippage_model = MarketPortfolioSlippageModel
+
+
+def market_portfolio_slippage_model(*args, **kwargs):
+    return MarketPortfolioSlippageModel(*args, **kwargs)
+
+
+def calculate_slippage(price_or_params: Any, slippage_factor: float = 0.0) -> float:
+    if isinstance(price_or_params, OrderExecutionParameters):
+        model = MarketPortfolioSlippageModel()
+        return model.calculate_slippage(price_or_params)
+    try:
+        price = float(price_or_params)
+        factor = float(slippage_factor)
+        return price * (factor / 100.0)
+    except (TypeError, ValueError) as e:
+        raise SlippageCalculationError(f"Invalid parameters for slippage calculation: {e}")

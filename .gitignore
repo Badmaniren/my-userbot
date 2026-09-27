@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.db
+storage_*
+SYM_*
+test_env_*
+test_portfolio_*

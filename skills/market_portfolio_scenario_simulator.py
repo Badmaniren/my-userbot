@@ -4,6 +4,7 @@ import logging
 
 from skills.market_parser import MarketParser
 from skills.market_portfolio_valuation import PortfolioValuation
+from skills.market_portfolio_slippage_model import calculate_slippage
 
 logger = logging.getLogger("PortfolioScenarioSimulator")
 if not logger.handlers:
@@ -14,15 +15,19 @@ if not logger.handlers:
     logger.setLevel(logging.INFO)
 
 class PortfolioScenarioSimulator:
-    def __init__(self, storage_file):
+    def __init__(self, storage_file=None):
         self.storage_file = storage_file
 
-    def load_data(self, storage_file):
+    def load_data(self, storage_file=None):
+        if storage_file is None:
+            storage_file = self.storage_file
+        if not storage_file:
+            return {}
         logger.info("Loading portfolio data from %s", storage_file)
         try:
-            with open(storage_file, 'r') as f:
+            with open(storage_file, 'r', encoding='utf-8') as f:
                 return json.load(f)
-        except (IOError, json.JSONDecodeError) as e:
+        except (IOError, json.JSONDecodeError, TypeError) as e:
             logger.error("Failed to load portfolio data: %s", e)
             return {}
 
@@ -51,10 +56,15 @@ class PortfolioScenarioSimulator:
                 target = next((item for item in data["holdings"] if isinstance(item, dict) and item.get("symbol") == symbol), None)
             elif data.get("symbol") == symbol:
                 target = data
+            else:
+                for v in data.values():
+                    if isinstance(v, dict) and (v.get("symbol") == symbol or v.get("ticker") == symbol):
+                        target = v
+                        break
         elif isinstance(data, list):
             target = next((item for item in data if isinstance(item, dict) and item.get("symbol") == symbol), None)
         
-        if not target:
+        if target is None:
             logger.error("Symbol %s not found in portfolio data", symbol)
             raise KeyError(f"Symbol {symbol} not found")
 
@@ -64,7 +74,15 @@ class PortfolioScenarioSimulator:
         logger.info("Found target for %s: price=%.4f, quantity=%.4f", symbol, current_price, quantity)
         
         base_simulated_price = current_price * (1 + pct_val / 100.0)
-        slippage_adjustment = base_simulated_price * (float(slippage_factor) / 100.0) if slippage_factor else 0.0
+
+        if slippage_factor:
+            try:
+                slippage_adjustment = calculate_slippage(base_simulated_price, float(slippage_factor))
+            except Exception:
+                slippage_adjustment = base_simulated_price * (float(slippage_factor) / 100.0)
+        else:
+            slippage_adjustment = 0.0
+
         simulated_price = base_simulated_price + slippage_adjustment
         
         pnl_impact = (simulated_price - current_price) * quantity
@@ -83,16 +101,20 @@ class PortfolioScenarioSimulator:
         report = []
         for shift in shifts:
             try:
-                res = self.simulate_scenario(symbol, shift)
+                shift_float = float(shift)
+                res = self.simulate_scenario(symbol, shift_float)
                 resulting_valuation = round(res["simulated_price"], 10)
-            except KeyError:
-                logger.warning("Stress test step failed for symbol %s at shift %s: symbol not found", symbol, shift)
+                shift_percentage = shift_float
+            except (KeyError, ValueError, TypeError):
+                logger.warning("Stress test step failed for symbol %s at shift %s", symbol, shift)
                 resulting_valuation = 0.0
-            except ValueError:
-                logger.warning("Stress test step failed for symbol %s at shift %s: value error", symbol, shift)
-                resulting_valuation = 0.0
+                try:
+                    shift_percentage = float(shift)
+                except (ValueError, TypeError):
+                    shift_percentage = 0.0
+
             report.append({
-                "shift_percentage": float(shift),
+                "shift_percentage": shift_percentage,
                 "resulting_valuation": resulting_valuation
             })
         logger.info("Stress test completed for symbol: %s", symbol)
@@ -112,3 +134,8 @@ def run_stress_test(storage_file, symbol, range_min, range_max, step):
         "symbol": symbol,
         "scenarios": scenarios
     }
+
+MarketPortfolioScenarioSimulator = PortfolioScenarioSimulator
+
+def market_portfolio_scenario_simulator(storage_file=None, *args, **kwargs):
+    return PortfolioScenarioSimulator(storage_file=storage_file)

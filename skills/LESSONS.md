@@ -3,7 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-rbot/tests/test_market_portfolio_audit_compliance_hub.py", line 52, in test_run_compliance_export_boolean
+
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_anomaly_detector (create) — раундов: 4
@@ -322,3 +322,6 @@ rbot/tests/test_market_portfolio_audit_compliance_hub.py", line 52, in test_run_
 ## market_portfolio_strategy_optimizer (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_tax_calculator (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

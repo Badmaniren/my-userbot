@@ -42,6 +42,11 @@ def start_ened(symbol, url, telegram_token, chat_id, storage_file):
         storage_file=storage_file
     )
 
+def load_data(storage_file):
+    """Загружает данные мониторинга из файла хранилища."""
+    parser = MarketParser(storage_file=storage_file)
+    return parser.load_data(storage_file)
+
 
 class MarketParser:
     def __init__(self, storage_file):

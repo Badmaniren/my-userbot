@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ly_detector (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## extractor_tool_1790359254 (create) — раундов: 4
+eate) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid character '—' (U+2014) (<unknown>, line 66); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/tests/test_market_portfolio_audit_compliance_hub.py", line 52, in test_run_compliance_export_boolean
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
@@ -315,4 +311,8 @@ ly_detector (create) — раундов: 4
 
 ## market_portfolio_tax_dividend_report (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_tax_dividend_synthesis (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

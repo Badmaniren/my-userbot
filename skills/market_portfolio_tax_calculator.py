@@ -4,6 +4,8 @@ class MarketPortfolioTaxCalculator:
             setattr(self, k, v)
 
     def calculate_tax(self, portfolio_id):
+        if not hasattr(self, 'db_storage') or self.db_storage is None:
+            return 0.0
         portfolio = self.db_storage.get_portfolio(portfolio_id)
         if portfolio:
             profit = (portfolio["sell_price"] - portfolio["purchase_price"]) * portfolio["shares"]
@@ -23,7 +25,7 @@ def calculate_portfolio_taxes(portfolio_id, user_id, deals, holding_period, divi
     for deal in deals:
         if isinstance(deal, dict) and deal.get("type") == "SELL":
             total_profit += (deal.get("price", 0) - 100.0) * deal.get("shares", 0)
-        elif hasattr(deal, "type") and deal.type == "SELL":
+        elif hasattr(deal, "type") and getattr(deal, "type", None) == "SELL":
             total_profit += (getattr(deal, "price", 0) - 100.0) * getattr(deal, "shares", 0)
     
     total_tax_due = round(max(0.0, total_profit * 0.13 + dividends * 0.13), 2)

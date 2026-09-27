@@ -55,3 +55,19 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+_db_storage_store = {}
+
+
+def db_storage(data=None, *args, **kwargs):
+    if isinstance(data, dict):
+        action = data.get("action")
+        key = data.get("key")
+        if action == "set":
+            val = data.get("value")
+            _db_storage_store[key] = val
+            return val
+        elif action == "get":
+            return _db_storage_store.get(key)
+    return _db_storage_store

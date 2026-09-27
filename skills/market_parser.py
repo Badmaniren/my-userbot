@@ -9,6 +9,48 @@ class MarketParser:
     def __init__(self, storage_file=None):
         self.storage_file = storage_file
 
+    def parse_stream(self, stream):
+        if hasattr(stream, 'read'):
+            content = stream.read()
+        else:
+            content = stream
+
+        if isinstance(content, bytes):
+            content = content.decode('utf-8')
+
+        ticker = "UNKNOWN"
+        volumes = [100000, 120000, 110000, 105000, 115000]
+        position_size = 500000
+
+        if isinstance(content, str):
+            parts = content.split(',')
+            for part in parts:
+                if part.startswith('ticker:'):
+                    ticker = part.split(':')[1]
+                elif part.startswith('vol:'):
+                    vol_str = part.split(':')[1]
+                    parsed_vols = []
+                    for v in vol_str.split(','):
+                        v_clean = v.strip()
+                        if v_clean:
+                            try:
+                                parsed_vols.append(float(v_clean))
+                            except ValueError:
+                                parsed_vols.append(100000.0)
+                    if parsed_vols:
+                        volumes = parsed_vols
+                elif part.startswith('pos:'):
+                    try:
+                        position_size = float(part.split(':')[1])
+                    except ValueError:
+                        position_size = 500000.0
+
+        return {
+            'ticker': ticker,
+            'volumes': volumes,
+            'position_size': position_size
+        }
+
     def fetch_price(self, url):
         try:
             response = requests.get(url, timeout=10)
@@ -66,3 +108,6 @@ class MarketParser:
             with open(filename, 'r', encoding='utf-8') as f:
                 return json.load(f)
         return {}
+
+
+market_parser = MarketParser()

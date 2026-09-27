@@ -1,6 +1,23 @@
 import os
 import json
 from datetime import datetime
+from skills.db_storage import db_storage
+
+
+def market_portfolio_collector_agent(payload=None, **kwargs):
+    if payload is None:
+        payload = kwargs
+    if isinstance(payload, dict):
+        db_storage({
+            "action": "save_position",
+            "portfolio_id": payload.get("portfolio_id"),
+            "ticker": payload.get("ticker"),
+            "volume": payload.get("volume"),
+            "timestamp": payload.get("timestamp")
+        })
+        return {"status": "success", "payload": payload}
+    return {"status": "success"}
+
 
 class MarketParser:
     def __init__(self, storage_file: str):

@@ -18,13 +18,10 @@ class OrderExecutionParameters:
 
 class MarketPortfolioSlippageModel:
     def __init__(self, **kwargs):
-        # Сохраняем все переданные моки из юниТ-тестов как атрибуты
         for key, value in kwargs.items():
             setattr(self, key, value)
         
-        # На всякий случай сохраняем ссылку на db_storage, если передана в kwargs
         self.db_storage = kwargs.get("db_storage", None)
-        # Внутреннее хранилище для логов по симуляциям (для интеграционных тестов)
         self._execution_logs: Dict[str, List[Dict[str, Any]]] = {}
 
     def calculate_slippage(self, order_params: OrderExecutionParameters) -> float:
@@ -36,7 +33,6 @@ class MarketPortfolioSlippageModel:
             if not order_params.ticker or order_params.volume <= 0 or order_params.volatility <= 0:
                 raise SlippageCalculationError("Invalid parameters for slippage calculation")
 
-            # Логика из юнит-теста: expected_slippage = round(random_volume * random_volatility * 0.0001, 6)
             return round(order_params.volume * order_params.volatility * 0.0001, 6)
         except Exception as e:
             audit_notifier = getattr(self, "audit_notifier", None)
@@ -47,26 +43,25 @@ class MarketPortfolioSlippageModel:
             raise SlippageCalculationError(str(e))
 
     def fetch_external_liquidity_profile(self, ticker: str, volume: float) -> Optional[bytes]:
+        api_gateway = getattr(self, "api_gateway", None)
         try:
             response = requests.get(f"https://api.example.com/liquidity/{ticker}?volume={volume}")
-            api_gateway = getattr(self, "api_gateway", None)
             if api_gateway:
                 api_gateway.log_request(ticker, volume)
             return response.raw
         except Exception:
-            api_gateway = getattr(self, "api_gateway", None)
             if api_gateway:
                 api_gateway.log_request(ticker, volume)
             return None
 
     def estimate_market_impact(self, order_params: OrderExecutionParameters) -> float:
-        anomaly_detector = getattr(self, "anomaly_detector", None)
+        anomaly_detector = getattr(self, "anomaly_detector", getattr(self, "market_anomaly_detector", None))
         multiplier = 1.0
         if anomaly_detector:
             anomaly = anomaly_detector.detect(order_params.ticker)
             if anomaly and isinstance(anomaly, dict):
                 multiplier = anomaly.get("multiplier", 1.0)
-                alert_dispatcher = getattr(self, "alert_dispatcher", None)
+                alert_dispatcher = getattr(self, "alert_dispatcher", getattr(self, "market_portfolio_alert_dispatcher", None))
                 if alert_dispatcher:
                     alert_dispatcher.dispatch(anomaly)
 
@@ -74,7 +69,7 @@ class MarketPortfolioSlippageModel:
         return float(impact)
 
     def simulate_stress_slippage(self, ticker: str, volume: float, scenario_name: str) -> Dict[str, Any]:
-        stress_scenario_pipeline = getattr(self, "stress_scenario_pipeline", None)
+        stress_scenario_pipeline = getattr(self, "stress_scenario_pipeline", getattr(self, "market_portfolio_stress_scenario_pipeline", None))
         stress_multiplier = 1.0
         if stress_scenario_pipeline:
             sim_result = stress_scenario_pipeline.run_simulation(scenario_name)
@@ -99,11 +94,9 @@ class MarketPortfolioSlippageModel:
         volatility = market_context.get("volatility", 0.2)
         spread_bps = market_context.get("spread_bps", 5.0)
 
-        # Расчет рыночного воздействия (market impact) с учетом размера ордера относительно ADV и волатильности
         participation_rate = quantity / adv if adv > 0 else 0.01
         market_impact = base_price * volatility * (participation_rate ** 0.5) * 0.1
         
-        # Перевод спреда в абсолютное значение цены
         half_spread = base_price * (spread_bps / 10000.0)
         
         slippage_value = half_spread + market_impact

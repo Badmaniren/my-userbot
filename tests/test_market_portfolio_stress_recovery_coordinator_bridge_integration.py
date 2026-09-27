@@ -1,19 +1,24 @@
-import unittest
 import os
+import unittest
 import uuid
 import random
-from skills.market_portfolio_stress_recovery_coordinator_bridge import run_stress_recovery_coordinator_pipeline
+from skills.market_portfolio_stress_recovery_coordinator_bridge import (
+    StressRecoveryCoordinatorBridge,
+    run_stress_recovery_coordinator,
+    run_stress_recovery_coordinator_pipeline
+)
 
 class TestMarketPortfolioStressRecoveryCoordinatorBridgeIntegration(unittest.TestCase):
     def setUp(self):
-        self.symbol = f"TEST_{uuid.uuid4().hex[:6].upper()}"
-        self.price = round(random.uniform(100.0, 2000.0), 2)
+        self.random_suffix = uuid.uuid4().hex[:8]
+        self.storage_file = f"test_stress_recovery_{self.random_suffix}.db"
+        self.symbol = f"TICKER_{random.randint(100, 999)}"
+        self.url = f"https://api.mock-gateway-{self.random_suffix}.local/webhook"
+        self.telegram_token = f"TOKEN_{uuid.uuid4().hex[:6]}"
+        self.chat_id = str(random.randint(100000, 999999))
         self.percentage = round(random.uniform(5.0, 25.0), 2)
         self.shifts = random.randint(1, 5)
-        self.telegram_token = f"{random.randint(100000, 999999)}:ABC-DEF{uuid.uuid4().hex[:6]}"
-        self.chat_id = str(random.randint(10000000, 99999999))
-        self.url = f"https://api.telegram.org/bot{self.telegram_token}/sendMessage"
-        self.storage_file = f"test_storage_{uuid.uuid4().hex}.json"
+        self.price = round(random.uniform(10.0, 500.0), 2)
 
     def tearDown(self):
         if os.path.exists(self.storage_file):
@@ -22,7 +27,38 @@ class TestMarketPortfolioStressRecoveryCoordinatorBridgeIntegration(unittest.Tes
             except OSError:
                 pass
 
-    def test_stress_recovery_coordinator_bridge_integration(self):
+    def test_stress_recovery_coordinator_bridge_workflow(self):
+        bridge = StressRecoveryCoordinatorBridge(storage_file=self.storage_file)
+        
+        result = bridge.execute_recovery_workflow(
+            symbol=self.symbol,
+            url=self.url,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id,
+            percentage=self.percentage,
+            shifts=self.shifts
+        )
+
+        self.assertIsInstance(result, dict)
+        self.assertIn("stress_result", result)
+        self.assertIn("recovery_result", result)
+
+    def test_run_stress_recovery_coordinator_function(self):
+        result = run_stress_recovery_coordinator(
+            storage_file=self.storage_file,
+            symbol=self.symbol,
+            url=self.url,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id,
+            percentage=self.percentage,
+            shifts=self.shifts
+        )
+
+        self.assertIsInstance(result, dict)
+        self.assertIn("stress", result)
+        self.assertIn("recovery", result)
+
+    def test_run_stress_recovery_coordinator_pipeline_function(self):
         result = run_stress_recovery_coordinator_pipeline(
             storage_file=self.storage_file,
             symbol=self.symbol,
@@ -34,8 +70,10 @@ class TestMarketPortfolioStressRecoveryCoordinatorBridgeIntegration(unittest.Tes
             url=self.url
         )
 
-        self.assertIsNotNone(result)
-        self.assertTrue(os.path.exists(self.storage_file), "Storage file must be created by the integrated pipeline.")
+        self.assertIsInstance(result, dict)
+        self.assertIn("stress", result)
+        self.assertIn("recovery", result)
+        self.assertTrue(os.path.exists(self.storage_file), "Storage file must be created or verified during pipeline execution.")
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

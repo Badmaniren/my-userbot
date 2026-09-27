@@ -3,16 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-еред фиксом: FAILED (failures=1, errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_monitor (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_anomaly_detector (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+редан на эскалацию
 
 ## market_insider_alert_pipeline (compose) — раундов: 4
 - Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/tests/test_market_portfolio_audit_compliance_hub.py", line 52, in test_run_compliance_export_boolean
@@ -311,5 +302,10 @@
 
 ## market_portfolio_fundamental_screener (create) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 10); АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.; Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_risk_engine (create) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- импорт: 'from skills.market_parser import ...'
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_anomaly_detector (create) — раундов: 4
+ly_detector (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -316,3 +312,7 @@
 
 ## market_portfolio_dividend_tracker (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_tax_dividend_report (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

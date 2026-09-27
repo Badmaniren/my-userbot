@@ -18,7 +18,7 @@ class MarketPortfolioAuditComplianceHub:
         if not hasattr(self.audit_exporter, 'process_audit_stream'):
             setattr(self.audit_exporter, 'process_audit_stream', lambda path, stream: True)
         if not hasattr(self.audit_exporter, 'generate_audit_log'):
-            setattr(self.audit_exporter, 'generate_audit_log', lambda path: True)
+            setattr(self.audit_exporter, 'generate_audit_log', self.export_audit_logs)
 
     def run_compliance_export(self, export_path):
         res = self.audit_exporter.export_audit_logs(export_path)

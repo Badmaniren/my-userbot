@@ -55,12 +55,15 @@ class MarketParser:
                     content = f.read()
                     if content.strip():
                         data = json.loads(content)
-            except (json.JSONDecodeError, IOError):
-                data = {}
+            except (IOError, OSError, json.JSONDecodeError):
+                pass
         
         data[symbol] = price
-        with open(self.storage_file, "w", encoding="utf-8") as f:
-            json.dump(data, f)
+        try:
+            with open(self.storage_file, "w", encoding="utf-8") as f:
+                json.dump(data, f)
+        except (IOError, OSError):
+            pass
 
     def load_data(self, storage_file):
         if not os.path.exists(storage_file):
@@ -71,7 +74,7 @@ class MarketParser:
                 if not content.strip():
                     return {}
                 return json.loads(content)
-        except (json.JSONDecodeError, IOError, UnicodeDecodeError):
+        except (IOError, OSError, json.JSONDecodeError):
             return None
 
 
@@ -90,7 +93,7 @@ class MarketReportGenerator:
             try:
                 with open(self.storage_file, "r", encoding="utf-8") as f:
                     return f.read()
-            except (IOError, UnicodeDecodeError):
+            except (IOError, OSError):
                 return "{}"
         return "{}"
 
@@ -123,6 +126,6 @@ def export_audit_logs(storage_file=None):
                 if not content.strip():
                     return False
                 return True
-        except (IOError, json.JSONDecodeError, UnicodeDecodeError):
+        except (IOError, OSError):
             return False
     return False

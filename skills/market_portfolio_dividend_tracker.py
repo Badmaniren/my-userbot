@@ -68,6 +68,49 @@ class DividendTracker:
             "calendar_entries": []
         }
 
+    def track(self, portfolio_payload):
+        if isinstance(portfolio_payload, dict):
+            portfolio_id = portfolio_payload.get("portfolio_id", "UNKNOWN")
+            total_dividends_received = 0.0
+            total_tax_withheld = 0.0
+            asset_summaries = {}
+
+            for asset in portfolio_payload.get("assets", []):
+                ticker = asset.get("ticker", "UNKNOWN")
+                shares = asset.get("shares", 0)
+                asset_gross = 0.0
+                asset_withheld = 0.0
+
+                for div in asset.get("dividends_received", []):
+                    div_amount = div.get("amount_per_share", 0.0) * shares
+                    withheld = div.get("tax_withheld", 0.0) * shares
+                    asset_gross += div_amount
+                    asset_withheld += withheld
+
+                total_dividends_received += asset_gross
+                total_tax_withheld += asset_withheld
+                asset_summaries[ticker] = {
+                    "total_gross": round(asset_gross, 2),
+                    "total_withheld": round(asset_withheld, 2),
+                    "total_net": round(asset_gross - asset_withheld, 2)
+                }
+
+            return {
+                "portfolio_id": portfolio_id,
+                "total_dividends_received": round(total_dividends_received, 2),
+                "total_tax_withheld": round(total_tax_withheld, 2),
+                "net_dividends_received": round(total_dividends_received - total_tax_withheld, 2),
+                "asset_summaries": asset_summaries
+            }
+        return {"portfolio_id": "UNKNOWN", "net_dividends_received": 0.0}
+
+
+MarketPortfolioDividendTracker = DividendTracker
+
+
+def market_portfolio_dividend_tracker(db_storage=None, tax_calculator=None, api_gateway=None):
+    return DividendTracker(db_storage=db_storage, tax_calculator=tax_calculator, api_gateway=api_gateway)
+
 
 def process_dividends(portfolio_id, asset, amount):
     if not hasattr(db_storage, "save_record"):

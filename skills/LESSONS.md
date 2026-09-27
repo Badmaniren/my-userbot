@@ -3,7 +3,15 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-я ошибка перед фиксом: FAILED (errors=2)
+market_parser import ...'
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_insider_alert_pipeline (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_insider_exposure_report (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_insider_exposure_report (create) — раундов: 4
@@ -291,9 +299,4 @@
 
 ## market_portfolio_backtester (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: from skills.market_portfolio_strategy_optimizer import PortfolioStrategyOptimizer
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_simulation_evaluator (compose) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
-- Последняя ошибка перед фиксом: with patch(
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

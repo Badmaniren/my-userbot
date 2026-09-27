@@ -15,7 +15,13 @@ class DividendTracker:
         self.api_gateway = api_gateway
 
     def calculate_projected_dividends(self, asset_ticker, shares_count, tax_rate):
+        if self.api_gateway is None:
+            raise DividendTrackerException("API gateway is not initialized.")
+        
         dividend_info = self.api_gateway.get_dividend_info(asset_ticker)
+        if not dividend_info or "dividend_per_share" not in dividend_info:
+            raise DividendTrackerException("Invalid dividend info received from API.")
+            
         dividend_per_share = dividend_info["dividend_per_share"]
         
         gross_dividend = shares_count * dividend_per_share
@@ -30,7 +36,8 @@ class DividendTracker:
         }
 
     def fetch_and_store_dividend_history(self, asset_id):
-        self.api_gateway.pull_raw_stream(asset_id)
+        if self.api_gateway is not None:
+            self.api_gateway.pull_raw_stream(asset_id)
 
     def aggregate_portfolio_dividends(self, portfolio_id):
         assets = self.db_storage.get_portfolio_assets(portfolio_id)

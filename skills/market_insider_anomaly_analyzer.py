@@ -130,6 +130,12 @@ def market_insider_anomaly_analyzer(ticker=None, raw_stream_data=None):
         t = ticker.get("ticker")
         s = ticker.get("raw_stream_data")
         return analyzer.analyze_ticker(t, s)
+    elif isinstance(ticker, list):
+        results = [
+            analyzer.analyze_ticker(item.get("ticker"), item) if isinstance(item, dict) else analyzer.analyze_ticker(item)
+            for item in ticker
+        ]
+        return {"status": "success", "results": results}
     return analyzer.analyze_ticker(ticker, raw_stream_data)
 
 

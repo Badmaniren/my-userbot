@@ -41,7 +41,7 @@ class MarketInsiderActivityTrackerModuleAPI:
                 "signature": uuid.uuid4().hex
             }
             
-        ticker_id = payload.get("ticker_id")
+        ticker_id = payload.get("ticker_id") or payload.get("ticker")
         raw_volume = payload.get("volume", 0)
         raw_multiplier = payload.get("anomaly_multiplier", 1.0)
         
@@ -117,5 +117,40 @@ class DBStorage:
 
 MarketInsiderActivityTrackerModuleIdempotentProxy = MarketInsiderActivityTrackerModuleAPI
 
-globals()["market_insider_activity_tracker"] = MarketInsiderActivityTrackerModuleAPI
-globals()["DBStorage"] = DBStorage
+
+def track_insider_activity(payload: Any = None, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+    if payload is None and kwargs:
+        payload = kwargs
+    return MarketInsiderActivityTrackerModuleAPI.track_activity(payload)
+
+
+def market_insider_activity_tracker(payload: Any = None, *args: Any, **kwargs: Any) -> Any:
+    if payload is None and kwargs:
+        payload = kwargs
+
+    if isinstance(payload, dict):
+        insider_trades = float(payload.get("insider_trades_count", 0))
+        volume = float(payload.get("volume", 0))
+        avg_vol = float(payload.get("avg_volume", 0))
+        multiplier = float(payload.get("anomaly_multiplier", 1.0))
+        sec_flag = bool(payload.get("sec_filing_flag", False))
+
+        score = 0.0
+        if insider_trades > 0:
+            score += min(0.6, insider_trades * 0.1)
+        if avg_vol > 0 and volume > avg_vol:
+            ratio = volume / avg_vol
+            score += min(0.3, (ratio - 1.0) * 0.05)
+        if sec_flag:
+            score += 0.1
+        if multiplier > 1.0:
+            score += min(0.3, (multiplier - 1.0) * 0.1)
+
+        return min(1.0, max(0.0, round(score, 2)))
+    elif isinstance(payload, (int, float)):
+        return float(payload)
+    elif hasattr(payload, "read"):
+        tracker = MarketInsiderActivityTracker()
+        res = tracker.analyze_activity(payload)
+        return 1.0 if res.get("status") == "ALERT" else 0.0
+    return 0.0

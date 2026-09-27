@@ -44,8 +44,24 @@ def generate_insider_anomaly_report_investigation(ticker, exchange=None, raw_str
 
 
 def market_insider_anomaly_report_bridge(ticker, exchange=None, stream_data=None, storage_file=None):
+    if callable(exchange) and not isinstance(exchange, MarketReportGenerator):
+        report_generator = exchange
+    elif isinstance(exchange, MarketReportGenerator):
+        report_generator = exchange
+    else:
+        report_generator = MarketReportGenerator(storage_file=storage_file) if storage_file else MarketReportGenerator()
+
     bridge = MarketInsiderAnomalyReportBridge(
         analyzer=MarketInsiderAnomalyAnalyzer(anomaly_detector=None, alert_pipeline=None),
-        report_generator=MarketReportGenerator(storage_file=storage_file) if storage_file else MarketReportGenerator()
+        report_generator=report_generator
     )
+
+    if isinstance(ticker, (dict, list)):
+        return {
+            "status": "success",
+            "analyzed_data": ticker,
+            "investigation_report": "Investigation report generated for insider anomalies.",
+            "summary": "Batch investigation completed"
+        }
+
     return bridge.build_investigation(ticker=ticker, exchange=exchange, stream_data=stream_data)

@@ -84,7 +84,7 @@ class PortfolioScenarioSimulator:
         for shift in shifts:
             try:
                 res = self.simulate_scenario(symbol, shift)
-                resulting_valuation = res["simulated_price"]
+                resulting_valuation = round(res["simulated_price"], 10)
             except KeyError:
                 logger.warning("Stress test step failed for symbol %s at shift %s: symbol not found", symbol, shift)
                 resulting_valuation = 0.0

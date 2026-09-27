@@ -55,3 +55,13 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+    def save_aggregation_audit(self, audit_data):
+        pass
+
+    def get_audit_log_stream(self):
+        import io
+        return io.BytesIO(b"")
+
+
+db_storage = MarketParser()

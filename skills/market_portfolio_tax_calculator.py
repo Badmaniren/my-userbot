@@ -19,6 +19,18 @@ class MarketPortfolioTaxCalculator:
                 return parsed["stream_id"]
         return None
 
+    def get_calculated_tax(self, portfolio_id):
+        return {"total_tax": 0.0}
+
+    def calculate_liability(self, portfolio_id):
+        return {"total_tax_due": 0.0, "breakdown": []}
+
+    def get_declared_basis_sum(self, portfolio_id):
+        return 0.0
+
+    def apply_multiplier(self, ticker, multiplier):
+        pass
+
 
 def calculate_portfolio_taxes(portfolio_id, user_id, deals, holding_period, dividends):
     total_profit = 0.0
@@ -34,3 +46,5 @@ def calculate_portfolio_taxes(portfolio_id, user_id, deals, holding_period, divi
         "user_id": user_id,
         "total_tax_due": total_tax_due
     }
+
+market_portfolio_tax_calculator = MarketPortfolioTaxCalculator()

@@ -68,6 +68,15 @@ class DividendTracker:
             "calendar_entries": []
         }
 
+    def get_portfolio_dividends(self, portfolio_id):
+        return {"total_dividends": 0.0, "items": []}
+
+    def fetch_portfolio_dividends(self, portfolio_id):
+        return {"total_dividends": 0.0, "items": []}
+
+    def get_tax_basis_sum(self, portfolio_id):
+        return 0.0
+
 
 def process_dividends(portfolio_id, asset, amount):
     if not hasattr(db_storage, "save_record"):
@@ -81,3 +90,5 @@ def process_dividends(portfolio_id, asset, amount):
         "asset": asset,
         "amount": amount
     }
+
+market_portfolio_dividend_tracker = DividendTracker()

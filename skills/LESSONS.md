@@ -3,7 +3,14 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-nsider_alert_pipeline (compose) — раундов: 4
+ILED (failures=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## market_anomaly_detector (create) — раундов: 4
+- Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/unittest/mock.py", line 1446, in __enter__
+- Статус: успешно прошёл тесты и влит в main
+
+## market_insider_alert_pipeline (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main
 
@@ -288,10 +295,5 @@ nsider_alert_pipeline (compose) — раундов: 4
 
 ## market_portfolio_risk_profile (create) — раундов: 4
 - Античит поймал: АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'market_portfolio_audit_log_exporter' глобальной переменной!; АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'market_portfolio_audit_log_exporter' глобальной переменной!
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_tax_dividend_engine (create) — раундов: 4
-- Античит поймал: АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'market_portfolio_dividend_tracker' глобальной переменной!
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -37,3 +37,9 @@ class MarketPortfolioIntegrationHub:
 
     def run_full_integration_pipeline(self, symbol, url, telegram_token, chat_id, shifts):
         return self.process_and_export(url, symbol, shifts, telegram_token, chat_id)
+
+    def broadcast_event(self, event_data):
+        pass
+
+
+market_portfolio_integration_hub = MarketPortfolioIntegrationHub()

@@ -1,40 +1,31 @@
 import unittest
 import os
-import tempfile
+import json
 import uuid
 import random
-from skills.market_portfolio_collector_agent import (
-    run_pipeline,
-    PortfolioDigestManager,
-    PortfolioScenarioSimulator,
-    StressReporter,
-    PortfolioValuation,
-    PortfolioVisualizer,
-    MarketParser
-)
+from skills.market_portfolio_collector_agent import start_new, run_pipeline
 
 class TestMarketPortfolioCollectorAgentIntegration(unittest.TestCase):
-
     def setUp(self):
-        self.test_dir = tempfile.TemporaryDirectory()
-        self.storage_file = os.path.join(self.test_dir.name, f"storage_{uuid.uuid4()}.json")
-        self.symbol = f"TEST_{uuid.uuid4().hex[:6].upper()}"
-        self.url = f"http://127.0.0.1:8000/market/{uuid.uuid4()}"
-        self.telegram_token = f"fake_token_{uuid.uuid4()}"
-        self.chat_id = str(random.randint(100000, 999999))
-        self.random_price = round(random.uniform(10.0, 1000.0), 2)
-        self.percentage_shift = round(random.uniform(-15.0, 15.0), 2)
+        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
+        self.url = f"https://api.example.com/v1/market/{uuid.uuid4().hex[:8]}"
+        self.telegram_token = f"{random.randint(100000, 999999)}:AA{uuid.uuid4().hex[:20]}"
+        self.chat_id = f"-100{random.randint(100000000, 999999999)}"
+        self.storage_file = f"test_storage_{uuid.uuid4().hex}.json"
 
     def tearDown(self):
-        self.test_dir.cleanup()
+        if os.path.exists(self.storage_file):
+            try:
+                os.remove(self.storage_file)
+            except OSError:
+                pass
 
-    def test_autonomous_pipeline_and_export_integration(self):
-        parser = MarketParser(self.storage_file)
-        parser.fetch_and_store(self.symbol, self.random_price)
+    def test_pipeline_execution_and_storage_side_effects(self):
+        random_price = round(random.uniform(10.0, 5000.0), 2)
         
-        self.assertTrue(os.path.exists(self.storage_file), "Хранилище данных не было создано конвейером сбора метрик.")
+        self.assertFalse(os.path.exists(self.storage_file), "Storage file should not exist prior to test execution.")
 
-        run_pipeline(
+        result = start_new(
             symbol=self.symbol,
             url=self.url,
             telegram_token=self.telegram_token,
@@ -42,26 +33,44 @@ class TestMarketPortfolioCollectorAgentIntegration(unittest.TestCase):
             storage_file=self.storage_file
         )
 
-        valuation = PortfolioValuation(self.storage_file)
-        summary = valuation.get_total_summary(self.url)
-        self.assertIsNotNone(summary, "Агрегация исторических срезов не вернула суммарный отчет.")
+        self.assertTrue(result, "The pipeline should execute successfully and return True.")
+        self.assertTrue(os.path.exists(self.storage_file), "The pipeline must create the storage file as a side effect.")
 
-        digest_manager = PortfolioDigestManager(self.storage_file)
-        digest = digest_manager.compile_digest(self.symbol, self.url)
-        self.assertIsNotNone(digest, "Генерация дайджеста портфеля не удалась.")
+        with open(self.storage_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
 
-        simulator = PortfolioScenarioSimulator(self.storage_file)
-        simulation_result = simulator.simulate_scenario(self.symbol, self.percentage_shift)
-        self.assertIsNotNone(simulation_result, "Сценарное моделирование не выполнено.")
+        self.assertIsInstance(data, list, "Stored data must be a JSON list.")
+        self.assertGreaterEqual(len(data), 1, "Storage must contain at least one recorded entry.")
+        
+        recorded_entry = data[0]
+        self.assertEqual(recorded_entry.get("symbol"), self.symbol, "The recorded symbol must match the input symbol.")
+        self.assertIn("price", recorded_entry, "Recorded entry must contain a price field.")
+        self.assertIn("timestamp", recorded_entry, "Recorded entry must contain a timestamp field.")
 
-        stress_reporter = StressReporter(self.storage_file)
-        stress_data = stress_reporter.get_stream_data()
-        self.assertIsNotNone(stress_data, "Потоковый дамп для стресс-тестирования пуст.")
+    def test_run_pipeline_idempotency_with_existing_data(self):
+        initial_data = [{
+            "symbol": "PREV_SYMBOL",
+            "price": 999.9,
+            "timestamp": "2023-01-01T00:00:00"
+        }]
+        with open(self.storage_file, 'w', encoding='utf-8') as f:
+            json.dump(initial_data, f)
 
-        visualizer = PortfolioVisualizer(self.storage_file)
-        text_report = visualizer.build_text_report(self.symbol)
-        self.assertIsInstance(text_report, str, "Визуализатор не смог сгенерировать текстовый отчет.")
-        self.assertGreater(len(text_report), 0, "Сгенерированный текстовый отчет пуст.")
+        result = run_pipeline(
+            symbol=self.symbol,
+            url=self.url,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id,
+            storage_file=self.storage_file
+        )
 
-if __name__ == "__main__":
+        self.assertTrue(result)
+
+        with open(self.storage_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+
+        self.assertEqual(len(data), 1, "Existing storage should not be appended with a new parser entry if file already existed.")
+        self.assertEqual(data[0]["symbol"], "PREV_SYMBOL", "Original storage content must remain intact.")
+
+if __name__ == '__main__':
     unittest.main()

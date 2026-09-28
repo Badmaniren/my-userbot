@@ -1,159 +1,158 @@
 import unittest
 from unittest.mock import patch, MagicMock
+import io
 import uuid
 import random
-import io
-
 from skills.market_portfolio_strategy_optimizer import PortfolioStrategyOptimizer
 
 class TestPortfolioStrategyOptimizer(unittest.TestCase):
-
     def setUp(self):
-        self.storage_path = f"{uuid.uuid4().hex}.db"
-        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
-        self.optimizer = PortfolioStrategyOptimizer(self.storage_path)
+        self.storage_file = f"storage_{uuid.uuid4().hex}.db"
+        with patch('skills.market_portfolio_strategy_optimizer.MarketPortfolioBacktester'), \
+             patch('skills.market_portfolio_strategy_optimizer.PortfolioScenarioSimulator'):
+            self.optimizer = PortfolioStrategyOptimizer(self.storage_file)
 
-    def test_init_state(self):
-        self.assertEqual(self.optimizer.storage_file, self.storage_path)
-        self.assertIsNotNone(self.optimizer.backtester)
-        self.assertIsNotNone(self.optimizer.simulator)
+    def test_init_and_storage(self):
+        rand_symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
+        summary = self.optimizer.get_strategy_summary(rand_symbol)
+        self.assertIn(rand_symbol, summary)
+        self.assertEqual(summary[rand_symbol]["storage"], self.storage_file)
+        self.assertEqual(summary[rand_symbol]["summary"], "active")
 
-    def test_validate_allocation_valid_floats(self):
+    def test_validate_allocation_boundaries_and_types(self):
         valid_val = round(random.uniform(0.0, 1.0), 4)
-        result = self.optimizer._validate_allocation(valid_val)
-        self.assertIsInstance(result, float)
-        self.assertEqual(result, valid_val)
+        self.assertEqual(self.optimizer._validate_allocation(valid_val), valid_val)
 
-    def test_validate_allocation_boundary_conditions(self):
-        below_zero = -round(random.uniform(0.1, 10.0), 2)
-        self.assertEqual(self.optimizer._validate_allocation(below_zero), 0.0)
+        over_val = 1.0 + random.uniform(0.1, 10.0)
+        self.assertEqual(self.optimizer._validate_allocation(over_val), 1.0)
 
-        above_one = 1.0 + round(random.uniform(0.1, 10.0), 2)
-        self.assertEqual(self.optimizer._validate_allocation(above_one), 1.0)
+        under_val = -1.0 * random.uniform(0.1, 10.0)
+        self.assertEqual(self.optimizer._validate_allocation(under_val), 0.0)
 
-    def test_validate_allocation_string_parsing(self):
-        target_val = round(random.uniform(0.0, 1.0), 2)
-        result = self.optimizer._validate_allocation(str(target_val))
-        self.assertEqual(result, float(target_val))
+        str_val = str(random.choice([0.25, 0.5, 0.75]))
+        self.assertEqual(self.optimizer._validate_allocation(str_val), float(str_val))
 
-    def test_validate_allocation_invalid_types(self):
-        garbage_input = uuid.uuid4().hex
-        result = self.optimizer._validate_allocation(garbage_input)
-        self.assertEqual(result, 0.0)
+        invalid_str = f"corrupt_{uuid.uuid4().hex}"
+        self.assertEqual(self.optimizer._validate_allocation(invalid_str), 0.0)
+        self.assertEqual(self.optimizer._validate_allocation(None), 0.0)
 
     def test_optimize_strategy_success(self):
-        shifts = [random.randint(1, 30) for _ in range(3)]
-        percentage = round(random.uniform(1.0, 50.0), 2)
-        backtest_mock_data = {uuid.uuid4().hex: random.random()}
-        simulation_mock_data = {uuid.uuid4().hex: random.random()}
+        rand_symbol = f"TICKER_{uuid.uuid4().hex[:5]}"
+        rand_shift = random.randint(1, 100)
+        rand_percentage = random.uniform(0.0, 100.0)
+        
+        mock_backtest_data = {uuid.uuid4().hex: random.random()}
+        mock_simulation_data = {uuid.uuid4().hex: random.random()}
 
-        with patch.object(self.optimizer.backtester, 'run_backtest', return_value=backtest_mock_data) as mock_bt, \
-             patch.object(self.optimizer.simulator, 'simulate_scenario', return_value=simulation_mock_data) as mock_sim:
+        with patch.object(self.optimizer.backtester, 'run_backtest', return_value=mock_backtest_data) as mock_bt, \
+             patch.object(self.optimizer.simulator, 'simulate_scenario', return_value=mock_simulation_data) as mock_sim:
             
-            res = self.optimizer.optimize_strategy(self.symbol, shifts, percentage)
+            result = self.optimizer.optimize_strategy(rand_symbol, rand_shift, rand_percentage)
             
-            mock_bt.assert_called_once_with(self.symbol, shifts)
-            mock_sim.assert_called_once_with(self.symbol, percentage)
-            self.assertEqual(res['backtest'], backtest_mock_data)
-            self.assertEqual(res['simulation'], simulation_mock_data)
+            mock_bt.assert_called_once_with(rand_symbol, [rand_shift])
+            mock_sim.assert_called_once_with(rand_symbol, rand_percentage)
+            self.assertEqual(result['backtest'], mock_backtest_data)
+            self.assertEqual(result['simulation'], mock_simulation_data)
 
     def test_optimize_strategy_key_error_handling(self):
-        shifts = random.randint(1, 10)
-        percentage = round(random.uniform(1.0, 100.0), 2)
+        rand_symbol = f"TICKER_{uuid.uuid4().hex[:5]}"
+        rand_shift = [random.randint(1, 50), random.randint(51, 100)]
+        rand_percentage = random.uniform(0.0, 100.0)
 
-        with patch.object(self.optimizer.backtester, 'run_backtest', side_effect=KeyError) as mock_bt, \
-             patch.object(self.optimizer.simulator, 'simulate_scenario', side_effect=KeyError) as mock_sim:
+        with patch.object(self.optimizer.backtester, 'run_backtest', side_effect=KeyError), \
+             patch.object(self.optimizer.simulator, 'simulate_scenario', side_effect=KeyError):
             
-            res = self.optimizer.optimize_strategy(self.symbol, shifts, percentage)
-            
-            self.assertEqual(res, {'backtest': {}, 'simulation': {}})
+            result = self.optimizer.optimize_strategy(rand_symbol, rand_shift, rand_percentage)
+            self.assertEqual(result['backtest'], {})
+            self.assertEqual(result['simulation'], {})
 
-    def test_evaluate_resilience_success(self):
-        shifts = [random.randint(5, 50) for _ in range(2)]
-        stress_mock = {uuid.uuid4().hex: uuid.uuid4().hex}
-        drawdown_val = -round(random.uniform(0.01, 0.99), 2)
+    def test_evaluate_resilience_flow(self):
+        rand_symbol = f"TICKER_{uuid.uuid4().hex[:5]}"
+        rand_shift = random.randint(1, 10)
+        rand_stress_key = uuid.uuid4().hex
+        rand_stress_val = random.random()
+        mock_stress_data = {rand_stress_key: rand_stress_val}
+        
+        drawdown_val = round(-random.uniform(0.1, 0.9), 2)
 
-        with patch.object(self.optimizer.simulator, 'run_stress_test', return_value=stress_mock) as mock_stress, \
+        with patch.object(self.optimizer.simulator, 'run_stress_test', return_value=mock_stress_data) as mock_stress, \
              patch.object(self.optimizer.backtester, 'calculate_maximum_drawdown', return_value=drawdown_val) as mock_dd:
             
-            res = self.optimizer.evaluate_resilience(self.symbol, shifts)
-
-            mock_stress.assert_called_once_with(self.symbol, shifts)
-            mock_dd.assert_called_once_with(self.symbol)
-            self.assertEqual(res['stress_data'], stress_mock)
+            res = self.optimizer.evaluate_resilience(rand_symbol, rand_shift)
+            
+            mock_stress.assert_called_once_with(rand_symbol, [rand_shift])
+            mock_dd.assert_called_once_with(rand_symbol)
+            self.assertEqual(res['stress_data'], mock_stress_data)
             self.assertEqual(res['drawdown_checked'], drawdown_val)
 
-    def test_evaluate_resilience_drawdown_string_conversion(self):
-        shifts = random.randint(1, 10)
-        stress_mock = {}
-        drawdown_str = str(round(random.uniform(-0.8, -0.1), 2))
-
-        with patch.object(self.optimizer.simulator, 'run_stress_test', return_value=stress_mock), \
-             patch.object(self.optimizer.backtester, 'calculate_maximum_drawdown', return_value=drawdown_str):
-            
-            res = self.optimizer.evaluate_resilience(self.symbol, shifts)
-            self.assertIsInstance(res['drawdown_checked'], float)
-            self.assertEqual(res['drawdown_checked'], float(drawdown_str))
-
-    def test_evaluate_resilience_exceptions_fallback(self):
-        shifts = random.randint(1, 5)
+    def test_evaluate_resilience_string_drawdown_and_exceptions(self):
+        rand_symbol = f"TICKER_{uuid.uuid4().hex[:5]}"
+        rand_shift = [random.randint(1, 10)]
+        string_drawdown = str(round(-random.uniform(0.01, 0.5), 2))
 
         with patch.object(self.optimizer.simulator, 'run_stress_test', side_effect=KeyError), \
-             patch.object(self.optimizer.backtester, 'calculate_maximum_drawdown', side_effect=Exception):
+             patch.object(self.optimizer.backtester, 'calculate_maximum_drawdown', return_value=string_drawdown):
             
-            res = self.optimizer.evaluate_resilience(self.symbol, shifts)
+            res = self.optimizer.evaluate_resilience(rand_symbol, rand_shift)
             self.assertEqual(res['stress_data'], {})
+            self.assertEqual(res['drawdown_checked'], float(string_drawdown))
+
+        with patch.object(self.optimizer.simulator, 'run_stress_test', return_value={}), \
+             patch.object(self.optimizer.backtester, 'calculate_maximum_drawdown', side_effect=Exception("Critical Failure")):
+            
+            res = self.optimizer.evaluate_resilience(rand_symbol, rand_shift)
             self.assertEqual(res['drawdown_checked'], 0.0)
 
     def test_load_strategy_stream(self):
-        filepath = f"{uuid.uuid4().hex}.bin"
-        random_bytes = uuid.uuid4().bytes + b"".join(bytes([random.randint(0, 255)]) for _ in range(16))
-        mock_file = io.BytesIO(random_bytes)
+        rand_filepath = f"path/to/strategy_{uuid.uuid4().hex}.bin"
+        rand_bytes = uuid.uuid4().bytes + random.randbytes(16)
+        mock_file = io.BytesIO(rand_bytes)
 
         with patch("builtins.open", return_value=mock_file) as mock_open:
-            result = self.optimizer.load_strategy_stream(filepath)
-            mock_open.assert_called_once_with(filepath, 'rb')
-            self.assertEqual(result, random_bytes)
+            data = self.optimizer.load_strategy_stream(rand_filepath)
+            mock_open.assert_called_once_with(rand_filepath, 'rb')
+            self.assertEqual(data, rand_bytes)
 
-    def test_optimize_and_evaluate_workflow(self):
-        allocation_input = round(random.uniform(0.0, 1.0), 2)
-        shifts = [random.randint(10, 100)]
-        backtest_res_mock = {uuid.uuid4().hex: random.randint(1, 100)}
-        stress_res_mock = {uuid.uuid4().hex: random.randint(100, 200)}
-        drawdown_val = -0.25
-
-        with patch.object(self.optimizer.backtester, 'run_backtest', return_value=backtest_res_mock) as mock_bt, \
-             patch.object(self.optimizer.simulator, 'run_stress_test', return_value=stress_res_mock) as mock_stress, \
-             patch.object(self.optimizer.backtester, 'calculate_maximum_drawdown', return_value=drawdown_val) as mock_dd:
-            
-            res = self.optimizer.optimize_and_evaluate(self.symbol, allocation_input, shifts)
-
-            mock_bt.assert_called_once_with(self.symbol, shifts)
-            mock_stress.assert_called_once_with(self.symbol, shifts)
-            mock_dd.assert_called_once_with(self.symbol)
-
-            self.assertEqual(res['optimized_weights'], {self.symbol: allocation_input})
-            self.assertEqual(res['resilience_score'], 1.0 - abs(drawdown_val))
-            self.assertEqual(res['backtest'], backtest_res_mock)
-            self.assertEqual(res['stress'], stress_res_mock)
-
-    def test_optimize_and_evaluate_scalar_shifts(self):
-        allocation_input = round(random.uniform(0.0, 1.0), 2)
-        scalar_shift = random.randint(1, 50)
+    def test_optimize_and_evaluate_comprehensive(self):
+        rand_symbol = f"TICKER_{uuid.uuid4().hex[:5]}"
+        raw_allocation = random.uniform(0.0, 1.0)
+        rand_shift = random.randint(5, 50)
         
-        with patch.object(self.optimizer.backtester, 'run_backtest', return_value={}) as mock_bt, \
-             patch.object(self.optimizer.simulator, 'run_stress_test', return_value={}) as mock_stress, \
-             patch.object(self.optimizer.backtester, 'calculate_maximum_drawdown', return_value=0.0):
-            
-            self.optimizer.optimize_and_evaluate(self.symbol, allocation_input, scalar_shift)
-            mock_bt.assert_called_once_with(self.symbol, [scalar_shift])
-            mock_stress.assert_called_once_with(self.symbol, [scalar_shift])
+        bt_res_key = uuid.uuid4().hex
+        stress_res_key = uuid.uuid4().hex
+        mock_bt_res = {bt_res_key: random.random()}
+        mock_stress_res = {stress_res_key: random.random()}
+        drawdown_val = -0.35
 
-    def test_get_strategy_summary(self):
-        summary = self.optimizer.get_strategy_summary(self.symbol)
-        self.assertIn(self.symbol, summary)
-        self.assertEqual(summary[self.symbol]["summary"], "active")
-        self.assertEqual(summary[self.symbol]["storage"], self.storage_path)
+        with patch.object(self.optimizer.backtester, 'run_backtest', return_value=mock_bt_res) as mock_bt, \
+             patch.object(self.simulator if hasattr(self.optimizer, 'simulator') else self.optimizer.simulator, 'run_stress_test', return_value=mock_stress_res) as mock_st, \
+             patch.object(self.optimizer.backtester, 'calculate_maximum_drawdown', return_value=drawdown_val):
+            
+            result = self.optimizer.optimize_and_evaluate(rand_symbol, raw_allocation, rand_shift)
+            
+            mock_bt.assert_called_once_with(rand_symbol, [rand_shift])
+            mock_st.assert_called_once_with(rand_symbol, [rand_shift])
+            
+            self.assertEqual(result["optimized_weights"], {rand_symbol: raw_allocation})
+            self.assertAlmostEqual(result["resilience_score"], 1.0 - abs(drawdown_val))
+            self.assertEqual(result["backtest"], mock_bt_res)
+            self.assertEqual(result["stress"], mock_stress_res)
+
+    def test_optimize_and_evaluate_fallback_resilience(self):
+        rand_symbol = f"TICKER_{uuid.uuid4().hex[:5]}"
+        allocation_out_of_bounds = 5.0
+        rand_shifts = [random.randint(1, 10), random.randint(11, 20)]
+
+        with patch.object(self.optimizer.backtester, 'run_backtest', side_effect=KeyError), \
+             patch.object(self.optimizer.simulator, 'run_stress_test', side_effect=KeyError), \
+             patch.object(self.optimizer.backtester, 'calculate_maximum_drawdown', side_effect=TypeError):
+            
+            result = self.optimizer.optimize_and_evaluate(rand_symbol, allocation_out_of_bounds, rand_shifts)
+            
+            self.assertEqual(result["optimized_weights"], {rand_symbol: 1.0})
+            self.assertEqual(result["resilience_score"], 0.5)
+            self.assertEqual(result["backtest"], {})
+            self.assertEqual(result["stress"], {})
 
 if __name__ == '__main__':
     unittest.main()

@@ -19,12 +19,8 @@ class PortfolioScenarioSimulator:
 
     def load_data(self, storage_file):
         logger.info("Loading portfolio data from %s", storage_file)
-        try:
-            with open(storage_file, 'r') as f:
-                return json.load(f)
-        except (IOError, json.JSONDecodeError) as e:
-            logger.error("Failed to load portfolio data: %s", e)
-            return {}
+        with open(storage_file, 'r') as f:
+            return json.load(f)
 
     def simulate_scenario(self, symbol, percentage, slippage_factor=0.0):
         logger.info("Starting simulation for symbol: %s with percentage shift: %s", symbol, percentage)

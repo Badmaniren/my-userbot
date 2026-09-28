@@ -15,7 +15,6 @@ class PortfolioStrategyOptimizer:
             except (ValueError, TypeError):
                 allocation = 0.0
         
-        # Граничные условия аллокации (0.0 до 1.0)
         if allocation < 0.0:
             return 0.0
         if allocation > 1.0:

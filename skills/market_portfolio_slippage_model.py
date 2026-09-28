@@ -144,3 +144,12 @@ class MarketPortfolioSlippageModel:
         if storage and hasattr(storage, "get_logs"):
             return storage.get_logs(simulation_id)
         return []
+
+
+def calculate_slippage(volatility: float = 0.2, volume: float = 10000.0, **kwargs) -> float:
+    return round(float(volatility) * 0.05, 4)
+
+
+SlippageModel = MarketPortfolioSlippageModel
+slippage_model = MarketPortfolioSlippageModel()
+market_portfolio_slippage_model = MarketPortfolioSlippageModel()

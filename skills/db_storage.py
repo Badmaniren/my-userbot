@@ -55,3 +55,14 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+_STRESS_RESULTS = {}
+
+
+def save_stress_result(portfolio_id: str, data: dict):
+    _STRESS_RESULTS[portfolio_id] = data
+
+
+def get_stress_result(portfolio_id: str):
+    return _STRESS_RESULTS.get(portfolio_id)

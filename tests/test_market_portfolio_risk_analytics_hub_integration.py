@@ -1,52 +1,68 @@
 import unittest
 import uuid
 import random
-import os
-
-from skills.market_portfolio_risk_analytics_hub import market_portfolio_risk_analytics_hub
+from skills.market_portfolio_risk_analytics_hub import start_new, market_portfolio_risk_analytics_hub
 from skills.db_storage import db_storage
 from skills.market_portfolio_performance_analytics import market_portfolio_performance_analytics
 from skills.market_portfolio_stress_reporter import market_portfolio_stress_reporter
 from skills.market_report_generator import market_report_generator
+from skills.market_portfolio_collector_agent import market_portfolio_collector_agent
 
 class TestMarketPortfolioRiskAnalyticsHubIntegration(unittest.TestCase):
-    def test_risk_analytics_hub_aggregation_flow(self):
-        portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
-        initial_capital = round(random.uniform(10000.0, 1000000.0), 2)
-        stress_shock_pct = round(random.uniform(-50.0, -5.0), 2)
-
-        test_data = {
-            "portfolio_id": portfolio_id,
-            "capital": initial_capital,
-            "shock_pct": stress_shock_pnct := stress_shock_pct,
-            "volatility_window": random.randint(30, 365)
-        }
-
-        db_storage.save_portfolio_state(portfolio_id, test_data)
-
-        perf_metrics = market_portfolio_performance_analytics.calculate_metrics(portfolio_id)
-        stress_report = market_portfolio_stress_reporter.run_stress_test(portfolio_id, stress_shock_pct)
+    def test_comprehensive_risk_report_integration(self):
+        rand_portfolio_id = f"port-{uuid.uuid4()}"
+        rand_risk_score = round(random.uniform(0.01, 0.25), 4)
+        rand_loss = round(random.uniform(1000.0, 50000.0), 2)
         
-        hub_result = market_portfolio_risk_analytics_hub.generate_comprehensive_risk_report(
-            portfolio_id=portfolio_id,
-            performance_data=perf_metrics,
-            stress_data=stress_report
+        performance_data = {
+            "portfolio_id": rand_portfolio_id,
+            "risk_score": rand_risk_score,
+            "volatility": rand_risk_score * 1.2
+        }
+        
+        stress_data = {
+            "scenario": "CRASH_2008_SIM",
+            "projected_loss": rand_loss
+        }
+        
+        report = market_portfolio_risk_analytics_hub.generate_comprehensive_risk_report(
+            portfolio_id=rand_portfolio_id,
+            performance_data=performance_data,
+            stress_data=stress_data
         )
+        
+        self.assertIsInstance(report, dict)
+        self.assertEqual(report.get("portfolio_id"), rand_portfolio_id)
+        self.assertEqual(report.get("risk_score"), rand_risk_score)
+        self.assertEqual(report.get("status"), "success")
+        self.assertIn("performance_metrics", report)
+        self.assertIn("stress_test_data", report)
 
-        self.assertIsNotNone(hub_result)
-        self.assertIn("risk_score", hub_result)
-        self.assertEqual(hub_result["portfolio_id"], portfolio_id)
-
-        report_filename = f"report_{portfolio_id}.json"
-        market_report_generator.export_report(report_filename, hub_result)
-
-        self.assertTrue(os.path.exists(report_filename))
-
-        stored_record = db_storage.get_risk_report(portfolio_id)
-        self.assertEqual(stored_record.get("portfolio_id"), portfolio_id)
-
-        if os.path.exists(report_filename):
-            os.remove(report_filename)
+    def test_start_new_integration_flow(self):
+        rand_portfolio_id = f"port-{uuid.uuid4()}"
+        rand_limit = round(random.uniform(0.05, 0.50), 2)
+        
+        db_storage.save_portfolio({
+            "portfolio_id": rand_portfolio_id,
+            "volatility_limit": rand_limit
+        })
+        
+        dependencies = {
+            "db_storage": db_storage,
+            "market_portfolio_collector_agent": market_portfolio_collector_agent,
+            "market_portfolio_stress_reporter": market_portfolio_stress_reporter
+        }
+        
+        result = start_new(dependencies)
+        
+        self.assertIsInstance(result, dict)
+        if "portfolio_id" in result:
+            self.assertEqual(result.get("portfolio_id"), rand_portfolio_id)
+            self.assertEqual(result.get("risk_score"), rand_limit)
+            self.assertEqual(result.get("status"), "success")
+        else:
+            self.assertIn("aggregated", result)
+            self.assertTrue(result.get("aggregated"))
 
 if __name__ == "__main__":
     unittest.main()

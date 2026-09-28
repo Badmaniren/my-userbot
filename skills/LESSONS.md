@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- ошибка перед фиксом: FAILED (errors=1)
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_alert_dispatcher (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
+о прошёл тесты и влит в main
 
 ## portfolio_rebalance_calculator (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
@@ -297,3 +293,7 @@
 
 ## market_portfolio_scenario_simulator (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_monte_carlo (start_new) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

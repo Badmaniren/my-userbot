@@ -55,3 +55,32 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+_GLOBAL_DB_STORAGE_RECORDS = {}
+
+
+def save_record(record_id: str, data: dict):
+    _GLOBAL_DB_STORAGE_RECORDS[record_id] = data
+
+
+def get_record(record_id: str):
+    return _GLOBAL_DB_STORAGE_RECORDS.get(record_id)
+
+
+class DBStorage:
+    def save_record(self, record_id: str, data: dict):
+        save_record(record_id, data)
+
+    def get_record(self, record_id: str):
+        return get_record(record_id)
+
+    def save(self, key, value):
+        save_record(key, value)
+
+    def get(self, key):
+        return get_record(key)
+
+
+class db_storage(DBStorage):
+    pass

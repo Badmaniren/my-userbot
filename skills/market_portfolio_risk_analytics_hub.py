@@ -8,8 +8,8 @@ def start_new(dependencies):
     """
     Основная функция инициализации и агрегации для удовлетворения юнит-тестов.
     """
-    db = dependencies.get("db_storage")
-    collector = dependencies.get("market_portfolio_collector_agent")
+    db = dependencies["db_storage"]
+    collector = dependencies["market_portfolio_collector_agent"]
     
     portfolio = db.fetch_portfolio()
     portfolio_id = portfolio.get("portfolio_id")

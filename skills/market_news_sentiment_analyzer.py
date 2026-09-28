@@ -72,6 +72,24 @@ class MarketNewsSentimentAnalyzer:
         return True
 
 
+class _MarketNewsSentimentAnalyzerCallable(MarketNewsSentimentAnalyzer):
+    def __call__(self, data=None, *args, **kwargs):
+        if data is None:
+            return {"sentiment": "neutral", "score": 0.0}
+        if isinstance(data, str):
+            return self.analyze(data)
+        if isinstance(data, dict):
+            text = data.get("text") or data.get("raw_text") or " ".join(str(v) for v in data.values())
+            res = self.analyze(text)
+            if "symbol" in data:
+                res["symbol"] = data["symbol"]
+            return res
+        return {"sentiment": "neutral", "score": 0.0}
+
+
+market_news_sentiment_analyzer = _MarketNewsSentimentAnalyzerCallable()
+
+
 def analyze_news_sentiment(parsed_data) -> dict:
     analyzer = MarketNewsSentimentAnalyzer()
     if isinstance(parsed_data, dict):

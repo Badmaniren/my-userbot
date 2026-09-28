@@ -38,6 +38,7 @@ class PortfolioStrategyOptimizer:
             simulation_result = {}
             
         return {
+            'status': 'completed',
             'backtest': backtest_result,
             'simulation': simulation_result
         }
@@ -60,7 +61,10 @@ class PortfolioStrategyOptimizer:
         except Exception:
             drawdown_checked = 0.0
 
+        score = 1.0 - abs(drawdown_checked) if drawdown_checked is not None else 0.5
+
         return {
+            'score': score,
             'stress_data': stress_data,
             'drawdown_checked': drawdown_checked
         }

@@ -21,7 +21,12 @@ class PortfolioValuation:
         parser = MarketParser()
         result = {}
 
+        if not isinstance(portfolio, dict):
+            return {}
+
         for symbol, data in portfolio.items():
+            if not isinstance(data, dict):
+                continue
             quantity = data.get("quantity", 0.0)
             buy_price = data.get("buy_price", 0.0)
 

@@ -3,6 +3,13 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
+о прошёл тесты и влит в main
+
+## portfolio_rebalance_calculator (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_sentiment_risk_alert_bridge (compose) — раундов: 3
 - Последняя ошибка перед фиксом: ERROR: test_process_stream_alert_fallback_empty (tests.test_market_portfolio_alert_dispatcher.TestMarketPortfolioAlertDispatcher.test_process_stream_alert_fallback_empty)
 - Статус: успешно прошёл тесты и влит в main
 
@@ -288,10 +295,5 @@
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_monte_carlo (start_new) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_risk_analytics_hub (start_new) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

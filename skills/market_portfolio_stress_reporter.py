@@ -40,3 +40,6 @@ def generate_stress_report(storage_file, symbol, percentage):
 def run_stress_reporting_pipeline(storage_file, symbol, shifts):
     reporter = PortfolioStressReporter(storage_file)
     return reporter.run_stress_report(symbol, shifts)
+
+
+market_portfolio_stress_reporter = PortfolioStressReporter(None)

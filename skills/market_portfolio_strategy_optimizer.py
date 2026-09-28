@@ -109,6 +109,6 @@ class PortfolioStrategyOptimizer:
         return {
             symbol: {
                 "summary": "active",
-                "storage": self.storage_file
+                "storage": getattr(self, 'storage_file', None)
             }
         }

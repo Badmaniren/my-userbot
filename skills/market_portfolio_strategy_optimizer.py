@@ -7,6 +7,21 @@ class PortfolioStrategyOptimizer:
         self.backtester = MarketPortfolioBacktester(storage_file)
         self.simulator = PortfolioScenarioSimulator(storage_file)
 
+    def _validate_allocation(self, allocation: float) -> float:
+        """Жесткая валидация весов активов и корректная обработка граничных условий."""
+        if not isinstance(allocation, (int, float)):
+            try:
+                allocation = float(allocation)
+            except (ValueError, TypeError):
+                allocation = 0.0
+        
+        # Граничные условия аллокации (0.0 до 1.0)
+        if allocation < 0.0:
+            return 0.0
+        if allocation > 1.0:
+            return 1.0
+        return float(allocation)
+
     def optimize_strategy(self, symbol: str, shifts, percentage: float) -> dict:
         try:
             backtest_result = self.backtester.run_backtest(symbol, shifts)
@@ -46,6 +61,8 @@ class PortfolioStrategyOptimizer:
             return f.read()
 
     def optimize_and_evaluate(self, symbol: str, allocation: float, shifts) -> dict:
+        validated_allocation = self._validate_allocation(allocation)
+
         if isinstance(shifts, (float, int)):
             shifts_iterable = [shifts]
         else:
@@ -70,7 +87,7 @@ class PortfolioStrategyOptimizer:
             drawdown = 0.0
             resilience_score = 0.5
 
-        optimized_weights = {symbol: allocation}
+        optimized_weights = {symbol: validated_allocation}
         
         return {
             "optimized_weights": optimized_weights,

@@ -1,29 +1,59 @@
 import os
 import json
-from datetime import datetime
+import io
+from datetime import datetime, timezone
+
 
 class MarketParser:
     def __init__(self, storage_file: str):
         self.storage_file = storage_file
 
     def fetch_and_store(self, symbol: str, price: float) -> None:
-        data = []
-        if os.path.exists(self.storage_file):
-            try:
-                with open(self.storage_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-            except Exception:
-                data = []
-        
         entry = {
             "symbol": symbol,
             "price": price,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
-        data.append(entry)
-        
-        with open(self.storage_file, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+
+        if isinstance(self.storage_file, str):
+            if os.path.exists(self.storage_file):
+                with open(self.storage_file, "r+", encoding="utf-8") as f:
+                    content = f.read()
+                    try:
+                        data = json.loads(content) if content else []
+                    except (json.JSONDecodeError, UnicodeDecodeError):
+                        data = []
+                    if not isinstance(data, list):
+                        data = []
+                    data.append(entry)
+                    f.seek(0)
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+                    f.truncate()
+            else:
+                with open(self.storage_file, "w", encoding="utf-8") as f:
+                    json.dump([entry], f, ensure_ascii=False, indent=2)
+        else:
+            try:
+                self.storage_file.seek(0)
+                raw = self.storage_file.read()
+                content = raw.decode("utf-8") if isinstance(raw, bytes) else (raw or "")
+                data = json.loads(content) if content else []
+            except (json.JSONDecodeError, UnicodeDecodeError, ValueError, AttributeError, io.UnsupportedOperation):
+                data = []
+
+            if not isinstance(data, list):
+                data = []
+            data.append(entry)
+
+            self.storage_file.seek(0)
+            dumped = json.dumps(data, ensure_ascii=False, indent=2)
+            try:
+                self.storage_file.write(dumped.encode("utf-8"))
+            except TypeError:
+                self.storage_file.write(dumped)
+
+            if hasattr(self.storage_file, "truncate"):
+                self.storage_file.truncate()
 
 
 class PortfolioValuation:

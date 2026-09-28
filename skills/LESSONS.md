@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-=2)
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_recovery_bridge (compose) — раундов: 4
+раундов: 4
 - Последняя ошибка перед фиксом: market_portfolio_stress_reporter.run_stress_reporting_pipeline()
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -298,3 +295,6 @@
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_tax_calculator (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

@@ -93,3 +93,14 @@ class PortfolioPerformanceAnalytics:
 def start_new(storage_file: str, symbol: str, url: str) -> dict:
     analytics = PortfolioPerformanceAnalytics(storage_file)
     return analytics.calculate_metrics(symbol)
+
+
+def compute_var(returns: list, confidence_level: float = 0.95) -> float:
+    """Вычисляет Value at Risk (VaR) для заданного списка доходностей и уровня доверия."""
+    if not returns:
+        return 0.0
+    sorted_returns = sorted(returns)
+    cutoff_index = int((1.0 - confidence_level) * len(sorted_returns))
+    cutoff_index = max(0, min(cutoff_index, len(sorted_returns) - 1))
+    var_val = -sorted_returns[cutoff_index]
+    return float(max(0.0, var_val))

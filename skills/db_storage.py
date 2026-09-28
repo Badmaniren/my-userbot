@@ -55,3 +55,8 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+def fetch_historical_matrix(portfolio_id: str) -> list:
+    """Возвращает историческую матрицу доходностей или цен для заданного portfolio_id."""
+    return []

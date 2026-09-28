@@ -53,3 +53,12 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
         "stress_test": stress_test_result,
         "stress_report": stress_report_result
     }
+
+
+def execute_stress_test(payload: dict) -> dict:
+    """Выполняет стресс-тестирование по переданному нагрузочному сценарию."""
+    storage_file = payload.get("storage_file", "market_data.json")
+    symbol = payload.get("symbol", "DEFAULT")
+    percentage = payload.get("percentage", -0.1)
+    shifts = payload.get("shifts", [-0.05, -0.1, -0.2])
+    return run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts)

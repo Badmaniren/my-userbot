@@ -74,3 +74,8 @@ def generate_visual_report(storage_file, symbol):
     chart = visualizer.generate_ascii_chart(symbol)
     pnl = visualizer.visualize_pnl(symbol)
     return f"{chart}\n{pnl}"
+
+
+def render_distribution_curve(data_points):
+    """Отрисовывает или форматирует график распределения для точек данных."""
+    return generate_ascii_chart(data_points)

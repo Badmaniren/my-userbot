@@ -9,19 +9,20 @@ from skills.market_portfolio_valuation import PortfolioValuation
 
 class TestPortfolioScenarioSimulatorIntegration(unittest.TestCase):
     def setUp(self):
-        self.test_dir = f"test_env_{uuid.uuid4().hex}"
-        os.makedirs(self.test_dir, exist_ok=True)
-        self.storage_file = os.path.join(self.test_dir, f"portfolio_{uuid.uuid4().hex}.json")
+        self.test_dir = os.path.dirname(os.path.abspath(__file__))
+        self.unique_id = uuid.uuid4().hex[:8]
+        self.storage_filename = f"test_portfolio_{self.unique_id}.json"
+        self.storage_file = os.path.join(self.test_dir, self.storage_filename)
         
-        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
-        self.current_price = round(random.uniform(10.0, 1000.0), 4)
-        self.quantity = round(random.uniform(1.0, 100.0), 4)
+        self.symbol = f"TICK_{uuid.uuid4().hex[:4].upper()}"
+        self.initial_price = round(random.uniform(10.0, 1000.0), 4)
+        self.quantity = round(random.uniform(1.0, 100.0), 2)
         
         self.portfolio_data = {
             "assets": [
                 {
                     "symbol": self.symbol,
-                    "current_price": self.current_price,
+                    "current_price": self.initial_price,
                     "quantity": self.quantity
                 }
             ]
@@ -32,39 +33,44 @@ class TestPortfolioScenarioSimulatorIntegration(unittest.TestCase):
 
     def tearDown(s):
         if os.path.exists(s.storage_file):
-            os.remove(s.storage_file)
-        if os.path.exists(s.test_dir):
-            os.rmdir(s.test_dir)
+            try:
+                os.remove(s.storage_file)
+            except OSError:
+                pass
 
-    def test_simulate_scenario_integration(self):
-        percentage = round(random.uniform(-50.0, 50.0), 2)
+    def test_simulate_scenario_integration_without_mocks(self):
+        percentage_shift = round(random.uniform(-20.0, 20.0), 2)
+        slippage = round(random.uniform(0.0, 2.0), 2)
         
         simulator = PortfolioScenarioSimulator(self.storage_file)
-        result = simulator.simulate_scenario(self.symbol, percentage)
+        result = simulator.simulate_scenario(self.symbol, percentage_shift, slippage_factor=slippage)
         
-        self.assertIsInstance(result, dict)
         self.assertEqual(result["symbol"], self.symbol)
         
-        expected_price = self.current_price * (1 + percentage / 100.0)
-        expected_pnl = (expected_price - self.current_price) * self.quantity
+        expected_base = self.initial_price * (1 + percentage_shift / 100.0)
+        expected_slippage_adj = expected_base * (slippage / 100.0)
+        expected_price = expected_base + expected_slippage_adj
+        expected_pnl = (expected_price - self.initial_price) * self.quantity
         
         self.assertAlmostEqual(result["simulated_price"], expected_price, places=4)
         self.assertAlmostEqual(result["pnl_impact"], expected_pnl, places=4)
         self.assertAlmostEqual(result["portfolio_value_delta"], expected_pnl, places=4)
 
     def test_wrapper_functions_integration(self):
-        percentage = round(random.uniform(-20.0, 20.0), 2)
+        percentage_shift = round(random.uniform(-10.0, 10.0), 2)
         
-        res_wrapper = simulate_market_scenario(self.storage_file, self.symbol, percentage)
-        self.assertIsInstance(res_wrapper, dict)
-        self.assertEqual(res_wrapper["symbol"], self.symbol)
+        wrapper_result = simulate_market_scenario(self.storage_file, self.symbol, percentage_shift)
+        self.assertEqual(wrapper_result["symbol"], self.symbol)
+        self.assertIn("simulated_price", wrapper_result)
         
-        stress_res = run_stress_test(self.storage_file, self.symbol, -10, 10, 5)
-        self.assertIsInstance(stress_res, dict)
-        self.assertEqual(stress_res["symbol"], self.symbol)
-        self.assertIn("scenarios", stress_res)
-        self.assertIsInstance(stress_res["scenarios"], list)
-        self.assertGreater(len(stress_res["scenarios"]), 0)
+        stress_result = run_stress_test(self.storage_file, self.symbol, -5, 5, 5)
+        self.assertEqual(stress_result["symbol"], self.symbol)
+        self.assertIsInstance(stress_result["scenarios"], list)
+        self.assertGreaterEqual(len(stress_result["scenarios"]), 1)
+        
+        for scenario in stress_result["scenarios"]:
+            self.assertIn("shift_percentage", scenario)
+            self.assertIn("resulting_valuation", scenario)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

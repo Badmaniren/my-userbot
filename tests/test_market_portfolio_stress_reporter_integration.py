@@ -2,19 +2,14 @@ import unittest
 import os
 import uuid
 import random
-from skills.market_portfolio_stress_reporter import (
-    StressReporter,
-    PortfolioStressReporter,
-    generate_stress_report,
-    run_stress_reporting_pipeline
-)
+from skills.market_portfolio_stress_reporter import StressReporter, PortfolioStressReporter, generate_stress_report, run_stress_reporting_pipeline
 
 class TestPortfolioStressReporterIntegration(unittest.TestCase):
     def setUp(self):
-        self.storage_file = f"test_market_storage_{uuid.uuid4()}.db"
+        self.storage_file = f"test_storage_{uuid.uuid4()}.db"
         self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
-        self.percentage = round(random.uniform(-50.0, 50.0), 2)
-        self.shifts = [self.percentage, round(self.percentage / 2, 2)]
+        self.percentage = round(random.uniform(-0.5, 0.5), 4)
+        self.shifts = [round(random.uniform(-0.3, 0.3), 4), round(random.uniform(-0.3, 0.3), 4)]
 
     def tearDown(self):
         if os.path.exists(self.storage_file):
@@ -31,27 +26,30 @@ class TestPortfolioStressReporterIntegration(unittest.TestCase):
         self.assertIn("simulation_results", result)
         self.assertIn("base_report", result)
 
-    def test_portfolio_stress_reporter_pipeline(self):
-        pipeline_result = run_stress_reporting_pipeline(self.storage_file, self.symbol, self.shifts)
+        single_sim = reporter.simulate_single(self.symbol, self.percentage)
+        self.assertIsInstance(single_sim, dict)
+
+        stream_data = reporter.get_stream_data()
+        self.assertIsInstance(stream_data, (dict, list, type(None)))
+
+    def test_portfolio_stress_reporter_subclass(self):
+        pipeline_reporter = PortfolioStressReporter(self.storage_file)
+        pipeline_result = pipeline_reporter.run_stress_report(self.symbol, self.shifts)
         
         self.assertIsInstance(pipeline_result, dict)
         self.assertIn("simulation_results", pipeline_result)
         self.assertIn("base_report", pipeline_result)
 
-    def test_generate_stress_report_wrapper(self):
-        report = generate_stress_report(self.storage_file, self.symbol, self.percentage)
-        
-        self.assertIsInstance(report, dict)
-        self.assertIn("simulation_results", report)
-        self.assertIn("base_report", report)
+    def test_functional_wrappers_integration(self):
+        func_report = generate_stress_report(self.storage_file, self.symbol, self.percentage)
+        self.assertIsInstance(func_report, dict)
+        self.assertIn("simulation_results", func_report)
+        self.assertIn("base_report", func_report)
 
-    def test_single_simulation_and_stream(self):
-        reporter = PortfolioStressReporter(self.storage_file)
-        sim_single = reporter.simulate_single(self.symbol, self.percentage)
-        self.assertIsInstance(sim_single, (dict, list, type(None)))
-
-        stream_data = reporter.get_stream_data()
-        self.assertIsInstance(stream_data, (dict, list, type(None)))
+        pipeline_report = run_stress_reporting_pipeline(self.storage_file, self.symbol, self.shifts)
+        self.assertIsInstance(pipeline_report, dict)
+        self.assertIn("simulation_results", pipeline_report)
+        self.assertIn("base_report", pipeline_report)
 
 if __name__ == "__main__":
     unittest.main()

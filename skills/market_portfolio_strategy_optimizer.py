@@ -23,8 +23,13 @@ class PortfolioStrategyOptimizer:
         return float(allocation)
 
     def optimize_strategy(self, symbol: str, shifts, percentage: float) -> dict:
+        if isinstance(shifts, (float, int)):
+            shifts_iterable = [shifts]
+        else:
+            shifts_iterable = shifts
+
         try:
-            backtest_result = self.backtester.run_backtest(symbol, shifts)
+            backtest_result = self.backtester.run_backtest(symbol, shifts_iterable)
         except KeyError:
             backtest_result = {}
             
@@ -39,8 +44,13 @@ class PortfolioStrategyOptimizer:
         }
 
     def evaluate_resilience(self, symbol: str, shifts) -> dict:
+        if isinstance(shifts, (float, int)):
+            shifts_iterable = [shifts]
+        else:
+            shifts_iterable = shifts
+
         try:
-            stress_data = self.simulator.run_stress_test(symbol, shifts)
+            stress_data = self.simulator.run_stress_test(symbol, shifts_iterable)
         except KeyError:
             stress_data = {}
 

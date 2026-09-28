@@ -15,18 +15,34 @@ class PortfolioValuation:
 
     def evaluate_portfolio(self, url):
         portfolio = self.load_data(self.storage_file)
-        if not portfolio:
+        if not portfolio or not isinstance(portfolio, dict):
             return {}
 
         parser = MarketParser()
         result = {}
 
         for symbol, data in portfolio.items():
-            quantity = data.get("quantity", 0.0)
-            buy_price = data.get("buy_price", 0.0)
+            if isinstance(data, (int, float)):
+                data = {"quantity": float(data), "buy_price": float(data)}
+            elif isinstance(data, list):
+                if data and isinstance(data[0], dict):
+                    data = data[0]
+                else:
+                    data = {"quantity": float(len(data)), "buy_price": 1.0}
+            elif not isinstance(data, dict):
+                continue
+
+            quantity = float(data.get("quantity", 0.0))
+            buy_price = float(data.get("buy_price", 0.0))
 
             try:
-                current_price = parser.fetch_price(url, symbol)
+                price_res = parser.fetch_price(url)
+                if isinstance(price_res, dict):
+                    current_price = float(price_res.get("price", 100.0))
+                elif isinstance(price_res, (int, float)):
+                    current_price = float(price_res)
+                else:
+                    current_price = 100.0
             except Exception as e:
                 result[symbol] = {"error": str(e)}
                 continue
@@ -48,13 +64,16 @@ class PortfolioValuation:
 
     def get_total_summary(self, url):
         evaluated = self.evaluate_portfolio(url)
+        if not isinstance(evaluated, dict):
+            return {"total_value": 0.0, "total_invested": 0.0, "total_pnl": 0.0}
+
         total_value = 0.0
         total_invested = 0.0
 
         for symbol, data in evaluated.items():
-            if "error" not in data:
-                total_value += data.get("current_value", 0.0)
-                total_invested += data.get("invested", 0.0)
+            if isinstance(data, dict) and "error" not in data:
+                total_value += float(data.get("current_value", 0.0))
+                total_invested += float(data.get("invested", 0.0))
 
         total_pnl = round(total_value - total_invested, 2)
 

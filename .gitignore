@@ -3,3 +3,7 @@ __pycache__/
 *.pyo
 .pytest_cache/
 *.db
+SYM_*
+test_portfolio_*
+test_env_*
+test_storage_*

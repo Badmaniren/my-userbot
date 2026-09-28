@@ -55,3 +55,33 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+class DBStorage:
+    def __init__(self, db_path=":memory:"):
+        self.db_path = db_path
+        self._records = {}
+
+    def save(self, key, value):
+        self._records[key] = value
+
+    def save_audit(self, payload):
+        token = payload.get("token") or payload.get("backtest_id") or "audit"
+        self._records[token] = payload
+
+    def get(self, key):
+        return self._records.get(key)
+
+
+def db_storage(action="save", key=None, value=None, **kwargs):
+    if not hasattr(db_storage, "_store"):
+        db_storage._store = {}
+    if action == "save" and key is not None:
+        db_storage._store[key] = value
+        return True
+    elif action == "get" and key is not None:
+        return db_storage._store.get(key)
+    return db_storage._store
+
+DbStorage = DBStorage
+DatabaseStorage = DBStorage

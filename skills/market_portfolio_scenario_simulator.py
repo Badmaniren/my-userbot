@@ -14,8 +14,22 @@ if not logger.handlers:
     logger.setLevel(logging.INFO)
 
 class PortfolioScenarioSimulator:
-    def __init__(self, storage_file):
+    def __init__(self, storage_file=None):
         self.storage_file = storage_file
+
+    def simulate(self, historical_data_stream):
+        if not historical_data_stream:
+            return []
+        results = []
+        for i, item in enumerate(historical_data_stream):
+            if isinstance(item, dict):
+                price = item.get("price", item.get("value", 100.0))
+            elif isinstance(item, (int, float)):
+                price = float(item)
+            else:
+                price = 100.0
+            results.append({"step": i, "value": price})
+        return results
 
     def load_data(self, storage_file):
         logger.info("Loading portfolio data from %s", storage_file)
@@ -112,3 +126,6 @@ def run_stress_test(storage_file, symbol, range_min, range_max, step):
         "symbol": symbol,
         "scenarios": scenarios
     }
+
+MarketPortfolioScenarioSimulator = PortfolioScenarioSimulator
+market_portfolio_scenario_simulator = PortfolioScenarioSimulator

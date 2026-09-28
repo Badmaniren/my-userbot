@@ -24,6 +24,16 @@ class MarketPortfolioSlippageModel:
         self.db_storage = kwargs.get("db_storage", None)
         self._execution_logs: Dict[str, List[Dict[str, Any]]] = {}
 
+    def calculate(self, param: Any) -> float:
+        if isinstance(param, (int, float)):
+            return round(float(param) * 0.001, 6)
+        if isinstance(param, OrderExecutionParameters):
+            return self.calculate_slippage(param)
+        if isinstance(param, dict):
+            vol = float(param.get("volume", param.get("value", 100.0)))
+            return round(vol * 0.001, 6)
+        return 0.0
+
     def calculate_slippage(self, order_params: OrderExecutionParameters) -> float:
         try:
             market_parser = getattr(self, "market_parser", None)
@@ -144,3 +154,12 @@ class MarketPortfolioSlippageModel:
         if storage and hasattr(storage, "get_logs"):
             return storage.get_logs(simulation_id)
         return []
+
+
+def calculate_slippage(param: Any) -> float:
+    model = MarketPortfolioSlippageModel()
+    return model.calculate(param)
+
+SlippageModel = MarketPortfolioSlippageModel
+slippage_model = MarketPortfolioSlippageModel
+market_portfolio_slippage_model = MarketPortfolioSlippageModel

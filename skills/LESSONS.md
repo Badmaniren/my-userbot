@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ты и влит в main
-
-## market_portfolio_tax_calculator (create) — раундов: 3
-- Последняя ошибка перед фиксом: FAILED (errors=1)
+ед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_dividend_tracker (create) — раундов: 3
@@ -305,4 +302,7 @@
 
 ## market_portfolio_tail_risk_analyzer (create) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## extractor_tool_1790619520 (create) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

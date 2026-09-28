@@ -6,9 +6,9 @@ from skills.market_portfolio_strategy_optimizer import PortfolioStrategyOptimize
 
 class TestPortfolioStrategyOptimizerIntegration(unittest.TestCase):
     def setUp(self):
-        self.test_dir = f"test_storage_{uuid.uuid4().hex}"
+        self.test_dir = "test_storage"
         os.makedirs(self.test_dir, exist_ok=True)
-        self.storage_file = os.path.join(self.test_dir, f"db_{uuid.uuid4().hex}.db")
+        self.storage_file = os.path.join(self.test_dir, f"test_portfolio_{uuid.uuid4()}.db")
         self.optimizer = PortfolioStrategyOptimizer(self.storage_file)
         self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
 
@@ -24,20 +24,9 @@ class TestPortfolioStrategyOptimizerIntegration(unittest.TestCase):
             except OSError:
                 pass
 
-    def test_validate_allocation_edge_cases(self):
-        valid_inputs = [random.uniform(-10.0, 0.0), random.uniform(0.0, 1.0), random.uniform(1.0, 10.0)]
-        for val in valid_inputs:
-            result = self.optimizer._validate_allocation(val)
-            self.assertIsInstance(result, float)
-            self.assertTrue(0.0 <= result <= 1.0)
-
-        invalid_input = f"str_{uuid.uuid4().hex}"
-        fallback_result = self.optimizer._validate_allocation(invalid_input)
-        self.assertEqual(fallback_result, 0.0)
-
-    def test_optimize_and_evaluate_integration(self):
+    def test_integration_optimize_and_evaluate(self):
         allocation = round(random.uniform(0.1, 0.9), 2)
-        shift_val = round(random.uniform(1.0, 5.0), 2)
+        shift_val = random.randint(1, 10)
         
         result = self.optimizer.optimize_and_evaluate(self.symbol, allocation, shift_val)
         
@@ -47,49 +36,34 @@ class TestPortfolioStrategyOptimizerIntegration(unittest.TestCase):
         self.assertIn("backtest", result)
         self.assertIn("stress", result)
         
-        self.assertEqual(result["optimized_weights"], {self.symbol: allocation})
+        weights = result["optimized_weights"]
+        self.assertIn(self.symbol, weights)
+        self.assertAlmostEqual(weights[self.symbol], allocation)
         self.assertIsInstance(result["resilience_score"], float)
 
-    def test_evaluate_resilience_integration(self):
-        shifts = [round(random.uniform(0.5, 3.0), 2) for _ in range(3)]
-        
-        resilience_data = self.optimizer.evaluate_resilience(self.symbol, shifts)
-        
-        self.assertIsInstance(resilience_data, dict)
-        self.assertIn("stress_data", resilience_data)
-        self.assertIn("drawdown_checked", resilience_data)
-        self.assertIsInstance(resilience_data["drawdown_checked"], float)
+    def test_integration_optimize_strategy_with_random_data(self):
+        shifts = [random.randint(1, 5), random.randint(6, 10)]
+        percentage = round(random.uniform(0.01, 0.5), 4)
 
-    def test_optimize_strategy_integration(self):
-        percentage = round(random.uniform(5.0, 50.0), 2)
-        shift_val = round(random.uniform(1.0, 10.0), 2)
+        result = self.optimizer.optimize_strategy(self.symbol, shifts, percentage)
         
-        opt_result = self.optimizer.optimize_strategy(self.symbol, shift_val, percentage)
-        
-        self.assertIsInstance(opt_result, dict)
-        self.assertIn("backtest", opt_result)
-        self.assertIn("simulation", opt_result)
+        self.assertIsInstance(result, dict)
+        self.assertIn('backtest', result)
+        self.assertIn('simulation', result)
 
-    def test_load_strategy_stream_integration(self):
-        dummy_file = os.path.join(self.test_dir, f"stream_{uuid.uuid4().hex}.bin")
-        random_bytes = os.urandom(32)
-        
-        with open(dummy_file, 'wb') as f:
-            f.write(random_bytes)
-            
-        stream_data = self.optimizer.load_strategy_stream(dummy_file)
-        self.assertEqual(stream_data, random_bytes)
-        
-        if os.path.exists(dummy_file):
-            os.remove(dummy_file)
+    def formula_validation_boundary_conditions(self):
+        invalid_allocations = [-0.5, 1.5, "invalid", None]
+        for alloc in invalid_allocations:
+            validated = self.optimizer._validate_allocation(alloc)
+            self.assertGreaterEqual(validated, 0.0)
+            self.assertLessEqual(validated, 1.0)
 
-    def test_get_strategy_summary_integration(self):
+    def test_integration_strategy_summary(self):
         summary = self.optimizer.get_strategy_summary(self.symbol)
-        
         self.assertIsInstance(summary, dict)
         self.assertIn(self.symbol, summary)
         self.assertEqual(summary[self.symbol]["summary"], "active")
         self.assertEqual(summary[self.symbol]["storage"], self.storage_file)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

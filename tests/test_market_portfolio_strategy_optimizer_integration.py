@@ -5,12 +5,12 @@ import random
 from skills.market_portfolio_strategy_optimizer import PortfolioStrategyOptimizer
 
 class TestPortfolioStrategyOptimizerIntegration(unittest.TestCase):
+
     def setUp(self):
         self.test_dir = f"test_storage_{uuid.uuid4().hex}"
         os.makedirs(self.test_dir, exist_ok=True)
         self.storage_file = os.path.join(self.test_dir, f"portfolio_{uuid.uuid4().hex}.db")
         self.optimizer = PortfolioStrategyOptimizer(self.storage_file)
-        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
 
     def tearDown(self):
         if os.path.exists(self.storage_file):
@@ -24,15 +24,26 @@ class TestPortfolioStrategyOptimizerIntegration(unittest.TestCase):
             except OSError:
                 pass
 
-    def test_integration_optimize_and_evaluate_flow(self):
-        random_allocation = round(random.uniform(0.1, 0.9), 2)
-        random_shifts = [random.randint(1, 30), random.randint(31, 60)]
+    def test_validate_allocation_boundaries_and_types(self):
+        random_valid = random.uniform(0.0, 1.0)
+        self.assertEqual(self.optimizer._validate_allocation(random_valid), float(random_valid))
         
-        result = self.optimizer.optimize_and_evaluate(
-            symbol=self.symbol,
-            allocation=random_allocation,
-            shifts=random_shifts
-        )
+        self.assertEqual(self.optimizer._validate_allocation(-5.5), 0.0)
+        self.assertEqual(self.optimizer._validate_allocation(15.5), 1.0)
+        
+        random_string_num = str(random.uniform(0.1, 0.9))
+        self.assertEqual(self.optimizer._validate_allocation(random_string_num), float(random_string_num))
+        
+        invalid_input_uuid = uuid.uuid4().hex
+        self.assertEqual(self.optimizer._validate_allocation(invalid_input_uuid), 0.0)
+        self.assertEqual(self.optimizer._validate_allocation(None), 0.0)
+
+    def test_optimize_and_evaluate_integration(self):
+        symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
+        allocation = random.uniform(0.0, 1.0)
+        shift_val = random.randint(1, 30)
+
+        result = self.optimizer.optimize_and_evaluate(symbol, allocation, shift_val)
 
         self.assertIsInstance(result, dict)
         self.assertIn("optimized_weights", result)
@@ -40,37 +51,30 @@ class TestPortfolioStrategyOptimizerIntegration(unittest.TestCase):
         self.assertIn("backtest", result)
         self.assertIn("stress", result)
 
-        weights = result["optimized_weights"]
-        self.assertIn(self.symbol, weights)
-        self.assertEqual(weights[self.symbol], random_allocation)
+        self.assertEqual(result["optimized_weights"], {symbol: self.optimizer._validate_allocation(allocation)})
         self.assertIsInstance(result["resilience_score"], float)
 
-    def test_integration_strategy_summary_and_validation(self):
-        invalid_allocations = [-5.0, 10.0, "invalid_str"]
-        for bad_alloc in invalid_allocations:
-            validated = self.optimizer._validate_allocation(bad_alloc)
-            self.assertIn(validated, [0.0, 1.0])
+    def test_get_strategy_summary_real_structure(self):
+        symbol = f"ASSET_{uuid.uuid4().hex[:5].upper()}"
+        summary = self.optimizer.get_strategy_summary(symbol)
 
-        summary = self.optimizer.get_strategy_summary(self.symbol)
         self.assertIsInstance(summary, dict)
-        self.assertIn(self.symbol, summary)
-        self.assertEqual(summary[self.symbol]["storage"], self.storage_file)
-        self.assertEqual(summary[self.symbol]["summary"], "active")
+        self.assertIn(symbol, summary)
+        self.assertEqual(summary[symbol]["summary"], "active")
+        self.assertEqual(summary[symbol]["storage"], self.storage_file)
 
-    def test_integration_evaluate_resilience_and_optimization(self):
-        shifts_val = random.randint(5, 50)
-        eval_result = self.optimizer.evaluate_resilience(self.symbol, shifts_val)
+    def test_load_strategy_stream_io(self):
+        stream_file = os.path.join(self.test_dir, f"stream_{uuid.uuid4().hex}.bin")
+        random_bytes = bytes(random.getrandbits(8) for _ in range(64))
         
-        self.assertIsInstance(eval_result, dict)
-        self.assertIn("stress_data", eval_result)
-        self.assertIn("drawdown_checked", eval_result)
+        with open(stream_file, 'wb') as f:
+            f.write(random_bytes)
 
-        percentage_val = round(random.uniform(0.01, 0.5), 4)
-        opt_result = self.optimizer.optimize_strategy(self.symbol, shifts_val, percentage_val)
-        
-        self.assertIsInstance(opt_result, dict)
-        self.assertIn("backtest", opt_result)
-        self.assertIn("simulation", opt_result)
+        loaded_data = self.optimizer.load_strategy_stream(stream_file)
+        self.assertEqual(loaded_data, random_bytes)
 
-if __name__ == "__main__":
+        if os.path.exists(stream_file):
+            os.remove(stream_file)
+
+if __name__ == '__main__':
     unittest.main()

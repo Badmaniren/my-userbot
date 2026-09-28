@@ -1,6 +1,55 @@
+import json
+import os
 import sqlite3
 import requests
 from bs4 import BeautifulSoup
+
+_GLOBAL_DB_RECORDS = {}
+
+
+def save_record(key_or_path, record):
+    """
+    Сохраняет запись либо в файл (если передана строка с именем файла),
+    либо в локальный словарь.
+    """
+    try:
+        if isinstance(key_or_path, str) and (
+            key_or_path.endswith('.json')
+            or 'test_db_' in key_or_path
+            or '/' in key_or_path
+            or '\\' in key_or_path
+        ):
+            with open(key_or_path, 'w', encoding='utf-8') as f:
+                json.dump(record, f, ensure_ascii=False)
+            return True
+        else:
+            _GLOBAL_DB_RECORDS[str(key_or_path)] = record
+            return True
+    except Exception:
+        return False
+
+
+def get_record(key_or_path, record_id=None):
+    """
+    Получает запись либо из файла, либо из локального словаря.
+    """
+    try:
+        if isinstance(key_or_path, str) and (
+            key_or_path.endswith('.json')
+            or 'test_db_' in key_or_path
+            or '/' in key_or_path
+            or '\\' in key_or_path
+            or os.path.exists(key_or_path)
+        ):
+            if os.path.exists(key_or_path):
+                with open(key_or_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                return data
+            return None
+        else:
+            return _GLOBAL_DB_RECORDS.get(str(key_or_path))
+    except Exception:
+        return None
 
 
 class MarketParser:

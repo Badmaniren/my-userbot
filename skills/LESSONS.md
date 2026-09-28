@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ntiment_risk_assessment_hub (create) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_sentiment_risk_hub (compose) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (errors=1)
@@ -294,4 +291,9 @@ ntiment_risk_assessment_hub (create) — раундов: 4
 ## market_portfolio_simulation_report_pipeline (compose) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/tests/test_market_portfolio_simulation_report_pipeline.py", line 103, in test_generate_simulation_report_scenario_error
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_simulation_report_bridge (compose) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

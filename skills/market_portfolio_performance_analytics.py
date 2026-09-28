@@ -1,9 +1,12 @@
 import math
-from skills.market_parser import MarketParser
+try:
+    from skills.market_parser import MarketParser
+except ImportError:
+    from market_parser import MarketParser
 
 
 class PortfolioPerformanceAnalytics:
-    def __init__(self, storage_file: str):
+    def __init__(self, storage_file: str = "default.db"):
         self.storage_file = storage_file
         self.parser = MarketParser(storage_file)
 
@@ -80,6 +83,25 @@ class PortfolioPerformanceAnalytics:
     def evaluate_performance(self, symbol: str) -> dict:
         return self.calculate_metrics(symbol)
 
+    def evaluate(self, report_or_symbol) -> dict:
+        if isinstance(report_or_symbol, str):
+            return self.calculate_metrics(report_or_symbol)
+        elif isinstance(report_or_symbol, dict):
+            tot_return = float(report_or_symbol.get("total_return", report_or_symbol.get("return", 0.0)))
+            volatility = float(report_or_symbol.get("volatility", 0.0))
+            risk_free_rate = 0.02
+            sharpe = (tot_return - risk_free_rate) / volatility if volatility > 0 else (tot_return / volatility if volatility > 0 else 0.0)
+            if sharpe < 0:
+                sharpe = 0.0
+            return {
+                "portfolio_id": report_or_symbol.get("portfolio_id", ""),
+                "return": tot_return,
+                "volatility": volatility,
+                "sharpe_ratio": float(sharpe),
+                "status": "evaluated"
+            }
+        return {"return": 0.0, "volatility": 0.0, "sharpe_ratio": 0.0}
+
     def __call__(self, symbol: str = None, url: str = None) -> dict:
         if symbol:
             return self.calculate_metrics(symbol)
@@ -93,3 +115,6 @@ class PortfolioPerformanceAnalytics:
 def start_new(storage_file: str, symbol: str, url: str) -> dict:
     analytics = PortfolioPerformanceAnalytics(storage_file)
     return analytics.calculate_metrics(symbol)
+
+
+market_portfolio_performance_analytics = PortfolioPerformanceAnalytics

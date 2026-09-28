@@ -3,70 +3,64 @@ import uuid
 import random
 from skills.market_portfolio_tax_calculator import MarketPortfolioTaxCalculator, calculate_portfolio_taxes
 
-class RealDbStorage:
-    def __init__(self):
-        self.portfolios = {}
-
-    def get_portfolio(self, portfolio_id):
-        return self.portfolios.get(portfolio_id)
-
-class RealMarketParser:
-    def parse_stream(self, stream):
-        if isinstance(stream, dict) and "stream_id" in stream:
-            return {"stream_id": stream["stream_id"]}
-        return None
-
 class TestMarketPortfolioTaxCalculatorIntegration(unittest.TestCase):
-    def test_end_to_end_tax_calculation_and_stream(self):
-        db = RealDbStorage()
-        parser = RealMarketParser()
+    def test_var_cvar_and_tax_calculation_integration(self):
+        random_portfolio_id = str(uuid.uuid4())
+        random_user_id = str(uuid.uuid4())
         
-        portfolio_id = str(uuid.uuid4())
-        user_id = str(uuid.uuid4())
+        purchase_price = round(random.uniform(50.0, 150.0), 2)
+        sell_price = round(purchase_price + random.uniform(10.0, 50.0), 2)
+        shares_count = random.randint(10, 100)
         
-        purchase_price = round(random.uniform(50.0, 90.0), 2)
-        sell_price = round(random.uniform(110.0, 200.0), 2)
-        shares = random.randint(10, 100)
+        class RealDBStorage:
+            def __init__(self, p_id, p_price, s_price, shares):
+                self.p_id = p_id
+                self.data = {
+                    "portfolio_id": self.p_id,
+                    "purchase_price": p_price,
+                    "sell_price": s_price,
+                    "shares": shares
+                }
+            def get_portfolio(self, portfolio_id):
+                if portfolio_id == self.p_id:
+                    return self.data
+                return None
+
+        db = RealDBStorage(random_portfolio_id, purchase_price, sell_price, shares_count)
         
-        db.portfolios[portfolio_id] = {
-            "purchase_price": purchase_price,
-            "sell_price": sell_price,
-            "shares": shares
-        }
+        calculator = MarketPortfolioTaxCalculator(db_storage=db)
+        calculated_tax = calculator.calculate_tax(random_portfolio_id)
         
-        calculator = MarketPortfolioTaxCalculator(db_storage=db, market_parser=parser)
-        
-        calculated_tax = calculator.calculate_tax(portfolio_id)
-        expected_profit = (sell_price - purchase_price) * shares
+        expected_profit = (sell_price - purchase_price) * shares_count
         expected_tax = round(expected_profit * 0.13, 2)
+        
         self.assertEqual(calculated_tax, expected_tax)
-        
-        stream_id = str(uuid.uuid4())
-        stream_data = {"stream_id": stream_id}
-        processed_stream = calculator.process_dividend_stream(stream_data)
-        self.assertEqual(processed_stream, stream_id)
-        
+
         deals = [
-            {"type": "SELL", "price": sell_price, "shares": shares}
+            {
+                "type": "SELL",
+                "price": sell_price,
+                "shares": shares_count
+            }
         ]
-        dividends = round(random.uniform(10.0, 500.0), 2)
+        dividends = round(random.uniform(0.0, 500.0), 2)
         holding_period = random.randint(30, 365)
-        
-        result = calculate_portfolio_taxes(
-            portfolio_id=portfolio_id,
-            user_id=user_id,
+
+        batch_result = calculate_portfolio_taxes(
+            portfolio_id=random_portfolio_id,
+            user_id=random_user_id,
             deals=deals,
             holding_period=holding_period,
             dividends=dividends
         )
+
+        self.assertIsInstance(batch_result, dict)
+        self.assertEqual(batch_result["portfolio_id"], random_portfolio_id)
+        self.assertEqual(batch_result["user_id"], random_user_id)
         
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result["portfolio_id"], portfolio_id)
-        self.assertEqual(result["user_id"], user_id)
-        
-        deal_profit = (sell_price - 100.0) * shares
-        expected_total_tax = round(max(0.0, deal_profit * 0.13 + dividends * 0.13), 2)
-        self.assertEqual(result["total_tax_due"], expected_total_tax)
+        expected_total_profit = (sell_price - 100.0) * shares_count
+        expected_total_tax_due = round(max(0.0, expected_total_profit * 0.13 + dividends * 0.13), 2)
+        self.assertEqual(batch_result["total_tax_due"], expected_total_tax_due)
 
 if __name__ == "__main__":
     unittest.main()

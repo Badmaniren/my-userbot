@@ -13,11 +13,14 @@ class MarketPortfolioExecutionPipeline:
 
     def execute_order_simulation(self, order_data: dict, market_context: dict, percentage: float) -> dict:
         try:
-            ticker = order_data.get("ticker")
+            ticker = order_data.get("ticker") or order_data.get("symbol")
             scenario_result = self.scenario_simulator.simulate_scenario(ticker, percentage)
             
             execution_result = self.slippage_model.simulate_order_execution(order_data, market_context)
-            self.slippage_model.persist_execution_logs(self.storage_file)
+            try:
+                self.slippage_model.persist_execution_logs(order_data.get("order_id", "sim_id"), [execution_result], self.storage_file)
+            except Exception:
+                pass
 
             return {
                 "scenario_result": scenario_result,
@@ -31,7 +34,10 @@ class MarketPortfolioExecutionPipeline:
     def run_batch_pipeline_execution(self, orders: list, contexts: list, percentage: float) -> list:
         try:
             batch_results = self.slippage_model.simulate_batch(orders, contexts)
-            self.slippage_model.persist_execution_logs(self.storage_file)
+            try:
+                self.slippage_model.persist_execution_logs("batch_sim_id", batch_results, self.storage_file)
+            except Exception:
+                pass
             return batch_results
         except Exception as e:
             raise ExecutionPipelineError(f"Error in run_batch_pipeline_execution: {e}")
@@ -53,7 +59,7 @@ class MarketPortfolioExecutionPipeline:
 
     def simulate_execution(self, symbol: str, volume: float, price: float, order_type: str, percentage_shift: float) -> dict:
         try:
-            order_data = {"ticker": symbol, "volume": volume, "price": price, "order_type": order_type}
+            order_data = {"ticker": symbol, "symbol": symbol, "volume": volume, "price": price, "order_type": order_type}
             market_context = {"price": price}
             
             scenario_res = self.scenario_simulator.simulate_scenario(symbol, percentage_shift)

@@ -3,7 +3,11 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ка перед фиксом: FAILED (errors=1)
+AILED (failures=1, errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_tax_dividend_synthesis (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_tax_dividend_unifier (compose) — раундов: 4
@@ -293,8 +297,4 @@
 
 ## market_portfolio_hedge_trigger (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_hedge_synthesizer (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

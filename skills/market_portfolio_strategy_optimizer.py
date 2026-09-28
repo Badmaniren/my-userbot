@@ -2,7 +2,7 @@ from skills.market_portfolio_backtester import MarketPortfolioBacktester
 from skills.market_portfolio_scenario_simulator import PortfolioScenarioSimulator
 
 class PortfolioStrategyOptimizer:
-    def __init__(self, storage_file: str):
+    def __init__(self, storage_file: str = "default.db"):
         self.storage_file = storage_file
         self.backtester = MarketPortfolioBacktester(storage_file)
         self.simulator = PortfolioScenarioSimulator(storage_file)
@@ -112,3 +112,7 @@ class PortfolioStrategyOptimizer:
                 "storage": getattr(self, 'storage_file', None)
             }
         }
+
+
+MarketPortfolioStrategyOptimizer = PortfolioStrategyOptimizer
+market_portfolio_strategy_optimizer = PortfolioStrategyOptimizer

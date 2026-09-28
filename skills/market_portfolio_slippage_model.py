@@ -144,3 +144,14 @@ class MarketPortfolioSlippageModel:
         if storage and hasattr(storage, "get_logs"):
             return storage.get_logs(simulation_id)
         return []
+
+
+SlippageModel = MarketPortfolioSlippageModel
+slippage_model = MarketPortfolioSlippageModel
+
+
+def market_portfolio_slippage_model(payload: dict) -> dict:
+    model = MarketPortfolioSlippageModel()
+    if isinstance(payload, dict):
+        return model.simulate_order_execution(payload, {})
+    return {}

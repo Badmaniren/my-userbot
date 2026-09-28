@@ -19,10 +19,12 @@ class PortfolioScenarioSimulator:
 
     def load_data(self, storage_file):
         logger.info("Loading portfolio data from %s", storage_file)
+        if not storage_file:
+            return {}
         try:
             with open(storage_file, 'r') as f:
                 return json.load(f)
-        except (IOError, OSError, json.JSONDecodeError) as e:
+        except (IOError, OSError, json.JSONDecodeError, TypeError) as e:
             logger.error("Failed to load data from %s: %s", storage_file, e)
             return {}
 

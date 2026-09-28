@@ -4,7 +4,11 @@ import uuid
 import random
 import io
 
-from skills.market_portfolio_tax_calculator import MarketPortfolioTaxCalculator, calculate_portfolio_taxes
+from skills.market_portfolio_tax_calculator import (
+    MarketPortfolioTaxCalculator,
+    calculate_portfolio_taxes,
+    market_portfolio_tax_calculator
+)
 
 
 class TestMarketPortfolioTaxCalculator(unittest.TestCase):
@@ -108,6 +112,28 @@ class TestMarketPortfolioTaxCalculator(unittest.TestCase):
         self.assertEqual(res["portfolio_id"], portfolio_id)
         self.assertEqual(res["user_id"], user_id)
         self.assertEqual(res["total_tax_due"], expected_tax)
+
+    def test_market_portfolio_tax_calculator_dict_payload(self):
+        payload = {
+            "portfolio_id": "TEST-PF-100",
+            "assets": [
+                {"ticker": "ABC", "weight": 0.5, "historical_returns": [-0.02, 0.01, 0.03]},
+                {"ticker": "XYZ", "weight": 0.5, "historical_returns": [-0.04, 0.02, 0.01]}
+            ],
+            "confidence_level": 0.95,
+            "tax_rate": 0.20,
+            "realized_gains": 10000.0
+        }
+        res = market_portfolio_tax_calculator(payload)
+        self.assertIsInstance(res, dict)
+        self.assertEqual(res["portfolio_id"], "TEST-PF-100")
+        self.assertIn("var", res)
+        self.assertIn("cvar", res)
+        self.assertEqual(res["tax_liability"], 2000.0)
+
+    def test_market_portfolio_tax_calculator_str_payload(self):
+        res = market_portfolio_tax_calculator("NON_EXISTENT_ID")
+        self.assertEqual(res, 0.0)
 
 
 if __name__ == '__main__':

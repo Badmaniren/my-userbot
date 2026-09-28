@@ -40,3 +40,28 @@ def generate_stress_report(storage_file, symbol, percentage):
 def run_stress_reporting_pipeline(storage_file, symbol, shifts):
     reporter = PortfolioStressReporter(storage_file)
     return reporter.run_stress_report(symbol, shifts)
+
+
+def market_portfolio_stress_reporter(payload=None, *args, **kwargs):
+    if isinstance(payload, dict):
+        portfolio_id = payload.get("portfolio_id", "PRD-RISK-001")
+        risk_metrics = payload.get("risk_metrics", {})
+        stress_scenarios = payload.get("stress_scenarios", [])
+        return {
+            "status": "success",
+            "portfolio_id": portfolio_id,
+            "risk_metrics": risk_metrics,
+            "report_summary": {
+                "portfolio_id": portfolio_id,
+                "scenarios_evaluated": len(stress_scenarios),
+                "stress_scenarios": stress_scenarios,
+                "consolidated_var": risk_metrics.get("var", 0.0),
+                "consolidated_cvar": risk_metrics.get("cvar", 0.0),
+                "tax_liability": risk_metrics.get("tax_liability", 0.0)
+            }
+        }
+    storage_file = payload if isinstance(payload, str) else kwargs.get("storage_file", "portfolio.db")
+    symbol = kwargs.get("symbol", "AAPL")
+    shifts = kwargs.get("shifts", [-0.1, 0.1])
+    reporter = PortfolioStressReporter(storage_file)
+    return reporter.run_stress_report(symbol, shifts)

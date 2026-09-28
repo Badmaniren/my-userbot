@@ -8,7 +8,8 @@ from skills.market_portfolio_stress_reporter import (
     StressReporter,
     PortfolioStressReporter,
     generate_stress_report,
-    run_stress_reporting_pipeline
+    run_stress_reporting_pipeline,
+    market_portfolio_stress_reporter
 )
 
 
@@ -129,6 +130,18 @@ class TestMarketPortfolioStressReporter(unittest.TestCase):
         mock_portfolio_reporter_cls.assert_called_once_with(self.storage_file)
         mock_instance.run_stress_report.assert_called_once_with(self.symbol, self.shifts)
         self.assertEqual(result, expected_payload)
+
+    def test_market_portfolio_stress_reporter_dict_payload(self):
+        report_payload = {
+            "portfolio_id": "PF-STRESS-01",
+            "risk_metrics": {"var": 0.05, "cvar": 0.08, "tax_liability": 500.0},
+            "stress_scenarios": [{"scenario_name": "Crash -10%", "impact_multiplier": -0.10}]
+        }
+        res = market_portfolio_stress_reporter(report_payload)
+        self.assertIsInstance(res, dict)
+        self.assertEqual(res["status"], "success")
+        self.assertEqual(res["portfolio_id"], "PF-STRESS-01")
+        self.assertIn("report_summary", res)
 
 
 if __name__ == '__main__':

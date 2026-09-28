@@ -3,6 +3,20 @@ import requests
 from bs4 import BeautifulSoup
 
 
+class DBStorage:
+    def __init__(self, db_path: str = "market_data.db"):
+        self.db_path = db_path
+
+    def save(self, key, data):
+        pass
+
+    def get(self, key):
+        return None
+
+
+DbStorage = DBStorage
+
+
 class MarketParser:
     def __init__(self, storage_file: str = "market_data.db"):
         self.storage_file = storage_file

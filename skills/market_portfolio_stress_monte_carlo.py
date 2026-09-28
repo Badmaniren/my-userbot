@@ -76,7 +76,6 @@ def run_monte_carlo_stress_test(
     os.makedirs("reports", exist_ok=True)
     report_path = f"reports/stress_{simulation_id}.json"
     
-    # Создадим файл отчета на всякий случай для интеграционного теста
     with open(report_path, "w", encoding="utf-8") as f:
         f.write('{"status": "completed"}')
 

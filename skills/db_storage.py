@@ -1,6 +1,13 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 
 class MarketParser:
@@ -55,3 +62,46 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+_report_cache = {}
+
+
+def save_report_to_db(report_id, report_data, storage_file: str = None):
+    """Saves a report to the DB/cache."""
+    _report_cache[report_id] = report_data
+    if storage_file and storage_file.endswith('.db'):
+        conn = sqlite3.connect(storage_file)
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS reports (
+                report_id TEXT PRIMARY KEY,
+                data TEXT
+            )
+        ''')
+        import json
+        cursor.execute(
+            'INSERT OR REPLACE INTO reports (report_id, data) VALUES (?, ?)',
+            (report_id, json.dumps(report_data))
+        )
+        conn.commit()
+        conn.close()
+    return True
+
+
+def get_report_from_db(report_id, storage_file: str = None):
+    """Retrieves a report from the DB/cache."""
+    if report_id in _report_cache:
+        return _report_cache[report_id]
+    if storage_file and storage_file.endswith('.db'):
+        conn = sqlite3.connect(storage_file)
+        cursor = conn.cursor()
+        try:
+            cursor.execute('SELECT data FROM reports WHERE report_id = ?', (report_id,))
+            row = cursor.fetchone()
+            if row:
+                import json
+                return json.loads(row[0])
+        finally:
+            conn.close()
+    return None

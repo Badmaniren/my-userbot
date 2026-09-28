@@ -66,3 +66,15 @@ class PortfolioValuation:
 
     def calculate_portfolio_pnl(self, url):
         return self.get_total_summary(url)
+
+
+def calculate_portfolio_valuation(portfolio_data=None, storage_file=None):
+    """Calculates portfolio valuation summary."""
+    valuation = PortfolioValuation(storage_file=storage_file)
+    if isinstance(portfolio_data, str) and (portfolio_data.startswith("http://") or portfolio_data.startswith("https://")):
+        return valuation.get_total_summary(portfolio_data)
+    return {
+        "total_value": 0.0,
+        "total_invested": 0.0,
+        "total_pnl": 0.0
+    }

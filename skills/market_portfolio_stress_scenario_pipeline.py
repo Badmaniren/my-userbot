@@ -39,6 +39,8 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
 
     try:
         stress_test_result = simulator.run_stress_test(symbol, shifts)
+        if isinstance(stress_test_result, list):
+            stress_test_result = {"symbol": symbol, "shifts": shifts, "results": stress_test_result}
     except KeyError:
         stress_test_result = {"symbol": symbol, "shifts": shifts, "results": []}
     

@@ -3,8 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
-- Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/tests/test_market_portfolio_simulation_report_pipeline.py", line 103, in test_generate_simulation_report_scenario_error
+me/runner/work/my-userbot/my-userbot/tests/test_market_portfolio_simulation_report_pipeline.py", line 103, in test_generate_simulation_report_scenario_error
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_simulation_report_bridge (compose) — раундов: 4
@@ -314,4 +313,8 @@
 
 ## market_portfolio_stress_scenario_pipeline (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_scenario_pipeline (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

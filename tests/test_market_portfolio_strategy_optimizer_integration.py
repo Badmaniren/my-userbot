@@ -6,11 +6,13 @@ from skills.market_portfolio_strategy_optimizer import PortfolioStrategyOptimize
 
 class TestPortfolioStrategyOptimizerIntegration(unittest.TestCase):
     def setUp(self):
-        self.test_dir = "test_storage"
-        os.makedirs(self.test_dir, exist_ok=True)
-        self.storage_file = os.path.join(self.test_dir, f"test_portfolio_{uuid.uuid4()}.db")
+        self.random_suffix = uuid.uuid4().hex[:8]
+        self.storage_file = f"test_portfolio_storage_{self.random_suffix}.db"
         self.optimizer = PortfolioStrategyOptimizer(self.storage_file)
-        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
+        self.symbol = f"SYM_{self.random_suffix}"
+        self.shifts = [random.uniform(0.01, 0.05), random.uniform(0.06, 0.10)]
+        self.allocation = round(random.uniform(0.1, 0.9), 2)
+        self.percentage = round(random.uniform(5.0, 25.0), 2)
 
     def tearDown(self):
         if os.path.exists(self.storage_file):
@@ -18,52 +20,57 @@ class TestPortfolioStrategyOptimizerIntegration(unittest.TestCase):
                 os.remove(self.storage_file)
             except OSError:
                 pass
-        if os.path.exists(self.test_dir):
-            try:
-                os.rmdir(self.test_dir)
-            except OSError:
-                pass
 
-    def test_integration_optimize_and_evaluate(self):
-        allocation = round(random.uniform(0.1, 0.9), 2)
-        shift_val = random.randint(1, 10)
-        
-        result = self.optimizer.optimize_and_evaluate(self.symbol, allocation, shift_val)
-        
+    def test_optimize_and_evaluate_integration(self):
+        result = self.optimizer.optimize_and_evaluate(
+            symbol=self.symbol,
+            allocation=self.allocation,
+            shifts=self.shifts
+        )
+
         self.assertIsInstance(result, dict)
         self.assertIn("optimized_weights", result)
         self.assertIn("resilience_score", result)
         self.assertIn("backtest", result)
         self.assertIn("stress", result)
-        
+
         weights = result["optimized_weights"]
         self.assertIn(self.symbol, weights)
-        self.assertAlmostEqual(weights[self.symbol], allocation)
-        self.assertIsInstance(result["resilience_score"], float)
+        self.assertEqual(weights[self.symbol], self.allocation)
 
-    def test_integration_optimize_strategy_with_random_data(self):
-        shifts = [random.randint(1, 5), random.randint(6, 10)]
-        percentage = round(random.uniform(0.01, 0.5), 4)
+        score = result["resilience_score"]
+        self.assertIsInstance(score, float)
+        self.assertTrue(0.0 <= score <= 1.0)
 
-        result = self.optimizer.optimize_strategy(self.symbol, shifts, percentage)
-        
+    def test_optimize_strategy_integration(self):
+        result = self.optimizer.optimize_strategy(
+            symbol=self.symbol,
+            shifts=self.shifts,
+            percentage=self.percentage
+        )
+
         self.assertIsInstance(result, dict)
         self.assertIn('backtest', result)
         self.assertIn('simulation', result)
 
-    def formula_validation_boundary_conditions(self):
-        invalid_allocations = [-0.5, 1.5, "invalid", None]
-        for alloc in invalid_allocations:
-            validated = self.optimizer._validate_allocation(alloc)
-            self.assertGreaterEqual(validated, 0.0)
-            self.assertLessEqual(validated, 1.0)
+    def test_evaluate_resilience_integration(self):
+        result = self.optimizer.evaluate_resilience(
+            symbol=self.symbol,
+            shifts=self.shifts
+        )
 
-    def test_integration_strategy_summary(self):
+        self.assertIsInstance(result, dict)
+        self.assertIn('stress_data', result)
+        self.assertIn('drawdown_checked', result)
+        self.assertIsInstance(result['drawdown_checked'], float)
+
+    def test_get_strategy_summary_integration(self):
         summary = self.optimizer.get_strategy_summary(self.symbol)
+        
         self.assertIsInstance(summary, dict)
         self.assertIn(self.symbol, summary)
         self.assertEqual(summary[self.symbol]["summary"], "active")
         self.assertEqual(summary[self.symbol]["storage"], self.storage_file)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

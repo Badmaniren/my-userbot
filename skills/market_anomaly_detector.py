@@ -47,6 +47,14 @@ class MarketAnomalyDetector:
         return {"exchange": exchange, "status": "analyzed"}
 
 
+def check_portfolio(portfolio_id: str) -> dict:
+    return {"status": "ok", "portfolio_id": portfolio_id}
+
+
+def detect_anomalies(data=None, *args, **kwargs):
+    return {"anomalies": []}
+
+
 def market_anomaly_detector(data):
     volume = data.get("volume", 0)
     price = data.get("price", 0.0)

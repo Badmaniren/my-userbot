@@ -1,6 +1,18 @@
 import os
 import json
 from datetime import datetime
+from typing import List, Dict, Any
+
+_historical_returns_store: Dict[str, List[float]] = {}
+
+
+def get_historical_returns(portfolio_id: str) -> List[float]:
+    return _historical_returns_store.get(portfolio_id, [])
+
+
+def save_historical_returns(portfolio_id: str, returns: List[float]) -> None:
+    _historical_returns_store[portfolio_id] = list(returns)
+
 
 class MarketParser:
     def __init__(self, storage_file: str):
@@ -97,3 +109,6 @@ def start_new(symbol: str, url: str, telegram_token: str, chat_id: str, storage_
         chat_id,
         storage_file
     )
+
+
+market_portfolio_collector_agent = start_new

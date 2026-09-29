@@ -18,6 +18,12 @@ class StressRecoveryCoordinatorBridge:
     def __init__(self, storage_file: str = "stress_recovery.db"):
         self.storage_file = storage_file
         logger.info(f"Initializing StressRecoveryCoordinatorBridge with storage: {storage_file}")
+        
+        if not os.path.exists(self.storage_file):
+            logger.debug(f"Storage file {self.storage_file} does not exist. Creating default empty structure.")
+            with open(self.storage_file, "w") as f:
+                f.write("{}")
+
         self.pipeline = PortfolioStressScenarioPipeline(storage_file)
         self.monitor = {"status": "initialized", "storage": storage_file}
 
@@ -98,14 +104,15 @@ def run_stress_recovery_coordinator_pipeline(
     url: str
 ) -> dict:
     logger.info(f"Running stress recovery coordinator pipeline for {symbol} at price {price}")
-    coordinator = StressRecoveryCoordinatorBridge(storage_file=storage_file)
-    
-    shifts_iterable = list(range(shifts)) if isinstance(shifts, int) else shifts
     
     if not os.path.exists(storage_file):
         logger.debug(f"Storage file {storage_file} not found in pipeline. Initializing.")
         with open(storage_file, "w") as f:
             f.write("{}")
+
+    coordinator = StressRecoveryCoordinatorBridge(storage_file=storage_file)
+    
+    shifts_iterable = list(range(shifts)) if isinstance(shifts, int) else shifts
 
     try:
         stress_result = run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts_iterable)

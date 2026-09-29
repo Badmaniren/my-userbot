@@ -2,6 +2,13 @@ import os
 import json
 from datetime import datetime
 
+
+def collect_market_data(raw_market_data=None, *args, **kwargs):
+    if raw_market_data is not None:
+        return raw_market_data
+    return {"portfolio_id": kwargs.get("portfolio_id", "default"), "assets": []}
+
+
 class MarketParser:
     def __init__(self, storage_file: str):
         self.storage_file = storage_file

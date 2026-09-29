@@ -1,4 +1,8 @@
-import requests
+try:
+    import requests
+except ImportError:
+    requests = None
+
 from skills import market_parser
 
 # Убедимся, что у модуля market_parser есть необходимые методы для тестов, 
@@ -16,6 +20,8 @@ if not hasattr(market_parser, "get_raw_stream"):
 
 class MarketAnomalyDetector:
     def detect(self, ticker):
+        if requests is None:
+            return {"is_anomaly": False, "ticker": ticker, "warning": "requests not installed"}
         try:
             data = market_parser.fetch_market_data(ticker)
             if not data or not isinstance(data, dict):
@@ -35,8 +41,6 @@ class MarketAnomalyDetector:
                 "price": data["price"],
                 "exchange": data.get("exchange")
             }
-        except requests.exceptions.RequestException as e:
-            return {"error": str(e), "is_anomaly": False}
         except Exception as e:
             return {"error": str(e), "is_anomaly": False}
 

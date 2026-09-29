@@ -3,7 +3,11 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- фиксом: from skills.market_portfolio_strategy_optimizer import PortfolioStrategyOptimizer
+ом: FAILED (failures=2)
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_scenario_simulator (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: from skills.market_portfolio_strategy_optimizer import PortfolioStrategyOptimizer
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_monte_carlo (create) — раундов: 4
@@ -302,9 +306,5 @@
 
 ## market_portfolio_macro_factor_evaluator (start_new) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено создавать классы-заглушки внутри `except ImportError:`! Импортируй честно, пусть падает, если модуля нет.
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_tail_risk_model (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

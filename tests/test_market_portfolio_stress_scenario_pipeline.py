@@ -4,7 +4,12 @@ import json
 import io
 import uuid
 import random
-from skills.market_portfolio_stress_scenario_pipeline import PortfolioStressScenarioPipeline, run_stress_scenario_pipeline
+from skills.market_portfolio_stress_scenario_pipeline import (
+    PortfolioStressScenarioPipeline,
+    run_stress_scenario_pipeline,
+    market_portfolio_stress_scenario_pipeline
+)
+
 
 class TestPortfolioStressScenarioPipeline(unittest.TestCase):
     def setUp(self):
@@ -13,6 +18,33 @@ class TestPortfolioStressScenarioPipeline(unittest.TestCase):
         self.percentage = round(random.uniform(-50.0, -5.0), 2)
         self.shifts = [round(random.uniform(-0.1, 0.1), 3) for _ in range(3)]
 
+    def test_run_pipeline_payload_execution(self):
+        pipeline = market_portfolio_stress_scenario_pipeline()
+        payload = {
+            "portfolio_id": "PF-TEST-123",
+            "initial_capital": 500000.0,
+            "assets": [
+                {"ticker": "AAPL", "weight": 0.6, "current_price": 150.0},
+                {"ticker": "GOOGL", "weight": 0.4, "current_price": 2800.0}
+            ],
+            "scenarios": [
+                {
+                    "scenario_id": "MARKET_CRASH",
+                    "description": "30% market crash",
+                    "shocks": {"AAPL": -0.30, "GOOGL": -0.25},
+                    "volatility_multiplier": 2.5
+                }
+            ]
+        }
+        output = pipeline.run_pipeline(payload)
+        self.assertEqual(output["execution_status"], "SUCCESS")
+        self.assertEqual(output["portfolio_id"], "PF-TEST-123")
+        self.assertEqual(len(output["scenario_results"]), 1)
+        res = output["scenario_results"][0]
+        self.assertEqual(res["scenario_id"], "MARKET_CRASH")
+        self.assertIn("shocked_portfolio_value", res)
+        self.assertIn("pnl", res)
+
     def test_pipeline_class_execution(self):
         sim_val = round(random.uniform(10.0, 1000.0), 2)
         stress_res = [round(random.uniform(-5.0, 5.0), 2) for _ in range(2)]
@@ -20,7 +52,7 @@ class TestPortfolioStressScenarioPipeline(unittest.TestCase):
 
         with patch("skills.market_portfolio_stress_scenario_pipeline.PortfolioScenarioSimulator") as mock_sim_cls, \
              patch("skills.market_portfolio_stress_scenario_pipeline.PortfolioStressReporter") as mock_rep_cls:
-            
+
             mock_sim_instance = mock_sim_cls.return_value
             mock_sim_instance.simulate_scenario.return_value = {"symbol": self.symbol, "val": sim_val}
             mock_sim_instance.run_stress_test.return_value = stress_res

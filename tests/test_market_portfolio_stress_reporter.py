@@ -8,7 +8,8 @@ from skills.market_portfolio_stress_reporter import (
     StressReporter,
     PortfolioStressReporter,
     generate_stress_report,
-    run_stress_reporting_pipeline
+    run_stress_reporting_pipeline,
+    market_portfolio_stress_reporter
 )
 
 
@@ -19,6 +20,23 @@ class TestStressReporter(unittest.TestCase):
         self.symbol = ''.join(random.choices(string.ascii_uppercase, k=5))
         self.percentage = round(random.uniform(-50.0, -5.0), 2)
         self.shifts = [self.percentage, round(self.percentage / 2, 2)]
+
+    def test_generate_comprehensive_report(self):
+        reporter = market_portfolio_stress_reporter()
+        pipeline_output = {
+            "execution_status": "SUCCESS",
+            "portfolio_id": "PF-COMP-100",
+            "scenario_results": [
+                {"scenario_id": "S1", "pnl": -10000.0, "percentage_change": -5.0},
+                {"scenario_id": "S2", "pnl": -50000.0, "percentage_change": -25.0},
+                {"scenario_id": "S3", "pnl": -20000.0, "percentage_change": -10.0}
+            ]
+        }
+        report = reporter.generate_comprehensive_report(pipeline_output)
+        self.assertEqual(report["portfolio_id"], "PF-COMP-100")
+        self.assertEqual(report["worst_case_scenario"]["scenario_id"], "S2")
+        self.assertIn("risk_metrics_summary", report)
+        self.assertEqual(report["risk_metrics_summary"]["max_drawdown_amount"], 50000.0)
 
     @patch('skills.market_portfolio_stress_reporter.PortfolioScenarioSimulator')
     @patch('skills.market_portfolio_stress_reporter.MarketReportGenerator')

@@ -26,10 +26,10 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
             content = f.read()
         data = json.loads(content)
         if not isinstance(data, dict):
-            raise ValueError()
-    except Exception:
+            raise ValueError("Invalid storage data format")
+    except (FileNotFoundError, json.JSONDecodeError, ValueError):
         with open(storage_file, "w", encoding="utf-8") as f:
-            json.dump({}, f)
+            f.write("{}")
 
     simulator = PortfolioScenarioSimulator(storage_file)
     try:

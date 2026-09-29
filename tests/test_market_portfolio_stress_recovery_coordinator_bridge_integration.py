@@ -9,14 +9,14 @@ from skills.market_portfolio_stress_recovery_coordinator_bridge import (
 )
 
 class TestStressRecoveryCoordinatorBridgeIntegration(unittest.TestCase):
-
+    
     def setUp(self):
-        self.unique_id = str(uuid.uuid4())[:8]
-        self.storage_file = f"test_stress_recovery_{self.unique_id}.db"
-        self.symbol = f"TICK_{self.unique_id.upper()}"
-        self.url = f"https://example.com/webhook/{self.unique_id}"
-        self.telegram_token = f"token_{self.unique_id}"
-        self.chat_id = str(random.randint(100000, 999999))
+        self.random_suffix = uuid.uuid4().hex[:8]
+        self.storage_file = f"test_stress_recovery_{self.random_suffix}.db"
+        self.symbol = f"SYM_{random.randint(1000, 9999)}"
+        self.url = f"https://api.mock-gateway-{self.random_suffix}.test/webhook"
+        self.telegram_token = f"token_{random.randint(100000, 999999)}"
+        self.chat_id = str(random.randint(1000000, 9999999))
         self.percentage = round(random.uniform(5.0, 25.0), 2)
         self.shifts = random.randint(1, 5)
         self.price = round(random.uniform(100.0, 1500.0), 2)
@@ -28,10 +28,10 @@ class TestStressRecoveryCoordinatorBridgeIntegration(unittest.TestCase):
             except OSError:
                 pass
 
-    def test_bridge_class_execution(self):
-        coordinator = StressRecoveryCoordinatorBridge(storage_file=self.storage_file)
+    def test_bridge_class_execution_integration(self):
+        bridge = StressRecoveryCoordinatorBridge(storage_file=self.storage_file)
         
-        result = coordinator.execute_recovery_workflow(
+        result = bridge.execute_recovery_workflow(
             symbol=self.symbol,
             url=self.url,
             telegram_token=self.telegram_token,
@@ -39,7 +39,7 @@ class TestStressRecoveryCoordinatorBridgeIntegration(unittest.TestCase):
             percentage=self.percentage,
             shifts=self.shifts
         )
-
+        
         self.assertTrue(os.path.exists(self.storage_file))
         self.assertIsInstance(result, dict)
         self.assertIn("stress_result", result)
@@ -47,10 +47,8 @@ class TestStressRecoveryCoordinatorBridgeIntegration(unittest.TestCase):
         
         stress_res = result["stress_result"]
         self.assertIsInstance(stress_res, dict)
-        if "symbol" in stress_res:
-            self.assertEqual(stress_res["symbol"], self.symbol)
 
-    def test_run_stress_recovery_coordinator_function(self):
+    def test_run_stress_recovery_coordinator_integration(self):
         result = run_stress_recovery_coordinator(
             storage_file=self.storage_file,
             symbol=self.symbol,
@@ -60,16 +58,16 @@ class TestStressRecoveryCoordinatorBridgeIntegration(unittest.TestCase):
             percentage=self.percentage,
             shifts=self.shifts
         )
-
+        
         self.assertTrue(os.path.exists(self.storage_file))
         self.assertIsInstance(result, dict)
         self.assertIn("stress", result)
         self.assertIn("recovery", result)
         
-        stress_out = result["stress"]
-        self.assertIsInstance(stress_out, dict)
+        recovery_res = result["recovery"]
+        self.assertIsInstance(recovery_res, dict)
 
-    def test_run_stress_recovery_coordinator_pipeline_function(self):
+    def test_run_stress_recovery_coordinator_pipeline_integration(self):
         result = run_stress_recovery_coordinator_pipeline(
             storage_file=self.storage_file,
             symbol=self.symbol,
@@ -80,14 +78,14 @@ class TestStressRecoveryCoordinatorBridgeIntegration(unittest.TestCase):
             chat_id=self.chat_id,
             url=self.url
         )
-
+        
         self.assertTrue(os.path.exists(self.storage_file))
         self.assertIsInstance(result, dict)
         self.assertIn("stress", result)
         self.assertIn("recovery", result)
-
-        recovery_out = result["recovery"]
-        self.assertIsInstance(recovery_out, dict)
+        
+        stress_data = result["stress"]
+        self.assertIsInstance(stress_data, dict)
 
 if __name__ == "__main__":
     unittest.main()

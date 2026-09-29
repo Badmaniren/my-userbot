@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-о прошёл тесты и влит в main
-
-## market_portfolio_scenario_simulator (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: from skills.market_portfolio_strategy_optimizer import PortfolioStrategyOptimizer
+olio_strategy_optimizer import PortfolioStrategyOptimizer
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_execution_pipeline (compose) — раундов: 1
@@ -314,3 +311,7 @@
 
 ## market_portfolio_slippage_model (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## extractor_tool_1790692733 (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

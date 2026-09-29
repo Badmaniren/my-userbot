@@ -6,6 +6,8 @@ import uuid
 import random
 import io
 from skills.market_portfolio_monitor import (
+    MarketPortfolioMonitor,
+    market_portfolio_monitor,
     MarketParser,
     MarketReportGenerator,
     run_pipeline,
@@ -32,6 +34,20 @@ class TestMarketPortfolioMonitor(unittest.TestCase):
                 os.remove(self.storage_file)
             except OSError:
                 pass
+
+    def test_market_portfolio_monitor_function_with_liquidity_data(self):
+        sample_data = [
+            {"ticker": "AAPL", "order_size": 10000, "average_daily_volume": 100000, "market_depth": 500000}
+        ]
+        res = market_portfolio_monitor(sample_data)
+        self.assertIsInstance(res, dict)
+        self.assertEqual(res["status"], "evaluated")
+        self.assertEqual(res["total_positions"], 1)
+
+    def test_market_portfolio_monitor_class_drawdown(self):
+        monitor = MarketPortfolioMonitor()
+        dd = monitor.calculate_drawdown([100.0, 120.0, 90.0, 110.0])
+        self.assertEqual(dd, 0.25)
 
     def test_market_parser_fetch_and_load(self):
         parser = MarketParser(storage_file=self.storage_file)

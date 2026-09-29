@@ -84,15 +84,15 @@ class MarketPortfolioSlippageModel:
         }
 
     def simulate_order_execution(self, order_data: Dict[str, Any], market_context: Dict[str, Any]) -> Dict[str, Any]:
-        order_id = order_data.get("order_id")
-        symbol = order_data.get("symbol")
+        order_id = order_data.get("order_id") or order_data.get("trade_id", "TRD-000")
+        symbol = order_data.get("symbol") or order_data.get("ticker", "UNKNOWN")
         side = order_data.get("side", "BUY")
-        quantity = order_data.get("quantity", 0)
+        quantity = order_data.get("quantity") or order_data.get("order_size", 0)
         base_price = order_data.get("price", 100.0)
 
-        adv = market_context.get("adv", 100000)
+        adv = market_context.get("adv") or order_data.get("average_daily_volume", 100000)
         volatility = market_context.get("volatility", 0.2)
-        spread_bps = market_context.get("spread_bps", 5.0)
+        spread_bps = market_context.get("spread_bps") or order_data.get("bid_ask_spread_bps", 5.0)
 
         participation_rate = quantity / adv if adv > 0 else 0.01
         market_impact = base_price * volatility * (participation_rate ** 0.5) * 0.1
@@ -126,11 +126,47 @@ class MarketPortfolioSlippageModel:
     def simulate_batch(self, orders_batch: List[Dict[str, Any]], contexts: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
         results = []
         for order in orders_batch:
-            symbol = order.get("symbol")
-            context = contexts.get(symbol, {"adv": 100000, "volatility": 0.2, "spread_bps": 5.0})
+            symbol = order.get("symbol") or order.get("ticker", "UNKNOWN")
+            context = contexts.get(symbol, {
+                "adv": order.get("average_daily_volume", 100000),
+                "volatility": 0.2,
+                "spread_bps": order.get("bid_ask_spread_bps", 5.0)
+            })
             res = self.simulate_order_execution(order, context)
             results.append(res)
         return results
+
+    def evaluate_portfolio_slippage(self, data: Any) -> Dict[str, Any]:
+        """Оценивает детали проскальзывания по списку сделок портфеля."""
+        if not data:
+            return {"status": "ok", "average_slippage_bps": 0.0, "total_evaluations": 0}
+
+        if not isinstance(data, list):
+            data = [data]
+
+        model_results = []
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            context = {
+                "adv": float(item.get("average_daily_volume", 100000.0)),
+                "volatility": float(item.get("volatility", 0.2)),
+                "spread_bps": float(item.get("bid_ask_spread_bps", 5.0))
+            }
+            res = self.simulate_order_execution(item, context)
+            model_results.append(res)
+
+        avg_slippage = (
+            sum(r["slippage_bps"] for r in model_results) / len(model_results)
+            if model_results else 0.0
+        )
+
+        return {
+            "status": "evaluated",
+            "total_evaluations": len(model_results),
+            "average_slippage_bps": round(avg_slippage, 2),
+            "evaluations": model_results
+        }
 
     def persist_execution_logs(self, simulation_id: str, executions: List[Dict[str, Any]], storage: Any) -> bool:
         self._execution_logs[simulation_id] = executions
@@ -144,3 +180,20 @@ class MarketPortfolioSlippageModel:
         if storage and hasattr(storage, "get_logs"):
             return storage.get_logs(simulation_id)
         return []
+
+
+def market_portfolio_slippage_model(data=None, *args, **kwargs):
+    """
+    Главная функция-точка входа для расчета проскальзывания портфельных позиций.
+    """
+    model = MarketPortfolioSlippageModel(**kwargs)
+    if data is not None:
+        if isinstance(data, (list, dict)):
+            return model.evaluate_portfolio_slippage(data)
+        if isinstance(data, OrderExecutionParameters):
+            return model.calculate_slippage(data)
+    return model.evaluate_portfolio_slippage([])
+
+
+SlippageModel = MarketPortfolioSlippageModel
+slippage_model = MarketPortfolioSlippageModel

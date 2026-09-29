@@ -1,6 +1,91 @@
 import json
 import os
 
+class MarketPortfolioMonitor:
+    def __init__(self, storage_file=None):
+        self.storage_file = storage_file
+
+    def calculate_drawdown(self, portfolio_values):
+        if not portfolio_values:
+            return 0.0
+        peak = portfolio_values[0]
+        max_dd = 0.0
+        for val in portfolio_values:
+            if val > peak:
+                peak = val
+            dd = (peak - val) / peak if peak > 0 else 0.0
+            if dd > max_dd:
+                max_dd = dd
+        return round(max_dd, 4)
+
+    def evaluate_portfolio_liquidity(self, data):
+        """Оценивает риск ликвидности для набора сделок/позиций."""
+        if not data:
+            return {"status": "ok", "liquidity_risk_score": 0.0, "total_positions": 0}
+
+        if not isinstance(data, list):
+            data = [data]
+
+        total_order_size = 0.0
+        total_volume = 0.0
+        total_depth = 0.0
+        position_evaluations = []
+
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            order_size = float(item.get("order_size", 0.0))
+            adv = float(item.get("average_daily_volume", 1.0))
+            depth = float(item.get("market_depth", 1.0))
+            ticker = item.get("ticker", "UNKNOWN")
+
+            participation_rate = order_size / adv if adv > 0 else 1.0
+            depth_impact = order_size / depth if depth > 0 else 1.0
+            liquidity_risk = (participation_rate * 0.6) + (depth_impact * 0.4)
+
+            total_order_size += order_size
+            total_volume += adv
+            total_depth += depth
+
+            position_evaluations.append({
+                "ticker": ticker,
+                "order_size": order_size,
+                "participation_rate": round(participation_rate, 4),
+                "depth_impact": round(depth_impact, 4),
+                "liquidity_risk": round(liquidity_risk, 4)
+            })
+
+        avg_risk = sum(p["liquidity_risk"] for p in position_evaluations) / len(position_evaluations) if position_evaluations else 0.0
+
+        return {
+            "status": "evaluated",
+            "total_positions": len(position_evaluations),
+            "average_liquidity_risk": round(avg_risk, 4),
+            "positions": position_evaluations
+        }
+
+
+def market_portfolio_monitor(data=None, *args, **kwargs):
+    """
+    Главная функция-точка входа для оценки рисков ликвидности и состояния портфеля.
+    Поддерживает вызов как с конфигурационными аргументами, так и с набором данных портфеля.
+    """
+    if isinstance(data, (list, dict)):
+        monitor = MarketPortfolioMonitor()
+        return monitor.evaluate_portfolio_liquidity(data)
+
+    # Если вызов с аргументами символа/конфигурации (старый стиль run_pipeline)
+    if isinstance(data, str) and args:
+        symbol = data
+        url = args[0] if len(args) > 0 else kwargs.get("url", "")
+        telegram_token = args[1] if len(args) > 1 else kwargs.get("telegram_token", "")
+        chat_id = args[2] if len(args) > 2 else kwargs.get("chat_id", "")
+        storage_file = args[3] if len(args) > 3 else kwargs.get("storage_file", "default.json")
+        return run_pipeline(symbol, url, telegram_token, chat_id, storage_file)
+
+    return MarketPortfolioMonitor().evaluate_portfolio_liquidity(data or [])
+
+
 def run_pipeline(symbol, url, telegram_token, chat_id, storage_file):
     """Выполняет основной конвейер мониторинга портфеля."""
     parser = MarketParser(storage_file=storage_file)

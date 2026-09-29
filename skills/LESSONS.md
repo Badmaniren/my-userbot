@@ -3,13 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ан на эскалацию
-
-## market_portfolio_stress_recovery_coordinator_bridge (compose) — раундов: 3
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_reporter (refactor) — раундов: 1
+в: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_recovery_coordinator_bridge (refactor) — раундов: 3
@@ -304,3 +298,8 @@
 
 ## extractor_tool_1790609504 (create) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_monitor (refactor) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Последняя ошибка перед фиксом: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

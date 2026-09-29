@@ -22,13 +22,13 @@ class PortfolioStressScenarioPipeline:
 
 def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
     try:
-        with open(storage_file, "r") as f:
+        with open(storage_file, "r", encoding="utf-8", errors="ignore") as f:
             content = f.read()
         data = json.loads(content)
         if not isinstance(data, dict):
             raise ValueError()
     except Exception:
-        with open(storage_file, "w") as f:
+        with open(storage_file, "w", encoding="utf-8") as f:
             json.dump({}, f)
 
     simulator = PortfolioScenarioSimulator(storage_file)

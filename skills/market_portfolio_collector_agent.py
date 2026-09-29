@@ -2,6 +2,17 @@ import os
 import json
 from datetime import datetime
 
+_historical_returns_store = {}
+
+
+def get_historical_returns(portfolio_id: str) -> list:
+    return _historical_returns_store.get(portfolio_id, [])
+
+
+def save_historical_returns(portfolio_id: str, returns: list) -> None:
+    _historical_returns_store[portfolio_id] = list(returns)
+
+
 class MarketParser:
     def __init__(self, storage_file: str):
         self.storage_file = storage_file

@@ -1,6 +1,13 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 
 class MarketParser:
@@ -8,11 +15,15 @@ class MarketParser:
         self.storage_file = storage_file
 
     def fetch_price(self, url: str):
+        if not requests:
+            return None
         response = requests.get(url, timeout=10)
         data = response.json()
         return data.get("price")
 
     def parse_html_prices(self, url: str):
+        if not requests or not BeautifulSoup:
+            return None
         response = requests.get(url, timeout=10)
         soup = BeautifulSoup(response.text, 'html.parser')
         element = soup.find()
@@ -55,3 +66,29 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+class DBStorage:
+    def __init__(self, db_path: str = "market_data.db"):
+        self.db_path = db_path
+
+    def load_data(self):
+        try:
+            import json
+            with open(self.db_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
+    def get_portfolio_history(self, portfolio_id: str):
+        data = self.load_data()
+        if isinstance(data, dict):
+            return data.get("returns", [])
+        return []
+
+    def save_report(self, portfolio_id: str, report_id: str, report_data: dict):
+        pass
+
+
+DbStorage = DBStorage
+db_storage = DBStorage()

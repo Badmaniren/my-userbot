@@ -3,6 +3,7 @@ from unittest.mock import patch, MagicMock
 import uuid
 import random
 import string
+
 from skills.market_portfolio_stress_reporter import (
     StressReporter,
     PortfolioStressReporter,
@@ -11,123 +12,116 @@ from skills.market_portfolio_stress_reporter import (
 )
 
 
-class TestMarketPortfolioStressReporter(unittest.TestCase):
+class TestStressReporter(unittest.TestCase):
 
     def setUp(self):
         self.storage_file = f"storage_{uuid.uuid4().hex}.db"
         self.symbol = ''.join(random.choices(string.ascii_uppercase, k=5))
-        self.shifts = [random.uniform(-0.5, 0.5) for _ in range(3)]
-        self.percentage = random.uniform(-0.3, 0.3)
+        self.percentage = round(random.uniform(-50.0, -5.0), 2)
+        self.shifts = [self.percentage, round(self.percentage / 2, 2)]
 
-    def test_stress_reporter_init(self):
-        with patch('skills.market_portfolio_stress_reporter.PortfolioScenarioSimulator') as mock_sim, \
-             patch('skills.market_portfolio_stress_reporter.MarketReportGenerator') as mock_gen:
-            
-            reporter = StressReporter(self.storage_file)
-            
-            self.assertEqual(reporter.storage_file, self.storage_file)
-            mock_sim.assert_called_once_with(self.storage_file)
-            mock_gen.assert_called_once_with(self.storage_file)
+    @patch('skills.market_portfolio_stress_reporter.PortfolioScenarioSimulator')
+    @patch('skills.market_portfolio_stress_reporter.MarketReportGenerator')
+    def test_run_stress_reporting(self, mock_generator_cls, mock_simulator_cls):
+        mock_simulator = mock_simulator_cls.return_value
+        mock_generator = mock_generator_cls.return_value
 
-    def test_run_stress_reporting_logic(self):
-        sim_data = {uuid.uuid4().hex: random.randint(100, 500)}
-        report_data = {uuid.uuid4().hex: ''.join(random.choices(string.ascii_lowercase, k=10))}
+        expected_sim_result = {self.symbol: random.randint(100, 1000), "shift": self.shifts[0]}
+        expected_base_report = {"symbol": self.symbol, "value": random.uniform(1000.0, 50000.0)}
 
-        with patch('skills.market_portfolio_stress_reporter.PortfolioScenarioSimulator') as mock_sim_cls, \
-             patch('skills.market_portfolio_stress_reporter.MarketReportGenerator') as mock_gen_cls:
-            
-            mock_sim_instance = mock_sim_cls.return_value
-            mock_sim_instance.run_stress_test.return_value = sim_data
+        mock_simulator.run_stress_test.return_value = expected_sim_result
+        mock_generator.generate_symbol_report.return_value = expected_base_report
 
-            mock_gen_instance = mock_gen_cls.return_value
-            mock_gen_instance.generate_symbol_report.return_value = report_data
+        reporter = StressReporter(self.storage_file)
+        result = reporter.run_stress_reporting(self.symbol, self.shifts)
 
-            reporter = StressReporter(self.storage_file)
-            result = reporter.run_stress_reporting(self.symbol, self.shifts)
+        mock_simulator_cls.assert_called_once_with(self.storage_file)
+        mock_generator_cls.assert_called_once_with(self.storage_file)
+        mock_simulator.run_stress_test.assert_called_once_with(self.symbol, self.shifts)
+        mock_generator.generate_symbol_report.assert_called_once_with(self.symbol)
 
-            mock_sim_instance.run_stress_test.assert_called_once_with(self.symbol, self.shifts)
-            mock_gen_instance.generate_symbol_report.assert_called_once_with(self.symbol)
+        self.assertEqual(result["simulation_results"], expected_sim_result)
+        self.assertEqual(result["base_report"], expected_base_report)
 
-            self.assertIn("simulation_results", result)
-            self.assertIn("base_report", result)
-            self.assertEqual(result["simulation_results"], sim_data)
-            self.assertEqual(result["base_report"], report_data)
+    @patch('skills.market_portfolio_stress_reporter.PortfolioScenarioSimulator')
+    @patch('skills.market_portfolio_stress_reporter.MarketReportGenerator')
+    def test_simulate_single_success(self, mock_generator_cls, mock_simulator_cls):
+        mock_simulator = mock_simulator_cls.return_value
+        expected_simulation = {"status": uuid.uuid4().hex, "loss": self.percentage}
+        mock_simulator.simulate_scenario.return_value = expected_simulation
 
-    def test_simulate_single_success(self):
-        expected_result = {uuid.uuid4().hex: random.random()}
+        reporter = StressReporter(self.storage_file)
+        result = reporter.simulate_single(self.symbol, self.percentage)
 
-        with patch('skills.market_portfolio_stress_reporter.PortfolioScenarioSimulator') as mock_sim_cls, \
-             patch('skills.market_portfolio_stress_reporter.MarketReportGenerator'):
-            
-            mock_sim_instance = mock_sim_cls.return_value
-            mock_sim_instance.simulate_scenario.return_value = expected_result
+        mock_simulator.simulate_scenario.assert_called_once_with(self.symbol, self.percentage)
+        self.assertEqual(result, expected_simulation)
 
-            reporter = StressReporter(self.storage_file)
-            res = reporter.simulate_single(self.symbol, self.percentage)
+    @patch('skills.market_portfolio_stress_reporter.PortfolioScenarioSimulator')
+    @patch('skills.market_portfolio_stress_reporter.MarketReportGenerator')
+    def test_simulate_single_key_error(self, mock_generator_cls, mock_simulator_cls):
+        mock_simulator = mock_simulator_cls.return_value
+        mock_simulator.simulate_scenario.side_effect = KeyError("Missing symbol")
 
-            mock_sim_instance.simulate_scenario.assert_called_once_with(self.symbol, self.percentage)
-            self.assertEqual(res, expected_result)
+        reporter = StressReporter(self.storage_file)
+        result = reporter.simulate_single(self.symbol, self.percentage)
 
-    def test_simulate_single_key_error(self):
-        with patch('skills.market_portfolio_stress_reporter.PortfolioScenarioSimulator') as mock_sim_cls, \
-             patch('skills.market_portfolio_stress_reporter.MarketReportGenerator'):
-            
-            mock_sim_instance = mock_sim_cls.return_value
-            mock_sim_instance.simulate_scenario.side_effect = KeyError
+        mock_simulator.simulate_scenario.assert_called_once_with(self.symbol, self.percentage)
+        self.assertEqual(result, {})
 
-            reporter = StressReporter(self.storage_file)
-            res = reporter.simulate_single(self.symbol, self.percentage)
+    @patch('skills.market_portfolio_stress_reporter.PortfolioScenarioSimulator')
+    @patch('skills.market_portfolio_stress_reporter.MarketReportGenerator')
+    def test_get_stream_data(self, mock_generator_cls, mock_simulator_cls):
+        mock_generator = mock_generator_cls.return_value
+        expected_stream = [uuid.uuid4().hex, uuid.uuid4().hex]
+        mock_generator.get_raw_stream_dump.return_value = expected_stream
 
-            self.assertEqual(res, {})
+        reporter = StressReporter(self.storage_file)
+        result = reporter.get_stream_data()
 
-    def test_get_stream_data(self):
-        raw_dump = [uuid.uuid4().hex, random.randint(1, 100)]
+        mock_generator.get_raw_stream_dump.assert_called_once()
+        self.assertEqual(result, expected_stream)
 
-        with patch('skills.market_portfolio_stress_reporter.PortfolioScenarioSimulator'), \
-             patch('skills.market_portfolio_stress_reporter.MarketReportGenerator') as mock_gen_cls:
-            
-            mock_gen_instance = mock_gen_cls.return_value
-            mock_gen_instance.get_raw_stream_dump.return_value = raw_dump
+    @patch('skills.market_portfolio_stress_reporter.PortfolioScenarioSimulator')
+    @patch('skills.market_portfolio_stress_reporter.MarketReportGenerator')
+    def test_portfolio_stress_reporter_inheritance(self, mock_generator_cls, mock_simulator_cls):
+        mock_simulator = mock_simulator_cls.return_value
+        mock_generator = mock_generator_cls.return_value
 
-            reporter = StressReporter(self.storage_file)
-            data = reporter.get_stream_data()
+        expected_sim_result = {"chaos_id": uuid.uuid4().hex}
+        expected_base_report = {"report_id": uuid.uuid4().hex}
 
-            mock_gen_instance.get_raw_stream_dump.assert_called_once()
-            self.assertEqual(data, raw_dump)
+        mock_simulator.run_stress_test.return_value = expected_sim_result
+        mock_generator.generate_symbol_report.return_value = expected_base_report
 
-    def test_portfolio_stress_reporter_inheritance_and_pipeline(self):
+        reporter = PortfolioStressReporter(self.storage_file)
+        result = reporter.run_stress_report(self.symbol, self.shifts)
+
+        self.assertEqual(result["simulation_results"], expected_sim_result)
+        self.assertEqual(result["base_report"], expected_base_report)
+
+    @patch('skills.market_portfolio_stress_reporter.StressReporter')
+    def test_generate_stress_report_function(self, mock_stress_reporter_cls):
+        mock_instance = mock_stress_reporter_cls.return_value
+        expected_output = {uuid.uuid4().hex: random.random()}
+        mock_instance.run_stress_reporting.return_value = expected_output
+
+        result = generate_stress_report(self.storage_file, self.symbol, self.percentage)
+
+        mock_stress_reporter_cls.assert_called_once_with(self.storage_file)
+        mock_instance.run_stress_reporting.assert_called_once_with(self.symbol, [self.percentage])
+        self.assertEqual(result, expected_output)
+
+    @patch('skills.market_portfolio_stress_reporter.PortfolioStressReporter')
+    def test_run_stress_reporting_pipeline_function(self, mock_portfolio_reporter_cls):
+        mock_instance = mock_portfolio_reporter_cls.return_value
         expected_output = {uuid.uuid4().hex: uuid.uuid4().hex}
+        mock_instance.run_stress_report.return_value = expected_output
 
-        with patch('skills.market_portfolio_stress_reporter.StressReporter.run_stress_reporting') as mock_super_run:
-            mock_super_run.return_value = expected_output
+        result = run_stress_reporting_pipeline(self.storage_file, self.symbol, self.shifts)
 
-            pipeline_reporter = PortfolioStressReporter(self.storage_file)
-            res = pipeline_reporter.run_stress_report(self.symbol, self.shifts)
-
-            mock_super_run.assert_called_once_with(self.symbol, self.shifts)
-            self.assertEqual(res, expected_output)
-
-    def test_generate_stress_report_helper(self):
-        mock_result = {uuid.uuid4().hex: random.choice([True, False])}
-
-        with patch('skills.market_portfolio_stress_reporter.StressReporter.run_stress_reporting') as mock_run:
-            mock_run.return_value = mock_result
-
-            res = generate_stress_report(self.storage_file, self.symbol, self.percentage)
-
-            mock_run.assert_called_once_with(self.symbol, [self.percentage])
-            self.assertEqual(res, mock_result)
-
-    def test_run_stress_reporting_pipeline_helper(self):
-        mock_result = {uuid.uuid4().hex: ''.join(random.choices(string.ascii_letters, k=8))}
-
-        with patch('skills.market_portfolio_stress_reporter.PortfolioStressReporter.run_stress_report') as mock_report:
-            mock_report.return_value = mock_result
-
-            res = run_stress_reporting_pipeline(self.storage_file, self.symbol, self.shifts)
-
-            mock_report.assert_called_once_with(self.symbol, self.shifts)
-            self.assertEqual(res, mock_result)
+        mock_portfolio_reporter_cls.assert_called_once_with(self.storage_file)
+        mock_instance.run_stress_report.assert_called_once_with(self.symbol, self.shifts)
+        self.assertEqual(result, expected_output)
 
 
 if __name__ == '__main__':

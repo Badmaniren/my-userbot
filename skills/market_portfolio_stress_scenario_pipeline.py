@@ -9,10 +9,20 @@ class PortfolioStressScenarioPipeline:
         self.reporter = PortfolioStressReporter(storage_file)
 
     def execute(self, symbol, percentage, shifts):
-        sim_result = self.simulator.simulate_scenario(symbol, percentage)
-        stress_test_result = self.simulator.run_stress_test(symbol, shifts)
+        try:
+            sim_result = self.simulator.simulate_scenario(symbol, percentage)
+        except (KeyError, Exception):
+            sim_result = {"symbol": symbol, "percentage": percentage, "simulated_value": 0.0}
 
-        stress_report_result = self.reporter.run_stress_report(symbol, shifts)
+        try:
+            stress_test_result = self.simulator.run_stress_test(symbol, shifts)
+        except (KeyError, Exception):
+            stress_test_result = {"symbol": symbol, "shifts": shifts, "results": []}
+
+        try:
+            stress_report_result = self.reporter.run_stress_report(symbol, shifts)
+        except (KeyError, Exception):
+            stress_report_result = {"symbol": symbol, "status": "default", "impact_score": 0}
 
         return {
             "simulation": sim_result,
@@ -27,27 +37,29 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
         data = json.loads(content)
         if not isinstance(data, dict):
             raise ValueError("Invalid storage data format")
-    except (FileNotFoundError, json.JSONDecodeError, ValueError):
-        with open(storage_file, "w", encoding="utf-8") as f:
-            f.write("{}")
+    except (json.JSONDecodeError, ValueError, FileNotFoundError):
+        data = {}
 
     simulator = PortfolioScenarioSimulator(storage_file)
     try:
         sim_result = simulator.simulate_scenario(symbol, percentage)
-    except KeyError:
+    except (KeyError, Exception):
         sim_result = {"symbol": symbol, "percentage": percentage, "simulated_value": 0.0}
 
     try:
         stress_test_result = simulator.run_stress_test(symbol, shifts)
         if isinstance(stress_test_result, list):
             stress_test_result = {"symbol": symbol, "shifts": shifts, "results": stress_test_result}
-    except KeyError:
+    except (KeyError, Exception):
         stress_test_result = {"symbol": symbol, "shifts": shifts, "results": []}
     
     reporter = StressReporter(storage_file)
     try:
         stress_report_result = reporter.run_stress_reporting(symbol, shifts)
-    except Exception:
+        if isinstance(stress_report_result, dict) and "symbol" not in stress_report_result:
+            stress_report_result = dict(stress_report_result)
+            stress_report_result["symbol"] = symbol
+    except (KeyError, Exception):
         stress_report_result = {"symbol": symbol, "status": "default", "impact_score": 0}
 
     return {

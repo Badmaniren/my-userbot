@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- Последняя ошибка перед фиксом: from skills.market_portfolio_strategy_optimizer import PortfolioStrategyOptimizer
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_simulation_evaluator (compose) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
+: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: with patch(
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -306,3 +302,7 @@
 - Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_scenario_pipeline (refactor) — раундов: 3
+- Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/unittest/mock.py", line 1124, in __call__
+- Статус: успешно прошёл тесты и влит в main

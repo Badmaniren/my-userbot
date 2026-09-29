@@ -1,96 +1,139 @@
 import unittest
 import uuid
 import random
-from skills.market_portfolio_slippage_model import MarketPortfolioSlippageModel, OrderExecutionParameters, SlippageCalculationError
+from skills.market_portfolio_slippage_model import (
+    MarketPortfolioSlippageModel,
+    OrderExecutionParameters,
+    SlippageCalculationError
+)
+
 
 class RealMarketParser:
     def parse_market_depth(self, ticker: str):
         pass
 
+
 class RealAnomalyDetector:
     def detect(self, ticker: str):
         return {"multiplier": 1.5}
+
+
+class RealAlertDispatcher:
+    def __init__(self):
+        self.dispatched = []
+
+    def dispatch(self, anomaly):
+        self.dispatched.append(anomaly)
+
 
 class RealStressPipeline:
     def run_simulation(self, scenario_name: str):
         return {"stress_multiplier": 2.0}
 
+
 class RealStorage:
     def __init__(self):
-        self.storage = {}
+        self.logs = {}
+
     def save_logs(self, simulation_id: str, executions: list):
-        self.storage[simulation_id] = executions
+        self.logs[simulation_id] = executions
+
     def get_logs(self, simulation_id: str):
-        return self.storage.get(simulation_id, [])
+        return self.logs.get(simulation_id, [])
+
 
 class TestMarketPortfolioSlippageModelIntegration(unittest.TestCase):
-    def test_end_to_end_slippage_and_simulation(self):
-        rand_ticker = f"TICKER_{uuid.uuid4().hex[:6].upper()}"
-        rand_volume = round(random.uniform(1000.0, 50000.0), 2)
-        rand_volatility = round(random.uniform(0.1, 0.9), 4)
-        order_id = str(uuid.uuid4())
-        sim_id = f"SIM_{uuid.uuid4().hex[:8]}"
 
-        parser = RealMarketParser()
-        detector = RealAnomalyDetector()
-        stress_pipeline = RealStressPipeline()
-        storage = RealStorage()
+    def setUp(self):
+        self.market_parser = RealMarketParser()
+        self.anomaly_detector = RealAnomalyDetector()
+        self.alert_dispatcher = RealAlertDispatcher()
+        self.stress_scenario_pipeline = RealStressPipeline()
+        self.db_storage = RealStorage()
 
-        model = MarketPortfolioSlippageModel(
-            market_parser=parser,
-            anomaly_detector=detector,
-            stress_scenario_pipeline=stress_pipeline,
-            db_storage=storage
+        self.model = MarketPortfolioSlippageModel(
+            market_parser=self.market_parser,
+            anomaly_detector=self.anomaly_detector,
+            alert_dispatcher=self.alert_dispatcher,
+            stress_scenario_pipeline=self.stress_scenario_pipeline,
+            db_storage=self.db_storage
         )
+
+    def test_calculate_slippage_integration(self):
+        ticker = f"TICK_{uuid.uuid4().hex[:6]}"
+        volume = round(random.uniform(1000.0, 50000.0), 2)
+        volatility = round(random.uniform(0.1, 0.9), 4)
 
         params = OrderExecutionParameters(
-            order_id=order_id,
-            ticker=rand_ticker,
-            volume=rand_volume,
-            volatility=rand_volatility
+            order_id=str(uuid.uuid4()),
+            ticker=ticker,
+            volume=volume,
+            volatility=volatility
         )
 
-        slippage = model.calculate_slippage(params)
-        self.assertIsInstance(slippage, float)
-        self.assertGreater(slippage, 0.0)
+        result = self.model.calculate_slippage(params)
+        expected = round(volume * volatility * 0.0001, 6)
+        self.assertEqual(result, expected)
 
-        impact = model.estimate_market_impact(params)
-        self.assertIsInstance(impact, float)
-        self.assertGreater(impact, 0.0)
+    def test_estimate_market_impact_integration(self):
+        ticker = f"TICK_{uuid.uuid4().hex[:6]}"
+        volume = round(random.uniform(500.0, 10000.0), 2)
+        volatility = round(random.uniform(0.15, 0.5), 4)
 
-        scenario_res = model.simulate_stress_slippage(rand_ticker, rand_volume, "CRASH_2024")
-        self.assertIn("adjusted_slippage", scenario_res)
-        self.assertEqual(scenario_res["scenario"], "CRASH_2024")
-        self.assertEqual(scenario_res["stress_multiplier"], 2.0)
+        params = OrderExecutionParameters(
+            order_id=str(uuid.uuid4()),
+            ticker=ticker,
+            volume=volume,
+            volatility=volatility
+        )
+
+        impact = self.model.estimate_market_impact(params)
+        expected = float(volume * volatility * 0.00005 * 1.5)
+        self.assertEqual(impact, expected)
+        self.assertTrue(len(self.alert_dispatcher.dispatched) > 0)
+
+    def test_simulate_stress_slippage_integration(self):
+        ticker = f"TICK_{uuid.uuid4().hex[:6]}"
+        volume = round(random.uniform(1000.0, 10000.0), 2)
+        scenario_name = f"scenario_{uuid.uuid4().hex[:6]}"
+
+        result = self.model.simulate_stress_slippage(ticker, volume, scenario_name)
+        self.assertEqual(result["scenario"], scenario_name)
+        self.assertEqual(result["stress_multiplier"], 2.0)
+        self.assertEqual(result["adjusted_slippage"], round(volume * 0.2 * 0.0001 * 2.0, 6))
+
+    def test_simulate_order_execution_and_persistence(self):
+        order_id = str(uuid.uuid4())
+        symbol = f"SYM_{uuid.uuid4().hex[:4]}"
+        quantity = random.randint(100, 5000)
+        price = round(random.uniform(50.0, 500.0), 2)
 
         order_data = {
             "order_id": order_id,
-            "symbol": rand_ticker,
+            "symbol": symbol,
             "side": "BUY",
-            "quantity": rand_volume,
-            "price": 150.5
+            "quantity": quantity,
+            "price": price
         }
         market_context = {
-            "adv": 500000,
-            "volatility": rand_volatility,
-            "spread_bps": 4.5
+            "adv": 1000000,
+            "volatility": 0.25,
+            "spread_bps": 4.0
         }
 
-        exec_res = model.simulate_order_execution(order_data, market_context)
-        self.assertEqual(exec_res["order_id"], order_id)
-        self.assertEqual(exec_res["symbol"], rand_ticker)
-        self.assertEqual(exec_res["status"], "FILLED")
+        execution_result = self.model.simulate_order_execution(order_data, market_context)
+        self.assertEqual(execution_result["order_id"], order_id)
+        self.assertEqual(execution_result["symbol"], symbol)
+        self.assertEqual(execution_result["status"], "FILLED")
 
-        batch_results = model.simulate_batch([order_data], {rand_ticker: market_context})
-        self.assertEqual(len(batch_results), 1)
-        self.assertEqual(batch_results[0]["order_id"], order_id)
+        simulation_id = str(uuid.uuid4())
+        persisted = self.model.persist_execution_logs(simulation_id, [execution_result], self.db_storage)
+        self.assertTrue(persisted)
 
-        persist_success = model.persist_execution_logs(sim_id, batch_results, storage)
-        self.assertTrue(persist_success)
+        fetched_logs = self.model.get_execution_logs(simulation_id, self.db_storage)
+        self.assertEqual(len(fetched_logs), 1)
+        self.assertEqual(fetched_logs[0]["order_id"], order_id)
 
-        logs = model.get_execution_logs(sim_id, storage)
-        self.assertEqual(len(logs), 1)
-        self.assertEqual(logs[0]["order_id"], order_id)
 
 if __name__ == "__main__":
     unittest.main()

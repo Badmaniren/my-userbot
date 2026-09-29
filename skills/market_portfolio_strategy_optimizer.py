@@ -25,7 +25,7 @@ class PortfolioStrategyOptimizer:
         if isinstance(shifts, (float, int)):
             shifts_iterable = [shifts]
         else:
-            shifts_iterable = shifts
+            shifts_iterable = list(shifts)
 
         try:
             backtest_result = self.backtester.run_backtest(symbol, shifts_iterable)
@@ -46,7 +46,7 @@ class PortfolioStrategyOptimizer:
         if isinstance(shifts, (float, int)):
             shifts_iterable = [shifts]
         else:
-            shifts_iterable = shifts
+            shifts_iterable = list(shifts)
 
         try:
             stress_data = self.simulator.run_stress_test(symbol, shifts_iterable)
@@ -75,7 +75,7 @@ class PortfolioStrategyOptimizer:
         if isinstance(shifts, (float, int)):
             shifts_iterable = [shifts]
         else:
-            shifts_iterable = shifts
+            shifts_iterable = list(shifts)
 
         try:
             backtest_res = self.backtester.run_backtest(symbol, shifts_iterable)

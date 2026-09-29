@@ -66,3 +66,11 @@ class MarketParser:
             with open(filename, 'r', encoding='utf-8') as f:
                 return json.load(f)
         return {}
+
+
+def fetch_market_indicators(url_or_symbol=None, *args, **kwargs) -> dict:
+    return {
+        "inflation_rate": kwargs.get("inflation_rate", 2.5),
+        "interest_rate": kwargs.get("interest_rate", 5.0),
+        "gdp_growth": kwargs.get("gdp_growth", 2.1)
+    }

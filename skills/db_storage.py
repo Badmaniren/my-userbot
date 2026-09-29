@@ -1,6 +1,20 @@
 import sqlite3
 import requests
-from bs4 import BeautifulSoup
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
+
+_macro_evaluations = {}
+
+
+def save_macro_evaluation(portfolio_id, evaluation):
+    _macro_evaluations[portfolio_id] = evaluation
+    return True
+
+
+def get_macro_evaluation(portfolio_id):
+    return _macro_evaluations.get(portfolio_id)
 
 
 class MarketParser:

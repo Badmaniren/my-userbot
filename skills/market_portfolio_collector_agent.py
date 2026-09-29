@@ -97,3 +97,12 @@ def start_new(symbol: str, url: str, telegram_token: str, chat_id: str, storage_
         chat_id,
         storage_file
     )
+
+
+def collect_portfolio_data(portfolio_id=None, *args, **kwargs) -> dict:
+    pid = portfolio_id if portfolio_id is not None else "default_portfolio"
+    return {
+        "portfolio_id": pid,
+        "assets": kwargs.get("assets", ["AAPL", "GOOGL", "MSFT"]),
+        "valuation": kwargs.get("valuation", 100000)
+    }

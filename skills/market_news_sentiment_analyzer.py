@@ -94,3 +94,13 @@ def parse_market_news(raw_news_snippet: str) -> dict:
         "identifier": identifier,
         "raw_text": raw_news_snippet
     }
+
+
+def market_news_sentiment_analyzer(payload=None, *args, **kwargs) -> dict:
+    """Top-level callable entry point for news sentiment analysis."""
+    if isinstance(payload, dict):
+        text = payload.get("text") or payload.get("raw_text", "")
+        return analyze_news_sentiment(text)
+    elif isinstance(payload, str):
+        return analyze_news_sentiment(payload)
+    return {"sentiment": "neutral", "score": 0.0}

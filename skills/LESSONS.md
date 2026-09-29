@@ -3,7 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
+жу через raise.
 - Последняя ошибка перед фиксом: with patch(
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -305,4 +305,7 @@
 
 ## market_portfolio_stress_scenario_pipeline (refactor) — раундов: 3
 - Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/unittest/mock.py", line 1124, in __call__
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_reporter (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

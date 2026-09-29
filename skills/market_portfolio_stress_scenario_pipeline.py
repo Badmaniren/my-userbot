@@ -11,17 +11,17 @@ class PortfolioStressScenarioPipeline:
     def execute(self, symbol, percentage, shifts):
         try:
             sim_result = self.simulator.simulate_scenario(symbol, percentage)
-        except (KeyError, Exception):
+        except Exception:
             sim_result = {"symbol": symbol, "percentage": percentage, "simulated_value": 0.0}
 
         try:
             stress_test_result = self.simulator.run_stress_test(symbol, shifts)
-        except (KeyError, Exception):
+        except Exception:
             stress_test_result = {"symbol": symbol, "shifts": shifts, "results": []}
 
         try:
             stress_report_result = self.reporter.run_stress_report(symbol, shifts)
-        except (KeyError, Exception):
+        except Exception:
             stress_report_result = {"symbol": symbol, "status": "default", "impact_score": 0}
 
         return {
@@ -43,14 +43,14 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
     simulator = PortfolioScenarioSimulator(storage_file)
     try:
         sim_result = simulator.simulate_scenario(symbol, percentage)
-    except (KeyError, Exception):
+    except Exception:
         sim_result = {"symbol": symbol, "percentage": percentage, "simulated_value": 0.0}
 
     try:
         stress_test_result = simulator.run_stress_test(symbol, shifts)
         if isinstance(stress_test_result, list):
             stress_test_result = {"symbol": symbol, "shifts": shifts, "results": stress_test_result}
-    except (KeyError, Exception):
+    except Exception:
         stress_test_result = {"symbol": symbol, "shifts": shifts, "results": []}
     
     reporter = StressReporter(storage_file)
@@ -59,7 +59,7 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
         if isinstance(stress_report_result, dict) and "symbol" not in stress_report_result:
             stress_report_result = dict(stress_report_result)
             stress_report_result["symbol"] = symbol
-    except (KeyError, Exception):
+    except Exception:
         stress_report_result = {"symbol": symbol, "status": "default", "impact_score": 0}
 
     return {

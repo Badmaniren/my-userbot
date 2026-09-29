@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
------------------------------------------------------
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_backtest_engine (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
+еред фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_simulation_report_pipeline (compose) — раундов: 4
@@ -310,6 +306,10 @@
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_stress_recovery_coordinator_bridge (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_recovery_coordinator_bridge (refactor) — раундов: 2
+- Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_recovery_coordinator_bridge (refactor) — раундов: 2

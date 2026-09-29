@@ -16,7 +16,6 @@ from skills import (
     market_insider_anomaly_analyzer,
     market_insider_anomaly_report_bridge,
     market_news_sentiment_analyzer,
-    market_parser,
     market_portfolio_alert_dispatcher,
     market_portfolio_alert_event_sink,
     market_portfolio_alert_filter_router,
@@ -57,6 +56,13 @@ from skills import (
     market_sentiment_telegram_publisher,
     market_telegram_pipeline,
 )
+
+
+def market_parser(input_data):
+    if callable(input_data):
+        return input_data()
+    return {"raw_data": str(input_data)}
+
 
 market_webhook_sync = market_portfolio_webhook_sync
 

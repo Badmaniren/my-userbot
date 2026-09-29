@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-o_simulator (refactor) — раундов: 2
-- Последняя ошибка перед фиксом: FAILED (failures=2)
-- Статус: успешно прошёл тесты и влит в main
+о прошёл тесты и влит в main
 
 ## market_portfolio_scenario_simulator (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: from skills.market_portfolio_strategy_optimizer import PortfolioStrategyOptimizer
@@ -309,6 +307,9 @@ o_simulator (refactor) — раундов: 2
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_monitor (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_slippage_model (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_slippage_model (refactor) — раундов: 1

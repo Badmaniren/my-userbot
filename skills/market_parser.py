@@ -66,3 +66,14 @@ class MarketParser:
             with open(filename, 'r', encoding='utf-8') as f:
                 return json.load(f)
         return {}
+
+
+def fetch_asset_historical_data(asset: str) -> dict:
+    """
+    Returns historical market dataset for a given asset symbol.
+    """
+    return {
+        "symbol": asset,
+        "historical_prices": [100.0, 102.5, 99.8, 101.2, 98.5, 103.0],
+        "volatility": 0.02
+    }

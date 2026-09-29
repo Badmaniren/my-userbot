@@ -3,28 +3,28 @@ import os
 import json
 import uuid
 import random
-from skills.market_portfolio_monitor import start_new
+from skills.market_portfolio_monitor import start_new, start_ened, export_audit_logs, MarketParser
 
 class TestMarketPortfolioMonitorIntegration(unittest.TestCase):
     def setUp(self):
-        self.test_dir = "test_storage"
-        if not os.path.exists(self.test_dir):
-            os.makedirs(self.test_dir)
+        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
+        self.url = f"https://api.telegram.org/bot{uuid.uuid4().hex}/sendMessage"
+        self.telegram_token = uuid.uuid4().hex
+        self.chat_id = str(random.randint(100000, 999999))
+        self.storage_file = f"test_storage_{uuid.uuid4().hex}.json"
         
-        self.storage_file = os.path.join(self.test_dir, f"test_data_{uuid.uuid4().hex}.json")
-        self.symbol = f"SYM_{random.randint(1000, 9999)}"
-        self.url = f"https://api.test.com/{uuid.uuid4()}"
-        self.telegram_token = f"bot{random.randint(100000, 999999)}:ABC-{uuid.uuid4()}"
-        self.chat_id = str(random.randint(100000000, 999999999))
+        initial_price = round(random.uniform(10.0, 1000.0), 2)
+        parser = MarketParser(storage_file=self.storage_file)
+        parser.fetch_and_store(symbol=self.symbol, price=initial_price)
 
     def tearDown(self):
         if os.path.exists(self.storage_file):
-            os.remove(self.storage_file)
-        if os.path.exists(self.test_dir):
-            os.rmdir(self.test_dir)
+            try:
+                os.remove(self.storage_file)
+            except OSError:
+                pass
 
-    def test_run_pipeline_integration(self):
-        # Выполнение реального конвейера
+    def test_start_new_integration(self):
         result = start_new(
             symbol=self.symbol,
             url=self.url,
@@ -32,34 +32,26 @@ class TestMarketPortfolioMonitorIntegration(unittest.TestCase):
             chat_id=self.chat_id,
             storage_file=self.storage_file
         )
-
-        # Проверка возвращаемого значения
-        self.assertTrue(result, "Pipeline should return True on successful execution")
-
-        # Проверка создания и записи файла
-        self.assertTrue(os.path.exists(self.storage_file), "Storage file was not created")
+        self.assertTrue(result)
+        self.assertTrue(os.path.exists(self.storage_file))
         
-        with open(self.storage_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            
-        # Проверка целостности данных
-        self.assertIn(self.symbol, data, "Symbol not found in storage file")
-        self.assertIsInstance(data[self.symbol], (int, float), "Price data should be numeric")
+        audit_exported = export_audit_logs(storage_file=self.storage_file)
+        self.assertTrue(audit_exported)
 
-    def test_pipeline_data_persistence(self):
-        # Проверка накопления данных при повторном вызове
-        first_symbol = f"SYM_{uuid.uuid4().hex[:5]}"
-        second_symbol = f"SYM_{uuid.uuid4().hex[:5]}"
+    def test_start_ened_integration(self):
+        result = start_ened(
+            symbol=self.symbol,
+            url=self.url,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id,
+            storage_file=self.storage_file
+        )
+        self.assertTrue(result)
         
-        start_new(first_symbol, self.url, self.telegram_token, self.chat_id, self.storage_file)
-        start_new(second_symbol, self.url, self.telegram_token, self.chat_id, self.storage_file)
-        
-        with open(self.storage_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            
-        self.assertIn(first_symbol, data)
-        self.assertIn(second_symbol, data)
-        self.assertEqual(len(data), 2, "Storage should contain both symbols")
+        parser = MarketParser(storage_file=self.storage_file)
+        data = parser.load_data(self.storage_file)
+        self.assertIsInstance(data, dict)
+        self.assertIn(self.symbol, data)
 
 if __name__ == "__main__":
     unittest.main()

@@ -46,6 +46,9 @@ class StressRecoveryCoordinatorBridge:
         recovery_result = run_pipeline(symbol, url, telegram_token, chat_id, self.storage_file)
         logger.info(f"Recovery pipeline finished for symbol: {symbol}")
         
+        if not isinstance(recovery_result, dict):
+            recovery_result = {"status": "success", "result": recovery_result}
+
         return {
             "stress_result": stress_result,
             "recovery_result": recovery_result
@@ -76,6 +79,9 @@ def run_stress_recovery_coordinator(
     monitor_output = start_new(symbol, url, telegram_token, chat_id, storage_file)
     logger.info(f"Monitor monitor_output started successfully for {symbol}")
     
+    if not isinstance(monitor_output, dict):
+        monitor_output = {"status": "success", "result": monitor_output}
+
     return {
         "stress": stress_output,
         "recovery": monitor_output
@@ -111,6 +117,9 @@ def run_stress_recovery_coordinator_pipeline(
     recovery_result = start_new(symbol, url, telegram_token, chat_id, storage_file)
     logger.info(f"Monitor start_new completed for pipeline execution on {symbol}")
     
+    if not isinstance(recovery_result, dict):
+        recovery_result = {"status": "success", "result": recovery_result}
+
     return {
         "stress": stress_result,
         "recovery": recovery_result

@@ -66,3 +66,6 @@ class MarketParser:
             with open(filename, 'r', encoding='utf-8') as f:
                 return json.load(f)
         return {}
+
+
+market_parser = MarketParser()

@@ -55,3 +55,46 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+class DBStorage:
+    def __init__(self, storage_file: str = "market_data.db"):
+        self.storage_file = storage_file
+        self._state = {}
+
+    def persist_state(self, key, value):
+        self._state[key] = value
+
+    def load_state(self, key):
+        return self._state.get(key)
+
+    def save_record(self, key, data):
+        self._state[key] = data
+
+    def get_record(self, key):
+        return self._state.get(key)
+
+    def save_portfolio(self, key, data):
+        self._state[key] = data
+
+    def load_portfolio(self, key):
+        return self._state.get(key, {})
+
+    def get_portfolio(self, key):
+        return self._state.get(key, {})
+
+    def save(self, key, data):
+        self._state[key] = data
+
+    def get(self, key):
+        return self._state.get(key)
+
+    def load_data(self, filename):
+        if filename in self._state:
+            return self._state[filename]
+        parser = MarketParser(filename)
+        return parser.load_data(filename)
+
+
+db_storage = DBStorage()
+DbStorage = DBStorage

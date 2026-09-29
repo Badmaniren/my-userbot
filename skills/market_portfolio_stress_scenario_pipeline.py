@@ -11,7 +11,6 @@ class PortfolioStressScenarioPipeline:
     def execute(self, symbol, percentage, shifts):
         sim_result = self.simulator.simulate_scenario(symbol, percentage)
         stress_test_result = self.simulator.run_stress_test(symbol, shifts)
-
         stress_report_result = self.reporter.run_stress_report(symbol, shifts)
 
         return {
@@ -26,10 +25,17 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
             content = f.read()
         data = json.loads(content)
         if not isinstance(data, dict):
-            raise ValueError("Invalid storage data format")
-    except (FileNotFoundError, json.JSONDecodeError, ValueError):
-        with open(storage_file, "w", encoding="utf-8") as f:
-            f.write("{}")
+            try:
+                with open(storage_file, "w", encoding="utf-8") as f:
+                    f.write("{}")
+            except (ValueError, OSError):
+                pass
+    except (FileNotFoundError, json.JSONDecodeError):
+        try:
+            with open(storage_file, "w", encoding="utf-8") as f:
+                f.write("{}")
+        except (ValueError, OSError):
+            pass
 
     simulator = PortfolioScenarioSimulator(storage_file)
     try:
@@ -41,6 +47,11 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
         stress_test_result = simulator.run_stress_test(symbol, shifts)
         if isinstance(stress_test_result, list):
             stress_test_result = {"symbol": symbol, "shifts": shifts, "results": stress_test_result}
+        elif isinstance(stress_test_result, dict):
+            if "symbol" not in stress_test_result:
+                stress_test_result["symbol"] = symbol
+            if "shifts" not in stress_test_result:
+                stress_test_result["shifts"] = shifts
     except KeyError:
         stress_test_result = {"symbol": symbol, "shifts": shifts, "results": []}
     

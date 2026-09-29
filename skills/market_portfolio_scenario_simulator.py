@@ -58,8 +58,13 @@ class PortfolioScenarioSimulator:
             logger.error("Symbol %s not found in portfolio data", symbol)
             raise KeyError(f"Symbol {symbol} not found")
 
-        current_price = target.get("current_price") or target.get("price") or 0.0
-        quantity = target.get("quantity") or target.get("shares") or 0.0
+        current_price = target.get("current_price") if target.get("current_price") is not None else target.get("price")
+        if current_price is None:
+            current_price = target.get("base_value", 0.0)
+
+        quantity = target.get("quantity") if target.get("quantity") is not None else target.get("shares")
+        if quantity is None:
+            quantity = target.get("liquidity_factor", 1.0)
         
         logger.info("Found target for %s: price=%.4f, quantity=%.4f", symbol, current_price, quantity)
         
@@ -73,6 +78,7 @@ class PortfolioScenarioSimulator:
         
         return {
             "symbol": symbol,
+            "percentage": pct_val,
             "simulated_price": simulated_price,
             "pnl_impact": pnl_impact,
             "portfolio_value_delta": pnl_impact

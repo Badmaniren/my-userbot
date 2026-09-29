@@ -80,7 +80,7 @@ def run_stress_recovery_coordinator_pipeline(
     try:
         stress_result = run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts_iterable)
     except (KeyError, TypeError):
-        stress_result = {"status": "simulated", "symbol": symbol, "shifts": shifts_iterable}
+        stress_result = {"status": "simulated", "symbol": symbol, "shifts": list(range(shifts)) if isinstance(shifts, int) else shifts}
 
     recovery_result = start_new(symbol, url, telegram_token, chat_id, storage_file)
     

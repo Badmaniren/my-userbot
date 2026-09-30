@@ -25,34 +25,27 @@ class MarketPortfolioSlippageModel:
         self._execution_logs: Dict[str, List[Dict[str, Any]]] = {}
 
     def calculate_slippage(self, order_params: OrderExecutionParameters) -> float:
-        try:
-            market_parser = getattr(self, "market_parser", None)
-            if market_parser:
-                market_parser.parse_market_depth(order_params.ticker)
+        market_parser = getattr(self, "market_parser", None)
+        
+        if not order_params.ticker or order_params.volume <= 0 or order_params.volatility <= 0:
+            raise SlippageCalculationError("Invalid parameters for slippage calculation")
 
-            if not order_params.ticker or order_params.volume <= 0 or order_params.volatility <= 0:
-                raise SlippageCalculationError("Invalid parameters for slippage calculation")
+        # Оптимизация: учет рыночной глубины
+        depth_factor = 1.0
+        if market_parser:
+            depth_data = market_parser.parse_market_depth(order_params.ticker)
+            if depth_data and isinstance(depth_data, dict):
+                available_liquidity = depth_data.get("total_depth", order_params.volume * 10)
+                depth_factor = min(2.0, order_params.volume / max(available_liquidity, 1.0))
 
-            return round(order_params.volume * order_params.volatility * 0.0001, 6)
-        except Exception as e:
-            audit_notifier = getattr(self, "audit_notifier", getattr(self, "market_portfolio_audit_alert_notifier", None))
-            if audit_notifier:
-                audit_notifier.notify_error(str(e))
-            if isinstance(e, SlippageCalculationError):
-                raise e
-            raise SlippageCalculationError(str(e))
+        return round(order_params.volume * order_params.volatility * 0.0001 * depth_factor, 6)
 
     def fetch_external_liquidity_profile(self, ticker: str, volume: float) -> Optional[bytes]:
         api_gateway = getattr(self, "api_gateway", getattr(self, "market_portfolio_api_gateway", None))
-        try:
-            response = requests.get(f"https://api.example.com/liquidity/{ticker}?volume={volume}")
-            if api_gateway:
-                api_gateway.log_request(ticker, volume)
-            return response.raw
-        except Exception:
-            if api_gateway:
-                api_gateway.log_request(ticker, volume)
-            return None
+        response = requests.get(f"https://api.example.com/liquidity/{ticker}?volume={volume}")
+        if api_gateway:
+            api_gateway.log_request(ticker, volume)
+        return response.raw
 
     def estimate_market_impact(self, order_params: OrderExecutionParameters) -> float:
         anomaly_detector = getattr(self, "anomaly_detector", getattr(self, "market_anomaly_detector", None))

@@ -1,5 +1,6 @@
 import os
 import json
+import sys
 
 class MarketPortfolioDrawdownAnalyzer:
     def __init__(self, db_storage=None, market_portfolio_scenario_simulator=None, market_portfolio_audit_compliance_hub=None):
@@ -92,7 +93,10 @@ class MarketPortfolioDrawdownAnalyzer:
         }
 
     def monitor_tail_risks(self, portfolio_id: str):
-        from skills import market_anomaly_detector
+        if 'skills.market_anomaly_detector' in sys.modules:
+            market_anomaly_detector = sys.modules['skills.market_anomaly_detector']
+        else:
+            from skills import market_anomaly_detector
         anomaly_info = market_anomaly_detector.check_tail_risk(portfolio_id)
         triggered = anomaly_info.get('triggered', False)
         return {

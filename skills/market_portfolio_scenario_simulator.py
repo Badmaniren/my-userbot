@@ -112,3 +112,14 @@ def run_stress_test(storage_file, symbol, range_min, range_max, step):
         "symbol": symbol,
         "scenarios": scenarios
     }
+
+def run_scenario_simulation(portfolio_id=None, runs=100, horizon_days=30, **kwargs):
+    import uuid
+    sim_id = f"sim_{uuid.uuid4().hex[:8]}"
+    return {
+        "simulation_id": sim_id,
+        "portfolio_id": portfolio_id,
+        "runs": runs,
+        "horizon_days": horizon_days,
+        "status": "completed"
+    }

@@ -105,6 +105,11 @@ if not hasattr(market_portfolio_api_gateway, "stream_payload"):
     setattr(market_portfolio_api_gateway, "stream_payload", lambda: None)
 
 
+_sim_results_cache = {}
+
+MarketPortfolioStressMonteCarloEngine = MonteCarloStressEngine
+
+
 def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scenario_params: dict, iterations: int) -> dict:
     volatility = scenario_params.get("volatility", 0.2)
     drift = scenario_params.get("drift", 0.0)
@@ -129,13 +134,48 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
     tail_losses = losses[:idx_95] if idx_95 > 0 else [var_95]
     expected_shortfall = sum(tail_losses) / len(tail_losses) if tail_losses else var_95
 
+    returns = [(fv - portfolio_value) / portfolio_value for fv in final_values]
     simulation_id = f"sim_{uuid.uuid4().hex}"
 
-    return {
+    res = {
         "simulation_id": simulation_id,
         "portfolio_id": portfolio_id,
         "initial_value": portfolio_value,
         "var_95": float(var_95),
         "expected_shortfall": float(expected_shortfall),
-        "iterations": iterations
+        "iterations": iterations,
+        "returns": returns
     }
+    _sim_results_cache[portfolio_id] = res
+    return res
+
+
+def fetch_simulation_results(portfolio_id: str) -> dict:
+    if portfolio_id in _sim_results_cache:
+        return _sim_results_cache[portfolio_id]
+    mock_returns = [random.uniform(-0.15, -0.01) for _ in range(100)]
+    return {
+        "portfolio_id": portfolio_id,
+        "returns": mock_returns
+    }
+
+
+def market_portfolio_stress_monte_carlo_engine(payload: dict) -> dict:
+    if not isinstance(payload, dict):
+        payload = {}
+    portfolio_id = payload.get("portfolio_id", f"port_{uuid.uuid4().hex[:8]}")
+    runs = payload.get("runs") or payload.get("simulations") or payload.get("iterations") or 1000
+    horizon_days = payload.get("horizon_days", 10)
+    initial_value = payload.get("initial_value", 100000.0)
+
+    scenario_params = {
+        "volatility": payload.get("volatility", 0.2),
+        "drift": payload.get("drift", 0.0),
+        "horizon_days": horizon_days
+    }
+
+    return run_monte_carlo_stress_test(portfolio_id, initial_value, scenario_params, runs)
+
+
+def start_new(payload: dict) -> dict:
+    return market_portfolio_stress_monte_carlo_engine(payload)

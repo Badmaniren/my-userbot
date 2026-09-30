@@ -23,6 +23,9 @@ class MonteCarloStressEngine:
                 portfolio_data = db_storage.fetch_portfolio(portfolio_id)
         except AttributeError:
             portfolio_data = getattr(db_storage, "_in_memory_db", {}).get(portfolio_id, {"portfolio_id": portfolio_id})
+
+        if not portfolio_data:
+            portfolio_data = {"portfolio_id": portfolio_id}
             
         initial_value = portfolio_data.get("initial_value", 100000.0)
         volatility = portfolio_data.get("volatility", 0.2)

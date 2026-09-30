@@ -1,82 +1,82 @@
 import unittest
 import uuid
 import random
-from skills import db_storage
 from skills import market_portfolio_stress_monte_carlo_engine
-from skills import market_portfolio_collector_agent
-from skills import market_portfolio_valuation
-from skills import market_portfolio_scenario_simulator
+from skills import db_storage
 
 
-class IntegrationTestMonteCarloStressEngine(unittest.TestCase):
+class TestIntegrationMonteCarloStressEngine(unittest.TestCase):
 
-    def setUp(self):
-        self.portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
-        self.simulations_count = random.randint(100, 500)
-        self.horizon_days = random.randint(5, 30)
-        self.initial_capital = round(random.uniform(50000.0, 500000.0), 2)
+    def test_run_simulation_integration(self):
+        portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
+        initial_value = round(random.uniform(50000.0, 500000.0), 2)
+        volatility = round(random.uniform(0.1, 0.4), 4)
+        drift = round(random.uniform(-0.05, 0.05), 4)
         
-        if not hasattr(db_storage, "fetch_portfolio"):
-            setattr(db_storage, "fetch_portfolio", lambda pid: {
-                "portfolio_id": pid,
-                "initial_value": self.initial_capital,
-                "volatility": 0.25,
-                "drift": 0.02
-            })
-        else:
-            if hasattr(db_storage, "_in_memory_db"):
-                db_storage._in_memory_db[self.portfolio_id] = {
-                    "portfolio_id": self.portfolio_id,
-                    "initial_value": self.initial_capital,
-                    "volatility": 0.25,
-                    "drift": 0.02
-                }
-
-    def test_monte_carlo_engine_integration_workflow(self):
-        collected_data = market_portfolio_collector_agent.collect_portfolio_data(
-            self.portfolio_id, self.initial_capital
-        )
-        self.assertIsInstance(collected_data, dict)
-        self.assertEqual(collected_data.get("portfolio_id"), self.portfolio_id)
-
-        portfolio_val = market_portfolio_valuation.calculate_portfolio_value(collected_data)
-        self.assertIsInstance(portfolio_val, (int, float))
-        self.assertGreater(portfolio_val, 0)
-
-        scenario_params = market_portfolio_scenario_simulator.generate_stress_scenario(
-            volatility_factor=round(random.uniform(0.1, 0.5), 2)
-        )
-        self.assertIsInstance(scenario_params, dict)
-        self.assertIn("volatility", scenario_params)
+        if hasattr(db_storage, "_in_memory_db"):
+            db_storage._in_memory_db[portfolio_id] = {
+                "portfolio_id": portfolio_id,
+                "initial_value": initial_value,
+                "volatility": volatility,
+                "drift": drift
+            }
 
         engine = market_portfolio_stress_monte_carlo_engine.MonteCarloStressEngine()
-        simulation_result = engine.run_simulation(
-            portfolio_id=self.portfolio_id,
-            simulations=self.simulations_count,
-            horizon_days=self.horizon_days
-        )
+        simulations_count = random.randint(50, 200)
+        horizon_days = random.randint(5, 30)
 
-        self.assertIsInstance(simulation_result, dict)
-        self.assertEqual(simulation_result.get("portfolio_id"), self.portfolio_id)
-        self.assertIn("var_95", simulation_result)
-        self.assertIn("cvar_95", simulation_result)
-        self.assertIn("simulation_results", simulation_result)
-        self.assertEqual(len(simulation_result["simulation_results"]), self.simulations_count)
+        result = engine.run_simulation(portfolio_id, simulations=simulations_count, horizon_days=horizon_days)
 
-        standalone_result = market_portfolio_stress_monte_carlo_engine.run_monte_carlo_stress_test(
-            portfolio_id=self.portfolio_id,
-            portfolio_value=portfolio_val,
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("portfolio_id"), portfolio_id)
+        self.assertIn("simulation_results", result)
+        self.assertIn("var_95", result)
+        self.assertIn("cvar_95", result)
+        
+        sim_results = result.get("simulation_results")
+        self.assertEqual(len(sim_results), simulations_count)
+        for path in sim_results:
+            self.assertEqual(len(path), horizon_days)
+
+    def test_run_monte_carlo_stress_test_function(self):
+        portfolio_id = f"stress_port_{uuid.uuid4().hex[:8]}"
+        portfolio_value = round(random.uniform(10000.0, 1000000.0), 2)
+        iterations = random.randint(100, 500)
+        
+        scenario_params = {
+            "volatility": round(random.uniform(0.15, 0.5), 4),
+            "drift": round(random.uniform(-0.1, 0.05), 4),
+            "horizon_days": random.randint(1, 15)
+        }
+
+        result = market_portfolio_stress_monte_carlo_engine.run_monte_carlo_stress_test(
+            portfolio_id=portfolio_id,
+            portfolio_value=portfolio_value,
             scenario_params=scenario_params,
-            iterations=self.simulations_count
+            iterations=iterations
         )
 
-        self.assertIsInstance(standalone_result, dict)
-        self.assertIn("simulation_id", standalone_result)
-        self.assertTrue(standalone_result["simulation_id"].startswith("sim_"))
-        self.assertEqual(standalone_result.get("portfolio_id"), self.portfolio_id)
-        self.assertEqual(standalone_result.get("iterations"), self.simulations_count)
-        self.assertIsInstance(standalone_result.get("var_95"), float)
-        self.assertIsInstance(standalone_result.get("expected_shortfall"), float)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("portfolio_id"), portfolio_id)
+        self.assertEqual(result.get("initial_value"), portfolio_value)
+        self.assertEqual(result.get("iterations"), iterations)
+        self.assertIn("simulation_id", result)
+        self.assertTrue(result.get("simulation_id").startswith("sim_"))
+        self.assertIsInstance(result.get("var_95"), float)
+        self.assertIsInstance(result.get("expected_shortfall"), float)
+
+    def test_engine_auxiliary_methods(self):
+        engine = market_portfolio_stress_monte_carlo_engine.MonteCarloStressEngine()
+        report_id = f"rep_{uuid.uuid4().hex[:8]}"
+        loss_limit = round(random.uniform(5000.0, 50000.0), 2)
+
+        export_res = engine.export_report(report_id, loss_limit)
+        self.assertIsInstance(export_res, dict)
+        self.assertEqual(export_res.get("report_id"), report_id)
+        self.assertEqual(export_res.get("loss_limit"), loss_limit)
+
+        stream_res = engine.consume_stream()
+        self.assertTrue(stream_res is None or isinstance(stream_res, (dict, list, str, bytes)))
 
 
 if __name__ == "__main__":

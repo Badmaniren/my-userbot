@@ -63,18 +63,27 @@ class MonteCarloStressEngine:
         }
 
     def _get_anomaly_adjustment(self) -> float:
-        if hasattr(market_anomaly_detector, "get_current_anomaly_multiplier"):
-            return market_anomaly_detector.get_current_anomaly_multiplier()
+        try:
+            if hasattr(market_anomaly_detector, "get_current_anomaly_multiplier"):
+                return market_anomaly_detector.get_current_anomaly_multiplier()
+        except AttributeError:
+            pass
         return 1.0
 
     def export_report(self, report_id: str, loss_limit: float) -> dict:
-        if hasattr(market_portfolio_data_exporter, "export"):
-            return market_portfolio_data_exporter.export(report_id, loss_limit)
+        try:
+            if hasattr(market_portfolio_data_exporter, "export"):
+                return market_portfolio_data_exporter.export(report_id, loss_limit)
+        except AttributeError:
+            pass
         return {"report_id": report_id, "loss_limit": loss_limit}
 
     def consume_stream(self):
-        if hasattr(market_portfolio_api_gateway, "stream_payload"):
-            return market_portfolio_api_gateway.stream_payload()
+        try:
+            if hasattr(market_portfolio_api_gateway, "stream_payload"):
+                return market_portfolio_api_gateway.stream_payload()
+        except AttributeError:
+            pass
         return None
 
 

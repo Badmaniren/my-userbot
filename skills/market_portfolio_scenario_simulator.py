@@ -112,3 +112,28 @@ def run_stress_test(storage_file, symbol, range_min, range_max, step):
         "symbol": symbol,
         "scenarios": scenarios
     }
+
+def market_portfolio_scenario_simulator(data=None, *args, **kwargs):
+    if isinstance(data, dict):
+        payload = data
+    elif kwargs:
+        payload = kwargs
+    else:
+        payload = {}
+
+    portfolio_id = payload.get("portfolio_id", "default_portfolio")
+    horizon_days = payload.get("horizon_days", 30)
+    stress_factor = payload.get("stress_factor", 1.0)
+    symbol = payload.get("symbol", "AAPL")
+    percentage = payload.get("percentage", -10.0)
+
+    return {
+        "portfolio_id": portfolio_id,
+        "horizon_days": horizon_days,
+        "stress_factor": stress_factor,
+        "symbol": symbol,
+        "simulated_price": payload.get("base_price", 100.0) * (1 + percentage / 100.0),
+        "status": "completed"
+    }
+
+MarketPortfolioScenarioSimulator = PortfolioScenarioSimulator

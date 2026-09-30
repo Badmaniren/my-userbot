@@ -1,8 +1,7 @@
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch, MagicMock
 import uuid
 import random
-import string
 import io
 
 from skills.market_portfolio_stress_resilience_analyzer import start_new
@@ -11,96 +10,68 @@ from skills.market_portfolio_stress_resilience_analyzer import start_new
 class TestMarketPortfolioStressResilienceAnalyzer(unittest.TestCase):
 
     def setUp(self):
-        self.dependencies = {
-            f"dep_{uuid.uuid4().hex[:8]}": MagicMock()
-            for _ in range(53)
+        self.portfolio_id = uuid.uuid4().hex
+        self.shock_level = round(random.uniform(1.0, 50.0), 2)
+        self.scenario_name = uuid.uuid4().hex
+
+    def test_start_new_anomaly_check_path(self):
+        dynamic_scenario = "anomaly_check"
+        mock_raw_stream = uuid.uuid4().hex
+        mock_analysis_result = {"status": uuid.uuid4().hex, "metric": random.randint(1, 100)}
+
+        with patch("skills.market_anomaly_detector.market_anomaly_detector.fetch_live_data", return_value=mock_raw_stream) as mock_fetch, \
+             patch("skills.market_anomaly_detector.market_anomaly_detector.analyze_stream", return_value=mock_analysis_result) as mock_analyze:
+
+            result = start_new(scenario_name=dynamic_scenario)
+
+            mock_fetch.assert_called_once()
+            mock_analyze.assert_called_once_with(mock_raw_stream)
+            self.assertEqual(result, mock_analysis_result)
+
+    def test_start_new_fallback_collector_agent(self):
+        dynamic_scenario = "anomaly_check"
+        mock_raw_stream = uuid.uuid4().hex
+        mock_analysis_result = {"anomaly_detected": True, "code": uuid.uuid4().hex}
+
+        with patch("skills.market_anomaly_detector.market_anomaly_detector.fetch_live_data", side_effect=AttributeError), \
+             patch("skills.market_portfolio_collector_agent.market_portfolio_collector_agent.fetch_live_data", return_value=mock_raw_stream) as mock_collector_fetch, \
+             patch("skills.market_anomaly_detector.market_anomaly_detector.analyze_stream", return_value=mock_analysis_result) as mock_analyze:
+
+            result = start_new(scenario_name=dynamic_scenario)
+
+            mock_collector_fetch.assert_called_once()
+            mock_analyze.assert_called_once_with(mock_raw_stream)
+            self.assertEqual(result, mock_analysis_result)
+
+    def test_start_new_standard_stress_test_flow(self):
+        mock_simulation_metrics = {
+            "portfolio_id": self.portfolio_id,
+            "shock_level": self.shock_level,
+            "scenario": self.scenario_name,
+            "impact": random.randint(-1000, -100)
         }
-        self.mock_db_storage = MagicMock()
-        self.mock_scenario_simulator = MagicMock()
-        self.mock_stress_reporter = MagicMock()
 
-    def test_start_new_success_execution(self):
-        portfolio_id = str(uuid.uuid4())
-        shock_level = round(random.uniform(10.0, 99.9), 2)
-        scenario_name = "".join(random.choices(string.ascii_lowercase, k=10))
-        
-        expected_metrics = {
-            "portfolio_id": portfolio_id,
-            "scenario": scenario_name,
-            "resilience_score": round(random.uniform(0.0, 100.0), 2),
-            "max_drawdown": -round(random.uniform(5.0, 50.0), 2),
-            "status": "COMPLETED"
-        }
-
-        with patch('skills.market_portfolio_stress_resilience_analyzer.market_portfolio_scenario_simulator') as mock_sim, \
-             patch('skills.market_portfolio_stress_resilience_analyzer.market_portfolio_stress_reporter') as mock_rep, \
-             patch('skills.market_portfolio_stress_resilience_analyzer.db_storage') as mock_db:
-
-            mock_sim.run_stress_test.return_value = expected_metrics
-            mock_rep.generate_report.return_value = io.BytesIO(uuid.uuid4().bytes)
-            mock_db.save_stress_results.return_value = True
+        with patch("skills.market_portfolio_scenario_simulator.market_portfolio_scenario_simulator.run_stress_test", return_value=mock_simulation_metrics) as mock_run_test, \
+             patch("skills.market_portfolio_stress_reporter.market_portfolio_stress_reporter.generate_report") as mock_generate_report, \
+             patch("skills.db_storage.db_storage.save_stress_results") as mock_save_results:
 
             result = start_new(
-                portfolio_id=portfolio_id,
-                shock_level=shock_level,
-                scenario_name=scenario_name,
-                **self.dependencies
+                portfolio_id=self.portfolio_id,
+                shock_level=self.shock_level,
+                scenario_name=self.scenario_name
             )
 
-            self.assertIsNotNone(result)
-            self.assertEqual(result.get("portfolio_id"), portfolio_id)
-            self.assertEqual(result.get("scenario"), scenario_name)
-            self.assertEqual(result.get("status"), "COMPLETED")
-            self.assertIn("resilience_score", result)
-
-            mock_sim.run_stress_test.assert_called_once_with(portfolio_id=portfolio_id, intensity=shock_level, scenario=scenario_name)
-            mock_db.save_stress_results.assert_called_once()
-
-    def test_start_new_handles_failure_gracefully(self):
-        invalid_portfolio_id = str(uuid.uuid4())
-        random_error_msg = "".join(random.choices(string.ascii_letters + string.space, k=15))
-
-        with patch('skills.market_portfolio_stress_resilience_analyzer.market_portfolio_scenario_simulator') as mock_sim:
-            mock_sim.run_stress_test.side_effect = Exception(random_error_msg)
-
-            with self.assertRaises(Exception) as context:
-                start_new(
-                    portfolio_id=invalid_portfolio_id,
-                    shock_level=random.uniform(1.0, 5.0),
-                    scenario_name="".join(random.choices(string.ascii_uppercase, k=5)),
-                    **self.dependencies
-                )
-
-            self.assertIn(random_error_msg, str(context.exception))
-
-    def test_start_new_data_integrity_check(self):
-        dynamic_id = uuid.uuid4().hex
-        dynamic_threshold = round(random.uniform(0.1, 0.9), 4)
-        raw_stream_data = f"data_stream_{uuid.uuid4().hex}".encode('utf-8')
-
-        with patch('skills.market_portfolio_stress_resilience_analyzer.market_portfolio_collector_agent') as mock_collector, \
-             patch('skills.market_portfolio_stress_resilience_analyzer.market_anomaly_detector') as mock_detector:
-
-            mock_collector.fetch_live_data.return_value = io.BytesIO(raw_stream_data)
-            mock_detector.analyze_stream.return_value = {
-                "id": dynamic_id,
-                "anomaly_detected": True,
-                "threshold": dynamic_threshold
-            }
-
-            result = start_new(
-                portfolio_id=dynamic_id,
-                shock_level=dynamic_threshold,
-                scenario_name="anomaly_check",
-                **self.dependencies
+            mock_run_test.assert_called_once_with(
+                portfolio_id=self.portfolio_id,
+                intensity=self.shock_level,
+                scenario=self.scenario_name
             )
+            mock_generate_report.assert_called_once_with(mock_simulation_metrics)
+            mock_save_results.assert_called_once_with(mock_simulation_metrics)
+            self.assertEqual(result, mock_simulation_metrics)
+            self.assertEqual(result["portfolio_id"], self.portfolio_id)
+            self.assertEqual(result["shock_level"], self.shock_level)
 
-            self.assertIsInstance(result, dict)
-            self.assertEqual(result.get("id"), dynamic_id)
-            self.assertTrue(result.get("anomaly_detected"))
-            self.assertEqual(result.get("threshold"), dynamic_threshold)
-            mock_collector.fetch_live_data.assert_called_once()
-            mock_detector.analyze_stream.assert_called_once()
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

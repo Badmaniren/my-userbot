@@ -14,7 +14,7 @@ def start_new(portfolio_id=None, shock_level=None, scenario_name=None, **kwargs)
     """Основная точка входа для юнит-тестов (модульный запуск стресс-тестирования или анализа аномалий)."""
     # Сценарий данных (проверка целостности данных из юнит-тестов)
     if scenario_name == "anomaly_check":
-        raw_stream = market_portfolio_collector_agent.fetch_live_data()
+        raw_stream = market_anomaly_detector.fetch_live_data() if hasattr(market_anomaly_detector, "fetch_live_data") else market_portfolio_collector_agent.fetch_live_data()
         analysis = market_anomaly_detector.analyze_stream(raw_stream)
         return analysis
 

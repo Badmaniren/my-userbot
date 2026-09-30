@@ -1,6 +1,6 @@
 import json
 import os
-import random
+import uuid
 from skills.db_storage import db_storage
 from skills.market_portfolio_slippage_model import market_portfolio_slippage_model
 from skills.market_portfolio_tax_calculator import market_portfolio_tax_calculator
@@ -11,7 +11,6 @@ def start_new(config, db_storage=None, **kwargs):
     
     tx_id = config.get("transaction_id")
     if not tx_id:
-        import uuid
         tx_id = uuid.uuid4().hex
         
     amount = config.get("amount", 10000.0)

@@ -53,7 +53,10 @@ class MarketParser:
             with open(self.storage_file, "r", encoding="utf-8") as f:
                 content = f.read()
                 if content.strip():
-                    data = json.loads(content)
+                    try:
+                        data = json.loads(content)
+                    except (json.JSONDecodeError, TypeError):
+                        data = {}
         
         data[symbol] = price
         with open(self.storage_file, "w", encoding="utf-8") as f:
@@ -66,7 +69,10 @@ class MarketParser:
             content = f.read()
             if not content.strip():
                 return {}
-            return json.loads(content)
+            try:
+                return json.loads(content)
+            except (json.JSONDecodeError, TypeError):
+                return None
 
 
 class MarketReportGenerator:
@@ -94,7 +100,7 @@ def generate_market_report(storage_file, symbol):
 def run_market_telegram_pipeline(storage_file, symbol, chat_id, url, telegram_token):
     parser = MarketParser(storage_file=storage_file)
     data = parser.load_data(storage_file)
-    price = data.get(symbol, 0.0) if isinstance(data, dict) else 0.0
+    price = data.get(symbol, 0.0) if isinstance(data, dict) and data is not None else 0.0
     
     return {
         "status": "success",
@@ -111,6 +117,10 @@ def export_audit_logs(storage_file=None):
         with open(storage_file, "r", encoding="utf-8") as f:
             content = f.read()
             if not content.strip():
+                return False
+            try:
+                json.loads(content)
+            except (json.JSONDecodeError, TypeError):
                 return False
             return True
     return False

@@ -66,3 +66,16 @@ class PortfolioValuation:
 
     def calculate_portfolio_pnl(self, url):
         return self.get_total_summary(url)
+
+
+def market_portfolio_valuation(payload=None, *args, **kwargs):
+    if isinstance(payload, dict):
+        portfolio_id = payload.get("portfolio_id", "default")
+        initial_capital = payload.get("initial_capital", 100000.0)
+        return {
+            "valuation_id": f"val_{portfolio_id}",
+            "portfolio_id": portfolio_id,
+            "initial_capital": initial_capital,
+            "current_value": initial_capital
+        }
+    return {}

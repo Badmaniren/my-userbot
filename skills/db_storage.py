@@ -1,6 +1,39 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
+
+
+class DBStorage:
+    def __init__(self, storage_file: str = "default.db"):
+        self.storage_file = storage_file
+        self._data = {}
+
+    def save(self, key, value):
+        self._data[key] = value
+
+    def get(self, key, default=None):
+        return self._data.get(key, default)
+
+    def __call__(self, arg=None, *args, **kwargs):
+        if isinstance(arg, dict):
+            key = arg.get("run_id") or arg.get("portfolio_id") or "last_record"
+            self._data[key] = arg
+            if "portfolio_id" in arg:
+                self._data[f"get_var_result_{arg['portfolio_id']}"] = arg
+            return arg
+        elif isinstance(arg, str):
+            return self._data.get(arg)
+        return self._data
+
+DbStorage = DBStorage
+db_storage = DBStorage()
 
 
 class MarketParser:

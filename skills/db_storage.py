@@ -1,6 +1,14 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 
 class MarketParser:
@@ -8,11 +16,15 @@ class MarketParser:
         self.storage_file = storage_file
 
     def fetch_price(self, url: str):
+        if requests is None:
+            raise ImportError("requests is required for fetch_price")
         response = requests.get(url, timeout=10)
         data = response.json()
         return data.get("price")
 
     def parse_html_prices(self, url: str):
+        if requests is None or BeautifulSoup is None:
+            raise ImportError("requests and BeautifulSoup are required for parse_html_prices")
         response = requests.get(url, timeout=10)
         soup = BeautifulSoup(response.text, 'html.parser')
         element = soup.find()
@@ -55,3 +67,125 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+class DatabaseConnection:
+    def __init__(self, db_path: str = "market_data.db"):
+        self.db_path = db_path
+
+    def connect(self):
+        return sqlite3.connect(self.db_path)
+
+
+class DBStorage:
+    def __init__(self, db_path: str = "market_data.db"):
+        self.db_path = db_path
+        self._registry = {}
+
+    def save(self, key, value):
+        self._registry[key] = value
+
+    def get(self, key, default=None):
+        return self._registry.get(key, default)
+
+    def fetch_stream(self, stream_id):
+        return self._registry.get(stream_id)
+
+    def save_stress_results(self, metrics):
+        self._registry["stress_results"] = metrics
+        return True
+
+    def save_portfolio_position(self, portfolio_id, position):
+        self._registry[f"pos_{portfolio_id}"] = position
+        return True
+
+    def save_record(self, record_id, record):
+        self._registry[record_id] = record
+        return True
+
+    def get_record(self, record_id):
+        return self._registry.get(record_id)
+
+    def get_portfolio(self, portfolio_id):
+        return self._registry.get(portfolio_id)
+
+    def save_portfolio(self, portfolio_id, data):
+        self._registry[portfolio_id] = data
+        return True
+
+    def load_portfolio(self, portfolio_id):
+        return self._registry.get(portfolio_id)
+
+    def persist_state(self, state):
+        self._registry["state"] = state
+        return True
+
+    def load_state(self):
+        return self._registry.get("state")
+
+    def load_data(self, filename: str):
+        parser = MarketParser(filename)
+        return parser.load_data(filename)
+
+    def save_sentiment_record(self, record):
+        self._registry["sentiment"] = record
+        return True
+
+    def export_to_file(self, pid, path):
+        with open(path, "w") as f:
+            f.write(str(self._registry.get(pid, "")))
+
+    def __call__(self, *args, **kwargs):
+        return self
+
+
+DbStorage = DBStorage
+db_storage = DBStorage()
+
+
+def save_portfolio_state(portfolio_id, state):
+    return db_storage.save_portfolio(portfolio_id, state)
+
+
+def get_portfolio_state(portfolio_id):
+    return db_storage.get_portfolio(portfolio_id)
+
+
+def save_to_db(key, data):
+    return db_storage.save(key, data)
+
+
+def fetch_from_db(key):
+    return db_storage.get(key)
+
+
+def save_report_to_db(report_id, report):
+    return db_storage.save_record(report_id, report)
+
+
+def get_report_from_db(report_id):
+    return db_storage.get_record(report_id)
+
+
+def save_macro_evaluation(portfolio_id, evaluation):
+    return db_storage.save(f"macro_{portfolio_id}", evaluation)
+
+
+def get_macro_evaluation(portfolio_id):
+    return db_storage.get(f"macro_{portfolio_id}")
+
+
+def save_portfolio_data(portfolio_id, data):
+    return db_storage.save_portfolio(portfolio_id, data)
+
+
+def get_portfolio_data(portfolio_id):
+    return db_storage.get_portfolio(portfolio_id)
+
+
+def save_simulation_results(sim_id, results):
+    return db_storage.save_record(sim_id, results)
+
+
+def get_simulation_results(sim_id):
+    return db_storage.get_record(sim_id)

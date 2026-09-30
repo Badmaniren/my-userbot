@@ -105,7 +105,13 @@ if not hasattr(market_portfolio_api_gateway, "stream_payload"):
     setattr(market_portfolio_api_gateway, "stream_payload", lambda: None)
 
 
-def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scenario_params: dict, iterations: int) -> dict:
+def run_monte_carlo_stress_test(portfolio_id: str = None, portfolio_value: float = 100000.0, scenario_params: dict = None, iterations: int = 100, **kwargs) -> dict:
+    if scenario_params is None:
+        scenario_params = {}
+
+    initial_capital = kwargs.get("initial_capital", portfolio_value)
+    num_simulations = kwargs.get("num_simulations", iterations)
+
     volatility = scenario_params.get("volatility", 0.2)
     drift = scenario_params.get("drift", 0.0)
     horizon_days = scenario_params.get("horizon_days", 1)
@@ -113,15 +119,15 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
     dt = 1.0 / 365.0
     final_values = []
     
-    for _ in range(iterations):
-        val = portfolio_value
+    for _ in range(num_simulations):
+        val = initial_capital
         for _ in range(horizon_days):
             rand_norm = random.gauss(0, 1)
             shock = (drift - 0.5 * (volatility ** 2)) * dt + volatility * math.sqrt(dt) * rand_norm
             val *= math.exp(shock)
         final_values.append(val)
 
-    losses = [portfolio_value - fv for fv in final_values]
+    losses = [initial_capital - fv for fv in final_values]
     losses.sort(reverse=True)
 
     idx_95 = int(0.05 * len(losses))
@@ -131,11 +137,19 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
 
     simulation_id = f"sim_{uuid.uuid4().hex}"
 
+    simulations_data = [(fv - initial_capital) / initial_capital for fv in final_values]
+
     return {
         "simulation_id": simulation_id,
         "portfolio_id": portfolio_id,
-        "initial_value": portfolio_value,
+        "initial_capital": initial_capital,
+        "initial_value": initial_capital,
         "var_95": float(var_95),
         "expected_shortfall": float(expected_shortfall),
-        "iterations": iterations
+        "iterations": num_simulations,
+        "final_values": final_values,
+        "simulations_data": simulations_data
     }
+
+
+market_portfolio_stress_monte_carlo_engine_run = run_monte_carlo_stress_test

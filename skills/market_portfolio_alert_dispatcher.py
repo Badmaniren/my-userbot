@@ -16,6 +16,12 @@ def send_telegram_notification(token, chat_id, message):
     """
     return True
 
+def send_alert(symbol, channel, anomaly_code):
+    """
+    Отправляет экстренное алерт-уведомление для портфеля/символа.
+    """
+    return True
+
 def dispatch_portfolio_alerts(
     symbol, 
     url, 

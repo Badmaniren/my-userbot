@@ -55,3 +55,14 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+_SIMULATION_RESULTS = {}
+
+
+def save_simulation_results(sim_id: str, results: dict) -> None:
+    _SIMULATION_RESULTS[sim_id] = results
+
+
+def get_simulation_results(sim_id: str) -> dict:
+    return _SIMULATION_RESULTS.get(sim_id)

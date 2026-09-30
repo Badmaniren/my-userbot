@@ -1,62 +1,65 @@
 import unittest
 import uuid
 import random
-import os
-from skills.market_portfolio_stress_monte_carlo_resiliency_engine import market_portfolio_stress_monte_carlo_resiliency_engine
 from skills.db_storage import db_storage
 from skills.market_portfolio_scenario_simulator import market_portfolio_scenario_simulator
 from skills.market_portfolio_valuation import market_portfolio_valuation
+from skills.market_portfolio_stress_monte_carlo_resiliency_engine import (
+    market_portfolio_stress_monte_carlo_resiliency_engine,
+    start_new
+)
 
 class TestMarketPortfolioStressMonteCarloResiliencyEngineIntegration(unittest.TestCase):
-    def test_monte_carlo_resiliency_pipeline(self):
-        portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
-        initial_value = round(random.uniform(50000.0, 500000.0), 2)
-        simulations_count = random.randint(100, 1000)
-        shock_factor = round(random.uniform(0.1, 0.5), 4)
 
-        valuation_data = {
-            "portfolio_id": portfolio_id,
-            "total_value": initial_value,
-            "assets": [
-                {"ticker": "BTC", "allocation": 0.5, "value": initial_value * 0.5},
-                {"ticker": "ETH", "allocation": 0.5, "value": initial_value * 0.5}
-            ]
-        }
-        valuation_res = market_portfolio_valuation(valuation_data)
-        self.assertIsNotNone(valuation_res)
+    def test_resiliency_engine_integration_flow(self):
+        portfolio_id = str(uuid.uuid4())
+        total_value = round(random.uniform(50000.0, 500000.0), 2)
+        shock_factor = round(random.uniform(0.05, 0.5), 2)
+        iterations = random.randint(100, 5000)
 
-        scenario_data = {
+        valuation_payload = {
             "portfolio_id": portfolio_id,
-            "shock_magnitude": shock_factor,
-            "simulations": simulations_count
+            "total_value": total_value
         }
-        scenario_res = market_portfolio_scenario_simulator(scenario_data)
-        self.assertIsNotNone(scenario_res)
+        valuation_result = market_portfolio_valuation(valuation_payload)
+
+        scenario_payload = {
+            "portfolio_id": portfolio_id,
+            "shock_factor": shock_factor,
+            "baseline_valuation": valuation_result
+        }
+        scenario_result = market_portfolio_scenario_simulator(scenario_payload)
 
         engine_payload = {
             "portfolio_id": portfolio_id,
-            "baseline_valuation": valuation_res,
-            "scenario": scenario_res,
-            "simulations_count": simulations_count,
+            "baseline_valuation": {"total_value": total_value},
             "shock_factor": shock_factor,
-            "run_uuid": uuid.uuid4().hex
+            "scenario_data": scenario_result
         }
 
-        resiliency_result = market_portfolio_stress_monte_carlo_resiliency_engine(engine_payload)
+        engine_result = market_portfolio_stress_monte_carlo_resiliency_engine(engine_payload)
 
-        self.assertIsInstance(resiliency_result, dict)
-        self.assertIn("resiliency_score", resiliency_result)
-        self.assertIn("var_95", resiliency_result)
-        self.assertIn("expected_shortfall", resiliency_result)
-        self.assertEqual(resiliency_result.get("portfolio_id"), portfolio_id)
+        self.assertEqual(engine_result.get("portfolio_id"), portfolio_id)
+        self.assertIn("resiliency_score", engine_result)
+        self.assertIn("var_95", engine_result)
+        self.assertIn("expected_shortfall", engine_result)
+        self.assertEqual(engine_result.get("status"), "success")
 
-        db_payload = {
-            "id": f"res_{uuid.uuid4().hex}",
+        expected_resiliency = max(0.0, min(100.0, 100.0 * (1.0 - shock_factor)))
+        self.assertAlmostEqual(engine_result.get("resiliency_score"), expected_resiliency)
+
+        expected_var_95 = total_value * shock_factor * 0.8
+        self.assertAlmostEqual(engine_result.get("var_95"), expected_var_95)
+
+        db_storage({
+            "action": "save_stress_test",
             "portfolio_id": portfolio_id,
-            "metrics": resiliency_result
-        }
-        db_save_res = db_storage(db_payload)
-        self.assertIsNotNone(db_save_res)
+            "metrics": engine_result
+        })
+
+        start_new_result = start_new(iterations=iterations, shock_factor=shock_factor)
+        self.assertEqual(start_new_result.get("iterations_processed"), iterations)
+        self.assertEqual(start_new_result.get("applied_shock"), shock_factor)
 
 if __name__ == "__main__":
     unittest.main()

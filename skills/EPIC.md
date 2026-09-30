@@ -4,3 +4,4 @@
 
 - market_portfolio_backtest_evaluator_bridge: Создаем инструмент ретроспективной оценки исполнения ордеров, который станет базовым компонентом для моделирования экстремальных рыночных сценариев и стресс-тестирования портфеля.
 - market_portfolio_stress_reporter: Исправляем и дорабатываем market_portfolio_stress_reporter для завершения цикла стресс-тестирования устойчивости портфеля.
+- market_portfolio_stress_scenario_pipeline: Завершаем исправление market_portfolio_stress_scenario_pipeline для полноценного функционирования эпика стресс-тестирования портфеля.

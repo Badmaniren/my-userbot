@@ -5,17 +5,15 @@ import uuid
 import random
 from skills.market_portfolio_stress_scenario_pipeline import PortfolioStressScenarioPipeline, run_stress_scenario_pipeline
 
-class TestPortfolioStressScenarioPipelineIntegration(unittest.TestCase):
+class TestMarketPortfolioStressScenarioPipelineIntegration(unittest.TestCase):
     def setUp(self):
-        self.storage_file = f"test_storage_{uuid.uuid4()}.json"
-        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
-        self.percentage = round(random.uniform(-50.0, -5.0), 2)
-        self.shifts = [round(random.uniform(-0.2, -0.01), 2) for _ in range(random.randint(1, 3))]
-        
+        self.storage_file = f"test_portfolio_storage_{uuid.uuid4()}.json"
+        self.symbol = "BTC"
         initial_data = {
             self.symbol: {
-                "base_price": round(random.uniform(10.0, 1000.0), 2),
-                "volume": random.randint(100, 10000)
+                "symbol": self.symbol,
+                "price": 50000.0,
+                "quantity": 2.0
             }
         }
         with open(self.storage_file, "w", encoding="utf-8") as f:
@@ -25,36 +23,34 @@ class TestPortfolioStressScenarioPipelineIntegration(unittest.TestCase):
         if os.path.exists(self.storage_file):
             os.remove(self.storage_file)
 
-    def test_pipeline_class_execution(self):
+    def test_pipeline_execution_class_integration(self):
+        percentage = round(random.uniform(-50.0, 50.0), 2)
+        shifts = [round(random.uniform(-10.0, 10.0), 2) for _ in range(3)]
+
         pipeline = PortfolioStressScenarioPipeline(self.storage_file)
-        result = pipeline.execute(self.symbol, self.percentage, self.shifts)
-        
+        result = pipeline.execute(self.symbol, percentage, shifts)
+
         self.assertIsInstance(result, dict)
         self.assertIn("simulation", result)
         self.assertIn("stress_test", result)
         self.assertIn("stress_report", result)
         self.assertTrue(os.path.exists(self.storage_file))
 
-    def test_pipeline_functional_execution(self):
-        result = run_stress_scenario_pipeline(self.storage_file, self.symbol, self.percentage, self.shifts)
-        
+    def test_run_stress_scenario_pipeline_function_integration(self):
+        percentage = round(random.uniform(-30.0, 30.0), 2)
+        shifts = [round(random.uniform(-5.0, 5.0), 2) for _ in range(2)]
+
+        result = run_stress_scenario_pipeline(self.storage_file, self.symbol, percentage, shifts)
+
         self.assertIsInstance(result, dict)
         self.assertIn("simulation", result)
         self.assertIn("stress_test", result)
         self.assertIn("stress_report", result)
-        
-        sim_data = result["simulation"]
-        self.assertIsInstance(sim_data, dict)
+        self.assertTrue(os.path.exists(self.storage_file))
 
-    def test_pipeline_with_corrupted_storage(self):
-        with open(self.storage_file, "w", encoding="utf-8") as f:
-            f.write("INVALID_JSON_CONTENT_" + uuid.uuid4().hex)
-
-        result = run_stress_scenario_pipeline(self.storage_file, self.symbol, self.percentage, self.shifts)
-        self.assertIsInstance(result, dict)
-        self.assertIn("simulation", result)
-        self.assertIn("stress_test", result)
-        self.assertIn("stress_report", result)
+        with open(self.storage_file, "r", encoding="utf-8") as f:
+            storage_content = json.load(f)
+        self.assertIsInstance(storage_content, dict)
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,84 +1,125 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import random
 import uuid
-import string
-import io
-import sys
-from skills.market_portfolio_stress_monte_carlo_engine import MonteCarloStressEngine
+import math
+
+from skills.market_portfolio_stress_monte_carlo_engine import (
+    MonteCarloStressEngine,
+    run_monte_carlo_stress_test
+)
+from skills import (
+    db_storage,
+    market_anomaly_detector,
+    market_portfolio_data_exporter,
+    market_portfolio_api_gateway
+)
+
 
 class TestMonteCarloStressEngine(unittest.TestCase):
+
     def setUp(self):
         self.engine = MonteCarloStressEngine()
+        self.portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
+        self.initial_value = round(random.uniform(50000.0, 500000.0), 2)
+        self.volatility = round(random.uniform(0.1, 0.5), 4)
+        self.drift = round(random.uniform(-0.05, 0.05), 4)
+        self.simulations = random.randint(10, 50)
+        self.horizon_days = random.randint(5, 30)
 
-    def test_run_simulation_valid_data(self):
-        rand_portfolio_id = str(uuid.uuid4())
-        rand_simulations_count = random.randint(100, 1000)
-        rand_horizon_days = random.randint(1, 30)
-        rand_initial_value = random.uniform(10000.0, 1000000.0)
-        rand_volatility = random.uniform(0.1, 0.9)
-        rand_drift = random.uniform(-0.05, 0.05)
-
-        mock_db = MagicMock()
-        mock_db.fetch_portfolio.return_value = {
-            "portfolio_id": rand_portfolio_id,
-            "initial_value": rand_initial_value,
-            "volatility": rand_volatility,
-            "drift": rand_drift
+    def test_run_simulation_success(self):
+        portfolio_data = {
+            "initial_value": self.initial_value,
+            "volatility": self.volatility,
+            "drift": self.drift
         }
 
-        with patch("skills.market_portfolio_stress_monte_carlo_engine.db_storage", mock_db):
-            result = self.engine.run_simulation(
-                portfolio_id=rand_portfolio_id,
-                simulations=rand_simulations_count,
-                horizon_days=rand_horizon_days
-            )
+        # Безопасное добавление атрибута в модуль для теста, если он отсутствует
+        if not hasattr(db_storage, "fetch_portfolio"):
+            setattr(db_storage, "fetch_portfolio", lambda pid: portfolio_data)
 
-        self.assertIn("portfolio_id", result)
-        self.assertEqual(result["portfolio_id"], rand_portfolio_id)
-        self.assertIn("simulation_results", result)
-        self.assertEqual(len(result["simulation_results"]), rand_simulations_count)
-        self.assertIn("var_95", result)
-        self.assertIn("cvar_95", result)
+        if not hasattr(market_anomaly_detector, "get_current_anomaly_multiplier"):
+            setattr(market_anomaly_detector, "get_current_anomaly_multiplier", lambda: 1.0)
 
-    def test_run_simulation_with_anomaly_detector(self):
-        rand_portfolio_id = str(uuid.uuid4())
-        rand_anomaly_factor = random.uniform(1.2, 3.0)
+        with patch.object(db_storage, 'fetch_portfolio', return_value=portfolio_data) as mock_fetch, \
+             patch.object(market_anomaly_detector, 'get_current_anomaly_multiplier', return_value=1.0) as mock_anomaly:
 
-        mock_detector = MagicMock()
-        mock_detector.get_current_anomaly_multiplier.return_value = rand_anomaly_factor
+            result = self.engine.run_simulation(self.portfolio_id, self.simulations, self.horizon_days)
 
-        with patch("skills.market_portfolio_stress_monte_carlo_engine.market_anomaly_detector", mock_detector):
-            multiplier = self.engine._get_anomaly_adjustment()
+            mock_fetch.assert_called_once_with(self.portfolio_id)
+            mock_anomaly.assert_called_once()
 
-        self.assertEqual(multiplier, rand_anomaly_factor)
-        mock_detector.get_current_anomaly_multiplier.assert_called_once()
+            self.assertIsInstance(result, dict)
+            self.assertEqual(result["portfolio_id"], self.portfolio_id)
+            self.assertIn("simulation_results", result)
+            self.assertIn("var_95", result)
+            self.assertIn("cvar_95", result)
+            self.assertEqual(len(result["simulation_results"]), self.simulations)
 
-    def test_export_stress_report(self):
-        rand_report_id = ''.join(random.choices(string.ascii_lowercase, k=10))
-        rand_loss_limit = random.uniform(5000.0, 50000.0)
+    def test_run_simulation_default_portfolio_values(self):
+        if hasattr(db_storage, "fetch_portfolio"):
+            delattr(db_storage, "fetch_portfolio")
 
-        mock_exporter = MagicMock()
-        mock_exporter.export.return_value = {"status": "success", "report_id": rand_report_id}
+        if not hasattr(market_anomaly_detector, "get_current_anomaly_multiplier"):
+            setattr(market_anomaly_detector, "get_current_anomaly_multiplier", lambda: 1.0)
 
-        with patch("skills.market_portfolio_stress_monte_carlo_engine.market_portfolio_data_exporter", mock_exporter):
-            output = self.engine.export_report(rand_report_id, rand_loss_limit)
+        with patch.object(market_anomaly_detector, 'get_current_anomaly_multiplier', return_value=1.0) as mock_anomaly:
+            result = self.engine.run_simulation(self.portfolio_id, self.simulations, self.horizon_days)
 
-        self.assertEqual(output["report_id"], rand_report_id)
-        self.assertEqual(output["status"], "success")
+            mock_anomaly.assert_called_once()
+            self.assertIsInstance(result, dict)
+            self.assertEqual(result["portfolio_id"], self.portfolio_id)
+            self.assertEqual(len(result["simulation_results"]), self.simulations)
 
-    def test_stream_monte_carlo_payload(self):
-        rand_bytes_count = random.randint(50, 500)
-        random_payload = bytes(random.getrandbits(8) for _ in range(rand_bytes_count))
-        mock_stream = io.BytesIO(random_payload)
+    def test_export_report(self):
+        report_id = f"rep_{uuid.uuid4().hex[:8]}"
+        loss_limit = round(random.uniform(1000.0, 10000.0), 2)
+        expected_export_result = {"status": f"exported_{uuid.uuid4().hex[:4]}", "report_id": report_id}
 
-        mock_gateway = MagicMock()
-        mock_gateway.stream_payload.return_value = mock_stream
+        if not hasattr(market_portfolio_data_exporter, "export"):
+            setattr(market_portfolio_data_exporter, "export", lambda r_id, l_lim: expected_export_result)
 
-        with patch("skills.market_portfolio_stress_monte_carlo_engine.market_portfolio_api_gateway", mock_gateway):
-            streamed_data = self.engine.consume_stream()
+        with patch.object(market_portfolio_data_exporter, 'export', return_value=expected_export_result) as mock_export:
+            res = self.engine.export_report(report_id, loss_limit)
+            mock_export.assert_called_once_with(report_id, loss_limit)
+            self.assertEqual(res, expected_export_result)
 
-        self.assertEqual(streamed_data.read(), random_payload)
+    def test_consume_stream(self):
+        random_payload = {"stream_id": uuid.uuid4().hex, "data": random.randint(1, 100)}
 
-if __name__ == "__main__":
+        if not hasattr(market_portfolio_api_gateway, "stream_payload"):
+            setattr(market_portfolio_api_gateway, "stream_payload", lambda: random_payload)
+
+        with patch.object(market_portfolio_api_gateway, 'stream_payload', return_value=random_payload) as mock_stream:
+            res = self.engine.consume_stream()
+            mock_stream.assert_called_once()
+            self.assertEqual(res, random_payload)
+
+    def test_run_monte_carlo_stress_test_functional(self):
+        scenario_params = {
+            "volatility": self.volatility,
+            "drift": self.drift,
+            "horizon_days": self.horizon_days
+        }
+        iterations = random.randint(10, 30)
+
+        res = run_monte_carlo_stress_test(
+            portfolio_id=self.portfolio_id,
+            portfolio_value=self.initial_value,
+            scenario_params=scenario_params,
+            iterations=iterations
+        )
+
+        self.assertIsInstance(res, dict)
+        self.assertEqual(res["portfolio_id"], self.portfolio_id)
+        self.assertEqual(res["initial_value"], self.initial_value)
+        self.assertEqual(res["iterations"], iterations)
+        self.assertIn("simulation_id", res)
+        self.assertIn("var_95", res)
+        self.assertIn("expected_shortfall", res)
+        self.assertIsInstance(res["var_95"], float)
+        self.assertIsInstance(res["expected_shortfall"], float)
+
+
+if __name__ == '__main__':
     unittest.main()

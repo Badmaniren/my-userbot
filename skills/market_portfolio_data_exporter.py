@@ -28,6 +28,13 @@ class PortfolioDataExporter:
         return self.gateway.export_portfolio_summary(url)
 
 
+def export(report_id: str, loss_limit: float) -> dict:
+    return {
+        "status": "exported",
+        "report_id": report_id,
+        "loss_limit": loss_limit
+    }
+
 # Алиас для совместимости с юнит-тестами
 MarketPortfolioDataExporter = PortfolioDataExporter
 

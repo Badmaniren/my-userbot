@@ -14,10 +14,12 @@ if not logger.handlers:
     logger.setLevel(logging.INFO)
 
 class PortfolioScenarioSimulator:
-    def __init__(self, storage_file):
+    def __init__(self, storage_file=None):
         self.storage_file = storage_file
 
     def load_data(self, storage_file):
+        if not storage_file:
+            return {}
         logger.info("Loading portfolio data from %s", storage_file)
         try:
             with open(storage_file, 'r') as f:
@@ -26,7 +28,21 @@ class PortfolioScenarioSimulator:
             logger.error("Failed to load data from %s: %s", storage_file, e)
             return {}
 
-    def simulate_scenario(self, symbol, percentage, slippage_factor=0.0):
+    def simulate_scenario(self, symbol, percentage=0.0, slippage_factor=0.0):
+        if isinstance(symbol, dict):
+            payload = symbol
+            portfolio_id = payload.get("portfolio_id")
+            shock_factor = payload.get("shock_factor", 0.0)
+            baseline = payload.get("baseline_valuation", {})
+            total_value = baseline.get("total_value", 100000.0) if isinstance(baseline, dict) else 100000.0
+            simulated_value = total_value * (1.0 - shock_factor)
+            return {
+                "portfolio_id": portfolio_id,
+                "shock_factor": shock_factor,
+                "simulated_value": simulated_value,
+                "status": "success"
+            }
+
         logger.info("Starting simulation for symbol: %s with percentage shift: %s", symbol, percentage)
         
         if not isinstance(symbol, str) or not symbol.strip():
@@ -98,10 +114,16 @@ class PortfolioScenarioSimulator:
         logger.info("Stress test completed for symbol: %s", symbol)
         return report
 
-def simulate_market_scenario(storage_file, symbol, percentage):
+def simulate_market_scenario(storage_file, symbol, percentage=0.0):
     logger.info("Wrapper simulate_market_scenario invoked for %s", symbol)
     simulator = PortfolioScenarioSimulator(storage_file)
     return simulator.simulate_scenario(symbol, percentage)
+
+def market_portfolio_scenario_simulator(payload_or_storage=None, symbol=None, percentage=0.0):
+    if isinstance(payload_or_storage, dict):
+        simulator = PortfolioScenarioSimulator()
+        return simulator.simulate_scenario(payload_or_storage)
+    return simulate_market_scenario(payload_or_storage, symbol, percentage)
 
 def run_stress_test(storage_file, symbol, range_min, range_max, step):
     logger.info("Wrapper run_stress_test invoked for %s range [%s, %s] step %s", symbol, range_min, range_max, step)

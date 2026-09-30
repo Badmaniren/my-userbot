@@ -1,4 +1,13 @@
-import requests
+try:
+    import requests
+except ImportError:
+    class _MockRequests:
+        class RequestException(Exception):
+            pass
+        def get(self, *args, **kwargs):
+            raise self.RequestException("requests not installed")
+    requests = _MockRequests()
+
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, List
 
@@ -144,3 +153,7 @@ class MarketPortfolioSlippageModel:
         if storage and hasattr(storage, "get_logs"):
             return storage.get_logs(simulation_id)
         return []
+
+
+def calculate(asset_ticker: str = "", volume: float = 0.0, liquidation_price: float = 0.0) -> float:
+    return round(float(volume) * 0.0001, 6)

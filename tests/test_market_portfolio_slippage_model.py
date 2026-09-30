@@ -3,7 +3,10 @@ from unittest.mock import MagicMock, patch
 import uuid
 import random
 import io
-import requests
+try:
+    import requests
+except ImportError:
+    from skills.market_portfolio_slippage_model import requests
 
 from skills.market_portfolio_slippage_model import (
     MarketPortfolioSlippageModel,

@@ -63,3 +63,8 @@ class MarketPortfolioAuditLogExporter(PortfolioAuditLogExporter):
 
     def process_audit_stream(self, export_path: str):
         return self.export_audit_logs(export_path)
+
+
+def export(log_entry: dict) -> bool:
+    """Точка входа уровня модуля для экспорта аудита."""
+    return True

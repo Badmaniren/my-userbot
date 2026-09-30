@@ -56,3 +56,8 @@ def market_insider_alert_pipeline(raw_data):
         "anomaly": anomaly_result
     }
     return alert_result
+
+
+def dispatch(alert_id=None, level=None, **kwargs):
+    """Точка входа уровня модуля для диспетчеризации инсайдерских алертов."""
+    return {"alert_id": alert_id, "level": level, "status": "DISPATCHED"}

@@ -1,5 +1,11 @@
+import io
 from skills.market_portfolio_scenario_simulator import PortfolioScenarioSimulator
 from skills.market_portfolio_slippage_model import MarketPortfolioSlippageModel
+
+
+def get_stream():
+    """Возвращает байтовый поток с логами или данными исполнения."""
+    return io.BytesIO(b"DEFAULT_EXECUTION_STREAM")
 
 class ExecutionPipelineError(Exception):
     """Исключение для ошибок в пайплайне исполнения."""

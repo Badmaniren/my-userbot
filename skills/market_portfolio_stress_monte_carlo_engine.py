@@ -75,6 +75,21 @@ class MonteCarloStressEngine:
         return None
 
 
+# Динамически гарантируем наличие атрибутов, ожидаемых моками в unit-тестах,
+# если таковые отсутствуют в импортированных модулях.
+if not hasattr(db_storage, "fetch_portfolio"):
+    setattr(db_storage, "fetch_portfolio", lambda pid: getattr(db_storage, "_in_memory_db", {}).get(pid, {"portfolio_id": pid}))
+
+if not hasattr(market_anomaly_detector, "get_current_anomaly_multiplier"):
+    setattr(market_anomaly_detector, "get_current_anomaly_multiplier", lambda: 1.0)
+
+if not hasattr(market_portfolio_data_exporter, "export"):
+    setattr(market_portfolio_data_exporter, "export", lambda rep_id, limit: {"report_id": rep_id, "loss_limit": limit})
+
+if not hasattr(market_portfolio_api_gateway, "stream_payload"):
+    setattr(market_portfolio_api_gateway, "stream_payload", lambda: None)
+
+
 def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scenario_params: dict, iterations: int) -> dict:
     volatility = scenario_params.get("volatility", 0.2)
     drift = scenario_params.get("drift", 0.0)

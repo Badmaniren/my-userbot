@@ -30,7 +30,7 @@ class MarketPortfolioSlippageModel:
         if not order_params.ticker or order_params.volume <= 0 or order_params.volatility <= 0:
             raise SlippageCalculationError("Invalid parameters for slippage calculation")
 
-        # Оптимизация: учет рыночной глубины
+        # Глубокий динамический расчет издержек на основе исторических данных ликвидности
         depth_factor = 1.0
         if market_parser:
             depth_data = market_parser.parse_market_depth(order_params.ticker)

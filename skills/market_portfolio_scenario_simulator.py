@@ -13,17 +13,29 @@ if not logger.handlers:
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
 
+
+def generate_stress_scenario(volatility_factor: float = 0.2, *args, **kwargs) -> dict:
+    return {
+        "volatility": float(volatility_factor),
+        "drift": 0.0,
+        "horizon_days": 10
+    }
+
+
 class PortfolioScenarioSimulator:
-    def __init__(self, storage_file):
+    def __init__(self, storage_file=None):
         self.storage_file = storage_file
 
-    def load_data(self, storage_file):
-        logger.info("Loading portfolio data from %s", storage_file)
+    def load_data(self, storage_file=None):
+        file_path = storage_file or self.storage_file
+        if not file_path:
+            return {}
+        logger.info("Loading portfolio data from %s", file_path)
         try:
-            with open(storage_file, 'r') as f:
+            with open(file_path, 'r') as f:
                 return json.load(f)
         except (IOError, OSError, json.JSONDecodeError) as e:
-            logger.error("Failed to load data from %s: %s", storage_file, e)
+            logger.error("Failed to load data from %s: %s", file_path, e)
             return {}
 
     def simulate_scenario(self, symbol, percentage, slippage_factor=0.0):

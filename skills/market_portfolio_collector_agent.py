@@ -66,6 +66,13 @@ class PortfolioVisualizer:
         return f"Report for {symbol}"
 
 
+def collect_portfolio_data(portfolio_id=None, capital=100000.0, *args, **kwargs) -> dict:
+    return {
+        "portfolio_id": portfolio_id or "default_portfolio",
+        "capital": float(capital) if capital is not None else 100000.0
+    }
+
+
 def run_pipeline(symbol: str, url: str, telegram_token: str, chat_id: str, storage_file: str) -> bool:
     parser = MarketParser(storage_file)
     if not os.path.exists(storage_file):

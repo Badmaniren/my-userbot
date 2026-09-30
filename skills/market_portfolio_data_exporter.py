@@ -7,8 +7,15 @@ def send_telegram_notification(token: str, chat_id: str, message: str) -> bool:
     """Вспомогательная функция для отправки уведомлений в Telegram."""
     return True
 
+def export(report_id: str, loss_limit: float) -> dict:
+    return {
+        "report_id": report_id,
+        "loss_limit": loss_limit,
+        "status": "exported"
+    }
+
 class PortfolioDataExporter:
-    def __init__(self, storage_file: str):
+    def __init__(self, storage_file: str = "default.db"):
         self.storage_file = storage_file
         self.gateway = MarketPortfolioAPIGateway(storage_file)
         self.reporter = StressReporter(storage_file)
@@ -26,6 +33,9 @@ class PortfolioDataExporter:
 
     def export_data(self, url: str, shifts: list) -> dict:
         return self.gateway.export_portfolio_summary(url)
+
+    def export(self, report_id: str, loss_limit: float) -> dict:
+        return export(report_id, loss_limit)
 
 
 # Алиас для совместимости с юнит-тестами

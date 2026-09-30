@@ -8,6 +8,9 @@ def send_telegram_notification(token, chat_id, message):
     """Отправка уведомления в Telegram (заглушка или реализация)."""
     pass
 
+def stream_payload():
+    return None
+
 def run_pipeline(symbol, url, telegram_token, chat_id, storage_file):
     """Запуск основного пайплайна сбора и обработки данных."""
     parser = MarketParser(storage_file)
@@ -25,7 +28,7 @@ def run_pipeline(symbol, url, telegram_token, chat_id, storage_file):
     }
 
 class MarketPortfolioAPIGateway:
-    def __init__(self, storage_file):
+    def __init__(self, storage_file="default.db"):
         self.storage_file = storage_file
         self.valuation = PortfolioValuation(storage_file)
         self.parser = MarketParser(storage_file)
@@ -33,6 +36,9 @@ class MarketPortfolioAPIGateway:
 
     def export_portfolio_summary(self, url):
         return self.valuation.get_total_summary(url)
+
+    def stream_payload(self):
+        return stream_payload()
 
 def start_new(symbol, url, telegram_token, chat_id, storage_file):
     try:

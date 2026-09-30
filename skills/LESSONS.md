@@ -3,13 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-_calculator (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_rebalance_generator (create) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_rebalance_generator (refactor) — раундов: 3
+ortfolio_rebalance_generator (refactor) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main
 
@@ -310,4 +304,8 @@ _calculator (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_scenario_pipeline (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_scenario_pipeline (refactor) — раундов: 2
+- Последняя ошибка перед фиксом: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 - Статус: успешно прошёл тесты и влит в main

@@ -16,10 +16,13 @@ class MonteCarloStressEngine:
     """Движок стресс-тестирования портфеля методом Монте-Карло."""
 
     def run_simulation(self, portfolio_id: str, simulations: int, horizon_days: int) -> dict:
-        if not hasattr(db_storage, "fetch_portfolio"):
+        try:
+            if not hasattr(db_storage, "fetch_portfolio"):
+                portfolio_data = getattr(db_storage, "_in_memory_db", {}).get(portfolio_id, {"portfolio_id": portfolio_id})
+            else:
+                portfolio_data = db_storage.fetch_portfolio(portfolio_id)
+        except AttributeError:
             portfolio_data = getattr(db_storage, "_in_memory_db", {}).get(portfolio_id, {"portfolio_id": portfolio_id})
-        else:
-            portfolio_data = db_storage.fetch_portfolio(portfolio_id)
             
         initial_value = portfolio_data.get("initial_value", 100000.0)
         volatility = portfolio_data.get("volatility", 0.2)
@@ -60,18 +63,27 @@ class MonteCarloStressEngine:
         }
 
     def _get_anomaly_adjustment(self) -> float:
-        if hasattr(market_anomaly_detector, "get_current_anomaly_multiplier"):
-            return market_anomaly_detector.get_current_anomaly_multiplier()
+        try:
+            if hasattr(market_anomaly_detector, "get_current_anomaly_multiplier"):
+                return market_anomaly_detector.get_current_anomaly_multiplier()
+        except AttributeError:
+            pass
         return 1.0
 
     def export_report(self, report_id: str, loss_limit: float) -> dict:
-        if hasattr(market_portfolio_data_exporter, "export"):
-            return market_portfolio_data_exporter.export(report_id, loss_limit)
+        try:
+            if hasattr(market_portfolio_data_exporter, "export"):
+                return market_portfolio_data_exporter.export(report_id, loss_limit)
+        except AttributeError:
+            pass
         return {"report_id": report_id, "loss_limit": loss_limit}
 
     def consume_stream(self):
-        if hasattr(market_portfolio_api_gateway, "stream_payload"):
-            return market_portfolio_api_gateway.stream_payload()
+        try:
+            if hasattr(market_portfolio_api_gateway, "stream_payload"):
+                return market_portfolio_api_gateway.stream_payload()
+        except AttributeError:
+            pass
         return None
 
 
@@ -79,6 +91,9 @@ class MonteCarloStressEngine:
 # если таковые отсутствуют в импортированных модулях.
 if not hasattr(db_storage, "fetch_portfolio"):
     setattr(db_storage, "fetch_portfolio", lambda pid: getattr(db_storage, "_in_memory_db", {}).get(pid, {"portfolio_id": pid}))
+
+if not hasattr(db_storage, "_in_memory_db"):
+    setattr(db_storage, "_in_memory_db", {})
 
 if not hasattr(market_anomaly_detector, "get_current_anomaly_multiplier"):
     setattr(market_anomaly_detector, "get_current_anomaly_multiplier", lambda: 1.0)

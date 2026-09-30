@@ -27,6 +27,9 @@ class MarketPortfolioBacktestEvaluatorBridge:
             "performance_evaluation": performance_evaluation
         }
 
+    def evaluate_retrospective(self, symbol: str) -> dict:
+        return self.evaluate_backtest_performance(symbol)
+
     def run_comprehensive_evaluation(self, symbol: str, initial_capital_or_shifts, strategy_params: dict) -> dict:
         self._ensure_storage_exists()
         backtest_execution = self.backtester.run_backtest(symbol, initial_capital_or_shifts, strategy_params)
@@ -53,3 +56,6 @@ class MarketPortfolioBacktestEvaluatorBridge:
             "performance_metrics": performance_metrics,
             "performance_evaluation": performance_evaluation
         }
+
+
+PortfolioBacktestEvaluatorBridge = MarketPortfolioBacktestEvaluatorBridge

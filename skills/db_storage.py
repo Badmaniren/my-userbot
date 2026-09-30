@@ -1,6 +1,13 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 
 class MarketParser:
@@ -55,3 +62,13 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+_portfolio_risk_metrics_db = {}
+
+def save_portfolio_risk_metrics(portfolio_id: str, metrics: dict) -> bool:
+    _portfolio_risk_metrics_db[portfolio_id] = metrics
+    return True
+
+def get_portfolio_risk_metrics(portfolio_id: str) -> dict:
+    return _portfolio_risk_metrics_db.get(portfolio_id, {})

@@ -139,3 +139,58 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
         "expected_shortfall": float(expected_shortfall),
         "iterations": iterations
     }
+
+
+def run_monte_carlo_stress(portfolio_data: dict = None, simulations: int = 1000, **kwargs) -> dict:
+    if isinstance(portfolio_data, dict):
+        portfolio_id = portfolio_data.get("portfolio_id", "default")
+        assets = portfolio_data.get("assets", [])
+        if assets and isinstance(assets, list):
+            initial_value = sum(asset.get("value", 0.0) for asset in assets if isinstance(asset, dict))
+        else:
+            initial_value = portfolio_data.get("initial_value", 100000.0)
+    else:
+        portfolio_id = str(portfolio_data) if portfolio_data is not None else "default"
+        initial_value = 100000.0
+
+    if initial_value <= 0:
+        initial_value = 100000.0
+
+    volatility = kwargs.get("volatility", 0.2)
+    drift = kwargs.get("drift", 0.0)
+    horizon_days = kwargs.get("horizon_days", 1)
+    dt = 1.0 / 365.0
+
+    losses = []
+    for _ in range(simulations):
+        val = initial_value
+        for _ in range(horizon_days):
+            rand_norm = random.gauss(0, 1)
+            shock = (drift - 0.5 * (volatility ** 2)) * dt + volatility * math.sqrt(dt) * rand_norm
+            val *= math.exp(shock)
+        losses.append(initial_value - val)
+
+    return {
+        "portfolio_id": portfolio_id,
+        "portfolio_loss_distribution": losses,
+        "initial_value": initial_value,
+        "simulations": simulations
+    }
+
+
+run_stress_monte_carlo_simulation = run_monte_carlo_stress
+run_monte_carlo_stress_simulation = run_monte_carlo_stress
+MarketPortfolioStressMonteCarloEngine = MonteCarloStressEngine
+
+
+def start_new(payload: dict = None) -> dict:
+    if payload is None:
+        payload = {}
+    return run_monte_carlo_stress(
+        portfolio_data=payload.get("portfolio_data", payload),
+        simulations=payload.get("simulations", 1000)
+    )
+
+
+def market_portfolio_stress_monte_carlo_engine(payload: dict = None) -> dict:
+    return start_new(payload)

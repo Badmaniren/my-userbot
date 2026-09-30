@@ -7,7 +7,12 @@ class MarketPortfolioBacktestEvaluatorBridge:
         self.backtester = MarketPortfolioBacktester(self.storage_file)
         self.analytics = PortfolioPerformanceAnalytics(self.storage_file)
 
+    def _ensure_storage_exists(self) -> None:
+        if self.storage_file:
+            open(self.storage_file, "a").close()
+
     def evaluate_backtest_performance(self, symbol: str) -> dict:
+        self._ensure_storage_exists()
         backtest_summary = self.backtester.get_backtest_summary(symbol)
         performance_metrics = self.analytics.calculate_metrics(symbol)
         performance_evaluation = self.analytics.evaluate_performance(symbol)
@@ -19,6 +24,7 @@ class MarketPortfolioBacktestEvaluatorBridge:
         }
 
     def run_comprehensive_evaluation(self, symbol: str, initial_capital_or_shifts, strategy_params: dict) -> dict:
+        self._ensure_storage_exists()
         backtest_execution = self.backtester.run_backtest(symbol, initial_capital_or_shifts, strategy_params)
         summary = self.backtester.get_backtest_summary(symbol)
         metrics = self.analytics.calculate_metrics(symbol)
@@ -32,6 +38,7 @@ class MarketPortfolioBacktestEvaluatorBridge:
         }
 
     def evaluate_strategy_backtest(self, symbol: str, initial_capital: float, strategy_params: dict) -> dict:
+        self._ensure_storage_exists()
         self.backtester.run_backtest(symbol, initial_capital, strategy_params)
         backtest_summary = self.backtester.get_backtest_summary(symbol)
         performance_metrics = self.analytics.calculate_metrics(symbol)

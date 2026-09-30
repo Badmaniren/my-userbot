@@ -1,9 +1,11 @@
 import json
 import os
 import uuid
+
 from skills.db_storage import db_storage
 from skills.market_portfolio_slippage_model import market_portfolio_slippage_model
 from skills.market_portfolio_tax_calculator import market_portfolio_tax_calculator
+
 
 def start_new(config, db_storage=None, **kwargs):
     if not isinstance(config, dict):
@@ -28,6 +30,7 @@ def start_new(config, db_storage=None, **kwargs):
         "total_cost": total_cost,
         "calculated_spread": 0.05
     }
+
 
 class MarketPortfolioTransactionCostAnalyzer:
     def analyze_costs(self, payload):
@@ -68,5 +71,6 @@ class MarketPortfolioTransactionCostAnalyzer:
         if filepath:
             with open(filepath, "w") as f:
                 json.dump(report_data, f)
+
 
 market_portfolio_transaction_cost_analyzer = MarketPortfolioTransactionCostAnalyzer()

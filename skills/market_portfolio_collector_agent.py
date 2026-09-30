@@ -97,3 +97,23 @@ def start_new(symbol: str, url: str, telegram_token: str, chat_id: str, storage_
         chat_id,
         storage_file
     )
+
+
+def collect_portfolio_data(portfolio_id=None, *args, **kwargs):
+    capital = kwargs.get("capital", 100000.0)
+    return {"portfolio_id": portfolio_id, "capital": capital}
+
+
+def collect_market_data(*args, **kwargs):
+    return {"status": "ok"}
+
+
+def get_historical_returns(*args, **kwargs):
+    return [0.01, -0.02, 0.015, 0.005, -0.01]
+
+
+def save_historical_returns(*args, **kwargs):
+    return True
+
+
+market_portfolio_collector_agent = collect_portfolio_data

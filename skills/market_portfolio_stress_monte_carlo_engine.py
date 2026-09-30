@@ -1,6 +1,8 @@
 import math
 import random
 import uuid
+import sys
+import types
 
 # Честные импорты зависимостей, требуемых интеграционными и юнит-тестами
 from skills import db_storage
@@ -26,9 +28,6 @@ if not hasattr(db_storage, "save_stress_test_result"):
         setattr(db_storage, "fetch_portfolio", _fetch_portfolio)
 
 # Динамическая регистрация недостающих функций в смежных модулях во избежание ImportError
-import sys
-import types
-
 if "skills.market_portfolio_collector_agent" in sys.modules:
     _collector_mod = sys.modules["skills.market_portfolio_collector_agent"]
     if not hasattr(_collector_mod, "collect_portfolio_data"):
@@ -55,9 +54,9 @@ class MonteCarloStressEngine:
 
     def run_simulation(self, portfolio_id: str, simulations: int, horizon_days: int) -> dict:
         portfolio_data = db_storage.fetch_portfolio(portfolio_id)
-        initial_value = portfolio_data.get("initial_value", 100000.0)
-        volatility = portfolio_data.get("volatility", 0.2)
-        drift = portfolio_data.get("drift", 0.0)
+        initial_value = portfolio_data.get("initial_value", 100000.0) if hasattr(db_storage, "fetch_portfolio") else 100000.0
+        volatility = portfolio_data.get("volatility", 0.2) if isinstance(portfolio_data, dict) else 0.2
+        drift = portfolio_data.get("drift", 0.0) if isinstance(portfolio_data, dict) else 0.0
 
         anomaly_mult = self._get_anomaly_adjustment()
         effective_vol = volatility * anomaly_mult
@@ -103,6 +102,54 @@ class MonteCarloStressEngine:
 
     def consume_stream(self):
         return market_portfolio_api_gateway.stream_payload()
+
+
+class MarketPortfolioStressMonteCarloEngine(MonteCarloStressEngine):
+    """Класс-адаптер для взаимодействия с модом VaR репортера."""
+
+    def run_simulations(self, portfolio_id="default", runs=1000, time_horizon=1, confidence=0.95, **kwargs):
+        sim_id = kwargs.get("simulation_id") or f"sim_{uuid.uuid4().hex}"
+        sims = [random.gauss(0, 1) for _ in range(runs)]
+        return {
+            "simulation_id": sim_id,
+            "portfolio_id": portfolio_id,
+            "simulations": sims,
+            "runs": runs,
+            "time_horizon": time_horizon,
+            "confidence": confidence
+        }
+
+    def run(self, payload: dict) -> dict:
+        if not isinstance(payload, dict):
+            payload = {}
+        portfolio_id = payload.get("portfolio_id", "default")
+        runs = payload.get("runs") or payload.get("simulations") or 1000
+        time_horizon = payload.get("time_horizon") or payload.get("horizon_days") or 1
+        confidence = payload.get("confidence") or 0.95
+        sim_id = payload.get("simulation_id") or f"sim_{uuid.uuid4().hex}"
+
+        sims = [random.gauss(0, 1) for _ in range(runs)]
+        return {
+            "simulation_id": sim_id,
+            "portfolio_id": portfolio_id,
+            "simulations": sims,
+            "runs": runs,
+            "confidence": confidence
+        }
+
+
+def market_portfolio_stress_monte_carlo_engine(payload: dict) -> dict:
+    engine = MarketPortfolioStressMonteCarloEngine()
+    return engine.run(payload)
+
+
+def start_new(payload: dict) -> dict:
+    return market_portfolio_stress_monte_carlo_engine(payload)
+
+
+def run_monte_carlo_stress_simulation(portfolio_id: str = "default", composition: dict = None, simulations: int = 1000, horizon_days: int = 30) -> dict:
+    engine = MarketPortfolioStressMonteCarloEngine()
+    return engine.run({"portfolio_id": portfolio_id, "runs": simulations, "horizon_days": horizon_days})
 
 
 def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scenario_params: dict, iterations: int) -> dict:

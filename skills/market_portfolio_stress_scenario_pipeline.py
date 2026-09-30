@@ -47,7 +47,7 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
     reporter = StressReporter(storage_file)
     try:
         stress_report_result = reporter.run_stress_reporting(symbol, shifts)
-    except Exception:
+    except (KeyError, RuntimeError, AttributeError):
         stress_report_result = {"symbol": symbol, "status": "default", "impact_score": 0}
 
     return {

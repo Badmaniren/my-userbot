@@ -33,7 +33,12 @@ class PortfolioStressScenarioPipeline:
         try:
             stress_test_result = self.simulator.run_stress_test(symbol, shifts)
             if isinstance(stress_test_result, list):
-                stress_test_result = {"symbol": symbol, "shifts": shifts, "results": stress_test_result}
+                # If all resulting valuations in stress_test_result are 0.0 (e.g. symbol not found or KeyError caught inside run_stress_test),
+                # treat results as empty [] for fallback behavior.
+                if stress_test_result and all(item.get("resulting_valuation") == 0.0 for item in stress_test_result if isinstance(item, dict)):
+                    stress_test_result = {"symbol": symbol, "shifts": shifts, "results": []}
+                else:
+                    stress_test_result = {"symbol": symbol, "shifts": shifts, "results": stress_test_result}
         except Exception:
             stress_test_result = {"symbol": symbol, "shifts": shifts, "results": []}
 

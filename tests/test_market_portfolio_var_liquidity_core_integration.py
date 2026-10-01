@@ -1,14 +1,16 @@
 import unittest
-import os
-import json
 import uuid
 import random
+import os
+import json
+import io
+
 from skills.market_portfolio_var_liquidity_core import market_portfolio_var_liquidity_core, start_new
 
 class TestMarketPortfolioVarLiquidityCoreIntegration(unittest.TestCase):
     def setUp(self):
         self.core_instance = market_portfolio_var_liquidity_core()
-        self.portfolio_id = f"port-{uuid.uuid4()}"
+        self.portfolio_id = str(uuid.uuid4())
         self.confidence_level = round(random.uniform(0.90, 0.99), 2)
         self.export_target = f"test_export_{uuid.uuid4()}.json"
 
@@ -19,7 +21,7 @@ class TestMarketPortfolioVarLiquidityCoreIntegration(unittest.TestCase):
             except OSError:
                 pass
 
-    def test_integration_calculation_and_export(self):
+    def test_calculate_var_and_liquidity_integration(self):
         result = self.core_instance.calculate_var_and_liquidity(
             portfolio_id=self.portfolio_id,
             confidence_level=self.confidence_level,
@@ -34,19 +36,27 @@ class TestMarketPortfolioVarLiquidityCoreIntegration(unittest.TestCase):
         expected_var = round(1500.50 * self.confidence_level, 2)
         self.assertEqual(result.get("var_value"), expected_var)
 
-        self.assertTrue(os.path.exists(self.export_target), "Экспортный файл не был создан в процессе интеграции")
-
+        self.assertTrue(os.path.exists(self.export_target))
         with open(self.export_target, "r", encoding="utf-8") as f:
             file_data = json.load(f)
+            self.assertEqual(file_data.get("portfolio_id"), self.portfolio_id)
+            self.assertEqual(file_data.get("var_value"), expected_var)
+            self.assertEqual(file_data.get("liquidity_score"), result.get("liquidity_score"))
 
-        self.assertEqual(file_data.get("portfolio_id"), self.portfolio_id)
-        self.assertEqual(file_data.get("var_value"), expected_var)
-        self.assertEqual(file_data.get("liquidity_score"), 0.85)
+    def test_start_new_with_db_storage(self):
+        mock_db_value = f"db_conn_{uuid.uuid4()}"
+        res = start_new(db_storage=mock_db_value)
+        self.assertEqual(res, mock_db_value)
 
-    def sf_test_db_storage_integration(self):
-        dummy_storage = f"db_conn_{uuid.uuid4()}"
-        res = start_new(db_storage=dummy_storage)
-        self.assertEqual(res, dummy_storage)
+    def test_start_new_with_bytes_io(self):
+        random_text = f"stream_data_{uuid.uuid4()}"
+        byte_stream = io.BytesIO(random_text.encode('utf-8'))
+        res = start_new(stream_flow=byte_stream)
+        self.assertEqual(res, random_text)
+
+    def test_start_new_default_success(self):
+        res = start_new()
+        self.assertEqual(res, {"status": "success"})
 
 if __name__ == "__main__":
     unittest.main()

@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-следняя ошибка перед фиксом: FAILED (failures=1)
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_scenario_pipeline (refactor) — раундов: 4
+folio_stress_scenario_pipeline (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -260,6 +257,9 @@
 
 ## market_portfolio_var_liquidity_core (start_new) — раундов: 3
 - Последняя ошибка перед фиксом: ImportError: cannot import name 'market_portfolio_var_liquidity_core' from 'skills.market_portfolio_var_liquidity_core' (unknown location)
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_var_liquidity_core (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_var_liquidity_core (refactor) — раундов: 1

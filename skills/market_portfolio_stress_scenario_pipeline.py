@@ -16,8 +16,11 @@ class PortfolioStressScenarioPipeline:
             if not isinstance(data, dict):
                 raise ValueError("Invalid storage data format")
         except (FileNotFoundError, json.JSONDecodeError, ValueError):
-            with open(self.storage_file, "w", encoding="utf-8") as f:
-                f.write("{}")
+            try:
+                with open(self.storage_file, "w", encoding="utf-8") as f:
+                    f.write("{}")
+            except FileNotFoundError:
+                pass
 
         try:
             sim_result = self.simulator.simulate_scenario(symbol, percentage)
@@ -59,8 +62,11 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
         if not isinstance(data, dict):
             raise ValueError("Invalid storage data format")
     except (FileNotFoundError, json.JSONDecodeError, ValueError):
-        with open(storage_file, "w", encoding="utf-8") as f:
-            f.write("{}")
+        try:
+            with open(storage_file, "w", encoding="utf-8") as f:
+                f.write("{}")
+        except FileNotFoundError:
+            pass
 
     simulator = PortfolioScenarioSimulator(storage_file)
     try:

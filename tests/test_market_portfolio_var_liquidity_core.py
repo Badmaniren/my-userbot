@@ -1,77 +1,112 @@
 import unittest
 from unittest.mock import patch
 import io
+import os
 import json
 import uuid
 import random
-import os
+import string
 
-from skills.market_portfolio_var_liquidity_core import (
-    start_new,
-    market_portfolio_var_liquidity_core
-)
+from skills.market_portfolio_var_liquidity_core import start_new, market_portfolio_var_liquidity_core
 
 class TestMarketPortfolioVarLiquidityCore(unittest.TestCase):
 
-    def test_bytes_io_processing(self):
-        random_text = f"risk_metric_{uuid.uuid4().hex}"
-        bytes_stream = io.BytesIO(random_text.encode('utf-8'))
+    def setUp(self):
+        self.core_instance = market_portfolio_var_liquidity_core()
+        self.random_portfolio_id = f"port_{uuid.uuid4().hex}"
+        self.random_db_storage = f"db_{uuid.uuid4().hex}"
+        self.random_bytes_content = ''.join(random.choices(string.ascii_letters + string.digits, k=32)).encode('utf-8')
+        self.random_export_filename = f"export_{uuid.uuid4().hex}.json"
+
+    def tearDown(self):
+        if os.path.exists(self.random_export_filename):
+            try:
+                os.remove(self.random_export_filename)
+            except OSError:
+                pass
+
+    def test_start_new_bytes_io_handling(self):
+        stream = io.BytesIO(self.random_bytes_content)
+        random_arg_name = f"stream_{uuid.uuid4().hex}"
+        kwargs = {random_arg_name: stream}
         
-        result = start_new(payload_stream=bytes_stream)
-        self.assertEqual(result, random_text)
+        result = start_new(**kwargs)
+        self.assertEqual(result, self.random_bytes_content.decode('utf-8', errors='ignore'))
 
-    def test_db_storage_handling(self):
-        storage_id = f"db_conn_{uuid.uuid4().hex}"
-        result = start_new(db_storage=storage_id)
-        self.assertEqual(result, storage_id)
-
-    def test_portfolio_calculation_and_export(self):
-        portfolio_id = f"port_{uuid.uuid4().hex}"
-        confidence = round(random.uniform(0.90, 0.99), 2)
-        export_target = f"report_{uuid.uuid4().hex}.json"
+    def test_start_new_db_storage_priority(self):
+        kwargs = {
+            "db_storage": self.random_db_storage,
+            "portfolio_id": self.random_portfolio_id,
+            "confidence_level": random.uniform(0.8, 0.99)
+        }
         
-        try:
-            result = start_new(
-                portfolio_id=portfolio_id,
-                confidence_level=confidence,
-                export_target=export_target
-            )
-            
-            expected_var = round(1500.50 * confidence, 2)
-            
-            self.assertIsInstance(result, dict)
-            self.assertEqual(result["portfolio_id"], portfolio_id)
-            self.assertEqual(result["var_value"], expected_var)
-            self.assertEqual(result["liquidity_score"], 0.85)
-            
-            self.assertTrue(os.path.exists(export_target))
-            with open(export_target, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                self.assertEqual(data["portfolio_id"], portfolio_id)
-                self.assertEqual(data["var_value"], expected_var)
-        finally:
-            if os.path.exists(export_target):
-                os.remove(export_target)
+        result = start_new(**kwargs)
+        self.assertEqual(result, self.random_db_storage)
 
-    def test_default_success_status(self):
-        random_arg = uuid.uuid4().hex
-        result = start_new(unknown_parameter=random_arg)
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result.get("status"), "success")
-
-    def test_class_wrapper_method(self):
-        portfolio_id = f"port_cls_{uuid.uuid4().hex}"
-        confidence = round(random.uniform(0.80, 0.98), 2)
+    def test_start_new_portfolio_calculation_and_export(self):
+        confidence = round(random.uniform(0.80, 0.99), 2)
+        expected_var = round(1500.50 * confidence, 2)
         
-        core_instance = market_portfolio_var_liquidity_core()
-        result = core_instance.calculate_var_and_liquidity(
-            portfolio_id=portfolio_id,
-            confidence_level=confidence
+        result = start_new(
+            portfolio_id=self.random_portfolio_id,
+            confidence_level=confidence,
+            export_target=self.random_export_filename
         )
         
-        expected_var = round(1500.50 * confidence, 2)
-        self.assertEqual(result["portfolio_id"], portfolio_id)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["portfolio_id"], self.random_portfolio_id)
         self.assertEqual(result["var_value"], expected_var)
+        self.assertEqual(result["liquidity_score"], 0.85)
+        
+        self.assertTrue(os.path.exists(self.random_export_filename))
+        with open(self.random_export_filename, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            self.assertEqual(data["portfolio_id"], self.random_portfolio_id)
+            self.assertEqual(data["var_value"], expected_var)
+
+    def test_start_new_default_success_status(self):
+        random_garbage_key = f"garbage_{uuid.uuid4().hex}"
+        random_garbage_value = uuid.uuid4().hex
+        
+        result = start_new(**{random_garbage_key: random_garbage_value})
+        self.assertEqual(result, {"status": "success"})
+
+    def test_class_calculate_var_and_liquidity(self):
+        confidence = round(random.uniform(0.80, 0.99), 2)
+        expected_var = round(1500.50 * confidence, 2)
+        
+        result = self.core_instance.calculate_var_and_liquidity(
+            portfolio_id=self.random_portfolio_id,
+            confidence_level=confidence,
+            export_target=None
+        )
+        
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["portfolio_id"], self.random_portfolio_id)
+        self.assertEqual(result["var_value"], expected_var)
+        self.assertEqual(result["liquidity_score"], 0.85)
+
+    def test_class_calculate_var_and_liquidity_with_export(self):
+        confidence = round(random.uniform(0.80, 0.99), 2)
+        
+        result = self.core_instance.calculate_var_and_liquidity(
+            portfolio_id=self.random_portfolio_id,
+            confidence_level=confidence,
+            export_target=self.random_export_filename
+        )
+        
+        self.assertEqual(result["portfolio_id"], self.random_portfolio_id)
+        self.assertTrue(os.path.exists(self.random_export_filename))
+
+    def test_start_new_default_confidence_level(self):
+        expected_var = round(1500.50 * 0.95, 2)
+        
+        result = start_new(portfolio_id=self.random_portfolio_id)
+        
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["portfolio_id"], self.random_portfolio_id)
+        self.assertEqual(result["var_value"], expected_var)
+        self.assertEqual(result["liquidity_score"], 0.85)
 
 if __name__ == '__main__':
     unittest.main()

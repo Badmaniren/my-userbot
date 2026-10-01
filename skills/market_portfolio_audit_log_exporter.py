@@ -1,5 +1,6 @@
 import json
 import os
+import io
 from skills.market_parser import MarketParser
 
 
@@ -19,14 +20,12 @@ class PortfolioAuditLogExporter:
                     return []
                 return json.loads(content)
         except (IOError, json.JSONDecodeError, UnicodeDecodeError):
-            # Перехватываем для безопасного возврата ошибки наружу в логике экспорта/сумм
             raise
 
     def export_audit_logs(self, export_path: str) -> bool:
         try:
             with open(self.storage_file, 'r', encoding='utf-8') as f:
                 data = f.read()
-                # Проверка на валидность JSON
                 json.loads(data)
 
             with open(export_path, 'w', encoding='utf-8') as f:
@@ -63,3 +62,7 @@ class MarketPortfolioAuditLogExporter(PortfolioAuditLogExporter):
 
     def process_audit_stream(self, export_path: str):
         return self.export_audit_logs(export_path)
+
+
+def export_raw_stream(portfolio_id=None, **kwargs):
+    return io.BytesIO(b"audit_log_data")

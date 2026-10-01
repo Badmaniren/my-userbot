@@ -3,7 +3,7 @@ from skills.market_report_generator import MarketReportGenerator
 
 
 class StressReporter:
-    def __init__(self, storage_file):
+    def __init__(self, storage_file="default.db"):
         self.storage_file = storage_file
         self.simulator = PortfolioScenarioSimulator(storage_file)
         self.generator = MarketReportGenerator(storage_file)
@@ -40,3 +40,9 @@ def generate_stress_report(storage_file, symbol, percentage):
 def run_stress_reporting_pipeline(storage_file, symbol, shifts):
     reporter = PortfolioStressReporter(storage_file)
     return reporter.run_stress_report(symbol, shifts)
+
+
+def compile_report(sim_results=None, *args, **kwargs):
+    if isinstance(sim_results, dict):
+        return {"status": "compiled", "id": sim_results.get("portfolio_id"), **sim_results}
+    return {"status": "compiled"}

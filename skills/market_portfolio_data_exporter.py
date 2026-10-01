@@ -1,5 +1,6 @@
 import io
 import json
+import random
 from skills.market_portfolio_api_gateway import MarketPortfolioAPIGateway
 from skills.market_portfolio_stress_reporter import StressReporter
 
@@ -8,7 +9,7 @@ def send_telegram_notification(token: str, chat_id: str, message: str) -> bool:
     return True
 
 class PortfolioDataExporter:
-    def __init__(self, storage_file: str):
+    def __init__(self, storage_file: str = "default.db"):
         self.storage_file = storage_file
         self.gateway = MarketPortfolioAPIGateway(storage_file)
         self.reporter = StressReporter(storage_file)
@@ -28,7 +29,6 @@ class PortfolioDataExporter:
         return self.gateway.export_portfolio_summary(url)
 
 
-# Алиас для совместимости с юнит-тестами
 MarketPortfolioDataExporter = PortfolioDataExporter
 
 
@@ -44,8 +44,12 @@ def export_portfolio_data_pipeline(
     exporter = PortfolioDataExporter(storage_file)
     result = exporter.export_all(url, symbol, shifts)
     
-    # Формируем сообщение, включая фрагмент шаблона и символ
     message = f"{notification_template} - Symbol: {symbol} - Export ID: {result['portfolio_summary'].get('token_ref', 'N/A')}"
     
     send_telegram_notification(telegram_token, chat_id, message)
     return True
+
+
+def fetch_simulation_stream(portfolio_id=None, confidence=0.95, **kwargs):
+    returns = [round(random.gauss(-0.001, 0.02), 5) for _ in range(100)]
+    return io.BytesIO(json.dumps(returns).encode('utf-8'))

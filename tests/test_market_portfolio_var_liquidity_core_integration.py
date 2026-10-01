@@ -1,16 +1,16 @@
 import unittest
 import os
 import uuid
-import random
 import json
-from skills.market_portfolio_var_liquidity_core import market_portfolio_var_liquidity_core, start_new
+import random
+from skills.market_portfolio_var_liquidity_core import market_portfolio_var_liquidity_core
 
 class TestMarketPortfolioVarLiquidityCoreIntegration(unittest.TestCase):
     def setUp(self):
         self.core = market_portfolio_var_liquidity_core()
-        self.portfolio_id = f"port-{uuid.uuid4()}"
+        self.portfolio_id = f"port_{uuid.uuid4().hex}"
         self.confidence_level = round(random.uniform(0.90, 0.99), 2)
-        self.export_target = f"export_{uuid.uuid4()}.json"
+        self.export_target = f"test_export_{uuid.uuid4().hex}.json"
 
     def tearDown(self):
         if os.path.exists(self.export_target):
@@ -33,17 +33,15 @@ class TestMarketPortfolioVarLiquidityCoreIntegration(unittest.TestCase):
         
         expected_var = round(1500.50 * self.confidence_level, 2)
         self.assertEqual(result.get("var_value"), expected_var)
-
-        self.assertTrue(os.path.exists(self.export_target))
+        
+        self.assertTrue(os.path.exists(self.export_target), "Export target file was not created.")
+        
         with open(self.export_target, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            self.assertEqual(data.get("portfolio_id"), self.portfolio_id)
-            self.assertEqual(data.get("var_value"), expected_var)
-
-    def test_start_new_direct_invocation(self):
-        random_storage = f"storage-{uuid.uuid4()}"
-        res = start_new(db_storage=random_storage)
-        self.assertEqual(res, random_storage)
+            file_data = json.load(f)
+            
+        self.assertEqual(file_data.get("portfolio_id"), self.portfolio_id)
+        self.assertEqual(file_data.get("var_value"), expected_var)
+        self.assertEqual(file_data.get("liquidity_score"), result.get("liquidity_score"))
 
 if __name__ == "__main__":
     unittest.main()

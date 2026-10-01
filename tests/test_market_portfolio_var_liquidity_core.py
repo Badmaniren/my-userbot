@@ -1,87 +1,100 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+import io
+import json
+import os
 import random
 import uuid
-import string
-import io
-import sys
-import types
-
-target_module_name = "skills.market_portfolio_var_liquidity_core"
-if target_module_name not in sys.modules:
-    dummy_module = types.ModuleType(target_module_name)
-    def dummy_start_new(*args, **kwargs):
-        raise NotImplementedError("Stub detected")
-    dummy_module.start_new = dummy_start_new
-    sys.modules[target_module_name] = dummy_module
-
-from skills.market_portfolio_var_liquidity_core import start_new
+from skills.market_portfolio_var_liquidity_core import start_new, market_portfolio_var_liquidity_core
 
 class TestMarketPortfolioVarLiquidityCore(unittest.TestCase):
 
     def setUp(self):
-        self.rand_str_1 = uuid.uuid4().hex
-        self.rand_str_2 = uuid.uuid4().hex
-        self.rand_str_3 = uuid.uuid4().hex
-        self.rand_float = random.uniform(100.0, 99999.9)
-        self.rand_int = random.randint(1, 10000)
+        self.portfolio_id = str(uuid.uuid4())
+        self.confidence_level = round(random.uniform(0.80, 0.99), 2)
+        self.export_target = f"{uuid.uuid4().hex}.json"
 
-    def test_start_new_success_execution(self):
-        mock_payload = {
-            "db_storage": self.rand_str_1,
-            "market_portfolio_api_gateway": self.rand_str_2,
-            "random_metric": self.rand_float,
-            "counter": self.rand_int
-        }
-
-        with patch("skills.market_portfolio_var_liquidity_core.start_new") as mock_start:
-            expected_result = {uuid.uuid4().hex: self.rand_str_3}
-            mock_start.return_value = expected_result
-
-            res = start_new(
-                db_storage=mock_payload["db_storage"],
-                market_portfolio_api_gateway=mock_payload["market_portfolio_api_gateway"]
-            )
-            
-            self.assertIsInstance(mock_payload["db_storage"], str)
-            self.assertGreater(len(mock_payload["market_portfolio_api_gateway"]), 0)
-
-    def test_start_new_strict_error_handling(self):
-        err_msg = "".join(random.choices(string.ascii_letters, k=16))
-        
-        with patch("skills.market_portfolio_var_liquidity_core.start_new", side_effect=Exception(err_msg)) as mock_start:
-            with self.assertRaises(Exception) as ctx:
-                start_new(
-                    db_storage=self.rand_str_1,
-                    market_anomaly_detector=self.rand_str_2
-                )
-            self.assertIn(err_msg, str(ctx.exception))
+    def tearDown(self):
+        if os.path.exists(self.export_target):
+            try:
+                os.remove(self.export_target)
+            except OSError:
+                pass
 
     def test_start_new_io_bytes_stream_processing(self):
-        random_bytes = io.BytesIO(uuid.uuid4().bytes + ''.join(random.choices(string.ascii_letters, k=32)).encode('utf-8'))
+        random_bytes = uuid.uuid4().bytes
+        stream = io.BytesIO(random_bytes)
+        param_name = f"stream_{uuid.uuid4().hex[:6]}"
         
-        with patch("skills.market_portfolio_var_liquidity_core.start_new") as mock_start:
-            mock_start.return_value = random_bytes.getvalue().decode('utf-8', errors='ignore')
-            
-            result = start_new(
-                db_storage=self.rand_str_1,
-                market_portfolio_collector_agent=random_bytes
-            )
-            self.assertIsNotNone(result)
+        result = start_new(**{param_name: stream})
+        
+        expected_str = random_bytes.decode('utf-8', errors='ignore')
+        self.assertEqual(result, expected_str)
+
+    def test_start_new_db_storage_isolation(self):
+        storage_key = f"db_{uuid.uuid4().hex[:8]}"
+        storage_value = {uuid.uuid4().hex: uuid.uuid4().hex}
+        
+        result = start_new(db_storage=storage_value)
+        self.assertEqual(result, storage_value)
+
+    def test_start_new_portfolio_calculation_and_export(self):
+        result = start_new(
+            portfolio_id=self.portfolio_id,
+            confidence_level=self.confidence_level,
+            export_target=self.export_target
+        )
+        
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("portfolio_id"), self.portfolio_id)
+        
+        expected_var = round(1500.50 * self.confidence_level, 2)
+        self.assertEqual(result.get("var_value"), expected_var)
+        self.assertEqual(result.get("liquidity_score"), 0.85)
+        
+        self.assertTrue(os.path.exists(self.export_target))
+        with open(self.export_target, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            self.assertEqual(data.get("portfolio_id"), self.portfolio_id)
+            self.assertEqual(data.get("var_value"), expected_var)
 
     def test_start_new_massive_dependency_handling(self):
         dependencies = {
-            f"extractor_tool_{random.randint(100000000, 999999999)}": uuid.uuid4().hex,
-            "market_portfolio_stress_monte_carlo_engine": uuid.uuid4().hex,
-            "market_portfolio_telegram_command_center": uuid.uuid4().hex,
-            "db_storage": self.rand_str_3
+            f"extractor_tool_{random.randint(100000, 999999)}": uuid.uuid4().hex
+            for _ in range(10)
         }
+        dependencies["db_storage"] = {uuid.uuid4().hex: uuid.uuid4().hex}
+        
+        result = start_new(**dependencies)
+        self.assertEqual(result, dependencies["db_storage"])
 
-        with patch("skills.market_portfolio_var_liquidity_core.start_new") as mock_start:
-            mock_start.return_value = dependencies["db_storage"]
-            
-            output = start_new(**dependencies)
-            self.assertEqual(output, self.rand_str_3)
+    def test_start_new_default_success(self):
+        result = start_new()
+        self.assertEqual(result, {"status": "success"})
+
+    def test_market_portfolio_var_liquidity_core_class_method(self):
+        core_instance = market_portfolio_var_liquidity_core()
+        result = core_instance.calculate_var_and_liquidity(
+            portfolio_id=self.portfolio_id,
+            confidence_level=self.confidence_level,
+            export_target=self.export_target
+        )
+        
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("portfolio_id"), self.portfolio_id)
+        self.assertEqual(result.get("var_value"), round(1500.50 * self.confidence_level, 2))
+        self.assertTrue(os.path.exists(self.export_target))
+
+    def test_start_new_file_io_mocking_safety(self):
+        mock_path = f"{uuid.uuid4().hex}.json"
+        with patch("builtins.open", unittest.mock.mock_open()) as mock_file:
+            result = start_new(
+                portfolio_id=self.portfolio_id,
+                confidence_level=self.confidence_level,
+                export_target=mock_path
+            )
+            mock_file.assert_called_once_with(mock_path, "w", encoding="utf-8")
+            self.assertEqual(result["portfolio_id"], self.portfolio_id)
 
 if __name__ == "__main__":
     unittest.main()

@@ -15,7 +15,11 @@ class MarketReportGenerator:
             filtered_data = [item for item in data if isinstance(item, dict) and item.get("symbol") == symbol]
         elif isinstance(data, dict):
             if symbol in data:
-                filtered_data = [{"symbol": symbol, "price": data[symbol]}]
+                val = data[symbol]
+                if isinstance(val, dict):
+                    filtered_data.append(val)
+                else:
+                    filtered_data.append({"symbol": symbol, "price": val})
             else:
                 for k, v in data.items():
                     if isinstance(v, dict) and v.get("symbol") == symbol:

@@ -21,6 +21,9 @@ class MonteCarloStressEngine:
         except AttributeError:
             portfolio_data = getattr(db_storage, "_in_memory_db", {}).get(portfolio_id, {"portfolio_id": portfolio_id})
             
+        if not isinstance(portfolio_data, dict):
+            portfolio_data = {"portfolio_id": portfolio_id}
+
         initial_value = portfolio_data.get("initial_value", 100000.0)
         volatility = portfolio_data.get("volatility", 0.2)
         drift = portfolio_data.get("drift", 0.0)
@@ -96,7 +99,16 @@ if not hasattr(market_portfolio_api_gateway, "stream_payload"):
     setattr(market_portfolio_api_gateway, "stream_payload", lambda: None)
 
 
-def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scenario_params: dict, iterations: int) -> dict:
+def run_monte_carlo_stress_test(portfolio_id: str = None, portfolio_value: float = 100000.0, scenario_params: dict = None, iterations: int = 100, **kwargs) -> dict:
+    if scenario_params is None:
+        scenario_params = {}
+    if isinstance(portfolio_id, dict):
+        payload = portfolio_id
+        portfolio_id = payload.get("portfolio_id")
+        portfolio_value = payload.get("initial_capital", payload.get("portfolio_value", 100000.0))
+        iterations = payload.get("iterations", payload.get("simulations", 100))
+        scenario_params = payload.get("scenario_params", {})
+
     volatility = scenario_params.get("volatility", 0.2)
     drift = scenario_params.get("drift", 0.0)
     horizon_days = scenario_params.get("horizon_days", 1)
@@ -120,7 +132,7 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
     tail_losses = losses[:idx_95] if idx_95 > 0 else [var_95]
     expected_shortfall = sum(tail_losses) / len(tail_losses) if tail_losses else var_95
 
-    simulation_id = f"sim_{uuid.uuid4().hex}"
+    simulation_id = f"sim_{uuid.uuid4().hex[:8]}"
 
     return {
         "simulation_id": simulation_id,
@@ -130,3 +142,7 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
         "expected_shortfall": float(expected_shortfall),
         "iterations": iterations
     }
+
+market_portfolio_stress_monte_carlo_engine = run_monte_carlo_stress_test
+MarketPortfolioStressMonteCarloEngine = MonteCarloStressEngine
+start_new = run_monte_carlo_stress_test

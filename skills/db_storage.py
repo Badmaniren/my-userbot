@@ -55,3 +55,20 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+_stream_records_store = {}
+
+
+def save_stream_record(record: dict) -> bool:
+    if not isinstance(record, dict):
+        return False
+    stream_id = record.get("stream_id")
+    if stream_id:
+        _stream_records_store[stream_id] = record
+        return True
+    return True
+
+
+def get_stream_record(stream_id: str) -> dict:
+    return _stream_records_store.get(stream_id, {})

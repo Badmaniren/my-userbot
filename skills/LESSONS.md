@@ -3,7 +3,12 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ution_cost_optimizer (create) — раундов: 4
+: успешно прошёл тесты и влит в main
+
+## market_portfolio_slippage_model (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_execution_cost_optimizer (create) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main
@@ -285,9 +290,5 @@ ution_cost_optimizer (create) — раундов: 4
 
 ## market_portfolio_hedge_signal_generator (create) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_monte_carlo_regime_switch (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

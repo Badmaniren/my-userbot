@@ -19,7 +19,11 @@ class MonteCarloStressEngine:
         try:
             portfolio_data = db_storage.fetch_portfolio(portfolio_id)
         except AttributeError:
-            portfolio_data = getattr(db_storage, "_in_memory_db", {}).get(portfolio_id, {"portfolio_id": portfolio_id})
+            in_mem = getattr(db_storage, "_in_memory_db", None)
+            if in_mem is None:
+                in_mem = {}
+                setattr(db_storage, "_in_memory_db", in_mem)
+            portfolio_data = in_mem.get(portfolio_id, {"portfolio_id": portfolio_id})
             
         initial_value = portfolio_data.get("initial_value", 100000.0)
         volatility = portfolio_data.get("volatility", 0.2)
@@ -78,8 +82,6 @@ class MonteCarloStressEngine:
             return None
 
 
-# Динамически гарантируем наличие атрибутов, ожидаемых моками в unit-тестах,
-# если таковые отсутствуют в импортированных модулях.
 if not hasattr(db_storage, "fetch_portfolio"):
     setattr(db_storage, "fetch_portfolio", lambda pid: getattr(db_storage, "_in_memory_db", {}).get(pid, {"portfolio_id": pid}))
 

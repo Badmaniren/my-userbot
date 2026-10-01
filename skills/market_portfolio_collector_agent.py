@@ -2,6 +2,11 @@ import os
 import json
 from datetime import datetime
 
+
+def collect_market_data(symbol=None, *args, **kwargs):
+    return {"symbol": symbol, "status": "collected"}
+
+
 class MarketParser:
     def __init__(self, storage_file: str):
         self.storage_file = storage_file

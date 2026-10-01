@@ -2,6 +2,41 @@ import sqlite3
 import requests
 from bs4 import BeautifulSoup
 
+_var_simulations_db = {}
+_in_memory_db = {}
+
+
+def save_var_simulation_result(simulation_result: dict) -> bool:
+    if isinstance(simulation_result, dict):
+        sim_id = simulation_result.get("simulation_id") or simulation_result.get("portfolio_id")
+        if sim_id:
+            _var_simulations_db[sim_id] = simulation_result
+            return True
+    return False
+
+
+def get_var_simulation_result(simulation_id: str) -> dict:
+    return _var_simulations_db.get(simulation_id)
+
+
+def fetch_portfolio(portfolio_id: str):
+    return _in_memory_db.get(portfolio_id)
+
+
+class DBStorage:
+    def __init__(self, db_path: str = "default.db", **kwargs):
+        self.db_path = db_path
+
+    def save(self, key, value):
+        _in_memory_db[key] = value
+
+    def get(self, key, default=None):
+        return _in_memory_db.get(key, default)
+
+
+DbStorage = DBStorage
+db_storage = DBStorage()
+
 
 class MarketParser:
     def __init__(self, storage_file: str = "market_data.db"):

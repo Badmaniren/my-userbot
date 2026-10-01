@@ -3,8 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ошибку предсказуемо или пробрось наружу через raise.
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
+ors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_stress_reporter (refactor) — раундов: 1
@@ -273,6 +272,9 @@
 
 ## market_portfolio_var_liquidity_core (refactor) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_var_liquidity_core (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_var_liquidity_core (refactor) — раундов: 1

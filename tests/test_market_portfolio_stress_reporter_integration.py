@@ -9,12 +9,12 @@ from skills.market_portfolio_stress_reporter import (
     run_stress_reporting_pipeline
 )
 
-class TestMarketPortfolioStressReporterIntegration(unittest.TestCase):
+class TestPortfolioStressReporterIntegration(unittest.TestCase):
     def setUp(self):
-        self.storage_file = f"test_storage_{uuid.uuid4()}.db"
-        self.symbol = f"SYM_{random.randint(1000, 9999)}"
+        self.storage_file = f"test_storage_{uuid.uuid4().hex}.db"
+        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
         self.percentage = round(random.uniform(-50.0, 50.0), 2)
-        self.shifts = [self.percentage, round(self.percentage * 1.5, 2)]
+        self.shifts = [round(random.uniform(-20.0, 20.0), 2), round(random.uniform(-20.0, 20.0), 2)]
 
     def tearDown(self):
         if os.path.exists(self.storage_file):
@@ -23,7 +23,7 @@ class TestMarketPortfolioStressReporterIntegration(unittest.TestCase):
             except OSError:
                 pass
 
-    def test_stress_reporter_end_to_end(self):
+    def test_stress_reporter_pipeline_integration(self):
         reporter = StressReporter(self.storage_file)
         result = reporter.run_stress_reporting(self.symbol, self.shifts)
         
@@ -31,20 +31,7 @@ class TestMarketPortfolioStressReporterIntegration(unittest.TestCase):
         self.assertIn("simulation_results", result)
         self.assertIn("base_report", result)
 
-    def test_simulate_single_raises_or_returns(self):
-        reporter = StressReporter(self.storage_file)
-        try:
-            res = reporter.simulate_single(self.symbol, self.percentage)
-            self.assertIsInstance(res, (dict, list, type(None)))
-        except Exception as e:
-            self.assertIsInstance(e, (KeyError, ValueError, Exception))
-
-    def test_get_stream_data(self):
-        reporter = StressReporter(self.storage_file)
-        stream_data = reporter.get_stream_data()
-        self.assertIsNotNone(stream_data)
-
-    def test_portfolio_stress_reporter_subclass(self):
+    def test_portfolio_stress_reporter_inheritance_and_pipeline(self):
         reporter = PortfolioStressReporter(self.storage_file)
         result = reporter.run_stress_report(self.symbol, self.shifts)
         
@@ -52,15 +39,27 @@ class TestMarketPortfolioStressReporterIntegration(unittest.TestCase):
         self.assertIn("simulation_results", result)
         self.assertIn("base_report", result)
 
-    def test_generate_stress_report_function(self):
+    def test_generate_stress_report_functional(self):
         result = generate_stress_report(self.storage_file, self.symbol, self.percentage)
+        
         self.assertIsInstance(result, dict)
         self.assertIn("simulation_results", result)
-
-    def test_run_stress_reporting_pipeline_function(self):
-        result = run_stress_reporting_pipeline(self.storage_file, self.symbol, self.shifts)
-        self.assertIsInstance(result, dict)
         self.assertIn("base_report", result)
+
+    def test_run_stress_reporting_pipeline_functional(self):
+        result = run_stress_reporting_pipeline(self.storage_file, self.symbol, self.shifts)
+        
+        self.assertIsInstance(result, dict)
+        self.assertIn("simulation_results", result)
+        self.assertIn("base_report", result)
+
+    def test_simulate_single_and_stream_data(self):
+        reporter = StressReporter(self.storage_file)
+        single_sim = reporter.simulate_single(self.symbol, self.percentage)
+        self.assertIsInstance(single_sim, dict)
+
+        stream_data = reporter.get_stream_data()
+        self.assertIsNotNone(stream_data)
 
 if __name__ == "__main__":
     unittest.main()

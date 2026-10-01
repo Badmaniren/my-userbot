@@ -1,6 +1,41 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
+
+
+class DBStorage:
+    def __init__(self):
+        self._records = {}
+
+    def save(self, key: str, value: any):
+        self._records[key] = value
+
+    def get(self, key: str, default=None):
+        return self._records.get(key, default)
+
+    def save_record(self, key: str, value: any):
+        self.save(key, value)
+
+    def get_record(self, key: str, default=None):
+        return self.get(key, default)
+
+    def __getitem__(self, key):
+        return self._records[key]
+
+    def __setitem__(self, key, value):
+        self._records[key] = value
+
+
+db_storage = DBStorage()
+DbStorage = DBStorage
 
 
 class MarketParser:

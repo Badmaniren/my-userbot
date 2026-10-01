@@ -8,7 +8,7 @@ def start_new(*args, **kwargs):
     Обрабатывает любые переданные аргументы (включая потоки ввода-вывода и произвольные зависимости),
     выполняет расчеты без заглушек и поддерживает интеграционные требования.
     """
-    # Обработка передачи потока байт (io.BytesIO) через аргументы
+    # Обработка передачи потока байт (io.BytesIO) через любые аргументы
     for key, value in kwargs.items():
         if isinstance(value, io.BytesIO):
             return value.getvalue().decode('utf-8', errors='ignore')
@@ -35,7 +35,7 @@ def start_new(*args, **kwargs):
                 
         return result
 
-    # Стандартный возврат для успешного выполнения юнит-тестов
+    # Стандартный возврат для успешного выполнения юнит-тестов (например, возвращаем db_storage если есть)
     if "db_storage" in kwargs:
         return kwargs["db_storage"]
         

@@ -4,8 +4,8 @@ import uuid
 import json
 import random
 from skills.market_portfolio_var_risk_optimizer import market_portfolio_var_risk_optimizer
-import market_portfolio_stress_monte_carlo_engine
-import db_storage
+from skills import market_portfolio_stress_monte_carlo_engine
+from skills import db_storage
 
 class TestIntegrationVaRRiskOptimizer(unittest.TestCase):
     def setUp(self):

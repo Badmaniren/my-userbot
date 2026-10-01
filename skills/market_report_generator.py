@@ -58,30 +58,18 @@ class MarketReportGenerator:
 def generate_market_report(storage_file, symbol):
     data = {}
     load_func = getattr(db_storage, "load_data", None)
-    if load_func is None and hasattr(db_storage, "load_db"):
-        load_func = db_storage.load_db
+    if load_func is None:
+        load_func = getattr(db_storage, "load_db", None)
     
     if load_func is not None:
         try:
             data = load_func(storage_file)
-        except (AttributeError, TypeError):
-            load_db_func = getattr(db_storage, "load_db", None)
-            if load_db_func is not None and load_db_func != load_func:
-                data = load_db_func(storage_file)
-            else:
-                parser = MarketParser(storage_file)
-                data = parser.load_data(storage_file)
-    else:
-        load_db_func = getattr(db_storage, "load_db", None)
-        if load_db_func is not None:
-            try:
-                data = load_db_func(storage_file)
-            except (AttributeError, TypeError):
-                parser = MarketParser(storage_file)
-                data = parser.load_data(storage_file)
-        else:
+        except AttributeError:
             parser = MarketParser(storage_file)
             data = parser.load_data(storage_file)
+    else:
+        parser = MarketParser(storage_file)
+        data = parser.load_data(storage_file)
             
     if not data and storage_file:
         parser = MarketParser(storage_file)

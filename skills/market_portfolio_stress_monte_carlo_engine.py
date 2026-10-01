@@ -15,18 +15,20 @@ from skills import market_portfolio_scenario_simulator
 class MonteCarloStressEngine:
     """Движок стресс-тестирования портфеля методом Монте-Карло."""
 
-    def run_simulation(self, portfolio_id: str, simulations: int, horizon_days: int) -> dict:
+    def run_simulation(self, portfolio_id: str, simulations: int = 1000, horizon_days: int = 30, initial_value: float = None, confidence: float = None, **kwargs) -> dict:
         try:
-            if not hasattr(db_storage, "fetch_portfolio"):
-                portfolio_data = getattr(db_storage, "_in_memory_db", {}).get(portfolio_id, {"portfolio_id": portfolio_id})
-            else:
+            if hasattr(db_storage, "fetch_portfolio"):
                 portfolio_data = db_storage.fetch_portfolio(portfolio_id)
-        except AttributeError:
+            else:
+                portfolio_data = getattr(db_storage, "_in_memory_db", {}).get(portfolio_id, {"portfolio_id": portfolio_id})
+        except Exception:
             portfolio_data = getattr(db_storage, "_in_memory_db", {}).get(portfolio_id, {"portfolio_id": portfolio_id})
-            
-        initial_value = portfolio_data.get("initial_value", 100000.0)
+
+        if initial_value is None:
+            initial_value = portfolio_data.get("initial_value", 100000.0)
         volatility = portfolio_data.get("volatility", 0.2)
         drift = portfolio_data.get("drift", 0.0)
+        conf = confidence if confidence is not None else 0.95
 
         anomaly_mult = self._get_anomaly_adjustment()
         effective_vol = volatility * anomaly_mult
@@ -46,21 +48,41 @@ class MonteCarloStressEngine:
             simulation_results.append(path)
             final_values.append(val)
 
-        # Сортируем для расчета VaR и CVaR
         losses = [initial_value - fv for fv in final_values]
         losses.sort(reverse=True)
 
-        idx_95 = int(0.05 * len(losses))
-        var_95 = losses[idx_95] if losses else 0.0
-        tail_losses = losses[:idx_95] if idx_95 > 0 else [var_95]
-        cvar_95 = sum(tail_losses) / len(tail_losses) if tail_losses else var_95
+        idx_conf = max(1, int((1.0 - conf) * len(losses))) if losses else 0
+        var_val = losses[idx_conf] if losses else 0.0
+        tail_losses = losses[:idx_conf] if idx_conf > 0 else [var_val]
+        cvar_val = sum(tail_losses) / len(tail_losses) if tail_losses else var_val
+
+        max_drawdown = 0.0
+        for path in simulation_results:
+            peak = path[0]
+            for pt in path:
+                if pt > peak:
+                    peak = pt
+                dd = (peak - pt) / peak if peak > 0 else 0.0
+                if dd > max_drawdown:
+                    max_drawdown = dd
+
+        simulation_id = f"sim_{uuid.uuid4().hex}"
 
         return {
+            "simulation_id": simulation_id,
             "portfolio_id": portfolio_id,
             "simulation_results": simulation_results,
-            "var_95": var_95,
-            "cvar_95": cvar_95
+            "var": float(var_val),
+            "cvar": float(cvar_val),
+            "var_95": float(var_val),
+            "cvar_95": float(cvar_val),
+            "max_drawdown": float(max_drawdown),
+            "confidence": conf,
+            "runs": simulations
         }
+
+    def run_multivariate_simulation(self, portfolio_id: str, simulations: int = 1000, horizon_days: int = 30, **kwargs) -> dict:
+        return self.run_simulation(portfolio_id, simulations=simulations, horizon_days=horizon_days, **kwargs)
 
     def _get_anomaly_adjustment(self) -> float:
         try:
@@ -87,6 +109,9 @@ class MonteCarloStressEngine:
         return None
 
 
+MarketPortfolioStressMonteCarloEngine = MonteCarloStressEngine
+
+
 # Динамически гарантируем наличие атрибутов, ожидаемых моками в unit-тестах,
 # если таковые отсутствуют в импортированных модулях.
 if not hasattr(db_storage, "fetch_portfolio"):
@@ -105,6 +130,11 @@ if not hasattr(market_portfolio_api_gateway, "stream_payload"):
     setattr(market_portfolio_api_gateway, "stream_payload", lambda: None)
 
 
+def run_simulation(portfolio_id: str, initial_value: float = 100000.0, confidence: float = 0.95, simulations: int = 1000, horizon_days: int = 30, **kwargs) -> dict:
+    engine = MonteCarloStressEngine()
+    return engine.run_simulation(portfolio_id, simulations=simulations, horizon_days=horizon_days, initial_value=initial_value, confidence=confidence, **kwargs)
+
+
 def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scenario_params: dict, iterations: int) -> dict:
     volatility = scenario_params.get("volatility", 0.2)
     drift = scenario_params.get("drift", 0.0)
@@ -112,7 +142,7 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
 
     dt = 1.0 / 365.0
     final_values = []
-    
+
     for _ in range(iterations):
         val = portfolio_value
         for _ in range(horizon_days):
@@ -139,3 +169,54 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
         "expected_shortfall": float(expected_shortfall),
         "iterations": iterations
     }
+
+
+market_portfolio_stress_monte_carlo_engine_run = run_monte_carlo_stress_test
+
+
+def market_portfolio_stress_monte_carlo_engine(payload: dict = None, **kwargs) -> dict:
+    if payload is None:
+        payload = kwargs
+    elif isinstance(payload, dict) and kwargs:
+        payload = {**payload, **kwargs}
+    if not isinstance(payload, dict):
+        payload = {}
+
+    portfolio_id = payload.get("portfolio_id", f"port_{uuid.uuid4().hex[:8]}")
+    runs = payload.get("runs") or payload.get("simulations") or 1000
+    confidence = payload.get("confidence") or payload.get("confidence_level") or 0.95
+    initial_value = payload.get("initial_value", 100000.0)
+    horizon_days = payload.get("horizon_days", 30)
+
+    engine = MonteCarloStressEngine()
+    res = engine.run_simulation(
+        portfolio_id=portfolio_id,
+        simulations=runs,
+        horizon_days=horizon_days,
+        initial_value=initial_value,
+        confidence=confidence
+    )
+    return res
+
+
+def start_new(payload: dict = None, **kwargs) -> dict:
+    return market_portfolio_stress_monte_carlo_engine(payload, **kwargs)
+
+
+def fetch_simulation_results(portfolio_id: str) -> dict:
+    engine = MonteCarloStressEngine()
+    return engine.run_simulation(portfolio_id)
+
+
+def run_monte_carlo_stress(portfolio_data=None, simulations: int = 1000, **kwargs) -> dict:
+    if isinstance(portfolio_data, dict):
+        pid = portfolio_data.get("portfolio_id", "default_portfolio")
+        val = portfolio_data.get("initial_value", 100000.0)
+    else:
+        pid = str(portfolio_data) if portfolio_data else "default_portfolio"
+        val = 100000.0
+    return run_simulation(portfolio_id=pid, initial_value=val, simulations=simulations, **kwargs)
+
+
+run_stress_monte_carlo_simulation = run_monte_carlo_stress
+run_monte_carlo_stress_simulation = run_monte_carlo_stress

@@ -97,3 +97,24 @@ def start_new(symbol: str, url: str, telegram_token: str, chat_id: str, storage_
         chat_id,
         storage_file
     )
+
+
+def collect_market_data(symbol: str = None, price: float = 100.0, volume: int = 1000, *args, **kwargs) -> dict:
+    data = {
+        "symbol": symbol,
+        "price": price,
+        "volume": volume,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+    data.update(kwargs)
+    return data
+
+
+def collect_portfolio_data(portfolio_id: str = None, capital: float = 100000.0, *args, **kwargs) -> dict:
+    data = {
+        "portfolio_id": portfolio_id,
+        "capital": capital,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+    data.update(kwargs)
+    return data

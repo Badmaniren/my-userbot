@@ -99,13 +99,15 @@ class PortfolioScenarioSimulator:
         return report
 
 def simulate_market_scenario(storage_file=None, symbol=None, percentage=0.0, **kwargs):
-    portfolio_id = kwargs.get("portfolio_id") or (storage_file if isinstance(storage_file, str) and not symbol else "default_portfolio")
+    sym = symbol or kwargs.get("symbol")
+    if sym is not None:
+        logger.info("Wrapper simulate_market_scenario invoked for %s", sym)
+        simulator = PortfolioScenarioSimulator(storage_file)
+        return simulator.simulate_scenario(sym, percentage)
+
+    portfolio_id = kwargs.get("portfolio_id") or (storage_file if isinstance(storage_file, str) else "default_portfolio")
     horizon = kwargs.get("horizon", 1)
     stress_metrics = kwargs.get("stress_metrics", {})
-
-    if symbol is not None and percentage is not None and isinstance(storage_file, str) and os.path.exists(storage_file):
-        simulator = PortfolioScenarioSimulator(storage_file)
-        return simulator.simulate_scenario(symbol, percentage)
 
     stress_var = stress_metrics.get("stress_var", stress_metrics.get("var_95", 0.05))
     expected_shortfall = stress_metrics.get("expected_shortfall", 0.08)

@@ -18,13 +18,18 @@ class MonteCarloStressEngine:
     def run_simulation(self, portfolio_id: str, simulations: int, horizon_days: int) -> dict:
         try:
             portfolio_data = db_storage.fetch_portfolio(portfolio_id)
-        except AttributeError:
+        except Exception:
+            portfolio_data = None
+
+        if not portfolio_data or not isinstance(portfolio_data, dict):
             in_mem = getattr(db_storage, "_in_memory_db", None)
             if in_mem is None:
                 in_mem = {}
                 setattr(db_storage, "_in_memory_db", in_mem)
-            portfolio_data = in_mem.get(portfolio_id, {"portfolio_id": portfolio_id})
-            
+            portfolio_data = in_mem.get(portfolio_id, {})
+            if not isinstance(portfolio_data, dict):
+                portfolio_data = {"portfolio_id": portfolio_id}
+
         initial_value = portfolio_data.get("initial_value", 100000.0)
         volatility = portfolio_data.get("volatility", 0.2)
         drift = portfolio_data.get("drift", 0.0)
@@ -96,6 +101,15 @@ if not hasattr(market_portfolio_data_exporter, "export"):
 
 if not hasattr(market_portfolio_api_gateway, "stream_payload"):
     setattr(market_portfolio_api_gateway, "stream_payload", lambda: None)
+
+
+def market_portfolio_stress_monte_carlo_engine(portfolio_id: str = "default", simulations: int = 100, **kwargs):
+    engine = MonteCarloStressEngine()
+    return engine.run_simulation(
+        portfolio_id=portfolio_id,
+        simulations=simulations,
+        horizon_days=kwargs.get("horizon_days", 1)
+    )
 
 
 def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scenario_params: dict, iterations: int) -> dict:

@@ -43,3 +43,6 @@ def start_new(symbol, url, telegram_token, chat_id, storage_file):
     except Exception as e:
         send_telegram_notification(telegram_token, chat_id, str(e))
         return {"status": "error", "message": str(e)}
+
+
+market_portfolio_api_gateway = MarketPortfolioAPIGateway

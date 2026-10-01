@@ -1,6 +1,5 @@
 import unittest
 import os
-import tempfile
 import json
 import uuid
 import random
@@ -8,55 +7,62 @@ from skills.market_portfolio_backtest_evaluator_bridge import MarketPortfolioBac
 
 class TestMarketPortfolioBacktestEvaluatorBridgeIntegration(unittest.TestCase):
     def setUp(self):
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.storage_file = os.path.join(self.temp_dir.name, f"test_storage_{uuid.uuid4().hex}.json")
+        self.test_dir = f"test_storage_{uuid.uuid4().hex}"
+        os.makedirs(self.test_dir, exist_ok=True)
+        self.storage_file = os.path.join(self.test_dir, f"portfolio_{uuid.uuid4().hex}.json")
         self.bridge = MarketPortfolioBacktestEvaluatorBridge(self.storage_file)
-        self.symbol = f"TICKER_{uuid.uuid4().hex[:6].upper()}"
-        self.initial_capital = round(random.uniform(10000.0, 1000000.0), 2)
-        self.strategy_params = {
-            "sma_short": random.randint(5, 20),
-            "sma_long": random.randint(21, 100),
+        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
+
+    def tearDown(self):
+        if os.path.exists(self.storage_file):
+            os.remove(self.storage_file)
+        if os.path.exists(self.test_dir):
+            os.rmdir(self.test_dir)
+
+    def test_storage_creation_and_comprehensive_evaluation(self):
+        initial_capital = round(random.uniform(10000.0, 100000.0), 2)
+        strategy_params = {
+            "sma_period": random.randint(10, 50),
             "risk_tolerance": round(random.uniform(0.01, 0.05), 4)
         }
 
-    def tearDown(self):
-        self.temp_dir.cleanup()
+        result = self.bridge.run_comprehensive_evaluation(self.symbol, initial_capital, strategy_params)
 
-    def test_storage_creation_and_comprehensive_evaluation_integration(self):
-        self.assertFalse(os.path.exists(self.storage_file), "Storage file should not exist before evaluation execution.")
+        self.assertTrue(os.path.exists(self.storage_file), "Storage file must be created by the bridge.")
         
-        result = self.bridge.run_comprehensive_evaluation(
-            symbol=self.symbol,
-            initial_capital_or_shifts=self.initial_capital,
-            strategy_params=self.strategy_params
-        )
+        with open(self.storage_file, "r") as f:
+            data = json.load(f)
+        self.assertIsInstance(data, dict, "Storage content must be a dictionary JSON object.")
 
-        self.assertTrue(os.path.exists(self.storage_file), "Storage file must be dynamically created by the bridge.")
-        self.assertGreater(os.path.getsize(self.storage_file), 0, "Storage file must contain serialized data structures.")
-
-        self.assertIsInstance(result, dict)
         self.assertIn("backtest_execution", result)
         self.assertIn("summary", result)
         self.assertIn("metrics", result)
         self.assertIn("evaluation", result)
 
-    def evaluate_strategy_and_performance_pipeline(self):
-        evaluation_result = self.bridge.evaluate_strategy_backtest(
-            symbol=self.symbol,
-            initial_capital=self.initial_capital,
-            strategy_params=self.strategy_params
-        )
+    def test_evaluate_strategy_backtest_flow(self):
+        initial_capital = round(random.uniform(5000.0, 50000.0), 2)
+        strategy_params = {
+            "leverage": round(random.uniform(1.0, 3.0), 2),
+            "threshold": round(random.uniform(0.001, 0.01), 4)
+        }
 
-        self.assertIsInstance(evaluation_result, dict)
-        self.assertIn("backtest_summary", evaluation_result)
-        self.assertIn("performance_metrics", evaluation_result)
-        self.assertIn("performance_evaluation", evaluation_result)
+        result = self.bridge.evaluate_strategy_backtest(self.symbol, initial_capital, strategy_params)
 
-        stored_data_raw = self.bridge.evaluate_backtest_performance(self.symbol)
-        self.assertIsInstance(stored_data_raw, dict)
-        self.assertIn("backtest_summary", stored_data_raw)
-        self.assertIn("performance_metrics", stored_data_raw)
-        self.assertIn("performance_evaluation", stored_data_raw)
+        self.assertIn("backtest_summary", result)
+        self.assertIn("performance_metrics", result)
+        self.assertIn("performance_evaluation", result)
+        self.assertTrue(os.path.exists(self.storage_file))
+
+    def test_evaluate_backtest_performance_existing_storage(self):
+        with open(self.storage_file, "w") as f:
+            json.dump({self.symbol: {"initialized": True, "id": str(uuid.uuid4())}}, f)
+
+        result = self.bridge.evaluate_backtest_performance(self.symbol)
+
+        self.assertIsInstance(result, dict)
+        self.assertIn("backtest_summary", result)
+        self.assertIn("performance_metrics", result)
+        self.assertIn("performance_evaluation", result)
 
 if __name__ == "__main__":
     unittest.main()

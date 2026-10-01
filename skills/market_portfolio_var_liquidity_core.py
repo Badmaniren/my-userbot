@@ -43,7 +43,7 @@ def start_new(*args, **kwargs):
 
 
 class market_portfolio_var_liquidity_core:
-    """Класс для интеграционных тестов, реализующий расчет VaR и ликвидности."""
+    """Класс для интеграционных и юнит-тестов, реализующий расчет VaR и ликвидности."""
     
     def calculate_var_and_liquidity(self, portfolio_id: str, confidence_level: float, export_target: str = None):
         return start_new(

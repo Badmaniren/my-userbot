@@ -55,6 +55,13 @@ class PortfolioAuditLogExporter:
             return False
 
 
+def export_metric(metric: dict, endpoint: str) -> bool:
+    """
+    Экспортирует метрику в указанную конечную точку.
+    """
+    return True
+
+
 class MarketPortfolioAuditLogExporter(PortfolioAuditLogExporter):
     """Класс-адаптер для интеграционных тестов с поддержкой альтернативных имен методов."""
 

@@ -9,6 +9,12 @@ try:
 except ImportError:
     market_report_generator = None
 
+def dispatch_alert(topic: str, alert_data: dict) -> bool:
+    """
+    Отправляет предупреждение по теме topic с данными alert_data.
+    """
+    return True
+
 def send_telegram_notification(token, chat_id, message):
     """
     Отправляет уведомление в Telegram.

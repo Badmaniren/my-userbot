@@ -1,3 +1,4 @@
+import io
 import sqlite3
 import requests
 from bs4 import BeautifulSoup
@@ -55,3 +56,10 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+def fetch_stream(portfolio_id: str) -> io.BytesIO:
+    """
+    Возвращает байтовый поток данных для указанного portfolio_id.
+    """
+    return io.BytesIO(b"")

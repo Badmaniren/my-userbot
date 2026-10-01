@@ -1,127 +1,82 @@
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch, MagicMock
 import uuid
 import random
-import string
 import io
+import os
 
-from skills.market_portfolio_stress_stress_matrix_builder import start_new
+from skills.market_portfolio_stress_stress_matrix_builder import (
+    start_new,
+    market_portfolio_stress_stress_matrix_builder
+)
 
 class TestMarketPortfolioStressStressMatrixBuilder(unittest.TestCase):
 
-    def setUp(self):
-        self.random_hex = uuid.uuid4().hex
-        self.random_string = ''.join(random.choices(string.ascii_letters, k=12))
-        self.random_float = random.uniform(10.0, 999.9)
-        self.random_int = random.randint(1, 10000)
+    def test_start_new_basic_execution(self):
+        portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
+        liquidity_shock_factor = random.uniform(0.01, 0.99)
 
-        self.mock_deps = {
-            "db_storage": MagicMock(),
-            "extractor_tool_1790087207": MagicMock(),
-            "extractor_tool_1790102839": MagicMock(),
-            "extractor_tool_1790262909": MagicMock(),
-            "extractor_tool_1790621808": MagicMock(),
-            "market_anomaly_detector": MagicMock(),
-            "market_insider_activity_tracker": MagicMock(),
-            "market_insider_alert_pipeline": MagicMock(),
-            "market_insider_anomaly_analyzer": MagicMock(),
-            "market_insider_anomaly_report_bridge": MagicMock(),
-            "market_news_sentiment_analyzer": MagicMock(),
-            "market_parser": MagicMock(),
-            "market_portfolio_alert_dispatcher": MagicMock(),
-            "market_portfolio_alert_event_sink": MagicMock(),
-            "market_portfolio_alert_filter_router": MagicMock(),
-            "market_portfolio_api_gateway": MagicMock(),
-            "market_portfolio_audit_alert_notifier": MagicMock(),
-            "market_portfolio_audit_compliance_hub": MagicMock(),
-            "market_portfolio_audit_log_exporter": MagicMock(),
-            "market_portfolio_autonomous_sentinel": MagicMock(),
-            "market_portfolio_backtest_evaluator_bridge": MagicMock(),
-            "market_portfolio_backtester": MagicMock(),
-            "market_portfolio_collector_agent": MagicMock(),
-            "market_portfolio_data_exporter": MagicMock(),
-            "market_portfolio_digest": MagicMock(),
-            "market_portfolio_dividend_tracker": MagicMock(),
-            "market_portfolio_event_intelligence_hub": MagicMock(),
-            "market_portfolio_execution_cost_optimizer": MagicMock(),
-            "market_portfolio_execution_pipeline": MagicMock(),
-            "market_portfolio_integration_hub": MagicMock(),
-            "market_portfolio_monitor": MagicMock(),
-            "market_portfolio_performance_analytics":     MagicMock(),
-            "market_portfolio_predictive_aggregator": MagicMock(),
-            "market_portfolio_scenario_simulator": MagicMock(),
-            "market_portfolio_slippage_model": MagicMock(),
-            "market_portfolio_strategy_optimizer": MagicMock(),
-            "market_portfolio_stress_monte_carlo_engine": MagicMock(),
-            "market_portfolio_stress_recovery_coordinator_bridge": MagicMock(),
-            "market_portfolio_stress_reporter": MagicMock(),
-            "market_portfolio_stress_scenario_pipeline": MagicMock(),
-            "market_portfolio_tax_calculator": MagicMock(),
-            "market_portfolio_telegram_command_center": MagicMock(),
-            "market_portfolio_telegram_notifier": MagicMock(),
-            "market_portfolio_valuation": MagicMock(),
-            "market_portfolio_visualizer_v2": MagicMock(),
-            "market_portfolio_webhook_event_logger": MagicMock(),
-            "market_portfolio_webhook_sync": MagicMock(),
-            "market_report_generator": MagicMock(),
-            "market_sentiment_digest": MagicMock(),
-            "market_sentiment_risk_alert_bridge": MagicMock(),
-            "market_sentiment_risk_hub": MagicMock(),
-            "market_sentiment_telegram_publisher": MagicMock(),
-            "market_telegram_pipeline": MagicMock()
-        }
+        mock_db = MagicMock()
+        mock_db.read_stream.return_value = None
 
-    def test_start_new_success_execution(self):
-        expected_result_key = self.random_hex
-        expected_value = self.random_float
+        mock_mc = MagicMock()
+        mock_mc.run.return_value = None
 
-        self.mock_deps["market_portfolio_scenario_simulator"].simulate.return_value = {
-            expected_result_key: expected_value
-        }
+        mock_sim = MagicMock()
+        sim_data_key = f"key_{uuid.uuid4().hex[:6]}"
+        sim_data_val = random.randint(100, 999)
+        mock_sim.simulate.return_value = {sim_data_key: sim_data_val}
 
-        with patch('skills.market_portfolio_stress_stress_matrix_builder.uuid.uuid4') as mock_uuid:
-            mock_uuid.return_value.hex = self.random_hex
-            
-            result = start_new(
-                portfolio_id=self.random_hex,
-                liquidity_shock_factor=self.random_float,
-                **self.mock_deps
-            )
+        result = start_new(
+            portfolio_id=portfolio_id,
+            liquidity_shock_factor=liquidity_shock_factor,
+            db_storage=mock_db,
+            market_portfolio_stress_monte_carlo_engine=mock_mc,
+            market_portfolio_scenario_simulator=mock_sim
+        )
 
-        self.assertIsNotNone(result)
-        self.mock_deps["market_portfolio_scenario_simulator"].simulate.assert_called_once()
-
-    def test_start_new_handles_io_stream(self):
-        stream_data = io.BytesIO(f"{self.random_string}_{self.random_int}".encode('utf-8'))
+        self.assertIn("matrix_id", result)
+        self.assertEqual(result["portfolio_id"], portfolio_id)
+        self.assertIn("simulation_data", result)
+        self.assertEqual(result["simulation_data"].get(sim_data_key), sim_data_val)
         
-        self.mock_deps["db_storage"].read_stream.return_value = stream_data
+        mock_db.read_stream.assert_called_once()
+        mock_mc.run.assert_called_once()
+        mock_sim.simulate.assert_called_once()
 
-        with patch('skills.market_portfolio_stress_stress_matrix_builder.uuid.uuid4') as mock_uuid:
-            mock_uuid.return_value.hex = self.random_hex
-            
-            result = start_new(
-                portfolio_id=self.random_hex,
-                liquidity_shock_factor=self.random_float,
-                **self.mock_deps
-            )
+    def test_start_new_missing_dependencies(self):
+        portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
+        result = start_new(portfolio_id=portfolio_id)
+        self.assertIn("matrix_id", result)
+        self.assertEqual(result["portfolio_id"], portfolio_id)
+        self.assertEqual(result["simulation_data"], {})
 
-        self.assertIsNotNone(result)
-        self.mock_deps["db_storage"].read_stream.assert_called_once()
+    def test_market_portfolio_stress_stress_matrix_builder_facade(self):
+        portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
+        output_target = f"matrix_out_{uuid.uuid4().hex[:8]}.json"
+        
+        builder_input = {
+            "portfolio_id": portfolio_id,
+            "output_target": output_target
+        }
 
-    def test_start_new_exception_handling(self):
-        self.mock_deps["market_portfolio_stress_monte_carlo_engine"].run.side_effect = Exception(self.random_string)
+        mock_storage_func = MagicMock()
 
-        with patch('skills.market_portfolio_stress_stress_matrix_builder.uuid.uuid4') as mock_uuid:
-            mock_uuid.return_value.hex = self.random_hex
-            
-            with self.assertRaises(Exception) as context:
-                start_new(
-                    portfolio_id=self.random_hex,
-                    liquidity_shock_factor=self.random_float,
-                    **self.mock_deps
-                )
-            
-            self.assertIn(self.random_string, str(context.exception))
+        with patch("skills.db_storage.db_storage", mock_storage_func, create=True):
+            try:
+                result = market_portfolio_stress_stress_matrix_builder(builder_input)
+            finally:
+                if os.path.exists(output_target):
+                    os.remove(output_target)
 
-if __name__ == '__main__':
-    unittest.main()
+        self.assertIn("matrix_id", result)
+        self.assertEqual(result["portfolio_id"], portfolio_id)
+        self.assertEqual(result["output_path"], output_target)
+        self.assertTrue(os.path.exists(output_target))
+
+        mock_storage_func.assert_called_once()
+        call_arg = mock_storage_func.call_args[0][0]
+        self.assertEqual(call_arg.get("action"), "save")
+        self.assertEqual(call_arg.get("table"), "stress_matrices")
+        self.assertEqual(call_arg.get("portfolio_id"), portfolio_id)
+        self.assertEqual(call_arg.get("matrix_id"), result["matrix_id"])

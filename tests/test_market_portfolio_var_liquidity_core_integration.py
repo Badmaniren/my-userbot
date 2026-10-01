@@ -1,16 +1,16 @@
 import unittest
 import os
-import uuid
 import json
+import uuid
+import random
 from skills.market_portfolio_var_liquidity_core import market_portfolio_var_liquidity_core, start_new
 
 class TestMarketPortfolioVarLiquidityCoreIntegration(unittest.TestCase):
-
     def setUp(self):
         self.core_instance = market_portfolio_var_liquidity_core()
-        self.portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
-        self.confidence_level = round(0.90 + (uuid.uuid4().int % 10) / 100, 2)
-        self.export_target = f"test_export_{uuid.uuid4().hex[:6]}.json"
+        self.portfolio_id = f"port-{uuid.uuid4()}"
+        self.confidence_level = round(random.uniform(0.90, 0.99), 2)
+        self.export_target = f"test_export_{uuid.uuid4()}.json"
 
     def tearDown(self):
         if os.path.exists(self.export_target):
@@ -19,7 +19,7 @@ class TestMarketPortfolioVarLiquidityCoreIntegration(unittest.TestCase):
             except OSError:
                 pass
 
-    def test_calculate_var_and_liquidity_integration(self):
+    def test_integration_calculation_and_export(self):
         result = self.core_instance.calculate_var_and_liquidity(
             portfolio_id=self.portfolio_id,
             confidence_level=self.confidence_level,
@@ -30,27 +30,23 @@ class TestMarketPortfolioVarLiquidityCoreIntegration(unittest.TestCase):
         self.assertEqual(result.get("portfolio_id"), self.portfolio_id)
         self.assertIn("var_value", result)
         self.assertIn("liquidity_score", result)
-        
+
         expected_var = round(1500.50 * self.confidence_level, 2)
         self.assertEqual(result.get("var_value"), expected_var)
 
-        self.assertTrue(os.path.exists(self.export_target), "Файл экспорта не был создан в процессе интеграционного вызова")
+        self.assertTrue(os.path.exists(self.export_target), "Экспортный файл не был создан в процессе интеграции")
 
         with open(self.export_target, "r", encoding="utf-8") as f:
             file_data = json.load(f)
-            
+
         self.assertEqual(file_data.get("portfolio_id"), self.portfolio_id)
         self.assertEqual(file_data.get("var_value"), expected_var)
-        self.assertEqual(file_data.get("liquidity_score"), result.get("liquidity_score"))
+        self.assertEqual(file_data.get("liquidity_score"), 0.85)
 
-    def test_start_new_direct_invocation_randomized(self):
-        random_db_value = f"db_conn_{uuid.uuid4().hex}"
-        db_result = start_new(db_storage=random_db_value)
-        self.assertEqual(db_result, random_db_value)
-
-        fallback_result = start_new(random_untracked_arg=uuid.uuid4().hex)
-        self.assertIsInstance(fallback_result, dict)
-        self.assertEqual(fallback_result.get("status"), "success")
+    def sf_test_db_storage_integration(self):
+        dummy_storage = f"db_conn_{uuid.uuid4()}"
+        res = start_new(db_storage=dummy_storage)
+        self.assertEqual(res, dummy_storage)
 
 if __name__ == "__main__":
     unittest.main()

@@ -3,7 +3,14 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ress_reporter (refactor) — раундов: 1
+
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_scenario_pipeline (refactor) — раундов: 3
+- Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/unittest/mock.py", line 1124, in __call__
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_reporter (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_reporter (refactor) — раундов: 1
@@ -285,8 +292,3 @@ ress_reporter (refactor) — раундов: 1
 
 ## market_report_generator (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_stress_matrix_builder (start_new) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
-- Последняя ошибка перед фиксом: FAILED (failures=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

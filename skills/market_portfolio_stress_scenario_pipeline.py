@@ -5,8 +5,14 @@ from skills.market_portfolio_stress_reporter import StressReporter, PortfolioStr
 class PortfolioStressScenarioPipeline:
     def __init__(self, storage_file):
         self.storage_file = storage_file
-        self.simulator = PortfolioScenarioSimulator(storage_file)
-        self.reporter = PortfolioStressReporter(storage_file)
+
+    @property
+    def simulator(self):
+        return PortfolioScenarioSimulator(self.storage_file)
+
+    @property
+    def reporter(self):
+        return PortfolioStressReporter(self.storage_file)
 
     def execute(self, symbol, percentage, shifts):
         try:
@@ -33,22 +39,16 @@ class PortfolioStressScenarioPipeline:
         try:
             stress_test_result = self.simulator.run_stress_test(symbol, shifts)
             if isinstance(stress_test_result, list):
-                # If all resulting valuations in stress_test_result are 0.0 (e.g. symbol not found or KeyError caught inside run_stress_test),
-                # treat results as empty [] for fallback behavior.
-                if stress_test_result and all(item.get("resulting_valuation") == 0.0 for item in stress_test_result if isinstance(item, dict)):
-                    stress_test_result = {"symbol": symbol, "shifts": shifts, "results": []}
-                else:
-                    stress_test_result = {"symbol": symbol, "shifts": shifts, "results": stress_test_result}
+                stress_test_result = {"symbol": symbol, "shifts": shifts, "results": stress_test_result}
         except Exception:
             stress_test_result = {"symbol": symbol, "shifts": shifts, "results": []}
 
-        if isinstance(stress_test_result, dict):
-            if "symbol" not in stress_test_result:
-                stress_test_result["symbol"] = symbol
+        if isinstance(stress_test_result, dict) and "symbol" not in stress_test_result:
+            stress_test_result["symbol"] = symbol
 
         try:
             stress_report_result = self.reporter.run_stress_report(symbol, shifts)
-        except (KeyError, RuntimeError, AttributeError):
+        except Exception:
             stress_report_result = {"symbol": symbol, "status": "default", "impact_score": 0}
 
         if isinstance(stress_report_result, dict) and "symbol" not in stress_report_result:
@@ -87,7 +87,7 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
         stress_test_result = simulator.run_stress_test(symbol, shifts)
         if isinstance(stress_test_result, list):
             stress_test_result = {"symbol": symbol, "shifts": shifts, "results": stress_test_result}
-    except KeyError:
+    except Exception:
         stress_test_result = {"symbol": symbol, "shifts": shifts, "results": []}
     
     if isinstance(stress_test_result, dict) and "symbol" not in stress_test_result:
@@ -96,7 +96,7 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
     reporter = StressReporter(storage_file)
     try:
         stress_report_result = reporter.run_stress_reporting(symbol, shifts)
-    except (KeyError, RuntimeError, AttributeError):
+    except Exception:
         stress_report_result = {"symbol": symbol, "status": "default", "impact_score": 0}
 
     if isinstance(stress_report_result, dict) and "symbol" not in stress_report_result:

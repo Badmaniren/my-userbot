@@ -34,11 +34,12 @@ class PortfolioStressScenarioPipeline:
             stress_test_result = self.simulator.run_stress_test(symbol, shifts)
             if isinstance(stress_test_result, list):
                 stress_test_result = {"symbol": symbol, "shifts": shifts, "results": stress_test_result}
-        except KeyError:
+        except Exception:
             stress_test_result = {"symbol": symbol, "shifts": shifts, "results": []}
 
-        if isinstance(stress_test_result, dict) and "symbol" not in stress_test_result:
-            stress_test_result["symbol"] = symbol
+        if isinstance(stress_test_result, dict):
+            if "symbol" not in stress_test_result:
+                stress_test_result["symbol"] = symbol
 
         try:
             stress_report_result = self.reporter.run_stress_report(symbol, shifts)

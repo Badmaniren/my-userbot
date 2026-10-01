@@ -1,122 +1,125 @@
 import unittest
-from unittest.mock import patch, MagicMock
-import random
-import uuid
-import string
+from unittest.mock import MagicMock, patch
 import io
-import requests
-from bs4 import BeautifulSoup
-
+import uuid
+import random
+import string
 from skills.market_portfolio_stress_dashboard_api import start_new
 
-class TestMarketPortfolioStressDashboardApi(unittest.TestCase):
+class TestMarketPortfolioStressDashboardApiStartNew(unittest.TestCase):
 
-    def setUp(self):
-        self.dependencies = {
-            "db_storage": MagicMock(),
-            "extractor_tool_1790087207": MagicMock(),
-            "extractor_tool_1790102839": MagicMock(),
-            "extractor_tool_1790262909": MagicMock(),
-            "extractor_tool_1790621808": MagicMock(),
-            "market_anomaly_detector": MagicMock(),
-            "market_insider_activity_tracker": MagicMock(),
-            "market_insider_alert_pipeline": MagicMock(),
-            "market_insider_anomaly_analyzer": MagicMock(),
-            "market_insider_anomaly_report_bridge": MagicMock(),
-            "market_news_sentiment_analyzer": MagicMock(),
-            "market_parser": MagicMock(),
-            "market_portfolio_alert_dispatcher": MagicMock(),
-            "market_portfolio_alert_event_sink": MagicMock(),
-            "market_portfolio_alert_filter_router": MagicMock(),
-            "market_portfolio_api_gateway": MagicMock(),
-            "market_portfolio_audit_alert_notifier": MagicMock(),
-            "market_portfolio_audit_compliance_hub": MagicMock(),
-            "market_portfolio_audit_log_exporter": MagicMock(),
-            "market_portfolio_autonomous_sentinel": MagicMock(),
-            "market_portfolio_backtest_evaluator_bridge": MagicMock(),
-            "market_portfolio_backtester": MagicMock(),
-            "market_portfolio_collector_agent": MagicMock(),
-            "market_portfolio_data_exporter": MagicMock(),
-            "market_portfolio_digest": MagicMock(),
-            "market_portfolio_dividend_tracker": MagicMock(),
-            "market_portfolio_event_intelligence_hub": MagicMock(),
-            "market_portfolio_execution_cost_optimizer": MagicMock(),
-            "market_portfolio_execution_pipeline": MagicMock(),
-            "market_portfolio_integration_hub": "...",
-            "market_portfolio_monitor": MagicMock(),
-            "market_portfolio_performance_analytics": MagicMock(),
-            "market_portfolio_predictive_aggregator": MagicMock(),
-            "market_portfolio_scenario_simulator": MagicMock(),
-            "market_portfolio_slippage_model": MagicMock(),
-            "market_portfolio_strategy_optimizer": MagicMock(),
-            "market_portfolio_stress_monte_carlo_engine": MagicMock(),
-            "market_portfolio_stress_recovery_coordinator_bridge": MagicMock(),
-            "market_portfolio_stress_reporter": MagicMock(),
-            "market_portfolio_stress_scenario_pipeline": MagicMock(),
-            "market_portfolio_tax_calculator": MagicMock(),
-            "market_portfolio_telegram_command_center": MagicMock(),
-            "market_portfolio_telegram_notifier": MagicMock(),
-            "market_portfolio_valuation": MagicMock(),
-            "market_portfolio_var_liquidity_core": MagicMock(),
-            "market_portfolio_visualizer_v2": MagicMock(),
-            "market_portfolio_webhook_event_logger": MagicMock(),
-            "market_portfolio_webhook_sync": MagicMock(),
-            "market_report_generator": MagicMock(),
-            "market_sentiment_digest": MagicMock(),
-            "market_sentiment_risk_alert_bridge": MagicMock(),
-            "market_sentiment_risk_hub": MagicMock(),
-            "market_sentiment_telegram_publisher": MagicMock(),
-            "market_telegram_pipeline": MagicMock()
+    def test_start_new_success_execution_path(self):
+        rand_sim_name = uuid.uuid4().hex
+        rand_url = f"http://{uuid.uuid4().hex}.local"
+        rand_stream_data = "".join(random.choices(string.ascii_letters + string.digits, k=32)).encode('utf-8')
+        
+        sim_mock = MagicMock()
+        sim_mock.simulate = MagicMock(return_value=rand_sim_name)
+
+        rg_mock = MagicMock()
+        rg_mock.get = MagicMock(return_value=True)
+
+        stream_mock = MagicMock()
+        stream_mock.read = MagicMock(return_value=rand_stream_data)
+
+        db_mock = MagicMock()
+        db_mock.fetch_stream = MagicMock(return_value=stream_mock)
+
+        det_mock = MagicMock()
+        det_mock.detect = MagicMock(return_value=True)
+
+        dependencies = {
+            "market_portfolio_scenario_simulator": sim_mock,
+            "market_portfolio_api_gateway": rg_mock,
+            "db_storage": db_mock,
+            "market_anomaly_detector": det_mock
         }
 
-    def test_start_new_initialization_and_flow(self):
-        random_prefix = ''.join(random.choices(string.ascii_lowercase, k=8))
-        expected_scenario_id = uuid.uuid4().hex
-        random_metric_value = random.uniform(10.0, 1000.0)
+        result = start_new(dependencies)
 
-        self.dependencies["market_portfolio_scenario_simulator"].simulate.return_value = {
-            "scenario_id": expected_scenario_id,
-            "impact_metric": random_metric_value
+        sim_mock.simulate.assert_called_once()
+        rg_mock.get.assert_called_once_with("http://localhost")
+        db_mock.fetch_stream.assert_called_once()
+        stream_mock.read.assert_called_once()
+        det_mock.detect.assert_called_once()
+        self.assertEqual(result, {"status": "success"})
+
+    def test_start_new_missing_optional_dependencies(self):
+        rand_url = f"http://{uuid.uuid4().hex}.test"
+        rg_mock = MagicMock()
+        
+        dependencies = {
+            "market_portfolio_api_gateway": rg_mock
         }
 
-        with patch('requests.get') as mock_requests_get:
-            mock_resp = MagicMock()
-            mock_resp.status_code = 200
-            mock_resp.content = f"<html><body><div id='{random_prefix}'>StressData</div></body></html>".encode('utf-8')
-            mock_requests_get.return_value = mock_resp
+        result = start_new(dependencies)
 
-            result = start_new(self.dependencies)
+        rg_mock.get.assert_called_once_with("http://localhost")
+        self.assertEqual(result, {"status": "success"})
 
-            self.assertIsNotNone(result)
-            self.dependencies["market_portfolio_scenario_simulator"].simulate.assert_called()
-            
-    def test_start_new_handles_streaming_data(self):
-        random_stream_data = uuid.uuid4().bytes
-        stream_mock = io.BytesIO(random_stream_data)
+    def test_start_new_db_stream_none(self):
+        sim_mock = MagicMock()
+        rg_mock = MagicMock()
+        
+        db_mock = MagicMock()
+        db_mock.fetch_stream = MagicMock(return_value=None)
 
-        self.dependencies["db_storage"].fetch_stream.return_value = stream_mock
+        det_mock = MagicMock()
 
-        with patch('bs4.BeautifulSoup') as mock_bs:
-            mock_soup_instance = MagicMock()
-            mock_bs.return_value = mock_soup_instance
-            
-            try:
-                start_new(self.dependencies)
-            except Exception as e:
-                self.fail(f"start_new crashed on stream processing: {e}")
-
-            self.dependencies["db_storage"].fetch_stream.assert_called()
-
-    def test_start_new_with_randomized_anomaly_trigger(self):
-        random_anomaly_score = random.randint(1, 100)
-        self.dependencies["market_anomaly_detector"].detect.return_value = {
-            "anomaly_score": random_anomaly_score,
-            "status": "TRIGGERED"
+        dependencies = {
+            "market_portfolio_scenario_simulator": sim_mock,
+            "market_portfolio_api_gateway": rg_mock,
+            "db_storage": db_mock,
+            "market_anomaly_detector": det_mock
         }
 
-        res = start_new(self.dependencies)
-        self.assertTrue(res is not None or res is None)
-        self.dependencies["market_anomaly_detector"].detect.assert_called()
+        result = start_new(dependencies)
 
-if __name__ == '__main__':
+        sim_mock.simulate.assert_called_once()
+        rg_mock.get.assert_called_once_with("http://localhost")
+        db_mock.fetch_stream.assert_called_once()
+        det_mock.detect.assert_called_once()
+        self.assertEqual(result, {"status": "success"})
+
+    def test_start_new_requests_fallback(self):
+        rand_stream_data = io.BytesIO(b"<html><body><h1>" + uuid.uuid4().hex.encode() + b"</h1></body></html>")
+        db_mock = MagicMock()
+        db_mock.fetch_stream = MagicMock(return_value=rand_stream_data)
+
+        dependencies = {
+            "db_storage": db_mock
+        }
+
+        with patch("requests.get") as mock_requests_get:
+            result = start_new(dependencies)
+            mock_requests_get.assert_called_once_with("http://localhost")
+            self.assertEqual(result, {"status": "success"})
+
+    def test_start_new_sim_without_simulate_attr(self):
+        sim_mock = object()
+        rg_mock = MagicMock()
+
+        dependencies = {
+            "market_portfolio_scenario_simulator": sim_mock,
+            "market_portfolio_api_gateway": rg_mock
+        }
+
+        result = start_new(dependencies)
+        rg_mock.get.assert_called_once_with("http://localhost")
+        self.assertEqual(result, {"status": "success"})
+
+    def test_start_new_det_without_detect_attr(self):
+        det_mock = object()
+        rg_mock = MagicMock()
+
+        dependencies = {
+            "market_anomaly_detector": det_mock,
+            "market_portfolio_api_gateway": rg_mock
+        }
+
+        result = start_new(dependencies)
+        rg_mock.get.assert_called_once_with("http://localhost")
+        self.assertEqual(result, {"status": "success"})
+
+if __name__ == "__main__":
     unittest.main()

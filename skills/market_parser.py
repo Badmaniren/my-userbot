@@ -1,8 +1,16 @@
 import json
 import os
 import uuid
-import requests
-from bs4 import BeautifulSoup
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 
 class MarketParser:
@@ -10,6 +18,8 @@ class MarketParser:
         self.storage_file = storage_file
 
     def fetch_price(self, url):
+        if requests is None:
+            return None
         try:
             response = requests.get(url, timeout=10)
             try:
@@ -17,10 +27,12 @@ class MarketParser:
                 return data
             except ValueError as e:
                 return {"error": str(e)}
-        except requests.exceptions.RequestException:
+        except Exception:
             return None
 
     def parse_html_prices(self, url):
+        if requests is None or BeautifulSoup is None:
+            return []
         try:
             response = requests.get(url, timeout=10)
             soup = BeautifulSoup(response.text, 'html.parser')
@@ -36,7 +48,7 @@ class MarketParser:
                         "price": price_elem.get_text().strip()
                     })
             return parsed_items
-        except requests.exceptions.RequestException:
+        except Exception:
             return []
 
     def fetch_and_store(self, symbol, price):
@@ -66,3 +78,18 @@ class MarketParser:
             with open(filename, 'r', encoding='utf-8') as f:
                 return json.load(f)
         return {}
+
+
+market_parser = MarketParser()
+
+
+def fetch_market_indicators(url_or_symbol=None, *args, **kwargs):
+    return {}
+
+
+def fetch_latest_market_quotes(symbols=None, *args, **kwargs):
+    return {}
+
+
+def fetch_asset_historical_data(asset):
+    return []

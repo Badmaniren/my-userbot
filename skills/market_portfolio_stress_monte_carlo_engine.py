@@ -56,7 +56,8 @@ class MonteCarloStressEngine:
             "portfolio_id": portfolio_id,
             "simulation_results": simulation_results,
             "var_95": var_95,
-            "cvar_95": cvar_95
+            "cvar_95": cvar_95,
+            "expected_shortfall": cvar_95
         }
 
     def _get_anomaly_adjustment(self) -> float:
@@ -94,6 +95,11 @@ if not hasattr(market_portfolio_data_exporter, "export"):
 
 if not hasattr(market_portfolio_api_gateway, "stream_payload"):
     setattr(market_portfolio_api_gateway, "stream_payload", lambda: None)
+
+
+def run_monte_carlo_simulation(portfolio_id: str = "default", runs: int = 1000, horizon_days: int = 30, **kwargs) -> dict:
+    engine = MonteCarloStressEngine()
+    return engine.run_simulation(portfolio_id=portfolio_id, simulations=runs, horizon_days=horizon_days)
 
 
 def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scenario_params: dict, iterations: int) -> dict:

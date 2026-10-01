@@ -55,8 +55,8 @@ class MonteCarloStressEngine:
         return {
             "portfolio_id": portfolio_id,
             "simulation_results": simulation_results,
-            "var_95": var_95,
-            "cvar_95": cvar_95
+            "var_95": float(var_95),
+            "cvar_95": float(cvar_95)
         }
 
     def _get_anomaly_adjustment(self) -> float:

@@ -3,7 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-_scenario_simulator'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.market_portfolio_scenario_simulator import ...'
+_simulator import ...'
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -286,3 +286,6 @@ _scenario_simulator'! Запрещено создавать заглушки. И
 ## market_portfolio_stress_tail_risk_mitigator (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_monte_carlo_engine (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

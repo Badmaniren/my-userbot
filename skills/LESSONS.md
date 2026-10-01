@@ -3,12 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-portfolio_liquidity_liquidation_engine (create) — раундов: 4
-- Последняя ошибка перед фиксом: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_transaction_cost_analyzer (start_new) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
+errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_stress_monte_carlo_engine (start_new) — раундов: 4
@@ -282,4 +277,8 @@ portfolio_liquidity_liquidation_engine (create) — раундов: 4
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_monte_carlo_engine (start_new) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_scenario_pipeline (create) — раундов: 2
+- Последняя ошибка перед фиксом: FAIL: test_pipeline_functional_execution (tests.test_market_portfolio_stress_scenario_pipeline_integration.TestPortfolioStressScenarioPipelineIntegration.test_pipeline_functional_execution)
 - Статус: успешно прошёл тесты и влит в main

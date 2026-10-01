@@ -130,3 +130,34 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
         "expected_shortfall": float(expected_shortfall),
         "iterations": iterations
     }
+
+
+def run_monte_carlo_stress(portfolio_data=None, portfolio_id=None, simulation_seed=None, shock_factor=None, iterations=1000, **kwargs) -> dict:
+    if simulation_seed is not None:
+        random.seed(simulation_seed)
+
+    pid = portfolio_id or "default_portfolio"
+    if isinstance(portfolio_data, dict):
+        initial_val = portfolio_data.get("initial_value", portfolio_data.get("portfolio_value", 100000.0))
+    elif isinstance(portfolio_data, (int, float)):
+        initial_val = float(portfolio_data)
+    else:
+        initial_val = kwargs.get("portfolio_value", 100000.0)
+
+    sf = float(shock_factor) if shock_factor is not None else -0.05
+    volatility = abs(sf) if sf != 0 else 0.2
+
+    scenario_params = {
+        "volatility": volatility,
+        "drift": sf,
+        "horizon_days": kwargs.get("horizon_days", 1)
+    }
+
+    res = run_monte_carlo_stress_test(
+        portfolio_id=pid,
+        portfolio_value=initial_val,
+        scenario_params=scenario_params,
+        iterations=iterations
+    )
+    res["stress_var"] = res.get("var_95", 0.0)
+    return res

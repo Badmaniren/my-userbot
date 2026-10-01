@@ -1,6 +1,31 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+import json
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
+
+_TREND_ANALYSIS_STORAGE = {}
+
+
+def save_trend_analysis_result(data: dict) -> bool:
+    if not isinstance(data, dict):
+        return False
+    run_id = data.get("run_id")
+    if not run_id:
+        return False
+    _TREND_ANALYSIS_STORAGE[run_id] = data
+    return True
+
+
+def get_trend_analysis_result(run_id: str) -> dict:
+    return _TREND_ANALYSIS_STORAGE.get(run_id)
 
 
 class MarketParser:

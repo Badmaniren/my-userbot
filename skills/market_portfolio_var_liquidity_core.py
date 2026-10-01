@@ -41,7 +41,7 @@ def start_new(*args, **kwargs):
     return {"status": "success"}
 
 
-class market_portfolio_var_liquidity_core:
+class MarketPortfolioVarLiquidityCore:
     """Класс для интеграционных и юнит-тестов, реализующий расчет VaR и ликвидности."""
     
     def calculate_var_and_liquidity(self, portfolio_id: str, confidence_level: float, export_target: str = None):
@@ -50,3 +50,28 @@ class market_portfolio_var_liquidity_core:
             confidence_level=confidence_level,
             export_target=export_target
         )
+
+    def evaluate_batch(self, raw_data: list) -> list:
+        """
+        Обрабатывает пакет данных оперативного контроля ликвидного VaR.
+        """
+        processed = []
+        if not isinstance(raw_data, list):
+            return processed
+
+        for record in raw_data:
+            if not isinstance(record, dict):
+                continue
+            item = dict(record)
+            var_95 = item.get("var_95", 0.0)
+            depth_score = item.get("market_depth_score", 1.0)
+
+            if "liquidity_adjusted_var" not in item:
+                item["liquidity_adjusted_var"] = round(var_95 * (1 + (1 - depth_score)), 2)
+
+            processed.append(item)
+        return processed
+
+
+# Алиас для сохранения обратной совместимости с существующими тестами
+market_portfolio_var_liquidity_core = MarketPortfolioVarLiquidityCore

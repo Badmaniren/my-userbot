@@ -43,6 +43,42 @@ def start_ened(symbol, url, telegram_token, chat_id, storage_file):
     )
 
 
+class MarketPortfolioMonitor:
+    """Система оперативного мониторинга портфеля и проверки лимитов рисков."""
+
+    def __init__(self, var_limit=215000.0, depth_limit=0.8):
+        self.var_limit = var_limit
+        self.depth_limit = depth_limit
+
+    def check_operational_limits(self, metrics: list) -> list:
+        """
+        Проверяет оперативные лимиты ликвидного VaR и глубины рынка.
+        Возвращает список выявленных алертов.
+        """
+        alerts = []
+        if not isinstance(metrics, list):
+            return alerts
+
+        for idx, record in enumerate(metrics):
+            if not isinstance(record, dict):
+                continue
+
+            portfolio_id = record.get("portfolio_id", "UNKNOWN")
+            status = record.get("operational_status", "NORMAL")
+            depth = record.get("market_depth_score", 1.0)
+            lvar = record.get("liquidity_adjusted_var", 0.0)
+            ts = record.get("timestamp", f"item_{idx}")
+
+            if status == "ELEVATED_RISK" or depth < self.depth_limit or lvar > self.var_limit:
+                alert_msg = (
+                    f"Alert [{ts}] Portfolio {portfolio_id}: Status={status}, "
+                    f"MarketDepth={depth:.4f}, LiquidVaR={lvar:.2f}"
+                )
+                alerts.append(alert_msg)
+
+        return alerts
+
+
 class MarketParser:
     def __init__(self, storage_file):
         self.storage_file = storage_file

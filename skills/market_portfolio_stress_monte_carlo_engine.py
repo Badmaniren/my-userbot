@@ -78,8 +78,6 @@ class MonteCarloStressEngine:
             return None
 
 
-# Динамически гарантируем наличие атрибутов, ожидаемых моками в unit-тестах,
-# если таковые отсутствуют в импортированных модулях.
 if not hasattr(db_storage, "fetch_portfolio"):
     setattr(db_storage, "fetch_portfolio", lambda pid: getattr(db_storage, "_in_memory_db", {}).get(pid, {"portfolio_id": pid}))
 

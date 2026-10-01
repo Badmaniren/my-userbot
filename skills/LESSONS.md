@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_strategy_optimizer (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
+шно прошёл тесты и влит в main
 
 ## market_portfolio_tail_risk_analyzer (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
@@ -289,4 +285,8 @@
 
 ## market_portfolio_var_metric_exporter (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_var_risk_summary (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

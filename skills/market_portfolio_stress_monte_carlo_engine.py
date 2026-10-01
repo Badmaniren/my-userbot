@@ -17,10 +17,7 @@ class MonteCarloStressEngine:
 
     def run_simulation(self, portfolio_id: str, simulations: int, horizon_days: int) -> dict:
         try:
-            if not hasattr(db_storage, "fetch_portfolio"):
-                portfolio_data = getattr(db_storage, "_in_memory_db", {}).get(portfolio_id, {"portfolio_id": portfolio_id})
-            else:
-                portfolio_data = db_storage.fetch_portfolio(portfolio_id)
+            portfolio_data = db_storage.fetch_portfolio(portfolio_id)
         except AttributeError:
             portfolio_data = getattr(db_storage, "_in_memory_db", {}).get(portfolio_id, {"portfolio_id": portfolio_id})
             
@@ -64,27 +61,21 @@ class MonteCarloStressEngine:
 
     def _get_anomaly_adjustment(self) -> float:
         try:
-            if hasattr(market_anomaly_detector, "get_current_anomaly_multiplier"):
-                return market_anomaly_detector.get_current_anomaly_multiplier()
+            return market_anomaly_detector.get_current_anomaly_multiplier()
         except AttributeError:
-            pass
-        return 1.0
+            return 1.0
 
     def export_report(self, report_id: str, loss_limit: float) -> dict:
         try:
-            if hasattr(market_portfolio_data_exporter, "export"):
-                return market_portfolio_data_exporter.export(report_id, loss_limit)
+            return market_portfolio_data_exporter.export(report_id, loss_limit)
         except AttributeError:
-            pass
-        return {"report_id": report_id, "loss_limit": loss_limit}
+            return {"report_id": report_id, "loss_limit": loss_limit}
 
     def consume_stream(self):
         try:
-            if hasattr(market_portfolio_api_gateway, "stream_payload"):
-                return market_portfolio_api_gateway.stream_payload()
+            return market_portfolio_api_gateway.stream_payload()
         except AttributeError:
-            pass
-        return None
+            return None
 
 
 # Динамически гарантируем наличие атрибутов, ожидаемых моками в unit-тестах,

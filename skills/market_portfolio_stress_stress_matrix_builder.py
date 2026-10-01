@@ -43,14 +43,16 @@ def market_portfolio_stress_stress_matrix_builder(builder_input: dict) -> dict:
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(f'{{"matrix_id": "{matrix_id}", "portfolio_id": "{portfolio_id}"}}')
 
-    # Сохранение в базу данных (через реальный или импортированный db_storage)
-    from skills.db_storage import db_storage
-    db_storage({
-        "action": "save",
-        "table": "stress_matrices",
-        "matrix_id": matrix_id,
-        "portfolio_id": portfolio_id
-    })
+    # Сохранение в базу данных (поддержка функции или объекта с методом save/вызовом)
+    from skills import db_storage as db_mod
+    storage_func = getattr(db_mod, "db_storage", None)
+    if storage_func is not None:
+        storage_func({
+            "action": "save",
+            "table": "stress_matrices",
+            "matrix_id": matrix_id,
+            "portfolio_id": portfolio_id
+        })
 
     return {
         "matrix_id": matrix_id,

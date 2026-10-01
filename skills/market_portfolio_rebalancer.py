@@ -1,8 +1,23 @@
 import os
 import requests
-import skills.db_storage as db_storage
-from skills.market_portfolio_valuation import market_portfolio_valuation
-from skills.market_portfolio_execution_pipeline import market_portfolio_execution_pipeline
+
+try:
+    from skills.db_storage import DbStorage as db_storage
+except ImportError:
+    import skills.db_storage as db_storage
+
+try:
+    from skills.market_portfolio_valuation import market_portfolio_valuation
+except ImportError:
+    try:
+        from skills.market_portfolio_valuation import PortfolioValuation as market_portfolio_valuation
+    except ImportError:
+        market_portfolio_valuation = None
+
+try:
+    from skills.market_portfolio_execution_pipeline import market_portfolio_execution_pipeline
+except ImportError:
+    market_portfolio_execution_pipeline = None
 
 class MarketPortfolioRebalancer:
     def __init__(self, **kwargs):

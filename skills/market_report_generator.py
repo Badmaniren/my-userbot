@@ -13,8 +13,13 @@ class MarketReportGenerator:
         filtered_data = []
         if isinstance(data, list):
             filtered_data = [item for item in data if isinstance(item, dict) and item.get("symbol") == symbol]
-        elif isinstance(data, dict) and symbol in data:
-            filtered_data = [{"symbol": symbol, "price": data[symbol]}]
+        elif isinstance(data, dict):
+            if symbol in data:
+                filtered_data = [{"symbol": symbol, "price": data[symbol]}]
+            else:
+                for k, v in data.items():
+                    if isinstance(v, dict) and v.get("symbol") == symbol:
+                        filtered_data.append(v)
             
         if not filtered_data:
             return {"count": 0, "error": "No data found"}
@@ -53,22 +58,18 @@ class MarketReportGenerator:
 def generate_market_report(storage_file, symbol):
     data = {}
     load_func = getattr(db_storage, "load_data", None)
-    if load_func is None and hasattr(db_storage, "load_db"):
-        load_func = db_storage.load_db
+    if load_func is None:
+        load_func = getattr(db_storage, "load_db", None)
     
     if load_func is not None:
         try:
             data = load_func(storage_file)
         except AttributeError:
-            load_db_func = getattr(db_storage, "load_db", None)
-            if load_db_func is not None and load_db_func != load_func:
-                data = load_db_func(storage_file)
-            else:
-                raise
+            parser = MarketParser(storage_file)
+            data = parser.load_data(storage_file)
     else:
-        load_db_func = getattr(db_storage, "load_db", None)
-        if load_db_func is not None:
-            data = load_db_func(storage_file)
+        parser = MarketParser(storage_file)
+        data = parser.load_data(storage_file)
             
     if not data and storage_file:
         parser = MarketParser(storage_file)
@@ -82,6 +83,11 @@ def generate_market_report(storage_file, symbol):
                 price = val.get("price")
             else:
                 price = val
+        else:
+            for k, v in data.items():
+                if isinstance(v, dict) and v.get("symbol") == symbol:
+                    price = v.get("price")
+                    break
     elif isinstance(data, list):
         for item in data:
             if isinstance(item, dict) and item.get("symbol") == symbol:

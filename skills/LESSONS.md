@@ -3,8 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-art_new) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
+аботай ошибку предсказуемо или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -273,4 +272,7 @@ art_new) — раундов: 4
 
 ## market_portfolio_var_liquidity_core (start_new) — раундов: 3
 - Последняя ошибка перед фиксом: ImportError: cannot import name 'market_portfolio_var_liquidity_core' from 'skills.market_portfolio_var_liquidity_core' (unknown location)
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_var_liquidity_core (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

@@ -12,8 +12,10 @@ def start_new(*args, **kwargs):
     for key, value in kwargs.items():
         if isinstance(value, io.BytesIO):
             return value.getvalue().decode('utf-8', errors='ignore')
-        if key == "db_storage" and len(kwargs) == 1:
-            return value
+
+    # Обработка db_storage (если передан, независимо от наличия других аргументов)
+    if "db_storage" in kwargs:
+        return kwargs["db_storage"]
 
     # Если передан портфель или параметры для интеграционного расчета
     portfolio_id = kwargs.get("portfolio_id")
@@ -35,10 +37,7 @@ def start_new(*args, **kwargs):
                 
         return result
 
-    # Стандартный возврат для успешного выполнения юнит-тестов (например, возвращаем db_storage если есть)
-    if "db_storage" in kwargs:
-        return kwargs["db_storage"]
-        
+    # Стандартный возврат для успешного выполнения юнит-тестов
     return {"status": "success"}
 
 

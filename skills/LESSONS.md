@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ator_bridge (refactor) — раундов: 2
-- Последняя ошибка перед фиксом: FAILED (failures=1)
-- Статус: успешно прошёл тесты и влит в main
+ошёл тесты и влит в main
 
 ## market_portfolio_stress_recovery_coordinator_bridge (refactor) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (failures=1)
@@ -265,6 +263,9 @@ ator_bridge (refactor) — раундов: 2
 
 ## market_portfolio_var_liquidity_core (start_new) — раундов: 3
 - Последняя ошибка перед фиксом: ImportError: cannot import name 'market_portfolio_var_liquidity_core' from 'skills.market_portfolio_var_liquidity_core' (unknown location)
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_var_liquidity_core (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_var_liquidity_core (refactor) — раундов: 1

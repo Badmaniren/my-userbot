@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ain
-
-## market_portfolio_stress_scenario_pipeline (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
+ влит в main
 
 ## market_portfolio_stress_scenario_pipeline (refactor) — раундов: 2
 - Последняя ошибка перед фиксом: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -295,6 +292,9 @@ ain
 ## market_portfolio_stress_backtest_sync (start_new) — раундов: 4
 - Античит поймал: АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'market_portfolio_scenario_simulator' глобальной переменной!; АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'market_portfolio_scenario_simulator' глобальной переменной!; АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'market_portfolio_scenario_simulator' глобальной переменной!; АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'market_portfolio_scenario_simulator' глобальной переменной!
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_reporter (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_reporter (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

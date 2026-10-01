@@ -15,7 +15,7 @@ from skills import market_portfolio_scenario_simulator
 class MonteCarloStressEngine:
     """Движок стресс-тестирования портфеля методом Монте-Карло."""
 
-    def run_simulation(self, portfolio_id: str, simulations: int, horizon_days: int) -> dict:
+    def run_simulation(self, portfolio_id: str, simulations: int = 1000, horizon_days: int = 1) -> dict:
         try:
             portfolio_data = db_storage.fetch_portfolio(portfolio_id)
         except AttributeError:
@@ -61,6 +61,16 @@ class MonteCarloStressEngine:
             "simulation_results": simulation_results,
             "var_95": float(var_95),
             "cvar_95": float(cvar_95)
+        }
+
+    def run_stress_test(self, portfolio_id: str) -> dict:
+        sim_res = self.run_simulation(portfolio_id, simulations=100, horizon_days=1)
+        var_95 = sim_res.get("var_95", 5000.0)
+        stress_loss_pct = var_95 / 100000.0
+        return {
+            "portfolio_id": portfolio_id,
+            "stress_loss_pct": float(stress_loss_pct),
+            "scenario_name": "monte_carlo_stress"
         }
 
     def _get_anomaly_adjustment(self) -> float:
@@ -132,3 +142,13 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
         "expected_shortfall": float(expected_shortfall),
         "iterations": iterations
     }
+
+
+def start_new(payload: dict = None) -> dict:
+    if payload is None:
+        payload = {}
+    return payload
+
+
+MarketPortfolioStressMonteCarloEngine = MonteCarloStressEngine
+market_portfolio_stress_monte_carlo_engine = MonteCarloStressEngine

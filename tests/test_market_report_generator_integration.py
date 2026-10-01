@@ -3,42 +3,51 @@ import os
 import uuid
 import random
 from skills.market_report_generator import MarketReportGenerator, generate_market_report
+from skills.market_parser import MarketParser
+from skills import db_storage
 
 class TestMarketReportGeneratorIntegration(unittest.TestCase):
     def setUp(self):
-        self.test_dir = "test_data_integration"
-        os.makedirs(self.test_dir, exist_ok=True)
-        self.unique_id = str(uuid.uuid4())[:8]
-        self.storage_file = os.path.join(self.test_dir, f"market_data_{self.unique_id}.json")
-        self.symbol = f"BTC_{self.unique_id}"
-        self.random_price = round(random.uniform(10000.0, 60000.0), 2)
+        self.test_id = str(uuid.uuid4())[:8]
+        self.storage_file = f"test_market_storage_{self.test_id}.json"
+        self.symbol = f"TICK_{random.randint(1000, 9999)}"
+        self.test_price = round(random.uniform(10.0, 1000.0), 2)
+        
+        if hasattr(db_storage, "init_db"):
+            try:
+                db_storage.init_db(self.storage_file)
+            except Exception:
+                pass
 
     def tearDown(self):
         if os.path.exists(self.storage_file):
-            os.remove(self.storage_file)
-        if os.path.exists(self.test_dir):
             try:
-                os.rmdir(self.test_dir)
-            except OSError:
+                os.remove(self.storage_file)
+            except Exception:
                 pass
 
-    def test_pipeline_integration_flow(self):
-        generator = MarketReportGenerator(storage_file=self.storage_file)
+    def test_integration_market_report_pipeline(self):
+        parser = MarketParser(self.storage_file)
+        parser.fetch_and_store(self.symbol, self.test_price)
         
-        test_url = f"https://api.example.com/crypto/{self.symbol}"
-        fetched_price = generator.update_and_fetch_report(test_url, self.symbol)
-        
-        self.assertIsNotNone(fetched_price)
-        
-        raw_data = generator.get_raw_stream_dump()
-        self.assertIsNotNone(raw_data)
+        self.assertTrue(os.path.exists(self.storage_file), "Storage file must be created by the integration pipeline")
 
-        report = generator.generate_symbol_report(self.symbol)
-        self.assertIsInstance(report, dict)
+        generator = MarketReportGenerator(self.storage_file)
+        symbol_report = generator.generate_symbol_report(self.symbol)
         
-        functional_report = generate_market_report(self.storage_file, self.symbol)
-        self.assertIsInstance(functional_report, str)
-        self.assertIn(self.symbol, functional_report)
+        self.assertIn('count', symbol_report)
+        self.assertGreater(symbol_report['count'], 0)
+        self.assertEqual(symbol_report.get('min_price'), self.test_price)
+        self.assertEqual(symbol_report.get('max_price'), self.test_price)
+        self.assertTrue(symbol_report.get(self.symbol))
 
-if __name__ == "__main__":
+        raw_dump = generator.get_raw_stream_dump()
+        self.assertIsNotNone(raw_dump)
+
+        global_report_str = generate_market_report(self.storage_file, self.symbol)
+        self.assertIsInstance(global_report_str, str)
+        self.assertIn(self.symbol, global_report_str)
+        self.assertIn(str(self.test_price), global_report_str)
+
+if __name__ == '__main__':
     unittest.main()

@@ -105,14 +105,39 @@ if not hasattr(market_portfolio_api_gateway, "stream_payload"):
     setattr(market_portfolio_api_gateway, "stream_payload", lambda: None)
 
 
-def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scenario_params: dict, iterations: int) -> dict:
+def run_monte_carlo_stress_test(
+    portfolio_id: str = None,
+    portfolio_value: float = 100000.0,
+    scenario_params: dict = None,
+    iterations: int = 100,
+    simulations: int = None,
+    **kwargs
+) -> dict:
+    if scenario_params is None:
+        scenario_params = {}
+
+    if simulations is not None:
+        iterations = simulations
+
+    if portfolio_value is None or portfolio_value == 100000.0:
+        if portfolio_id and hasattr(db_storage, "fetch_portfolio"):
+            try:
+                pdata = db_storage.fetch_portfolio(portfolio_id)
+                if isinstance(pdata, dict) and "initial_value" in pdata:
+                    portfolio_value = pdata["initial_value"]
+            except Exception:
+                pass
+
+    if portfolio_value is None:
+        portfolio_value = 100000.0
+
     volatility = scenario_params.get("volatility", 0.2)
     drift = scenario_params.get("drift", 0.0)
     horizon_days = scenario_params.get("horizon_days", 1)
 
     dt = 1.0 / 365.0
     final_values = []
-    
+
     for _ in range(iterations):
         val = portfolio_value
         for _ in range(horizon_days):
@@ -139,3 +164,32 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
         "expected_shortfall": float(expected_shortfall),
         "iterations": iterations
     }
+
+
+MarketPortfolioStressMonteCarloEngine = MonteCarloStressEngine
+market_portfolio_stress_monte_carlo_engine_run = run_monte_carlo_stress_test
+run_monte_carlo_stress = run_monte_carlo_stress_test
+run_stress_monte_carlo_simulation = run_monte_carlo_stress_test
+run_monte_carlo_stress_simulation = run_monte_carlo_stress_test
+
+
+def run_simulation(portfolio_id: str, simulations: int = 100, horizon_days: int = 1) -> dict:
+    return MonteCarloStressEngine().run_simulation(portfolio_id, simulations, horizon_days)
+
+
+def start_new(payload: dict = None) -> dict:
+    if payload is None:
+        payload = {}
+    portfolio_id = payload.get("portfolio_id", "default_portfolio")
+    simulations = payload.get("simulations", payload.get("iterations", 100))
+    return run_monte_carlo_stress_test(portfolio_id=portfolio_id, simulations=simulations, scenario_params=payload)
+
+
+def market_portfolio_stress_monte_carlo_engine(payload: dict = None) -> dict:
+    return start_new(payload)
+
+
+def fetch_simulation_results(portfolio_id: str):
+    if hasattr(db_storage, "get_simulation_results"):
+        return db_storage.get_simulation_results(portfolio_id)
+    return {}

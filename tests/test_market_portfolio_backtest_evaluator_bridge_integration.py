@@ -12,9 +12,9 @@ class TestMarketPortfolioBacktestEvaluatorBridgeIntegration(unittest.TestCase):
         self.storage_file = os.path.join(self.test_dir, f"portfolio_{uuid.uuid4().hex}.json")
         self.bridge = MarketPortfolioBacktestEvaluatorBridge(self.storage_file)
         self.symbol = f"SYM_{random.randint(1000, 9999)}"
-        self.initial_capital = float(random.randint(10000, 100000))
+        self.initial_capital = float(random.randint(10000, 1000000))
         self.strategy_params = {
-            "sma_window": random.randint(10, 50),
+            "sma_period": random.randint(10, 50),
             "risk_tolerance": round(random.uniform(0.01, 0.05), 4)
         }
 
@@ -34,34 +34,41 @@ class TestMarketPortfolioBacktestEvaluatorBridgeIntegration(unittest.TestCase):
         )
 
         self.assertTrue(os.path.exists(self.storage_file))
-        self.assertGreater(os.path.getsize(self.storage_file), 0)
+        
+        with open(self.storage_file, "r") as f:
+            data = json.load(f)
+        self.assertIsInstance(data, dict)
 
         self.assertIn("backtest_execution", result)
         self.assertIn("summary", result)
         self.assertIn("metrics", result)
         self.assertIn("evaluation", result)
 
-    def test_evaluate_strategy_backtest_flow(self):
+    def test_evaluate_strategy_backtest(self):
         result = self.bridge.evaluate_strategy_backtest(
-            self.symbol,
-            self.initial_capital,
+            self.symbol, 
+            self.initial_capital, 
             self.strategy_params
         )
 
+        self.assertTrue(os.path.exists(self.storage_file))
         self.assertIn("backtest_summary", result)
         self.assertIn("performance_metrics", result)
         self.assertIn("performance_evaluation", result)
 
-    def test_evaluate_backtest_performance_existing_storage(self):
-        with open(self.storage_file, "w") as f:
-            json.dump({self.symbol: {"initialized": True, "id": uuid.uuid4().str}}, f)
+    def test_evaluate_backtest_performance(self):
+        self.bridge.run_comprehensive_evaluation(
+            self.symbol, 
+            self.initial_capital, 
+            self.strategy_params
+        )
 
-        result = self.bridge.evaluate_backtest_performance(self.symbol)
+        evaluation_result = self.bridge.evaluate_backtest_performance(self.symbol)
 
-        self.assertIsInstance(result, dict)
-        self.assertIn("backtest_summary", result)
-        self.assertIn("performance_metrics", result)
-        self.assertIn("performance_evaluation", result)
+        self.assertIsInstance(evaluation_result, dict)
+        self.assertIn("backtest_summary", evaluation_result)
+        self.assertIn("performance_metrics", evaluation_result)
+        self.assertIn("performance_evaluation", evaluation_result)
 
 if __name__ == "__main__":
     unittest.main()

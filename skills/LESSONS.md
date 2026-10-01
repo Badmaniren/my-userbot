@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-actor) — раундов: 3
-- Последняя ошибка перед фиксом: data = self.parser.load_data(target_storage)
-- Статус: успешно прошёл тесты и влит в main
+: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_scenario_pipeline (refactor) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
@@ -299,6 +297,9 @@ actor) — раундов: 3
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_monte_carlo_engine (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_reporter (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_reporter (refactor) — раундов: 1

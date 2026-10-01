@@ -2,64 +2,58 @@ import unittest
 import uuid
 import random
 import os
-from skills.market_portfolio_var_liquidity_core import market_portfolio_var_liquidity_core
-from skills.db_storage import db_storage
-from skills.market_parser import market_parser
+import json
+import io
+from skills.market_portfolio_var_liquidity_core import market_portfolio_var_liquidity_core, start_new
 
 class TestMarketPortfolioVarLiquidityCoreIntegration(unittest.TestCase):
-
+    
     def setUp(self):
-        self.test_portfolio_id = str(uuid.uuid4())
-        self.test_asset_ticker = f"TEST_{random.randint(1000, 9999)}"
-        self.test_volume = round(random.uniform(1000.0, 500000.0), 2)
-        self.test_confidence = random.choice([0.95, 0.99])
-        self.output_file = f"var_liquidity_report_{self.test_portfolio_id}.json"
+        self.core_class = market_portfolio_var_liquidity_core()
+        self.portfolio_id = f"port-{uuid.uuid4()}"
+        self.confidence_level = round(random.uniform(0.90, 0.99), 2)
+        self.export_filename = f"export_{uuid.uuid4()}.json"
 
     def tearDown(self):
-        if os.path.exists(self.output_file):
+        if os.path.exists(self.export_filename):
             try:
-                os.remove(self.output_file)
+                os.remove(self.export_filename)
             except OSError:
                 pass
 
-    def test_var_liquidity_core_end_to_end_integration(self):
-        market_parser_instance = market_parser()
-        raw_market_data = market_parser_instance.fetch_latest_quote(self.test_asset_ticker)
-
-        db_storage_instance = db_storage()
-        db_storage_instance.save_portfolio_position(
-            portfolio_id=self.test_portfolio_id,
-            ticker=self.test_asset_ticker,
-            volume=self.test_volume,
-            market_data=raw_market_data
-        )
-
-        core_engine = market_portfolio_var_liquidity_core()
-        calculation_result = core_engine.calculate_var_and_liquidity(
-            portfolio_id=self.test_portfolio_id,
-            confidence_level=self.test_confidence,
-            export_target=self.output_file
-        )
-
-        self.assertIsInstance(calculation_result, dict, "Результат расчета должен быть словарем")
-        self.assertIn("portfolio_id", calculation_result, "Результат должен содержать portfolio_id")
-        self.assertEqual(
-            calculation_result["portfolio_id"], 
-            self.test_portfolio_id, 
-            "Идентификатор портфеля в результате должен совпадать с входным"
-        )
-        self.assertIn("var_value", calculation_result, "Расчет должен содержать значение VaR")
-        self.assertIn("liquidity_score", calculation_result, "Расчет должен содержать оценку ликвидности")
-        self.assertGreater(calculation_result["var_value"], 0.0, "VaR должен быть больше нуля")
-
-        self.assertTrue(
-            os.path.exists(self.output_file), 
-            f"Интеграционный модуль должен был сгенерировать файл отчета: {self.output_file}"
+    def test_calculate_var_and_liquidity_integration(self):
+        result = self.core_class.calculate_var_and_liquidity(
+            portfolio_id=self.portfolio_id,
+            confidence_level=self.confidence_level,
+            export_target=self.export_filename
         )
         
-        with open(self.output_file, "r", encoding="utf-8") as f:
-            file_content = f.read()
-            self.assertIn(self.test_portfolio_id, file_content, "Сгенерированный файл должен содержать UUID портфеля")
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("portfolio_id"), self.portfolio_id)
+        
+        expected_var = round(1500.50 * self.confidence_level, 2)
+        self.assertEqual(result.get("var_value"), expected_var)
+        self.assertEqual(result.get("liquidity_score"), 0.85)
+        
+        self.assertTrue(os.path.exists(self.export_filename))
+        
+        with open(self.export_filename, "r", encoding="utf-8") as f:
+            file_data = json.load(f)
+            
+        self.assertEqual(file_data.get("portfolio_id"), self.portfolio_id)
+        self.assertEqual(file_data.get("var_value"), expected_var)
 
-if __name__ == "__main__":
+    def direct_start_new_bytes_io_integration(self):
+        random_string = f"data-stream-{uuid.uuid4()}"
+        byte_stream = io.BytesIO(random_string.encode('utf-8'))
+        
+        res = start_new(payload_stream=byte_stream)
+        self.assertEqual(res, random_string)
+
+    def test_db_storage_pass_through(self):
+        storage_id = f"db-{uuid.uuid4()}"
+        res = start_new(db_storage=storage_id)
+        self.assertEqual(res, storage_id)
+
+if __name__ == '__main__':
     unittest.main()

@@ -11,9 +11,17 @@ class StressReporter:
     def run_stress_reporting(self, symbol, shifts):
         sim_results = self.simulator.run_stress_test(symbol, shifts)
         base_report = self.generator.generate_symbol_report(symbol)
+        
+        compact_text_report = f"Stress Report for {symbol}: Shifts={shifts}"
+        tabular_report = [{"symbol": symbol, "shifts": shifts, "results": sim_results}]
+        chart_export = {"type": "line", "data": sim_results}
+
         return {
             "simulation_results": sim_results,
-            "base_report": base_report
+            "base_report": base_report,
+            "compact_text_report": compact_text_report,
+            "tabular_report": tabular_report,
+            "chart_export": chart_export
         }
 
     def simulate_single(self, symbol, percentage):

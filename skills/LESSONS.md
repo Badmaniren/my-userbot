@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-^^^^^^^^^^^^^^^^^^^^^^^^^
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_monte_carlo_engine (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
+иксом: FAILED (errors=2)
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_tail_risk_analyzer (create) — раундов: 4
@@ -309,3 +305,7 @@
 
 ## market_portfolio_stress_audit_visualizer (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_dashboard_api_v2 (start_new) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

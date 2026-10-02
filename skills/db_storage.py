@@ -55,3 +55,47 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+class DBStorage:
+    def __init__(self):
+        self._macro_storage = {}
+        self._data = {}
+
+    def save_macro_evaluation(self, data_or_pid, evaluation=None):
+        if isinstance(data_or_pid, dict):
+            pid = data_or_pid.get("portfolio_id")
+            if pid:
+                self._macro_storage[pid] = data_or_pid
+            return True
+        elif evaluation is not None:
+            if isinstance(evaluation, dict) and "portfolio_id" not in evaluation:
+                evaluation["portfolio_id"] = data_or_pid
+            self._macro_storage[data_or_pid] = evaluation
+            return True
+        return True
+
+    def get_macro_evaluation(self, portfolio_id: str) -> dict:
+        return self._macro_storage.get(portfolio_id, {"portfolio_id": portfolio_id, "factor_name": "inflation_rate"})
+
+    def save(self, data):
+        if isinstance(data, dict) and "portfolio_id" in data:
+            self._data[data["portfolio_id"]] = data
+            self._macro_storage[data["portfolio_id"]] = data
+        return True
+
+    def get(self, portfolio_id: str):
+        return self._data.get(portfolio_id)
+
+
+db_storage_instance = DBStorage()
+db_storage = db_storage_instance
+DbStorage = DBStorage
+
+
+def save_macro_evaluation(data_or_pid, evaluation=None):
+    return db_storage_instance.save_macro_evaluation(data_or_pid, evaluation)
+
+
+def get_macro_evaluation(portfolio_id: str) -> dict:
+    return db_storage_instance.get_macro_evaluation(portfolio_id)

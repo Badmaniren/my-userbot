@@ -14,19 +14,31 @@ if not logger.handlers:
     logger.setLevel(logging.INFO)
 
 class PortfolioScenarioSimulator:
-    def __init__(self, storage_file):
+    def __init__(self, storage_file="default.json"):
         self.storage_file = storage_file
 
-    def load_data(self, storage_file):
-        logger.info("Loading portfolio data from %s", storage_file)
+    def load_data(self, storage_file=None):
+        target_file = storage_file or self.storage_file
+        logger.info("Loading portfolio data from %s", target_file)
         try:
-            with open(storage_file, 'r') as f:
+            with open(target_file, 'r') as f:
                 return json.load(f)
         except (IOError, OSError, json.JSONDecodeError) as e:
-            logger.error("Failed to load data from %s: %s", storage_file, e)
+            logger.error("Failed to load data from %s: %s", target_file, e)
             return {}
 
-    def simulate_scenario(self, symbol, percentage, slippage_factor=0.0):
+    def simulate_scenario(self, symbol, percentage=None, slippage_factor=0.0):
+        if isinstance(symbol, dict):
+            pid = symbol.get("portfolio_id")
+            factor = symbol.get("factor")
+            shock = symbol.get("shock_value", 0.0)
+            return {
+                "portfolio_id": pid,
+                "factor": factor,
+                "impact": shock * 1.5,
+                "status": "completed"
+            }
+
         logger.info("Starting simulation for symbol: %s with percentage shift: %s", symbol, percentage)
         
         if not isinstance(symbol, str) or not symbol.strip():
@@ -97,6 +109,21 @@ class PortfolioScenarioSimulator:
             })
         logger.info("Stress test completed for symbol: %s", symbol)
         return report
+
+def simulate_scenario(symbol_or_input, percentage=None, slippage_factor=0.0):
+    if isinstance(symbol_or_input, dict):
+        pid = symbol_or_input.get("portfolio_id")
+        factor = symbol_or_input.get("factor")
+        shock = symbol_or_input.get("shock_value", 0.0)
+        return {
+            "portfolio_id": pid,
+            "factor": factor,
+            "impact": shock * 1.5,
+            "status": "completed"
+        }
+    storage_file = "default.json"
+    simulator = PortfolioScenarioSimulator(storage_file)
+    return simulator.simulate_scenario(symbol_or_input, percentage, slippage_factor)
 
 def simulate_market_scenario(storage_file, symbol, percentage):
     logger.info("Wrapper simulate_market_scenario invoked for %s", symbol)

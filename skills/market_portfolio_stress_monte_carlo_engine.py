@@ -15,7 +15,9 @@ from skills import market_portfolio_scenario_simulator
 class MonteCarloStressEngine:
     """Движок стресс-тестирования портфеля методом Монте-Карло."""
 
-    def run_simulation(self, portfolio_id_or_positions, simulations: int = 1000, horizon_days: int = 30) -> list:
+    def run_simulation(self, portfolio_id_or_positions=None, simulations: int = 1000, horizon_days: int = 30, portfolio_id: str = None) -> list:
+        target_pid = portfolio_id or (portfolio_id_or_positions if isinstance(portfolio_id_or_positions, str) else None)
+
         if isinstance(portfolio_id_or_positions, list):
             positions = portfolio_id_or_positions
             simulation_results = []
@@ -36,15 +38,15 @@ class MonteCarloStressEngine:
                 simulation_results.append(simulated_scenario)
             return simulation_results
 
-        portfolio_id = str(portfolio_id_or_positions)
+        portfolio_id_str = str(target_pid or "UNKNOWN")
         try:
-            portfolio_data = db_storage.fetch_portfolio(portfolio_id)
+            portfolio_data = db_storage.fetch_portfolio(portfolio_id_str)
         except AttributeError:
             in_mem = getattr(db_storage, "_in_memory_db", None)
             if in_mem is None:
                 in_mem = {}
                 setattr(db_storage, "_in_memory_db", in_mem)
-            portfolio_data = in_mem.get(portfolio_id, {"portfolio_id": portfolio_id})
+            portfolio_data = in_mem.get(portfolio_id_str, {"portfolio_id": portfolio_id_str})
             
         initial_value = portfolio_data.get("initial_value", 100000.0)
         volatility = portfolio_data.get("volatility", 0.2)
@@ -80,7 +82,7 @@ class MonteCarloStressEngine:
         cvar_95 = sum(tail_losses) / len(tail_losses) if tail_losses else var_95
 
         return {
-            "portfolio_id": portfolio_id,
+            "portfolio_id": portfolio_id_str,
             "simulation_results": simulation_results,
             "var_95": float(var_95),
             "cvar_95": float(cvar_95)

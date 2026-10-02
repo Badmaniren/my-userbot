@@ -112,3 +112,15 @@ def run_stress_test(storage_file, symbol, range_min, range_max, step):
         "symbol": symbol,
         "scenarios": scenarios
     }
+
+
+def market_portfolio_scenario_simulator(payload=None, *args, **kwargs):
+    if isinstance(payload, dict):
+        shocks_count = payload.get("shocks_count", 10)
+        import random
+        seed = payload.get("seed")
+        if seed is not None:
+            random.seed(seed)
+        scenarios = [{"return": round(random.normalvariate(-0.02, 0.05), 4)} for _ in range(shocks_count)]
+        return {"scenarios": scenarios}
+    return {"scenarios": []}

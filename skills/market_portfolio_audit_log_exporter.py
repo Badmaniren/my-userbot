@@ -73,7 +73,7 @@ class PortfolioAuditLogExporter:
             return True
         elif format_type.lower() == "csv":
             if not data:
-                with open(export_path, 'w', encoding='utf-8', newline='' ) as f:
+                with open(export_path, 'w', encoding='utf-8', newline='') as f:
                     pass
                 return True
             

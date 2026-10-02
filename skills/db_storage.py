@@ -2,6 +2,17 @@ import sqlite3
 import requests
 from bs4 import BeautifulSoup
 
+_EVALUATION_RESULTS = {}
+
+
+def save_evaluation_result(record_id: str, data: dict):
+    _EVALUATION_RESULTS[record_id] = data
+    return True
+
+
+def get_evaluation_result(record_id: str) -> dict:
+    return _EVALUATION_RESULTS.get(record_id)
+
 
 class MarketParser:
     def __init__(self, storage_file: str = "market_data.db"):

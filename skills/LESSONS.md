@@ -3,16 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- эскалацию
-
-## market_portfolio_var_telemetry_collector (create) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.; АНТИЧИТ: Запрещено создавать классы-заглушки внутри `except ImportError:`! Импортируй честно, пусть падает, если модуля нет.
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_var_telemetry_streamer (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+цию
 
 ## market_portfolio_var_liquidity_core (start_new) — раундов: 3
 - Последняя ошибка перед фиксом: ImportError: cannot import name 'market_portfolio_var_liquidity_core' from 'skills.market_portfolio_var_liquidity_core' (unknown location)
@@ -324,4 +315,8 @@
 ## market_portfolio_macro_factor_evaluator (start_new) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: from skills.db_storage import db_storage
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_macro_factor_evaluator_v2 (create) — раундов: 4
+- Античит поймал: АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'market_anomaly_detector' глобальной переменной!; АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'market_anomaly_detector' глобальной переменной!; АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'market_anomaly_detector' глобальной переменной!; АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'market_anomaly_detector' глобальной переменной!
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

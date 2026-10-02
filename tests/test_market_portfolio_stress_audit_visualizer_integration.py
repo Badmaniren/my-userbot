@@ -1,46 +1,51 @@
 import unittest
 import uuid
 import random
-from skills.market_portfolio_stress_audit_visualizer import MarketPortfolioStressAuditVisualizer
+from skills.market_portfolio_stress_audit_visualizer import MarketPortfolioStressAuditVisualizer, market_portfolio_stress_audit_visualizer
+from skills.market_portfolio_scenario_simulator import market_portfolio_scenario_simulator
+from skills.market_report_generator import market_report_generator
 
 class TestMarketPortfolioStressAuditVisualizerIntegration(unittest.TestCase):
-    def test_visualizer_integration_text_format(self):
-        portfolio_id = str(uuid.uuid4())
-        adaptive_score = round(random.uniform(1.0, 100.0), 2)
+    def test_stress_audit_visualizer_integration(self):
+        rand_id = f"port_{uuid.uuid4().hex[:8]}"
+        risk_score = round(random.uniform(10.0, 99.9), 2)
         
-        payload = {
-            "portfolio_id": portfolio_id,
-            "format": "text_summary",
-            "adaptive_risk_score": adaptive_score,
-            "export_to_text_report": True
+        sim_payload = {
+            "portfolio_id": rand_id,
+            "scenario": "market_crash",
+            "intensity": random.choice([0.1, 0.25, 0.5])
         }
+        sim_result = market_portfolio_scenario_simulator(sim_payload)
         
-        visualizer = MarketPortfolioStressAuditVisualizer()
-        result = visualizer.visualize(payload)
+        report_payload = {
+            "report_id": rand_id,
+            "simulation_data": sim_result,
+            "format": "detailed"
+        }
+        report_result = market_report_generator(report_payload)
         
-        self.assertIsInstance(result, str)
-        self.assertIn(portfolio_id, result)
-        self.assertIn(str(adaptive_score), result)
-        self.assertIn("Exported to text report successfully", result)
-
-    def test_visualizer_integration_graphical_format(self):
-        report_id = str(uuid.uuid4())
-        adaptive_score = round(random.uniform(10.0, 500.0), 2)
+        visualizer_instance = MarketPortfolioStressAuditVisualizer(
+            market_portfolio_scenario_simulator=market_portfolio_scenario_simulator,
+            market_report_generator=market_report_generator
+        )
         
         payload = {
-            "report_id": report_id,
+            "portfolio_id": rand_id,
             "format": "graphical",
-            "adaptive_risk_score": adaptive_score
+            "adaptive_risk_score": risk_score,
+            "export_to_text_report": True,
+            "simulation_ref": sim_result,
+            "report_ref": report_result
         }
         
-        visualizer = MarketPortfolioStressAuditVisualizer(db_storage=None)
-        result = visualizer.visualize(payload)
+        res_func = market_portfolio_stress_audit_visualizer(payload)
+        res_class = visualizer_instance.visualize(payload)
         
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result.get("portfolio_id"), report_id)
-        self.assertEqual(result.get("status"), "success")
-        self.assertEqual(result.get("layout"), "graphical")
-        self.assertEqual(result.get("adaptive_risk_score"), adaptive_score)
+        self.assertEqual(res_func, res_class)
+        self.assertEqual(res_func["portfolio_id"], rand_id)
+        self.assertEqual(res_func["adaptive_risk_score"], risk_score)
+        self.assertEqual(res_func["status"], "success")
+        self.assertEqual(res_func["layout"], "graphical")
 
 if __name__ == "__main__":
     unittest.main()

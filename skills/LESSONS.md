@@ -3,8 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ar_liquidity_core' from 'skills.market_portfolio_var_liquidity_core' (unknown location)
-- Статус: успешно прошёл тесты и влит в main
+сты и влит в main
 
 ## market_portfolio_var_liquidity_core (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
@@ -321,3 +320,6 @@ ar_liquidity_core' from 'skills.market_portfolio_var_liquidity_core' (unknown lo
 ## market_portfolio_monitor (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_audit_visualizer (start_new) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

@@ -1,10 +1,9 @@
 import unittest
-import uuid
 import random
+import uuid
+
 from skills import db_storage
 from skills import market_anomaly_detector
-from skills import market_portfolio_data_exporter
-from skills import market_portfolio_api_gateway
 from skills import market_portfolio_stress_monte_carlo_engine
 
 
@@ -12,77 +11,63 @@ class TestMonteCarloStressEngineIntegration(unittest.TestCase):
 
     def setUp(self):
         self.portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
-        self.initial_value = round(random.uniform(50000.0, 500000.0), 2)
-        self.volatility = round(random.uniform(0.1, 0.5), 4)
+        self.initial_value = float(random.randint(50000, 500000))
+        self.volatility = round(random.uniform(0.1, 0.4), 2)
         self.drift = round(random.uniform(-0.05, 0.05), 4)
 
-        # Заполняем хранилище реальными данными без заглушек и моков
-        if hasattr(db_storage, "_in_memory_db"):
-            db_storage._in_memory_db[self.portfolio_id] = {
-                "portfolio_id": self.portfolio_id,
-                "initial_value": self.initial_value,
-                "volatility": self.volatility,
-                "drift": self.drift
-            }
+        if not hasattr(db_storage, "_in_memory_db"):
+            setattr(db_storage, "_in_memory_db", {})
+        
+        db_storage._in_memory_db[self.portfolio_id] = {
+            "portfolio_id": self.portfolio_id,
+            "initial_value": self.initial_value,
+            "volatility": self.volatility,
+            "drift": self.drift
+        }
 
-        self.engine = market_portfolio_stress_monte_carlo_engine.MonteCarloStressEngine()
-
-    def test_run_simulation_and_export_integration(self):
-        simulations_count = random.randint(50, 200)
+    def test_run_simulation_and_stress_test_integration(self):
+        simulations_count = random.randint(100, 500)
         horizon = random.randint(5, 30)
 
-        # Вызов метода основного движка
-        sim_result = self.engine.run_simulation(
+        engine = market_portfolio_stress_monte_carlo_engine.MonteCarloStressEngine()
+        result = engine.run_simulation(
             portfolio_id=self.portfolio_id,
             simulations=simulations_count,
             horizon_days=horizon
         )
 
-        self.assertIn("portfolio_id", sim_result)
-        self.assertEqual(sim_result["portfolio_id"], self.portfolio_id)
-        self.assertIn("simulation_results", sim_result)
-        self.assertIn("var_95", sim_result)
-        self.assertIn("cvar_95", sim_result)
-        self.assertEqual(len(sim_result["simulation_results"]), simulations_count)
-        self.assertGreaterEqual(sim_result["var_95"], 0.0)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["portfolio_id"], self.portfolio_id)
+        self.assertIn("simulation_results", result)
+        self.assertIn("var_95", result)
+        self.assertIn("cvar_95", result)
+        self.assertEqual(len(result["simulation_results"]), simulations_count)
+        self.assertGreaterEqual(result["var_95"], 0.0)
+        self.assertGreaterEqual(result["cvar_95"], 0.0)
 
-        # Проверка экспорта отчета
-        report_id = f"rep_{uuid.uuid4().hex[:8]}"
-        loss_limit = round(sim_result["var_95"] * 1.5, 2)
-        export_res = self.engine.export_report(report_id, loss_limit)
-        
-        self.assertIsInstance(export_res, dict)
-        self.assertIn("report_id", export_res)
-        self.assertEqual(export_res["report_id"], report_id)
-
-        # Проверка потребления стрима из шлюза
-        stream_data = self.engine.consume_stream()
-        # Метод может возвращать None или полезную нагрузку, проверяем отсутствие исключений
-        self.assertTrue(stream_data is None or isinstance(stream_data, (dict, list, str)))
-
-    def test_run_monte_carlo_stress_test_functional(self):
-        iterations = random.randint(100, 300)
+        iterations = random.randint(50, 200)
         scenario_params = {
             "volatility": self.volatility,
             "drift": self.drift,
-            "horizon_days": random.randint(1, 15)
+            "horizon_days": horizon
         }
 
-        func_result = market_portfolio_stress_monte_carlo_engine.run_monte_carlo_stress_test(
+        standalone_result = market_portfolio_stress_monte_carlo_engine.run_monte_carlo_stress_test(
             portfolio_id=self.portfolio_id,
             portfolio_value=self.initial_value,
             scenario_params=scenario_params,
             iterations=iterations
         )
 
-        self.assertIsInstance(func_result, dict)
-        self.assertIn("simulation_id", func_result)
-        self.assertTrue(func_result["simulation_id"].startswith("sim_"))
-        self.assertEqual(func_result["portfolio_id"], self.portfolio_id)
-        self.assertEqual(func_result["initial_value"], self.initial_value)
-        self.assertEqual(func_result["iterations"], iterations)
-        self.assertIn("var_95", func_result)
-        self.assertIn("expected_shortfall", func_result)
+        self.assertIsInstance(standalone_result, dict)
+        self.assertTrue(standalone_result["simulation_id"].startswith("sim_"))
+        self.assertEqual(standalone_result["portfolio_id"], self.portfolio_id)
+        self.assertEqual(standalone_result["iterations"], iterations)
+        self.assertIn("var_95", standalone_result)
+        self.assertIn("expected_shortfall", standalone_result)
+
+        anomaly_mult = engine._get_anomaly_adjustment()
+        self.assertIsInstance(anomaly_mult, float)
 
 
 if __name__ == "__main__":

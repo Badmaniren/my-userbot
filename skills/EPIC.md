@@ -4,3 +4,4 @@
 
 - market_portfolio_audit_compliance_hub: Рефакторинг market_portfolio_audit_compliance_hub для обеспечения надежности проверок и интеграции с модулями стресс-тестирования без использования заглушек.
 - market_portfolio_stress_reporter: Рефакторинг market_portfolio_stress_reporter завершает цикл надежной генерации отчетов по стресс-тестам в рамках аудита портфеля.
+- market_portfolio_stress_monte_carlo_engine: Рефакторинг симулятора Монте-Карло укрепляет расчетную базу регуляторного аудита и проверки хвостовых рисков портфеля без создания фиктивных заглушек.

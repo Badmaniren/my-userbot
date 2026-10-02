@@ -13,34 +13,54 @@ class PortfolioAuditLogExporter:
     def _read_storage(self):
         if not os.path.exists(self.storage_file):
             return []
-        with open(self.storage_file, 'r', encoding='utf-8') as f:
-            content = f.read()
-            if not content.strip():
-                return []
-            return json.loads(content)
+        try:
+            with open(self.storage_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+                if not content.strip():
+                    return []
+                return json.loads(content)
+        except Exception:
+            return []
 
     def export_audit_logs(self, export_path: str) -> bool:
-        with open(self.storage_file, 'r', encoding='utf-8') as f:
-            data = f.read()
-            # Проверка на валидность JSON
-            json.loads(data)
+        if not os.path.exists(self.storage_file):
+            return False
+        try:
+            with open(self.storage_file, 'r', encoding='utf-8') as f:
+                data = f.read()
+                # Проверка на валидность JSON
+                json.loads(data)
+        except Exception:
+            return False
 
         with open(export_path, 'w', encoding='utf-8') as f:
             f.write(data)
         return True
 
     def get_audit_stream_summary(self) -> dict:
-        with open(self.storage_file, 'r', encoding='utf-8') as f:
-            content = f.read()
-            data = json.loads(content)
-            if not isinstance(data, list):
-                data = [data]
-            return {"total_records": len(data)}
+        if not os.path.exists(self.storage_file):
+            return {"total_records": 0}
+        try:
+            with open(self.storage_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+                if not content.strip():
+                    return {"total_records": 0}
+                data = json.loads(content)
+                if not isinstance(data, list):
+                    data = [data]
+                return {"total_records": len(data)}
+        except Exception:
+            return {"total_records": 0}
 
     def verify_log_integrity(self) -> bool:
-        with open(self.storage_file, 'r', encoding='utf-8') as f:
-            json.load(f)
-        return True
+        if not os.path.exists(self.storage_file):
+            return False
+        try:
+            with open(self.storage_file, 'r', encoding='utf-8') as f:
+                json.load(f)
+            return True
+        except Exception:
+            return False
 
     def export_aggregated_report(self, export_path: str, format_type: str = "json") -> bool:
         data = self._read_storage()

@@ -10,17 +10,13 @@ class PortfolioAuditLogExporter:
         self.storage_file = storage_file
 
     def _read_storage(self):
-        try:
-            if not os.path.exists(self.storage_file):
+        if not os.path.exists(self.storage_file):
+            return []
+        with open(self.storage_file, 'r', encoding='utf-8') as f:
+            content = f.read()
+            if not content.strip():
                 return []
-            with open(self.storage_file, 'r', encoding='utf-8') as f:
-                content = f.read()
-                if not content.strip():
-                    return []
-                return json.loads(content)
-        except (IOError, json.JSONDecodeError, UnicodeDecodeError):
-            # Перехватываем для безопасного возврата ошибки наружу в логике экспорта/сумм
-            raise
+            return json.loads(content)
 
     def export_audit_logs(self, export_path: str) -> bool:
         try:

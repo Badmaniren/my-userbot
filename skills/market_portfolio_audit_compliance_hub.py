@@ -1,6 +1,7 @@
 import os
 from skills.db_storage import MarketParser
 from skills.market_portfolio_audit_log_exporter import PortfolioAuditLogExporter
+from skills.market_portfolio_stress_monte_carlo_engine import MarketPortfolioStressMonteCarloEngine
 
 
 class MarketPortfolioAuditComplianceHub:
@@ -19,6 +20,8 @@ class MarketPortfolioAuditComplianceHub:
             setattr(self.audit_exporter, 'process_audit_stream', lambda path, stream: True)
         if not hasattr(self.audit_exporter, 'generate_audit_log'):
             setattr(self.audit_exporter, 'generate_audit_log', lambda path: True)
+
+        self.monte_carlo_engine = MarketPortfolioStressMonteCarloEngine()
 
     def run_compliance_export(self, export_path):
         res = self.audit_exporter.export_audit_logs(export_path)

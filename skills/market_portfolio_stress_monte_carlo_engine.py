@@ -84,6 +84,10 @@ class MonteCarloStressEngine:
             return None
 
 
+MarketPortfolioStressMonteCarloEngine = MonteCarloStressEngine
+market_portfolio_stress_monte_carlo_engine = MonteCarloStressEngine
+
+
 if not hasattr(db_storage, "fetch_portfolio"):
     setattr(db_storage, "fetch_portfolio", lambda pid: getattr(db_storage, "_in_memory_db", {}).get(pid, {"portfolio_id": pid}))
 

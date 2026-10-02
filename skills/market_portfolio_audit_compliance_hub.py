@@ -48,6 +48,9 @@ class MarketPortfolioAuditComplianceHub:
         return self.db_storage.fetch_price(url)
 
     def load_historical_audit_data(self, filename):
+        if not os.path.exists(filename):
+            with open(filename, "w", encoding="utf-8") as f:
+                f.write("[]")
         return self.db_storage.load_data(filename)
 
     def get_audit_stream_summary(self):

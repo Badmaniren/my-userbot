@@ -1,6 +1,8 @@
 import io
 import requests
 from bs4 import BeautifulSoup
+from skills.market_portfolio_scenario_simulator import MarketPortfolioScenarioSimulator
+from skills.market_report_generator import market_report_generator
 
 class MarketPortfolioStressAuditVisualizer:
     def __init__(self, **kwargs):
@@ -20,7 +22,10 @@ def market_portfolio_stress_audit_visualizer(payload):
     adaptive_score = payload.get("adaptive_risk_score")
     export_text = payload.get("export_to_text_report", False)
 
-    if format_type == "text_summary":
+    simulation_ref = payload.get("simulation_ref")
+    report_ref = payload.get("report_ref")
+
+    if format_type == "text_summary" and not simulation_ref and not report_ref:
         base_msg = f"Portfolio Stress Audit Summary for {portfolio_id}: Data successfully audited and visualized."
         if adaptive_score is not None:
             base_msg += f" Adaptive Risk Score: {adaptive_score}."
@@ -35,4 +40,11 @@ def market_portfolio_stress_audit_visualizer(payload):
         }
         if adaptive_score is not None:
             result["adaptive_risk_score"] = adaptive_score
+
+        if simulation_ref and isinstance(simulation_ref, dict):
+            if "simulated_metric" in simulation_ref:
+                result["simulated_metric"] = simulation_ref["simulated_metric"]
+        if report_ref:
+            result["report"] = report_ref
+
         return result

@@ -1,9 +1,18 @@
 import json
 import os
 import logging
+import sys
 
-from skills.market_parser import MarketParser
-from skills.market_portfolio_valuation import PortfolioValuation
+skills_dir = os.path.dirname(os.path.abspath(__file__))
+if skills_dir not in sys.path:
+    sys.path.insert(0, skills_dir)
+
+try:
+    from skills.market_parser import MarketParser
+    from skills.market_portfolio_valuation import PortfolioValuation
+except ModuleNotFoundError:
+    from market_parser import MarketParser
+    from market_portfolio_valuation import PortfolioValuation
 
 logger = logging.getLogger("PortfolioScenarioSimulator")
 if not logger.handlers:
@@ -14,16 +23,19 @@ if not logger.handlers:
     logger.setLevel(logging.INFO)
 
 class PortfolioScenarioSimulator:
-    def __init__(self, storage_file):
+    def __init__(self, storage_file=None):
         self.storage_file = storage_file
 
-    def load_data(self, storage_file):
-        logger.info("Loading portfolio data from %s", storage_file)
+    def load_data(self, storage_file=None):
+        target_file = storage_file or self.storage_file
+        if not target_file:
+            return {}
+        logger.info("Loading portfolio data from %s", target_file)
         try:
-            with open(storage_file, 'r') as f:
+            with open(target_file, 'r') as f:
                 return json.load(f)
         except (IOError, OSError, json.JSONDecodeError) as e:
-            logger.error("Failed to load data from %s: %s", storage_file, e)
+            logger.error("Failed to load data from %s: %s", target_file, e)
             return {}
 
     def simulate_scenario(self, symbol, percentage, slippage_factor=0.0):
@@ -97,6 +109,34 @@ class PortfolioScenarioSimulator:
             })
         logger.info("Stress test completed for symbol: %s", symbol)
         return report
+
+    def evaluate_scenarios(self, scenarios):
+        summary = []
+        if not isinstance(scenarios, list):
+            return summary
+        for item in scenarios:
+            if not isinstance(item, dict):
+                continue
+            scenario_id = item.get("scenario_id", "UNKNOWN")
+            loss_pct = item.get("estimated_loss_percentage", 0.0)
+            initial_val = item.get("initial_portfolio_value", 1000000.0)
+            stressed_val = item.get("stressed_portfolio_value", initial_val * (1.0 + loss_pct / 100.0))
+            summary.append({
+                "scenario_id": scenario_id,
+                "initial_value": initial_val,
+                "stressed_value": stressed_val,
+                "loss_percentage": loss_pct,
+                "shock_type": item.get("shock_type", "unspecified")
+            })
+        return summary
+
+
+class MarketPortfolioScenarioSimulator(PortfolioScenarioSimulator):
+    pass
+
+
+market_portfolio_scenario_simulator = MarketPortfolioScenarioSimulator
+
 
 def simulate_market_scenario(storage_file, symbol, percentage):
     logger.info("Wrapper simulate_market_scenario invoked for %s", symbol)

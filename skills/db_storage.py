@@ -55,3 +55,36 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+def db_storage_handler(payload):
+    if not isinstance(payload, dict):
+        return {"status": "error", "message": "Invalid payload format"}
+
+    query = payload.get("query")
+    if query == "save_dashboard_metric":
+        portfolio_id = payload.get("portfolio_id")
+        scenario_id = payload.get("scenario_id")
+        report_path = payload.get("report_path")
+        export_format = payload.get("export_format")
+
+        conn = sqlite3.connect("dashboard_metrics.db")
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS dashboard_metrics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                portfolio_id TEXT,
+                scenario_id TEXT,
+                report_path TEXT,
+                export_format TEXT
+            )
+        ''')
+        cursor.execute('''
+            INSERT INTO dashboard_metrics (portfolio_id, scenario_id, report_path, export_format)
+            VALUES (?, ?, ?, ?)
+        ''', (portfolio_id, scenario_id, report_path, export_format))
+        conn.commit()
+        conn.close()
+        return {"status": "success"}
+
+    return {"status": "ignored"}

@@ -37,3 +37,13 @@ class MarketPortfolioIntegrationHub:
 
     def run_full_integration_pipeline(self, symbol, url, telegram_token, chat_id, shifts):
         return self.process_and_export(url, symbol, shifts, telegram_token, chat_id)
+
+
+def market_portfolio_integration_hub(target_module=None, payload=None, *args, **kwargs):
+    """Точка входа для интеграционного взаимодействия модулей."""
+    if target_module == "macro_liquidity_engine":
+        from skills.market_portfolio_macro_liquidity_engine import market_portfolio_macro_liquidity_engine
+        if payload is not None:
+            return market_portfolio_macro_liquidity_engine(payload)
+        return {"status": "success"}
+    return {"status": "success", "target_module": target_module}

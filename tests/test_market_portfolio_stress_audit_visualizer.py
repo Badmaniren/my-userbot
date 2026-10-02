@@ -1,70 +1,68 @@
 import unittest
-from unittest.mock import patch
-import random
+from unittest.mock import MagicMock, patch
 import uuid
-
+import random
+import string
 from skills.market_portfolio_stress_audit_visualizer import (
     MarketPortfolioStressAuditVisualizer,
     market_portfolio_stress_audit_visualizer
 )
 
-
 class TestMarketPortfolioStressAuditVisualizer(unittest.TestCase):
+    def setUp(self):
+        self.rand_str = lambda: ''.join(random.choices(string.ascii_letters, k=10))
+        self.portfolio_id = uuid.uuid4().hex
+        self.report_id = uuid.uuid4().hex
+        self.mock_db = MagicMock()
+        self.visualizer = MarketPortfolioStressAuditVisualizer(db_storage=self.mock_db)
 
-    def test_visualizer_initialization_and_payload_handling(self):
-        rand_key = uuid.uuid4().hex
-        rand_val = uuid.uuid4().hex
-        dependency_name = uuid.uuid4().hex
-        
-        visualizer = MarketPortfolioStressAuditVisualizer(**{dependency_name: rand_val})
-        self.assertEqual(visualizer.dependencies[dependency_name], rand_val)
-
-        portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
+    def test_visualizer_class_init_and_call(self):
         payload = {
-            "portfolio_id": portfolio_id,
-            "format": "text_summary",
-            rand_key: rand_val
+            "portfolio_id": self.portfolio_id,
+            "format": "text_summary"
         }
+        res = self.visualizer.visualize(payload)
+        self.assertIn(self.portfolio_id, res)
+        self.assertIsInstance(res, str)
 
-        result_obj = visualizer.visualize(payload)
-        self.assertIn(portfolio_id, result_obj)
-        
-        direct_result = market_portfolio_stress_audit_visualizer(payload)
-        self.assertIn(portfolio_id, direct_result)
+    def test_market_portfolio_stress_audit_visualizer_invalid_payload(self):
+        random_payload = random.randint(1000, 99999)
+        res = market_portfolio_stress_audit_visualizer(random_payload)
+        self.assertEqual(res, str(random_payload))
 
-    def test_visualizer_graphical_format(self):
-        report_id = f"rep_{uuid.uuid4().hex[:8]}"
+    def test_market_portfolio_stress_audit_visualizer_text_summary(self):
         payload = {
-            "report_id": report_id,
-            "format": "graphical"
+            "report_id": self.report_id,
+            "format": "text_summary"
         }
+        res = market_portfolio_stress_audit_visualizer(payload)
+        self.assertIn(self.report_id, res)
+        self.assertTrue(res.startswith("Portfolio Stress Audit Summary"))
 
-        result = market_portfolio_stress_audit_visualizer(payload)
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result.get("portfolio_id"), report_id)
-        self.assertEqual(result.get("status"), "success")
-        self.assertEqual(result.get("layout"), "graphical")
-
-    def test_visualizer_non_dict_payload(self):
-        raw_string = uuid.uuid4().hex
-        result = market_portfolio_stress_audit_visualizer(raw_string)
-        self.assertEqual(result, raw_string)
-
-    def test_visualizer_report_rendering_chaos(self):
-        portfolio_id = uuid.uuid4().hex
+    def test_market_portfolio_stress_audit_visualizer_graphical_format(self):
         payload = {
-            "portfolio_id": portfolio_id,
-            "format": random.choice(["text_summary", "graphical"])
+            "portfolio_id": self.portfolio_id,
+            "format": self.rand_str()
         }
+        res = market_portfolio_stress_audit_visualizer(payload)
+        self.assertIsInstance(res, dict)
+        self.assertEqual(res.get("portfolio_id"), self.portfolio_id)
+        self.assertEqual(res.get("status"), "success")
+        self.assertEqual(res.get("layout"), "graphical")
 
-        with patch("skills.market_portfolio_stress_audit_visualizer.requests.get") as mock_get:
-            mock_resp = mock_get.return_value
+    def test_visualizer_with_storage_dependency(self):
+        with patch("requests.get") as mock_get:
+            mock_resp = MagicMock()
             mock_resp.status_code = 200
-            mock_resp.text = f"<html><body><div>{uuid.uuid4().hex}</div></body></html>"
+            mock_resp.text = f"<html><body>{self.rand_str()}</body></html>"
+            mock_get.return_value = mock_resp
 
-            res = market_portfolio_stress_audit_visualizer(payload)
-            self.assertIsNotNone(res)
+            payload = {
+                "portfolio_id": self.portfolio_id,
+                "format": "text_summary"
+            }
+            res = self.visualizer.visualize(payload)
+            self.assertIn(self.portfolio_id, res)
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

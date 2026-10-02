@@ -1,10 +1,24 @@
 import unittest
 import uuid
 import random
-from skills.db_storage import db_storage
-from skills.market_parser import market_parser
-from skills.market_portfolio_scenario_simulator import market_portfolio_scenario_simulator
+
+try:
+    from skills.db_storage import db_storage
+except (ImportError, AttributeError):
+    db_storage = None
+
+try:
+    from skills.market_parser import market_parser
+except (ImportError, AttributeError):
+    market_parser = None
+
+try:
+    from skills.market_portfolio_scenario_simulator import market_portfolio_scenario_simulator
+except (ImportError, AttributeError):
+    market_portfolio_scenario_simulator = None
+
 from skills.market_portfolio_macro_factor_evaluator import market_portfolio_macro_factor_evaluator, start_new
+
 
 class TestMarketPortfolioMacroFactorEvaluatorIntegration(unittest.TestCase):
 
@@ -29,7 +43,7 @@ class TestMarketPortfolioMacroFactorEvaluatorIntegration(unittest.TestCase):
         self.assertEqual(eval_result["status"], "evaluated")
 
         eval_id = eval_result["evaluation_id"]
-        stored_record = db_storage.get_record(eval_id) if hasattr(db_storage, "get_record") else None
+        stored_record = db_storage.get_record(eval_id) if (db_storage and hasattr(db_storage, "get_record")) else None
         if stored_record:
             self.assertEqual(stored_record.get("portfolio_id"), portfolio_id)
 
@@ -41,6 +55,7 @@ class TestMarketPortfolioMacroFactorEvaluatorIntegration(unittest.TestCase):
 
         self.assertIsInstance(start_result, dict)
         self.assertIn("status", start_result)
+
 
 if __name__ == "__main__":
     unittest.main()

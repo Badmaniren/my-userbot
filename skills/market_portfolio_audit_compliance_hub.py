@@ -45,9 +45,15 @@ class MarketPortfolioAuditComplianceHub:
         return True if res is None else res
 
     def audit_fetch_market_price(self, url):
-        return self.db_storage.fetch_price(url)
+        try:
+            return self.db_storage.fetch_price(url)
+        except Exception:
+            return 0.0
 
     def load_historical_audit_data(self, filename):
+        if not os.path.exists(filename):
+            with open(filename, "w", encoding="utf-8") as f:
+                f.write("[]")
         return self.db_storage.load_data(filename)
 
     def get_audit_stream_summary(self):

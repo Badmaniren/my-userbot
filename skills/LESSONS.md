@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-брось наружу через raise.
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_stress_monte_carlo_engine (refactor) — раундов: 4
+actor) — раундов: 4
 - Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/unittest/mock.py", line 1446, in __enter__
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -304,4 +300,8 @@
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_audit_log_exporter (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_audit_visualizer (create) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=2)
 - Статус: успешно прошёл тесты и влит в main

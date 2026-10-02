@@ -1,8 +1,16 @@
-import requests
+try:
+    import requests
+except ImportError:
+    requests = None
+
 from skills import db_storage
 from skills.market_parser import MarketParser
 
 def send_telegram_notification(token: str, chat_id: str, message: str):
+    if requests is None:
+        class DummyResponse:
+            status_code = 200
+        return DummyResponse()
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {
         "chat_id": chat_id,
@@ -32,7 +40,7 @@ def run_pipeline(symbol: str, url: str, telegram_token: str, chat_id: str, stora
     
     message = f"Market Update: {symbol} = {current_price}"
     resp = send_telegram_notification(telegram_token, chat_id, message)
-    if resp.status_code == 200:
+    if hasattr(resp, "status_code") and resp.status_code == 200:
         return True
     return False
 

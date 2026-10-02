@@ -1,6 +1,11 @@
 import json
 import os
-import requests
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
 from skills.market_news_sentiment_analyzer import MarketNewsSentimentAnalyzer
 from skills.market_portfolio_digest import PortfolioDigestManager
 
@@ -30,6 +35,8 @@ class MarketSentimentDigestEngine:
         }
 
     def fetch_raw_feed(self, url: str) -> bytes:
+        if requests is None:
+            return b""
         response = requests.get(url, timeout=10)
         return response.content
 

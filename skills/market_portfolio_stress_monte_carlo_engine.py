@@ -15,7 +15,28 @@ from skills import market_portfolio_scenario_simulator
 class MonteCarloStressEngine:
     """Движок стресс-тестирования портфеля методом Монте-Карло."""
 
-    def run_simulation(self, portfolio_id: str, simulations: int, horizon_days: int) -> dict:
+    def run_simulation(self, portfolio_id_or_positions, simulations: int = 1000, horizon_days: int = 30) -> list:
+        if isinstance(portfolio_id_or_positions, list):
+            positions = portfolio_id_or_positions
+            simulation_results = []
+            for _ in range(simulations):
+                simulated_scenario = []
+                for pos in positions:
+                    ticker = pos.get("ticker", "UNKNOWN") if isinstance(pos, dict) else "UNKNOWN"
+                    notional = pos.get("notional_usd", 100000.0) if isinstance(pos, dict) else 100000.0
+                    vol = pos.get("volatility", 0.2) if isinstance(pos, dict) else 0.2
+                    dt = 1.0 / 365.0
+                    rand_norm = random.gauss(0, 1)
+                    shock = -0.5 * (vol ** 2) * dt + vol * math.sqrt(dt) * rand_norm
+                    simulated_value = notional * math.exp(shock)
+                    simulated_scenario.append({
+                        "ticker": ticker,
+                        "simulated_value": float(simulated_value)
+                    })
+                simulation_results.append(simulated_scenario)
+            return simulation_results
+
+        portfolio_id = str(portfolio_id_or_positions)
         try:
             portfolio_data = db_storage.fetch_portfolio(portfolio_id)
         except AttributeError:
@@ -82,6 +103,10 @@ class MonteCarloStressEngine:
             return market_portfolio_api_gateway.stream_payload()
         except AttributeError:
             return None
+
+
+class MarketPortfolioStressMonteCarloEngine(MonteCarloStressEngine):
+    pass
 
 
 if not hasattr(db_storage, "fetch_portfolio"):

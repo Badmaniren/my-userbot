@@ -1,5 +1,6 @@
 import json
 import os
+import csv
 from skills.market_parser import MarketParser
 
 
@@ -47,6 +48,39 @@ class PortfolioAuditLogExporter:
             with open(self.storage_file, 'r', encoding='utf-8') as f:
                 json.load(f)
             return True
+        except Exception:
+            return False
+
+    def export_aggregated_report(self, export_path: str, format_type: str = "json") -> bool:
+        try:
+            data = self._read_storage()
+            if not isinstance(data, list):
+                data = [data]
+
+            if format_type.lower() == "json":
+                with open(export_path, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, ensure_ascii=False, indent=4)
+                return True
+            elif format_type.lower() == "csv":
+                if not data:
+                    with open(export_path, 'w', encoding='utf-8', newline='') as f:
+                        pass
+                    return True
+                
+                fieldnames = set()
+                for row in data:
+                    if isinstance(row, dict):
+                        fieldnames.update(row.keys())
+                fieldnames = sorted(list(fieldnames))
+
+                with open(export_path, 'w', encoding='utf-8', newline='') as f:
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    writer.writeheader()
+                    for row in data:
+                        if isinstance(row, dict):
+                            writer.writerow(row)
+                return True
+            return False
         except Exception:
             return False
 

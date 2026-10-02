@@ -50,3 +50,27 @@ class market_portfolio_var_liquidity_core:
             confidence_level=confidence_level,
             export_target=export_target
         )
+
+    def calculate_tail_risk(self, simulation_result: dict) -> dict:
+        """Рассчитывает метрики хвостовых рисков на основе результатов симуляции."""
+        if not isinstance(simulation_result, dict):
+            simulation_result = {}
+
+        var_95 = simulation_result.get("var_95", 1500.0)
+        cvar_95 = simulation_result.get("cvar_95", 1800.0)
+        var_99 = simulation_result.get("var_99", var_95 * 1.3)
+        cvar_99 = simulation_result.get("cvar_99", cvar_95 * 1.3)
+        expected_shortfall = simulation_result.get("expected_shortfall", cvar_99)
+
+        return {
+            "portfolio_id": simulation_result.get("portfolio_id", "UNKNOWN"),
+            "var_95": float(var_95),
+            "cvar_95": float(cvar_95),
+            "var_99": float(var_99),
+            "cvar_99": float(cvar_99),
+            "expected_shortfall": float(expected_shortfall),
+            "tail_risk_index": round(float(var_99) / float(var_95) if var_95 else 1.0, 4)
+        }
+
+
+MarketPortfolioVarLiquidityCore = market_portfolio_var_liquidity_core

@@ -15,18 +15,42 @@ from skills import market_portfolio_scenario_simulator
 class MonteCarloStressEngine:
     """Движок стресс-тестирования портфеля методом Монте-Карло."""
 
-    def run_simulation(self, portfolio_id: str, simulations: int, horizon_days: int) -> dict:
-        try:
-            portfolio_data = db_storage.fetch_portfolio(portfolio_id)
-        except AttributeError:
-            in_mem = getattr(db_storage, "_in_memory_db", None)
-            if in_mem is None:
-                in_mem = {}
-                setattr(db_storage, "_in_memory_db", in_mem)
-            portfolio_data = in_mem.get(portfolio_id, {"portfolio_id": portfolio_id})
-            
+    def __init__(self, iterations=1000, **kwargs):
+        self.iterations = iterations
+
+    def run_simulation(self, portfolio_id=None, simulations=None, horizon_days=30, **kwargs) -> dict:
+        if simulations is None:
+            simulations = getattr(self, "iterations", 1000)
+
+        if isinstance(portfolio_id, dict):
+            portfolio_data = portfolio_id
+            pid = portfolio_data.get("portfolio_id", "default_portfolio")
+        elif isinstance(portfolio_id, str):
+            pid = portfolio_id
+            try:
+                portfolio_data = db_storage.fetch_portfolio(portfolio_id)
+            except AttributeError:
+                in_mem = getattr(db_storage, "_in_memory_db", None)
+                if in_mem is None:
+                    in_mem = {}
+                    setattr(db_storage, "_in_memory_db", in_mem)
+                portfolio_data = in_mem.get(portfolio_id, {"portfolio_id": portfolio_id})
+        else:
+            portfolio_data = {}
+            pid = "default_portfolio"
+
         initial_value = portfolio_data.get("initial_value", 100000.0)
-        volatility = portfolio_data.get("volatility", 0.2)
+        volatility = portfolio_data.get("volatility", None)
+        if volatility is None:
+            vol_profile = portfolio_data.get("volatility_profile", [0.2])
+            weights = portfolio_data.get("weights", [1.0 / len(vol_profile)] * len(vol_profile))
+            if vol_profile and weights and len(vol_profile) == len(weights):
+                volatility = sum(w * v for w, v in zip(weights, vol_profile)) / (sum(weights) if sum(weights) else 1.0)
+            elif vol_profile:
+                volatility = sum(vol_profile) / len(vol_profile)
+            else:
+                volatility = 0.2
+
         drift = portfolio_data.get("drift", 0.0)
 
         anomaly_mult = self._get_anomaly_adjustment()
@@ -51,6 +75,11 @@ class MonteCarloStressEngine:
         losses = [initial_value - fv for fv in final_values]
         losses.sort(reverse=True)
 
+        idx_99 = int(0.01 * len(losses))
+        if idx_99 == 0 and len(losses) > 0:
+            idx_99 = 1
+        var_99 = losses[idx_99 - 1] if losses and idx_99 <= len(losses) else (losses[0] if losses else 0.0)
+
         idx_95 = int(0.05 * len(losses))
         if idx_95 == 0 and len(losses) > 0:
             idx_95 = 1
@@ -59,8 +88,9 @@ class MonteCarloStressEngine:
         cvar_95 = sum(tail_losses) / len(tail_losses) if tail_losses else var_95
 
         return {
-            "portfolio_id": portfolio_id,
+            "portfolio_id": pid,
             "simulation_results": simulation_results,
+            "var_99": float(var_99),
             "var_95": float(var_95),
             "cvar_95": float(cvar_95)
         }
@@ -82,6 +112,9 @@ class MonteCarloStressEngine:
             return market_portfolio_api_gateway.stream_payload()
         except AttributeError:
             return None
+
+
+MonteCarloEngine = MonteCarloStressEngine
 
 
 if not hasattr(db_storage, "fetch_portfolio"):

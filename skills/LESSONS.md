@@ -3,7 +3,10 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ar_liquidity_core' from 'skills.market_portfolio_var_liquidity_core' (unknown location)
+цию
+
+## market_portfolio_var_liquidity_core (start_new) — раундов: 3
+- Последняя ошибка перед фиксом: ImportError: cannot import name 'market_portfolio_var_liquidity_core' from 'skills.market_portfolio_var_liquidity_core' (unknown location)
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_var_liquidity_core (refactor) — раундов: 1
@@ -316,8 +319,4 @@ ar_liquidity_core' from 'skills.market_portfolio_var_liquidity_core' (unknown lo
 
 ## market_portfolio_macro_factor_evaluator_v2 (create) — раундов: 4
 - Античит поймал: АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'market_anomaly_detector' глобальной переменной!; АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'market_anomaly_detector' глобальной переменной!; АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'market_anomaly_detector' глобальной переменной!; АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'market_anomaly_detector' глобальной переменной!
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_monitor (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

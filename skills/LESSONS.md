@@ -3,7 +3,11 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-s=1, errors=2)
+иксом: FAILED (errors=2)
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_tail_risk_analyzer (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_tail_risk_metrics (create) — раундов: 4
@@ -304,8 +308,4 @@ s=1, errors=2)
 
 ## market_portfolio_stress_dashboard_api_v2 (start_new) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_stress_recovery_coordinator_bridge (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

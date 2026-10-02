@@ -55,3 +55,25 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+class DBStorage:
+    def __init__(self):
+        self._data = {}
+
+    def __call__(self, payload=None, *args, **kwargs):
+        if payload is not None:
+            if isinstance(payload, dict) and "id" in payload:
+                self._data[payload["id"]] = payload
+            return {"status": "success", "data": payload}
+        return {"status": "success"}
+
+    def save(self, key, value):
+        self._data[key] = value
+
+    def get(self, key, default=None):
+        return self._data.get(key, default)
+
+
+db_storage = DBStorage()
+DbStorage = DBStorage

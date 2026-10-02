@@ -32,6 +32,11 @@ class PortfolioDataExporter:
 MarketPortfolioDataExporter = PortfolioDataExporter
 
 
+def generate_stream(report_id: str = None) -> io.BytesIO:
+    """Генерирует поток данных отчета для экспорта."""
+    return io.BytesIO(f"Report stream for {report_id}".encode("utf-8"))
+
+
 def export_portfolio_data_pipeline(
     storage_file: str,
     url: str,

@@ -15,13 +15,16 @@ from skills import market_portfolio_scenario_simulator
 class MonteCarloStressEngine:
     """Движок стресс-тестирования портфеля методом Монте-Карло."""
 
-    def run_simulation(self, portfolio_input, simulations: int = 1000, horizon_days: int = 10) -> dict:
+    def run_simulation(self, portfolio_input=None, simulations: int = 1000, horizon_days: int = 10, portfolio_id: str = None, **kwargs) -> dict:
+        if portfolio_input is None and portfolio_id is not None:
+            portfolio_input = portfolio_id
+
         if isinstance(portfolio_input, dict):
             portfolio_data = portfolio_input
-            portfolio_id = portfolio_data.get("portfolio_id", "PORTFOLIO-001")
+            p_id = portfolio_data.get("portfolio_id", portfolio_id or "PORTFOLIO-001")
             sim_params = portfolio_data.get("simulation_parameters", {})
-            simulations = sim_params.get("iterations", sim_params.get("simulations", simulations))
-            horizon_days = sim_params.get("horizon_days", horizon_days)
+            simulations = kwargs.get("simulations", sim_params.get("iterations", sim_params.get("simulations", simulations)))
+            horizon_days = kwargs.get("horizon_days", sim_params.get("horizon_days", horizon_days))
             
             assets = portfolio_data.get("assets", [])
             initial_value = portfolio_data.get("initial_value")
@@ -40,15 +43,15 @@ class MonteCarloStressEngine:
             drift = portfolio_data.get("drift", 0.0)
             shocks = portfolio_data.get("historical_shocks", [])
         else:
-            portfolio_id = portfolio_input
+            p_id = str(portfolio_input) if portfolio_input is not None else (portfolio_id or "PORTFOLIO-001")
             try:
-                portfolio_data = db_storage.fetch_portfolio(portfolio_id)
+                portfolio_data = db_storage.fetch_portfolio(p_id)
             except AttributeError:
                 in_mem = getattr(db_storage, "_in_memory_db", None)
                 if in_mem is None:
                     in_mem = {}
                     setattr(db_storage, "_in_memory_db", in_mem)
-                portfolio_data = in_mem.get(portfolio_id, {"portfolio_id": portfolio_id})
+                portfolio_data = in_mem.get(p_id, {"portfolio_id": p_id})
 
             initial_value = portfolio_data.get("initial_value", 100000.0)
             volatility = portfolio_data.get("volatility", 0.2)
@@ -94,7 +97,7 @@ class MonteCarloStressEngine:
         cvar_99 = sum(tail_losses_99) / len(tail_losses_99) if tail_losses_99 else var_99
 
         return {
-            "portfolio_id": portfolio_id,
+            "portfolio_id": p_id,
             "simulation_results": simulation_results,
             "var_95": float(var_95),
             "cvar_95": float(cvar_95),

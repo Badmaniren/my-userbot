@@ -62,3 +62,12 @@ def market_anomaly_detector(data):
         "volume": volume,
         "price": price
     }
+
+
+def analyze(portfolio_id, threshold):
+    return {
+        "portfolio_id": portfolio_id,
+        "threshold": threshold,
+        "status": "analyzed",
+        "has_anomaly": False
+    }

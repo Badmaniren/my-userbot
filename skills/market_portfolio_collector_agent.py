@@ -97,3 +97,11 @@ def start_new(symbol: str, url: str, telegram_token: str, chat_id: str, storage_
         chat_id,
         storage_file
     )
+
+
+class PortfolioCollectorAgent:
+    def __init__(self, storage_file: str = "collector_agent.db"):
+        self.storage_file = storage_file
+
+    def collect(self, symbol: str):
+        return {"symbol": symbol, "status": "collected"}

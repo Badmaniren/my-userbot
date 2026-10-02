@@ -3,7 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-тивный 'market_portfolio_stress_monte_carlo_engine'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.market_portfolio_stress_monte_carlo_engine i
+'from skills.market_portfolio_stress_monte_carlo_engine i
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -299,4 +299,7 @@
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_reporter (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_audit_log_exporter (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

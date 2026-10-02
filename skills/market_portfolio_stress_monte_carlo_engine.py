@@ -52,7 +52,9 @@ class MonteCarloStressEngine:
         losses.sort(reverse=True)
 
         idx_95 = int(0.05 * len(losses))
-        var_95 = losses[idx_95] if losses else 0.0
+        if idx_95 == 0 and len(losses) > 0:
+            idx_95 = 1
+        var_95 = losses[idx_95 - 1] if losses and idx_95 <= len(losses) else (losses[0] if losses else 0.0)
         tail_losses = losses[:idx_95] if idx_95 > 0 else [var_95]
         cvar_95 = sum(tail_losses) / len(tail_losses) if tail_losses else var_95
 
@@ -118,7 +120,9 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
     losses.sort(reverse=True)
 
     idx_95 = int(0.05 * len(losses))
-    var_95 = losses[idx_95] if losses else 0.0
+    if idx_95 == 0 and len(losses) > 0:
+        idx_95 = 1
+    var_95 = losses[idx_95 - 1] if losses and idx_95 <= len(losses) else (losses[0] if losses else 0.0)
     tail_losses = losses[:idx_95] if idx_95 > 0 else [var_95]
     expected_shortfall = sum(tail_losses) / len(tail_losses) if tail_losses else var_95
 

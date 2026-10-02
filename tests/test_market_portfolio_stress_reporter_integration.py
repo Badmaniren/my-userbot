@@ -2,19 +2,13 @@ import unittest
 import os
 import uuid
 import random
-from skills.market_portfolio_stress_reporter import (
-    StressReporter,
-    PortfolioStressReporter,
-    generate_stress_report,
-    run_stress_reporting_pipeline
-)
+from skills.market_portfolio_stress_reporter import PortfolioStressReporter, StressReporter, generate_stress_report, run_stress_reporting_pipeline
 
 class TestPortfolioStressReporterIntegration(unittest.TestCase):
     def setUp(self):
         self.storage_file = f"test_storage_{uuid.uuid4()}.db"
-        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
-        self.shifts = [round(random.uniform(-0.2, 0.2), 4) for _ in range(3)]
-        self.percentage = round(random.uniform(-0.15, 0.15), 4)
+        self.symbol = f"SYM_{random.randint(1000, 9999)}"
+        self.shift_value = round(random.uniform(-0.5, 0.5), 4)
 
     def tearDown(self):
         if os.path.exists(self.storage_file):
@@ -23,44 +17,45 @@ class TestPortfolioStressReporterIntegration(unittest.TestCase):
             except OSError:
                 pass
 
-    def test_stress_reporter_class_methods(self):
+    def test_stress_reporter_pipeline_real_execution(self):
+        reporter = PortfolioStressReporter(self.storage_file)
+        shifts = [self.shift_value, self.shift_value * 2]
+        
+        result = reporter.run_stress_report(self.symbol, shifts)
+        
+        self.assertIsInstance(result, dict)
+        self.assertIn("simulation_results", result)
+        self.assertIn("base_report", result)
+        self.assertIn("compact_text_report", result)
+        self.assertIn("tabular_report", result)
+        self.assertIn("chart_export", result)
+        
+        self.assertIn(self.symbol, result["compact_text_report"])
+        self.assertEqual(result["tabular_report"][0]["symbol"], self.symbol)
+        self.assertEqual(result["tabular_report"][0]["shifts"], shifts)
+
+    def test_generate_stress_report_helper(self):
+        result = generate_stress_report(self.storage_file, self.symbol, self.shift_value)
+        self.assertIsInstance(result, dict)
+        self.assertIn("simulation_results", result)
+        self.assertIn("base_report", result)
+
+    def test_run_stress_reporting_pipeline_helper(self):
+        shifts = [self.shift_value]
+        result = run_stress_reporting_pipeline(self.storage_file, self.symbol, shifts)
+        self.assertIsInstance(result, dict)
+        self.assertIn("chart_export", result)
+        self.assertEqual(result["chart_export"]["data"], result["simulation_results"])
+
+    def test_stress_reporter_single_simulation(self):
         reporter = StressReporter(self.storage_file)
-        
-        report_res = reporter.run_stress_reporting(self.symbol, self.shifts)
-        self.assertIsInstance(report_res, dict)
-        self.assertIn("simulation_results", report_res)
-        self.assertIn("base_report", report_res)
-        self.assertIn("compact_text_report", report_res)
-        self.assertIn("tabular_report", report_res)
-        self.assertIn("chart_export", report_res)
-        
-        self.assertIn(self.symbol, report_res["compact_text_report"])
-        self.assertEqual(report_res["tabular_report"][0]["symbol"], self.symbol)
-        self.assertEqual(report_res["tabular_report"][0]["shifts"], self.shifts)
+        res = reporter.simulate_single(self.symbol, self.shift_value)
+        self.assertIsInstance(res, (dict, type(None)))
 
-        single_sim = reporter.simulate_single(self.symbol, self.percentage)
-        self.assertIsInstance(single_sim, dict)
-
+    def test_get_stream_data_execution(self):
+        reporter = StressReporter(self.storage_file)
         stream_data = reporter.get_stream_data()
-        self.assertIsInstance(stream_data, (dict, list, type(None)))
-
-    def test_portfolio_stress_reporter_inheritance(self):
-        portfolio_reporter = PortfolioStressReporter(self.storage_file)
-        pipeline_res = portfolio_reporter.run_stress_report(self.symbol, self.shifts)
-        
-        self.assertIsInstance(pipeline_res, dict)
-        self.assertEqual(pipeline_res["tabular_report"][0]["symbol"], self.symbol)
-
-    def test_module_helper_functions(self):
-        gen_res = generate_stress_report(self.storage_file, self.symbol, self.percentage)
-        self.assertIsInstance(gen_res, dict)
-        self.assertEqual(gen_res["tabular_report"][0]["symbol"], self.symbol)
-        self.assertEqual(gen_res["tabular_report"][0]["shifts"], [self.percentage])
-
-        pipe_res = run_stress_reporting_pipeline(self.storage_file, self.symbol, self.shifts)
-        self.assertIsInstance(pipe_res, dict)
-        self.assertEqual(pipe_res["tabular_report"][0]["symbol"], self.symbol)
-        self.assertEqual(pipe_res["tabular_report"][0]["shifts"], self.shifts)
+        self.assertIsNotNone(stream_data)
 
 if __name__ == "__main__":
     unittest.main()

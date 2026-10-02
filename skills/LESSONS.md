@@ -3,7 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-азуемо или пробрось наружу через raise.; АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'market_portfolio_api_gateway' глобальной переменной!
+et_portfolio_api_gateway' глобальной переменной!
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -305,6 +305,9 @@
 ## market_portfolio_stress_recovery_coordinator_bridge (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_scenario_pipeline (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_scenario_pipeline (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

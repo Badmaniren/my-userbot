@@ -2,6 +2,10 @@ import io
 import requests
 from bs4 import BeautifulSoup
 
+from skills.market_portfolio_scenario_simulator import market_portfolio_scenario_simulator
+from skills.market_portfolio_stress_monte_carlo_engine import market_portfolio_stress_monte_carlo_engine
+from skills.market_report_generator import market_report_generator
+
 class MarketPortfolioStressAuditVisualizer:
     def __init__(self, **kwargs):
         self.dependencies = kwargs

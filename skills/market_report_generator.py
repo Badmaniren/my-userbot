@@ -99,3 +99,13 @@ def generate_market_report(storage_file, symbol):
                 break
                 
     return f"Report for {symbol}: price {price}"
+
+def market_report_generator(payload=None, *args, **kwargs):
+    if isinstance(payload, dict):
+        storage_file = payload.get("storage_file")
+        symbol = payload.get("symbol", "DEFAULT")
+        return generate_market_report(storage_file, symbol)
+    elif isinstance(payload, str):
+        symbol = args[0] if args else "DEFAULT"
+        return generate_market_report(payload, symbol)
+    return generate_market_report(None, "DEFAULT")

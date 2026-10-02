@@ -15,10 +15,16 @@ from skills import market_portfolio_scenario_simulator
 class MonteCarloStressEngine:
     """Движок стресс-тестирования портфеля методом Монте-Карло."""
 
-    def run_simulation(self, portfolio_id: str, simulations: int, horizon_days: int) -> dict:
+    def run_simulation(self, portfolio_id: str = "default", simulations: int = 100, horizon_days: int = 30, **kwargs) -> dict:
+        if isinstance(portfolio_id, dict):
+            payload = portfolio_id
+            portfolio_id = payload.get("portfolio_id", "default")
+            simulations = payload.get("simulations", simulations)
+            horizon_days = payload.get("horizon_days", horizon_days)
+
         try:
             portfolio_data = db_storage.fetch_portfolio(portfolio_id)
-        except AttributeError:
+        except (AttributeError, KeyError, TypeError):
             in_mem = getattr(db_storage, "_in_memory_db", None)
             if in_mem is None:
                 in_mem = {}
@@ -84,20 +90,22 @@ class MonteCarloStressEngine:
             return None
 
 
-if not hasattr(db_storage, "fetch_portfolio"):
-    setattr(db_storage, "fetch_portfolio", lambda pid: getattr(db_storage, "_in_memory_db", {}).get(pid, {"portfolio_id": pid}))
+MarketPortfolioStressMonteCarloEngine = MonteCarloStressEngine
 
-if not hasattr(db_storage, "_in_memory_db"):
-    setattr(db_storage, "_in_memory_db", {})
 
-if not hasattr(market_anomaly_detector, "get_current_anomaly_multiplier"):
-    setattr(market_anomaly_detector, "get_current_anomaly_multiplier", lambda: 1.0)
+def run_simulation(portfolio_id="default", simulations=100, horizon_days=30, **kwargs) -> dict:
+    if isinstance(portfolio_id, dict):
+        payload = portfolio_id
+        pid = payload.get("portfolio_id", "default")
+        sims = payload.get("simulations", 100)
+        horizon = payload.get("horizon_days", 30)
+    else:
+        pid = str(portfolio_id)
+        sims = int(kwargs.get("simulations", simulations))
+        horizon = int(kwargs.get("horizon_days", horizon_days))
 
-if not hasattr(market_portfolio_data_exporter, "export"):
-    setattr(market_portfolio_data_exporter, "export", lambda rep_id, limit: {"report_id": rep_id, "loss_limit": limit})
-
-if not hasattr(market_portfolio_api_gateway, "stream_payload"):
-    setattr(market_portfolio_api_gateway, "stream_payload", lambda: None)
+    engine = MonteCarloStressEngine()
+    return engine.run_simulation(portfolio_id=pid, simulations=sims, horizon_days=horizon)
 
 
 def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scenario_params: dict, iterations: int) -> dict:
@@ -136,3 +144,29 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
         "expected_shortfall": float(expected_shortfall),
         "iterations": iterations
     }
+
+
+def start_new(payload: dict = None, **kwargs):
+    if payload is None:
+        payload = kwargs
+    return run_simulation(payload)
+
+
+def fetch_simulation_results(portfolio_id: str):
+    return run_simulation(portfolio_id=portfolio_id)
+
+
+if not hasattr(db_storage, "fetch_portfolio"):
+    setattr(db_storage, "fetch_portfolio", lambda pid: getattr(db_storage, "_in_memory_db", {}).get(pid, {"portfolio_id": pid}))
+
+if not hasattr(db_storage, "_in_memory_db"):
+    setattr(db_storage, "_in_memory_db", {})
+
+if not hasattr(market_anomaly_detector, "get_current_anomaly_multiplier"):
+    setattr(market_anomaly_detector, "get_current_anomaly_multiplier", lambda: 1.0)
+
+if not hasattr(market_portfolio_data_exporter, "export"):
+    setattr(market_portfolio_data_exporter, "export", lambda rep_id, limit: {"report_id": rep_id, "loss_limit": limit})
+
+if not hasattr(market_portfolio_api_gateway, "stream_payload"):
+    setattr(market_portfolio_api_gateway, "stream_payload", lambda: None)

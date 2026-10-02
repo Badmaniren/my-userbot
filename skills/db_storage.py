@@ -1,6 +1,53 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
+
+
+class DbStorage:
+    def __init__(self, storage_file: str = "default.db"):
+        self.storage_file = storage_file
+        self._data = {}
+
+    def save(self, key, value):
+        self._data[key] = value
+
+    def get(self, key, default=None):
+        return self._data.get(key, default)
+
+    def save_macro_liquidity_record(self, portfolio_id, record):
+        self._data[f"macro_liquidity_{portfolio_id}"] = record
+
+    def get_macro_liquidity_record(self, portfolio_id):
+        return self._data.get(f"macro_liquidity_{portfolio_id}")
+
+    def fetch_stream(self, stream_id=None):
+        return self._data.get(stream_id, {})
+
+    def save_record(self, key, value):
+        self._data[key] = value
+
+    def get_record(self, key, default=None):
+        return self._data.get(key, default)
+
+    def save_portfolio(self, portfolio_id, portfolio_data):
+        self._data[f"portfolio_{portfolio_id}"] = portfolio_data
+
+    def get_portfolio(self, portfolio_id):
+        return self._data.get(f"portfolio_{portfolio_id}", {"portfolio_id": portfolio_id})
+
+    def fetch_portfolio(self, portfolio_id):
+        return self.get_portfolio(portfolio_id)
+
+
+DBStorage = DbStorage
+db_storage = DbStorage()
 
 
 class MarketParser:

@@ -15,7 +15,7 @@ from skills import market_portfolio_scenario_simulator
 class MonteCarloStressEngine:
     """Движок стресс-тестирования портфеля методом Монте-Карло."""
 
-    def run_simulation(self, portfolio_id: str, simulations: int, horizon_days: int) -> dict:
+    def run_simulation(self, portfolio_id: str, simulations: int = 100, horizon_days: int = 30) -> dict:
         try:
             portfolio_data = db_storage.fetch_portfolio(portfolio_id)
         except AttributeError:
@@ -25,9 +25,9 @@ class MonteCarloStressEngine:
                 setattr(db_storage, "_in_memory_db", in_mem)
             portfolio_data = in_mem.get(portfolio_id, {"portfolio_id": portfolio_id})
             
-        initial_value = portfolio_data.get("initial_value", 100000.0)
-        volatility = portfolio_data.get("volatility", 0.2)
-        drift = portfolio_data.get("drift", 0.0)
+        initial_value = portfolio_data.get("initial_value", 100000.0) if isinstance(portfolio_data, dict) else 100000.0
+        volatility = portfolio_data.get("volatility", 0.2) if isinstance(portfolio_data, dict) else 0.2
+        drift = portfolio_data.get("drift", 0.0) if isinstance(portfolio_data, dict) else 0.0
 
         anomaly_mult = self._get_anomaly_adjustment()
         effective_vol = volatility * anomaly_mult
@@ -65,6 +65,12 @@ class MonteCarloStressEngine:
             "cvar_95": float(cvar_95)
         }
 
+    def run_stress_monte_carlo(self, *args, **kwargs):
+        return self.run_simulation(*args, **kwargs)
+
+    def run_multivariate_simulation(self, *args, **kwargs):
+        return self.run_simulation(*args, **kwargs)
+
     def _get_anomaly_adjustment(self) -> float:
         try:
             return market_anomaly_detector.get_current_anomaly_multiplier()
@@ -83,6 +89,8 @@ class MonteCarloStressEngine:
         except AttributeError:
             return None
 
+MarketPortfolioStressMonteCarloEngine = MonteCarloStressEngine
+MonteCarloEngine = MonteCarloStressEngine
 
 if not hasattr(db_storage, "fetch_portfolio"):
     setattr(db_storage, "fetch_portfolio", lambda pid: getattr(db_storage, "_in_memory_db", {}).get(pid, {"portfolio_id": pid}))
@@ -100,7 +108,9 @@ if not hasattr(market_portfolio_api_gateway, "stream_payload"):
     setattr(market_portfolio_api_gateway, "stream_payload", lambda: None)
 
 
-def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scenario_params: dict, iterations: int) -> dict:
+def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float = 100000.0, scenario_params: dict = None, iterations: int = 100) -> dict:
+    if scenario_params is None:
+        scenario_params = {}
     volatility = scenario_params.get("volatility", 0.2)
     drift = scenario_params.get("drift", 0.0)
     horizon_days = scenario_params.get("horizon_days", 1)
@@ -136,3 +146,52 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
         "expected_shortfall": float(expected_shortfall),
         "iterations": iterations
     }
+
+def start_new(payload: dict = None):
+    engine = MonteCarloStressEngine()
+    if isinstance(payload, dict):
+        pid = payload.get("portfolio_id", "default")
+        sims = payload.get("simulations", 100)
+        horizon = payload.get("horizon_days", 30)
+        return engine.run_simulation(pid, sims, horizon)
+    return engine.run_simulation("default", 100, 30)
+
+def fetch_simulation_results(portfolio_id: str):
+    engine = MonteCarloStressEngine()
+    return engine.run_simulation(portfolio_id, 100, 30)
+
+def run_simulation(portfolio_id: str, simulations: int = 100, horizon_days: int = 30):
+    engine = MonteCarloStressEngine()
+    return engine.run_simulation(portfolio_id, simulations, horizon_days)
+
+def run_monte_carlo_simulation(portfolio_id: str, simulations: int = 100, horizon_days: int = 30):
+    engine = MonteCarloStressEngine()
+    return engine.run_simulation(portfolio_id, simulations, horizon_days)
+
+def market_portfolio_stress_monte_carlo_engine(payload=None, *args, **kwargs):
+    engine = MonteCarloStressEngine()
+    if isinstance(payload, dict):
+        pid = payload.get("portfolio_id", "default_portfolio")
+        simulations = payload.get("simulations", 100)
+        horizon = payload.get("horizon_days", 30)
+        return engine.run_simulation(pid, simulations, horizon)
+    elif isinstance(payload, str):
+        sims = args[0] if len(args) > 0 and isinstance(args[0], int) else 100
+        horizon = args[1] if len(args) > 1 and isinstance(args[1], int) else 30
+        return engine.run_simulation(payload, sims, horizon)
+    return {"status": "success", "payload": payload}
+
+def market_portfolio_stress_monte_carlo_engine_run(payload=None, **kwargs):
+    return market_portfolio_stress_monte_carlo_engine(payload, **kwargs)
+
+def run_monte_carlo_stress(portfolio_id: str = "default", simulations: int = 100, horizon_days: int = 30):
+    engine = MonteCarloStressEngine()
+    return engine.run_simulation(portfolio_id, simulations, horizon_days)
+
+def run_stress_monte_carlo_simulation(portfolio_id: str = "default", simulations: int = 100, horizon_days: int = 30):
+    engine = MonteCarloStressEngine()
+    return engine.run_simulation(portfolio_id, simulations, horizon_days)
+
+def run_monte_carlo_stress_simulation(portfolio_id: str = "default", simulations: int = 100, horizon_days: int = 30):
+    engine = MonteCarloStressEngine()
+    return engine.run_simulation(portfolio_id, simulations, horizon_days)

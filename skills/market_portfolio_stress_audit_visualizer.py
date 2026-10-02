@@ -11,6 +11,23 @@ class MarketPortfolioStressAuditVisualizer:
     def visualize(self, payload):
         return market_portfolio_stress_audit_visualizer(payload)
 
+    def render_audit_dashboard(self, report_data=None, audit_verdict=None):
+        if report_data is None:
+            report_data = {}
+        if audit_verdict is None:
+            audit_verdict = {}
+
+        return {
+            "dashboard_status": "rendered",
+            "portfolio_id": report_data.get("portfolio_id", "DEFAULT"),
+            "report_summary": report_data,
+            "compliance_verdict": audit_verdict,
+            "visual_elements": {
+                "drawdown_chart": "ASCII/Graphical Chart",
+                "mc_distribution": "Tail Risk Monte Carlo Curve"
+            }
+        }
+
 
 def market_portfolio_stress_audit_visualizer(payload):
     if not isinstance(payload, dict):

@@ -4,7 +4,10 @@ from skills.market_portfolio_audit_log_exporter import PortfolioAuditLogExporter
 
 
 class MarketPortfolioAuditComplianceHub:
-    def __init__(self, storage_file=None, db_storage=None, audit_exporter=None):
+    def __init__(self, storage_file=None, db_storage=None, audit_exporter=None, max_allowable_drawdown_pct=None, **kwargs):
+        self.max_allowable_drawdown_pct = max_allowable_drawdown_pct if max_allowable_drawdown_pct is not None else 20.0
+        self.kwargs = kwargs
+
         if db_storage is not None:
             self.db_storage = db_storage
         else:
@@ -71,3 +74,29 @@ class MarketPortfolioAuditComplianceHub:
                     f.write("{}")
             return True
         return res
+
+    def audit_stress_report(self, report_data=None):
+        if report_data is None:
+            report_data = {}
+
+        sim_res = report_data.get("simulation_result", {})
+        drawdown_pct = sim_res.get("drawdown_pct")
+        if drawdown_pct is None:
+            market_shock_pct = sim_res.get("market_shock_pct", 0.0)
+            drawdown_pct = abs(market_shock_pct) if market_shock_pct < 0 else 0.0
+
+        compliant = drawdown_pct <= self.max_allowable_drawdown_pct
+        if compliant:
+            reason = f"Drawdown {drawdown_pct}% is within limit of {self.max_allowable_drawdown_pct}%"
+        else:
+            reason = f"Drawdown {drawdown_pct}% exceeds limit of {self.max_allowable_drawdown_pct}%"
+
+        return {
+            "compliant": compliant,
+            "max_allowable_drawdown_pct": self.max_allowable_drawdown_pct,
+            "actual_drawdown_pct": drawdown_pct,
+            "reason": reason
+        }
+
+
+ComplianceHub = MarketPortfolioAuditComplianceHub

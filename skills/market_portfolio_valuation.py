@@ -66,3 +66,28 @@ class PortfolioValuation:
 
     def calculate_portfolio_pnl(self, url):
         return self.get_total_summary(url)
+
+
+class PortfolioValuationEngine:
+    """Движок оценки стоимости портфеля."""
+
+    def evaluate(self, portfolio_data: dict):
+        if not isinstance(portfolio_data, dict):
+            return 0.0
+
+        assets = portfolio_data.get("assets", [])
+        if not assets:
+            return 0.0
+
+        total_value = 0.0
+        for asset in assets:
+            if isinstance(asset, dict):
+                pos_size = asset.get("position_size")
+                if pos_size is not None:
+                    total_value += float(pos_size)
+                else:
+                    qty = float(asset.get("quantity", 0.0))
+                    price = float(asset.get("price", asset.get("buy_price", 0.0)))
+                    total_value += qty * price
+
+        return round(total_value, 2)

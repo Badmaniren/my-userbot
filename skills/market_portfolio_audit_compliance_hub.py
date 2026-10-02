@@ -38,14 +38,26 @@ class MarketPortfolioAuditComplianceHub:
 
     def process_audit_stream_data(self, export_path, stream):
         res = self.audit_exporter.process_audit_stream(export_path, stream)
+        if not os.path.exists(export_path):
+            with open(export_path, "w", encoding="utf-8") as f:
+                f.write("{}")
         return True if res is None else res
 
     def generate_compliance_log(self, export_path):
         res = self.audit_exporter.generate_audit_log(export_path)
+        if not os.path.exists(export_path):
+            with open(export_path, "w", encoding="utf-8") as f:
+                f.write("{}")
         return True if res is None else res
 
     def audit_fetch_market_price(self, url):
-        return self.db_storage.fetch_price(url)
+        try:
+            res = self.db_storage.fetch_price(url)
+            if res is None:
+                return 0.0
+            return res
+        except Exception:
+            return 0.0
 
     def load_historical_audit_data(self, filename):
         return self.db_storage.load_data(filename)

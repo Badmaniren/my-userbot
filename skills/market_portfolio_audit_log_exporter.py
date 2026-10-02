@@ -1,6 +1,7 @@
 import json
 import os
 import csv
+import io
 from skills.market_parser import MarketParser
 
 
@@ -33,9 +34,42 @@ class PortfolioAuditLogExporter:
         except Exception:
             return False
 
+        export_dir = os.path.dirname(export_path)
+        if export_dir and not os.path.exists(export_dir):
+            os.makedirs(export_dir, exist_ok=True)
+
         with open(export_path, 'w', encoding='utf-8') as f:
             f.write(data)
         return True
+
+    def save_to_storage(self, data):
+        existing = self._read_storage()
+        if isinstance(existing, list):
+            existing.append(data)
+        else:
+            existing = [existing, data] if existing else [data]
+
+        storage_dir = os.path.dirname(self.storage_file)
+        if storage_dir and not os.path.exists(storage_dir):
+            os.makedirs(storage_dir, exist_ok=True)
+
+        with open(self.storage_file, 'w', encoding='utf-8') as f:
+            json.dump(existing, f, ensure_ascii=False, indent=2)
+
+    def process_audit_stream(self, export_path: str, stream=None) -> bool:
+        if stream is not None:
+            if not isinstance(stream, (io.BytesIO, io.BufferedReader, io.RawIOBase)):
+                self.save_to_storage(stream)
+                export_dir = os.path.dirname(export_path)
+                if export_dir and not os.path.exists(export_dir):
+                    os.makedirs(export_dir, exist_ok=True)
+                with open(export_path, 'w', encoding='utf-8') as f:
+                    json.dump(stream, f, ensure_ascii=False, indent=2)
+                return True
+        return self.export_audit_logs(export_path)
+
+    def generate_audit_log(self, export_path: str) -> bool:
+        return self.export_audit_logs(export_path)
 
     def get_audit_stream_summary(self) -> dict:
         if not os.path.exists(self.storage_file):
@@ -99,5 +133,5 @@ class MarketPortfolioAuditLogExporter(PortfolioAuditLogExporter):
     def generate_audit_log(self, export_path: str):
         return self.export_audit_logs(export_path)
 
-    def process_audit_stream(self, export_path: str):
-        return self.export_audit_logs(export_path)
+    def process_audit_stream(self, export_path: str, stream=None):
+        return super().process_audit_stream(export_path, stream)

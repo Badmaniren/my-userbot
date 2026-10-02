@@ -132,3 +132,25 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
         "expected_shortfall": float(expected_shortfall),
         "iterations": iterations
     }
+
+
+def market_portfolio_stress_monte_carlo_engine(portfolio_id=None, iterations=100, scenario_payload=None, *args, **kwargs):
+    if isinstance(portfolio_id, dict):
+        payload = portfolio_id
+        portfolio_id = payload.get("portfolio_id", "default_portfolio")
+    else:
+        payload = scenario_payload or {}
+
+    engine = MonteCarloStressEngine()
+    result = engine.run_simulation(portfolio_id, simulations=iterations, horizon_days=1)
+    if isinstance(payload, dict):
+        for k, v in payload.items():
+            if k not in result:
+                result[k] = v
+    if "simulation_id" not in result:
+        result["simulation_id"] = f"sim_{portfolio_id}"
+    return result
+
+MarketPortfolioStressMonteCarloEngine = MonteCarloStressEngine
+run_monte_carlo_simulation = run_monte_carlo_stress_test
+start_new = market_portfolio_stress_monte_carlo_engine

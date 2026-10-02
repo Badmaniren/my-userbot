@@ -21,6 +21,8 @@ def market_portfolio_stress_audit_visualizer(payload):
 
     adaptive_score = payload.get("adaptive_risk_score")
     export_text = payload.get("export_to_text_report", False)
+    tail_risk_metrics = payload.get("tail_risk_metrics")
+    stream_payload = payload.get("stream_payload")
 
     if format_type == "text_summary":
         base_msg = (
@@ -40,4 +42,8 @@ def market_portfolio_stress_audit_visualizer(payload):
         }
         if adaptive_score is not None:
             result["adaptive_risk_score"] = adaptive_score
+        if tail_risk_metrics is not None:
+            result["tail_risk_metrics"] = tail_risk_metrics
+        if stream_payload is not None:
+            result["stream_payload"] = stream_payload
         return result

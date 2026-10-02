@@ -55,3 +55,15 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+_STRESS_INSPECTION_STORE = {}
+
+
+def save_stress_inspection_result(portfolio_id: str, result: dict) -> bool:
+    _STRESS_INSPECTION_STORE[portfolio_id] = result
+    return True
+
+
+def get_stress_inspection_result(portfolio_id: str) -> dict:
+    return _STRESS_INSPECTION_STORE.get(portfolio_id, {})

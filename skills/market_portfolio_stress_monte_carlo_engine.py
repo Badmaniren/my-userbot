@@ -132,3 +132,14 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
         "expected_shortfall": float(expected_shortfall),
         "iterations": iterations
     }
+
+
+def run_monte_carlo_simulation(portfolio_id: str = None, iterations: int = 100, horizon_days: int = 30, **kwargs) -> dict:
+    engine = MonteCarloStressEngine()
+    res = engine.run_simulation(portfolio_id=portfolio_id or "default_portfolio", simulations=iterations, horizon_days=horizon_days)
+    return {
+        "portfolio_id": portfolio_id,
+        "iterations": iterations,
+        "var_95": res.get("var_95", 0.0),
+        "cvar_95": res.get("cvar_95", 0.0)
+    }

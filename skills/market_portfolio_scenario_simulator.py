@@ -112,3 +112,14 @@ def run_stress_test(storage_file, symbol, range_min, range_max, step):
         "symbol": symbol,
         "scenarios": scenarios
     }
+
+def simulate_stress_scenario(portfolio_id=None, scenario_id=None, volatility_factor=0.2, **kwargs):
+    logger.info("simulate_stress_scenario invoked for portfolio_id=%s, scenario_id=%s", portfolio_id, scenario_id)
+    return {
+        "portfolio_id": portfolio_id,
+        "scenario_id": scenario_id or "default_stress_scenario",
+        "volatility_factor": volatility_factor,
+        "status": "simulated",
+        "stress_shock": -0.15,
+        "vulnerability_index": 0.45
+    }

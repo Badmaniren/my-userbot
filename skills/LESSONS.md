@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-monte_carlo_engine (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_report_generator (refactor) — раундов: 3
+generator (refactor) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main
 
@@ -322,6 +319,9 @@ monte_carlo_engine (refactor) — раундов: 1
 ## market_portfolio_tail_risk_metrics_calculator (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_reporter (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_reporter (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

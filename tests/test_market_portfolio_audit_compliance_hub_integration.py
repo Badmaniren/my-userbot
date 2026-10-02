@@ -5,62 +5,70 @@ import random
 from skills.market_portfolio_audit_compliance_hub import MarketPortfolioAuditComplianceHub
 from skills.db_storage import MarketParser
 from skills.market_portfolio_audit_log_exporter import PortfolioAuditLogExporter
+from skills.market_portfolio_stress_monte_carlo_engine import MarketPortfolioStressMonteCarloEngine
+
 
 class TestMarketPortfolioAuditComplianceHubIntegration(unittest.TestCase):
     def setUp(self):
-        self.rand_suffix = uuid.uuid4().hex[:8]
-        self.storage_file = f"test_audit_storage_{self.rand_suffix}.db"
-        self.export_path = f"test_compliance_export_{self.rand_suffix}.json"
+        self.random_suffix = uuid.uuid4().hex[:8]
+        self.storage_file = f"test_storage_{self.random_suffix}.json"
+        self.export_path = f"test_audit_export_{self.random_suffix}.json"
         
-        self.db_storage = MarketParser(self.storage_file)
-        self.audit_exporter = PortfolioAuditLogExporter(self.storage_file)
-        
-        self.hub = MarketPortfolioAuditComplianceHub(
-            storage_file=self.storage_file,
-            db_storage=self.db_storage,
-            audit_exporter=self.audit_exporter
-        )
+        self.hub = MarketPortfolioAuditComplianceHub(storage_file=self.storage_file)
 
     def tearDown(self):
-        for path in [self.storage_file, self.export_path]:
-            if os.path.exists(path):
+        for filepath in [self.storage_file, self.export_path]:
+            if os.path.exists(filepath):
                 try:
-                    os.remove(path)
+                    os.remove(filepath)
                 except OSError:
                     pass
 
-    def test_compliance_hub_integration_workflow(self):
-        random_price_url = f"https://finance.example.com/asset/{uuid.uuid4().hex}"
+    def test_compliance_hub_monte_carlo_and_export_integration(self):
+        test_stream_data = f"audit_stream_payload_{uuid.uuid4().hex}"
         
-        integrity_result = self.hub.check_compliance_integrity()
-        self.assertIn(integrity_result, [True, False])
-
-        export_res = self.hub.run_compliance_export(self.export_path)
-        self.assertTrue(export_res)
+        export_result = self.hub.run_compliance_export(self.export_path)
+        self.assertTrue(export_result)
         self.assertTrue(os.path.exists(self.export_path))
 
-        stream_data = f"audit_stream_payload_{uuid.uuid4().hex}"
-        stream_res = self.hub.process_audit_stream_data(self.export_path, stream_data)
-        self.assertIn(stream_res, [True, False])
-
-        gen_res = self.hub.generate_compliance_log(self.export_path)
-        self.assertIn(gen_res, [True, False])
+        integrity_status = self.hub.check_compliance_integrity()
+        self.assertIn(integrity_status, [True, False])
 
         summary = self.hub.fetch_compliance_summary()
         self.assertIsNotNone(summary)
 
-        historical_filename = f"history_{uuid.uuid4().hex}.json"
-        history_data = self.hub.load_historical_audit_data(historical_filename)
-        self.assertIsNotNone(history_data)
+        process_result = self.hub.process_audit_stream_data(self.export_path, test_stream_data)
+        self.assertIn(process_result, [True, False])
 
-        market_price = self.hub.audit_fetch_market_price(random_price_url)
-        self.assertIsNotNone(market_price)
+        log_generation = self.hub.generate_compliance_log(self.export_path)
+        self.assertTrue(log_generation)
 
-        verify_res = self.hub.verify_log_integrity()
-        self.assertIn(verify_res, [True, False])
+        random_url = f"http://example.com/market/price/{uuid.uuid4().hex}"
+        price = self.hub.audit_fetch_market_price(random_url)
+        self.assertIsInstance(price, float)
 
-        export_logs_res = self.hub.export_audit_logs(self.export_path)
-        self.assertTrue(export_logs_res)
+        historical_data_load = self.hub.load_historical_audit_data(self.storage_file)
+        self.assertIsNotNone(historical_data_load)
+
+        stream_summary = self.hub.get_audit_stream_summary()
+        self.assertIsNotNone(stream_summary)
+
+        log_verify = self.hub.verify_log_integrity()
+        self.assertIn(log_verify, [True, False])
+
+        second_export_path = f"test_secondary_export_{uuid.uuid4().hex}.json"
+        try:
+            secondary_export = self.hub.export_audit_logs(second_export_path)
+            self.assertTrue(secondary_export)
+            self.assertTrue(os.path.exists(second_export_path))
+        finally:
+            if os.path.exists(second_export_path):
+                os.remove(second_export_path)
+
+        self.assertIsInstance(self.hub.monte_carlo_engine, MarketPortfolioStressMonteCarloEngine)
+        self.assertIsInstance(self.hub.db_storage, MarketParser)
+        self.assertIsInstance(self.hub.audit_exporter, PortfolioAuditLogExporter)
+
 
 if __name__ == "__main__":
     unittest.main()

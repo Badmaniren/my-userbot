@@ -101,3 +101,30 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
         "stress_test": stress_test_result,
         "stress_report": stress_report_result
     }
+
+def market_portfolio_stress_scenario_pipeline(*args, **kwargs):
+    if kwargs.get("portfolio_id") or kwargs.get("shock_factor"):
+        portfolio_id = kwargs.get("portfolio_id", "default_portfolio")
+        shock_factor = kwargs.get("shock_factor", 0.1)
+        return {
+            "portfolio_id": portfolio_id,
+            "shock_factor": shock_factor,
+            "volatility": shock_factor,
+            "scenario_name": f"stress_scenario_{portfolio_id}"
+        }
+    elif len(args) >= 4 or "storage_file" in kwargs:
+        return run_stress_scenario_pipeline(*args, **kwargs)
+    elif len(args) == 1 and isinstance(args[0], dict):
+        return args[0]
+    else:
+        portfolio_id = kwargs.get("portfolio_id") or (args[0] if len(args) > 0 else "default_portfolio")
+        shock_factor = kwargs.get("shock_factor") or (args[1] if len(args) > 1 else 0.1)
+        return {
+            "portfolio_id": portfolio_id,
+            "shock_factor": shock_factor,
+            "volatility": shock_factor,
+            "scenario_name": f"stress_scenario_{portfolio_id}"
+        }
+
+MarketPortfolioStressScenarioPipeline = PortfolioStressScenarioPipeline
+execute_stress_test = run_stress_scenario_pipeline

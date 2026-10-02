@@ -3,12 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-'from skills.market_portfolio_stress_monte_carlo_engine i
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_monte_carlo_var_calculator (create) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
+ймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -302,4 +297,8 @@
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_audit_log_exporter (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_audit_log_exporter (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FileNotFoundError: [Errno 2] No such file or directory: '348577858dc346cb96b794e620949ca4.json'
 - Статус: успешно прошёл тесты и влит в main

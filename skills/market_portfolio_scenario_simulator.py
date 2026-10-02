@@ -81,7 +81,8 @@ class PortfolioScenarioSimulator:
     def run_stress_test(self, symbol, shifts):
         logger.info("Running stress test for symbol: %s with shifts: %s", symbol, shifts)
         report = []
-        for shift in shifts:
+        shifts_iterable = range(shifts) if isinstance(shifts, int) else shifts
+        for shift in shifts_iterable:
             try:
                 res = self.simulate_scenario(symbol, shift)
                 resulting_valuation = round(res["simulated_price"], 10)

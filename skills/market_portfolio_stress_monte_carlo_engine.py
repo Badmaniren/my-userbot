@@ -2,7 +2,6 @@ import math
 import random
 import uuid
 
-# Честные импорты зависимостей без использования заглушек через try-except
 from skills import db_storage
 from skills import market_anomaly_detector
 from skills import market_portfolio_data_exporter
@@ -82,22 +81,6 @@ class MonteCarloStressEngine:
             return market_portfolio_api_gateway.stream_payload()
         except AttributeError:
             return None
-
-
-if not hasattr(db_storage, "fetch_portfolio"):
-    setattr(db_storage, "fetch_portfolio", lambda pid: getattr(db_storage, "_in_memory_db", {}).get(pid, {"portfolio_id": pid}))
-
-if not hasattr(db_storage, "_in_memory_db"):
-    setattr(db_storage, "_in_memory_db", {})
-
-if not hasattr(market_anomaly_detector, "get_current_anomaly_multiplier"):
-    setattr(market_anomaly_detector, "get_current_anomaly_multiplier", lambda: 1.0)
-
-if not hasattr(market_portfolio_data_exporter, "export"):
-    setattr(market_portfolio_data_exporter, "export", lambda rep_id, limit: {"report_id": rep_id, "loss_limit": limit})
-
-if not hasattr(market_portfolio_api_gateway, "stream_payload"):
-    setattr(market_portfolio_api_gateway, "stream_payload", lambda: None)
 
 
 def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scenario_params: dict, iterations: int) -> dict:

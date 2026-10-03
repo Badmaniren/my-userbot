@@ -14,6 +14,10 @@ if not hasattr(market_parser, "get_raw_stream"):
     market_parser.get_raw_stream = _get_raw_stream
 
 
+def get_current_anomaly_multiplier() -> float:
+    return 1.0
+
+
 class MarketAnomalyDetector:
     def detect(self, ticker):
         try:

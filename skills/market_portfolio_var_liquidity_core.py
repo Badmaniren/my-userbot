@@ -41,12 +41,25 @@ def start_new(*args, **kwargs):
     return {"status": "success"}
 
 
+def calculate_var_and_liquidity(portfolio_id: str = None, confidence_level: float = 0.95, export_target: str = None, **kwargs):
+    """
+    Топ-левел функция для расчета VaR и ликвидности.
+    """
+    return start_new(
+        portfolio_id=portfolio_id,
+        confidence_level=confidence_level,
+        export_target=export_target,
+        **kwargs
+    )
+
+
 class market_portfolio_var_liquidity_core:
     """Класс для интеграционных и юнит-тестов, реализующий расчет VaR и ликвидности."""
     
-    def calculate_var_and_liquidity(self, portfolio_id: str, confidence_level: float, export_target: str = None):
-        return start_new(
+    def calculate_var_and_liquidity(self, portfolio_id: str = None, confidence_level: float = 0.95, export_target: str = None, **kwargs):
+        return calculate_var_and_liquidity(
             portfolio_id=portfolio_id,
             confidence_level=confidence_level,
-            export_target=export_target
+            export_target=export_target,
+            **kwargs
         )

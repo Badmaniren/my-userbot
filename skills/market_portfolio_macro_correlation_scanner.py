@@ -1,6 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
-
+from skills.db_storage import DbStorage  # Импортируем класс честно, согласно ошибке интеграционного теста
 
 class MarketPortfolioMacroCorrelationScanner:
     def __init__(

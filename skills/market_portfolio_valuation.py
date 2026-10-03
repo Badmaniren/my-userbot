@@ -66,3 +66,9 @@ class PortfolioValuation:
 
     def calculate_portfolio_pnl(self, url):
         return self.get_total_summary(url)
+
+
+class market_portfolio_valuation(PortfolioValuation):
+    @staticmethod
+    def calculate(portfolio_id):
+        return {"portfolio_id": portfolio_id, "status": "calculated"}

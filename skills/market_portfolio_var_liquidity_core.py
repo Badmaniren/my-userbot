@@ -50,3 +50,7 @@ class market_portfolio_var_liquidity_core:
             confidence_level=confidence_level,
             export_target=export_target
         )
+
+    @staticmethod
+    def evaluate_buffer(portfolio_id: str, liquidity_buffer: float):
+        return {"portfolio_id": portfolio_id, "liquidity_buffer": liquidity_buffer, "status": "evaluated"}

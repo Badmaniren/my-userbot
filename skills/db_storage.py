@@ -55,3 +55,32 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+_portfolio_states = {}
+
+
+def save_portfolio_state(portfolio_id: str, state: dict) -> None:
+    _portfolio_states[portfolio_id] = state
+
+
+def get_portfolio_state(portfolio_id: str) -> dict:
+    return _portfolio_states.get(portfolio_id)
+
+
+def load_portfolio_state(portfolio_id: str) -> dict:
+    return _portfolio_states.get(portfolio_id)
+
+
+class DBStorage:
+    def save_portfolio_state(self, portfolio_id: str, state: dict) -> None:
+        save_portfolio_state(portfolio_id, state)
+
+    def get_portfolio_state(self, portfolio_id: str) -> dict:
+        return get_portfolio_state(portfolio_id)
+
+    def load_portfolio_state(self, portfolio_id: str) -> dict:
+        return load_portfolio_state(portfolio_id)
+
+
+db_storage = DBStorage()

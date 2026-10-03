@@ -1,6 +1,11 @@
 import requests
 from bs4 import BeautifulSoup
 
+from skills.market_portfolio_liquidity_scenario_analyzer import market_portfolio_liquidity_scenario_analyzer
+from skills.market_portfolio_stress_scenario_pipeline import market_portfolio_stress_scenario_pipeline
+from skills.db_storage import db_storage
+
+
 class MarketPortfolioMacroFactorEvaluator:
     def __init__(
         self,
@@ -31,13 +36,13 @@ class MarketPortfolioMacroFactorEvaluator:
         if self.anomaly_detector:
             anomaly_res = self.anomaly_detector.analyze(portfolio_id)
             if anomaly_res and anomaly_res.get("anomaly"):
-                soup = BeautifulSoup("", "html.parser")
-                soup.text = anomaly_res.get("msg", "")
+                msg_val = anomaly_res.get("msg", "")
+                soup = BeautifulSoup(f"<span>{msg_val}</span>", "html.parser")
                 return {
                     "anomaly_alert": {
                         "active": True,
                         "code": anomaly_res.get("code"),
-                        "msg": anomaly_res.get("msg")
+                        "msg": msg_val
                     }
                 }
 

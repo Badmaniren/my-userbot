@@ -47,8 +47,13 @@ class MarketParser:
             try:
                 with open(self.storage_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
+                    if not isinstance(data, dict):
+                        data = {}
             except (json.JSONDecodeError, OSError):
                 data = {}
+
+        if not isinstance(data, dict):
+            data = {}
 
         data[symbol] = {
             "price": price,

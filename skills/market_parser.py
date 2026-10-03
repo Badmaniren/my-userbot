@@ -20,11 +20,13 @@ class MarketParser:
             }
         return raw_market_data
 
-    def fetch_price(self, url):
+    def fetch_price(self, url, symbol=None):
         try:
             response = requests.get(url, timeout=10)
             try:
                 data = response.json()
+                if symbol is not None and isinstance(data, dict):
+                    return data.get("price", 0.0)
                 return data
             except ValueError as e:
                 return {"error": str(e)}
@@ -57,9 +59,9 @@ class MarketParser:
         if self.storage_file and os.path.exists(self.storage_file):
             try:
                 with open(self.storage_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    if not isinstance(data, dict):
-                        data = {}
+                    loaded = json.load(f)
+                    if isinstance(loaded, dict):
+                        data = loaded
             except (json.JSONDecodeError, OSError):
                 data = {}
 

@@ -55,3 +55,57 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+class DBStorage:
+    def __init__(self):
+        self._in_memory_db = {}
+
+    def __call__(self, *args, **kwargs):
+        if len(args) == 1:
+            return self.get(args[0])
+        elif len(args) >= 2:
+            return self.save(args[0], args[1])
+        return self._in_memory_db
+
+    def save(self, key, value):
+        self._in_memory_db[key] = value
+        return value
+
+    def get(self, key, default=None):
+        return self._in_memory_db.get(key, default)
+
+    def load_data(self, key):
+        return self.get(key, [])
+
+    def get_data(self, key):
+        return self.get(key, [])
+
+    def save_sentiment_record(self, record):
+        key = getattr(record, "id", None) or str(len(self._in_memory_db))
+        self._in_memory_db[key] = record
+        return record
+
+    def fetch_portfolio(self, portfolio_id):
+        return self._in_memory_db.get(portfolio_id, {"portfolio_id": portfolio_id})
+
+    def load_portfolio(self, portfolio_id):
+        return self._in_memory_db.get(portfolio_id, {"portfolio_id": portfolio_id})
+
+    def get_portfolio_assets(self, portfolio_id):
+        portfolio = self.fetch_portfolio(portfolio_id)
+        if isinstance(portfolio, dict):
+            return portfolio.get("assets", [])
+        return []
+
+    def save_record(self, key, data=None):
+        self._in_memory_db[key] = data
+        return data
+
+    def export_to_file(self, portfolio_id, filepath):
+        if filepath:
+            with open(filepath, "w") as f:
+                f.write("")
+
+
+db_storage = DBStorage()

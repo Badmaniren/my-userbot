@@ -1,12 +1,20 @@
+import json
+import os
 from skills.market_portfolio_scenario_simulator import PortfolioScenarioSimulator
 from skills.market_report_generator import MarketReportGenerator
 
 
 class StressReporter:
-    def __init__(self, storage_file):
-        self.storage_file = storage_file
-        self.simulator = PortfolioScenarioSimulator(storage_file)
-        self.generator = MarketReportGenerator(storage_file)
+    def __init__(self, storage_file=None):
+        self.storage_file = storage_file or "default.db"
+        self.simulator = PortfolioScenarioSimulator(self.storage_file)
+        self.generator = MarketReportGenerator(self.storage_file)
+
+    def generate(self, report_data, output_file=None, **kwargs):
+        path = output_file or "stress_report.json"
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(report_data, f, indent=2, ensure_ascii=False)
+        return path
 
     def run_stress_reporting(self, symbol, shifts):
         sim_results = self.simulator.run_stress_test(symbol, shifts)

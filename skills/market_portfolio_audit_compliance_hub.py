@@ -20,6 +20,24 @@ class MarketPortfolioAuditComplianceHub:
         if not hasattr(self.audit_exporter, 'generate_audit_log'):
             setattr(self.audit_exporter, 'generate_audit_log', lambda path: True)
 
+    def verify_portfolio(self, portfolio_data, simulation_results=None, **kwargs):
+        is_compliant = True
+        reason = "Portfolio complies with regulatory risk limits"
+
+        if simulation_results and isinstance(simulation_results, dict):
+            var_limit = portfolio_data.get("initial_value", 1000000.0) * 0.5 if isinstance(portfolio_data, dict) else 500000.0
+            var_val = simulation_results.get("var_99", simulation_results.get("var_95", 0.0))
+            if var_val > var_limit:
+                is_compliant = False
+                reason = f"Excessive Value-at-Risk: {var_val} exceeds limit {var_limit}"
+
+        return {
+            "is_compliant": is_compliant,
+            "reason": reason,
+            "portfolio": portfolio_data,
+            "simulation_results": simulation_results
+        }
+
     def run_compliance_export(self, export_path):
         res = self.audit_exporter.export_audit_logs(export_path)
         if res is False or res is None:
@@ -71,3 +89,6 @@ class MarketPortfolioAuditComplianceHub:
                     f.write("{}")
             return True
         return res
+
+
+ComplianceHub = MarketPortfolioAuditComplianceHub

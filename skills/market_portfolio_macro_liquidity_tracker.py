@@ -1,8 +1,10 @@
 import os
 import uuid
 import io
+
 from skills.db_storage import db_storage
 from skills.market_portfolio_collector_agent import market_portfolio_collector_agent
+
 
 def start_new(dependencies):
     """

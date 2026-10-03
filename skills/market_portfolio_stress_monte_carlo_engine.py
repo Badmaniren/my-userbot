@@ -100,6 +100,22 @@ if not hasattr(market_portfolio_api_gateway, "stream_payload"):
     setattr(market_portfolio_api_gateway, "stream_payload", lambda: None)
 
 
+def market_portfolio_stress_monte_carlo_engine(payload=None, **kwargs):
+    if payload is None:
+        payload = kwargs
+    elif isinstance(payload, str):
+        payload = {"portfolio_id": payload}
+    elif not isinstance(payload, dict):
+        payload = {}
+
+    portfolio_id = payload.get("portfolio_id", "default_portfolio")
+    simulations = payload.get("simulations", payload.get("runs", 100))
+    horizon_days = payload.get("horizon_days", payload.get("horizon", 30))
+
+    engine = MonteCarloStressEngine()
+    return engine.run_simulation(portfolio_id, simulations, horizon_days)
+
+
 def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scenario_params: dict, iterations: int) -> dict:
     volatility = scenario_params.get("volatility", 0.2)
     drift = scenario_params.get("drift", 0.0)

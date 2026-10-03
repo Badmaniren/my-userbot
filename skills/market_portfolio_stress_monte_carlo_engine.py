@@ -15,7 +15,7 @@ from skills import market_portfolio_scenario_simulator
 class MonteCarloStressEngine:
     """Движок стресс-тестирования портфеля методом Монте-Карло."""
 
-    def run_simulation(self, portfolio_id: str, simulations: int, horizon_days: int) -> dict:
+    def run_simulation(self, portfolio_id: str = "default", simulations: int = 1000, horizon_days: int = 30) -> dict:
         try:
             portfolio_data = db_storage.fetch_portfolio(portfolio_id)
         except AttributeError:
@@ -84,6 +84,10 @@ class MonteCarloStressEngine:
             return None
 
 
+MarketPortfolioStressMonteCarloEngine = MonteCarloStressEngine
+market_portfolio_stress_monte_carlo_engine = MonteCarloStressEngine
+
+
 if not hasattr(db_storage, "fetch_portfolio"):
     setattr(db_storage, "fetch_portfolio", lambda pid: getattr(db_storage, "_in_memory_db", {}).get(pid, {"portfolio_id": pid}))
 
@@ -100,7 +104,9 @@ if not hasattr(market_portfolio_api_gateway, "stream_payload"):
     setattr(market_portfolio_api_gateway, "stream_payload", lambda: None)
 
 
-def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scenario_params: dict, iterations: int) -> dict:
+def run_monte_carlo_stress_test(portfolio_id: str = "default", portfolio_value: float = 100000.0, scenario_params: dict = None, iterations: int = 1000) -> dict:
+    if scenario_params is None:
+        scenario_params = {}
     volatility = scenario_params.get("volatility", 0.2)
     drift = scenario_params.get("drift", 0.0)
     horizon_days = scenario_params.get("horizon_days", 1)

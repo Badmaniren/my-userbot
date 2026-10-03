@@ -22,8 +22,10 @@ def run_pipeline(symbol, url, telegram_token, chat_id, storage_file):
     )
     return True
 
-def start_new(symbol, url, telegram_token, chat_id, storage_file):
+def start_new(symbol=None, url=None, telegram_token=None, chat_id=None, storage_file=None):
     """Точка входа для запуска нового мониторинга."""
+    if symbol is None:
+        return market_portfolio_monitor()
     return run_pipeline(
         symbol=symbol,
         url=url,
@@ -41,6 +43,19 @@ def start_ened(symbol, url, telegram_token, chat_id, storage_file):
         chat_id=chat_id,
         storage_file=storage_file
     )
+
+
+class market_portfolio_monitor:
+    """Класс/обертка мониторинга макро-ликвидности портфеля."""
+
+    def load_macro_state_from_file(self, file_path):
+        if not file_path or not os.path.exists(file_path):
+            return None
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+            if not content.strip():
+                return {}
+            return json.loads(content)
 
 
 class MarketParser:

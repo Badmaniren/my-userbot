@@ -57,6 +57,51 @@ def analyze_liquidity_stress_scenarios(
         "capital_reserve_requirement": reserve_capital_requirement
     }
 
+class market_portfolio_liquidity_scenario_analyzer:
+    """Анализатор сценариев ликвидности и VaR шоков."""
+
+    def evaluate_macro_scenarios(self, ingested_data):
+        if not ingested_data or not isinstance(ingested_data, dict):
+            return {}
+
+        total_val = ingested_data.get("total_value_usd", 1000000.0)
+        cash_buf = ingested_data.get("cash_buffer_usd", 0.0)
+        macro = ingested_data.get("macro_indicators", {})
+        mkt_liq = macro.get("market_liquidity_index", 1.0)
+
+        # Расчет VaR ликвидности (99%)
+        liquidity_var_99 = total_val * (1.0 - mkt_liq) * 0.15
+
+        # Оценка дефицита буфера при шоке
+        stress_shocks = ingested_data.get("stress_shocks", {})
+        liq_crunch = stress_shocks.get("liquidity_crunch", {})
+        redemption_pct = liq_crunch.get("redemption_shock_pct", 10.0)
+        potential_outflow = total_val * (redemption_pct / 100.0)
+        buffer_deficit = max(0.0, potential_outflow - cash_buf)
+
+        return {
+            "portfolio_id": ingested_data.get("portfolio_id"),
+            "liquidity_var_99": float(liquidity_var_99),
+            "buffer_deficit": float(buffer_deficit),
+            "total_value_usd": total_val,
+            "market_liquidity_index": mkt_liq
+        }
+
+    def evaluate_portfolio(
+        self,
+        portfolio_id,
+        confidence_level,
+        export_target,
+        symbol,
+        percentage,
+        shifts
+    ):
+        analyzer = MarketPortfolioLiquidityScenarioAnalyzer()
+        return analyzer.evaluate_portfolio(
+            portfolio_id, confidence_level, export_target, symbol, percentage, shifts
+        )
+
+
 class MarketPortfolioLiquidityScenarioAnalyzer:
     def __init__(self, storage_file=None):
         self.storage_file = storage_file

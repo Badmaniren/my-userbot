@@ -12,6 +12,43 @@ from skills import market_portfolio_valuation
 from skills import market_portfolio_scenario_simulator
 
 
+class market_portfolio_stress_monte_carlo_engine:
+    """Монте-Карло стресс-движок для симуляций с учетом макро-сценариев."""
+
+    def __init__(self, iterations=1000):
+        self.iterations = iterations
+
+    def run_stress_simulation(self, ingested_data, scenario_results):
+        if not ingested_data or not isinstance(ingested_data, dict):
+            return {}
+
+        total_value = ingested_data.get("total_value_usd", 100000.0)
+        scenario_results = scenario_results or {}
+        var_99 = scenario_results.get("liquidity_var_99", total_value * 0.05)
+
+        paths_simulated = self.iterations
+        simulated_drawdowns = []
+
+        for _ in range(paths_simulated):
+            shock = random.gauss(-0.05, 0.08)
+            simulated_drawdowns.append(shock)
+
+        simulated_drawdowns.sort()
+        median_idx = len(simulated_drawdowns) // 2
+        median_drawdown_pct = abs(round(simulated_drawdowns[median_idx] * 100, 2))
+
+        tail_idx = int(0.001 * len(simulated_drawdowns))
+        tail_loss_factor = abs(simulated_drawdowns[tail_idx]) if simulated_drawdowns else 0.15
+        tail_risk_loss_usd = total_value * tail_loss_factor + var_99
+
+        return {
+            "portfolio_id": ingested_data.get("portfolio_id"),
+            "paths_simulated": paths_simulated,
+            "median_drawdown_pct": median_drawdown_pct,
+            "tail_risk_loss_usd": float(tail_risk_loss_usd)
+        }
+
+
 class MonteCarloStressEngine:
     """Движок стресс-тестирования портфеля методом Монте-Карло."""
 

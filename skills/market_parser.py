@@ -46,7 +46,9 @@ class MarketParser:
         if self.storage_file and os.path.exists(self.storage_file):
             try:
                 with open(self.storage_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
+                    loaded = json.load(f)
+                    if isinstance(loaded, dict):
+                        data = loaded
             except (json.JSONDecodeError, OSError):
                 data = {}
 

@@ -1,5 +1,10 @@
 import json
 import os
+from skills import db_storage
+
+def _get_storage_handler():
+    """Безопасное получение доступных методов хранилища db_storage."""
+    return db_storage
 
 def run_pipeline(symbol, url, telegram_token, chat_id, storage_file):
     """Выполняет основной конвейер мониторинга портфеля."""
@@ -48,31 +53,47 @@ class MarketParser:
         self.storage_file = storage_file
 
     def fetch_and_store(self, symbol, price):
-        data = {}
-        if os.path.exists(self.storage_file):
-            with open(self.storage_file, "r", encoding="utf-8") as f:
-                content = f.read()
-                if content.strip():
-                    try:
-                        data = json.loads(content)
-                    except (json.JSONDecodeError, TypeError):
-                        data = {}
-        
+        data = self.load_data(self.storage_file)
+        if data is None or not isinstance(data, dict):
+            data = {}
         data[symbol] = price
-        with open(self.storage_file, "w", encoding="utf-8") as f:
-            json.dump(data, f)
+        store = _get_storage_handler()
+        if hasattr(store, "save_data"):
+            store.save_data(self.storage_file, data)
+        elif hasattr(store, "save"):
+            store.save(self.storage_file, data)
+        else:
+            with open(self.storage_file, "w", encoding="utf-8") as f:
+                json.dump(data, f)
 
     def load_data(self, storage_file):
-        if not os.path.exists(storage_file):
-            return None
-        with open(storage_file, "r", encoding="utf-8") as f:
-            content = f.read()
-            if not content.strip():
-                return {}
+        store = _get_storage_handler()
+        if hasattr(store, "load_data"):
             try:
-                return json.loads(content)
-            except (json.JSONDecodeError, TypeError):
-                return None
+                res = store.load_data(storage_file)
+                if isinstance(res, (dict, list)):
+                    return res
+            except (AttributeError, TypeError, OSError, json.JSONDecodeError):
+                pass
+        elif hasattr(store, "load"):
+            try:
+                res = store.load(storage_file)
+                if isinstance(res, (dict, list)):
+                    return res
+            except (AttributeError, TypeError, OSError, json.JSONDecodeError):
+                pass
+
+        try:
+            with open(storage_file, "r", encoding="utf-8") as f:
+                content = f.read()
+                if not content.strip():
+                    return None
+                try:
+                    return json.loads(content)
+                except (json.JSONDecodeError, TypeError):
+                    return None
+        except (FileNotFoundError, OSError):
+            return None
 
 
 class MarketReportGenerator:
@@ -86,10 +107,11 @@ class MarketReportGenerator:
         return f"Report for {symbol}: No data"
 
     def get_raw_stream_dump(self):
-        if os.path.exists(self.storage_file):
+        try:
             with open(self.storage_file, "r", encoding="utf-8") as f:
                 return f.read()
-        return "{}"
+        except (FileNotFoundError, OSError):
+            return "{}"
 
 
 def generate_market_report(storage_file, symbol):
@@ -113,14 +135,17 @@ def run_market_telegram_pipeline(storage_file, symbol, chat_id, url, telegram_to
 
 def export_audit_logs(storage_file=None):
     """Экспорт аудиторских логов с явным возвратом результата."""
-    if storage_file and os.path.exists(storage_file):
-        with open(storage_file, "r", encoding="utf-8") as f:
-            content = f.read()
-            if not content.strip():
-                return False
-            try:
-                json.loads(content)
-            except (json.JSONDecodeError, TypeError):
-                return False
-            return True
+    if storage_file:
+        try:
+            with open(storage_file, "r", encoding="utf-8") as f:
+                content = f.read()
+                if not content.strip():
+                    return False
+                try:
+                    json.loads(content)
+                except (json.JSONDecodeError, TypeError):
+                    return False
+                return True
+        except (FileNotFoundError, OSError):
+            return False
     return False

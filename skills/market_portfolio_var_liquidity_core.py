@@ -44,9 +44,18 @@ def start_new(*args, **kwargs):
 class market_portfolio_var_liquidity_core:
     """Класс для интеграционных и юнит-тестов, реализующий расчет VaR и ликвидности."""
     
-    def calculate_var_and_liquidity(self, portfolio_id: str, confidence_level: float, export_target: str = None):
+    def calculate_var_and_liquidity(self, portfolio_id: str, confidence_level: float = 0.95, export_target: str = None):
         return start_new(
             portfolio_id=portfolio_id,
             confidence_level=confidence_level,
             export_target=export_target
         )
+
+    def calculate(self, portfolio_id: str):
+        res = self.calculate_var_and_liquidity(portfolio_id)
+        if isinstance(res, dict):
+            return res.get("var_value", 0.0)
+        return float(res) if isinstance(res, (int, float)) else 0.0
+
+    def calculate_var(self, portfolio_id: str):
+        return self.calculate(portfolio_id)

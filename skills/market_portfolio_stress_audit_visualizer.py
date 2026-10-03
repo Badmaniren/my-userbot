@@ -1,12 +1,16 @@
 import io
 import requests
 from bs4 import BeautifulSoup
+from skills.market_portfolio_stress_monte_carlo_engine import market_portfolio_stress_monte_carlo_engine
+from skills.market_portfolio_liquidity_scenario_analyzer import market_portfolio_liquidity_scenario_analyzer
 
 
 class MarketPortfolioStressAuditVisualizer:
     def __init__(self, **kwargs):
         self.dependencies = kwargs
         self.db_storage = kwargs.get("db_storage")
+        self.monte_carlo_engine = kwargs.get("market_portfolio_stress_monte_carlo_engine", market_portfolio_stress_monte_carlo_engine)
+        self.liquidity_analyzer = kwargs.get("market_portfolio_liquidity_scenario_analyzer", market_portfolio_liquidity_scenario_analyzer)
 
     def visualize(self, payload):
         return market_portfolio_stress_audit_visualizer(payload)

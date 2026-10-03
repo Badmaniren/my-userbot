@@ -57,6 +57,33 @@ def analyze_liquidity_stress_scenarios(
         "capital_reserve_requirement": reserve_capital_requirement
     }
 
+def market_portfolio_liquidity_scenario_analyzer(payload=None, **kwargs):
+    if payload is None:
+        payload = kwargs
+    elif isinstance(payload, str):
+        payload = {"portfolio_id": payload}
+    elif not isinstance(payload, dict):
+        payload = {}
+
+    portfolio_id = payload.get("portfolio_id", payload.get("report_id", "default_portfolio"))
+    confidence_level = payload.get("confidence_level", 0.95)
+    export_target = payload.get("export_target")
+    symbol = payload.get("symbol", "AAPL")
+    percentage = payload.get("percentage", 0.0)
+    shifts = payload.get("shifts", [0.0])
+    storage_file = payload.get("storage_file", "default_scenario_storage.json")
+
+    return analyze_liquidity_stress_scenarios(
+        portfolio_id=portfolio_id,
+        confidence_level=confidence_level,
+        export_target=export_target,
+        symbol=symbol,
+        percentage=percentage,
+        shifts=shifts,
+        storage_file=storage_file
+    )
+
+
 class MarketPortfolioLiquidityScenarioAnalyzer:
     def __init__(self, storage_file=None):
         self.storage_file = storage_file

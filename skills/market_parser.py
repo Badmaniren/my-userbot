@@ -9,6 +9,17 @@ class MarketParser:
     def __init__(self, storage_file=None):
         self.storage_file = storage_file
 
+    def parse_raw_market_payload(self, raw_market_data):
+        if isinstance(raw_market_data, dict):
+            return {
+                "ticker": raw_market_data.get("ticker"),
+                "price": raw_market_data.get("price"),
+                "volume": raw_market_data.get("volume"),
+                "macro_indicator": raw_market_data.get("macro_indicator"),
+                "indicator_value": raw_market_data.get("indicator_value")
+            }
+        return raw_market_data
+
     def fetch_price(self, url):
         try:
             response = requests.get(url, timeout=10)
@@ -47,6 +58,8 @@ class MarketParser:
             try:
                 with open(self.storage_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
+                    if not isinstance(data, dict):
+                        data = {}
             except (json.JSONDecodeError, OSError):
                 data = {}
 
@@ -66,3 +79,6 @@ class MarketParser:
             with open(filename, 'r', encoding='utf-8') as f:
                 return json.load(f)
         return {}
+
+
+market_parser = MarketParser()

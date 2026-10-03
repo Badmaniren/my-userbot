@@ -75,10 +75,7 @@ class MarketParser:
             if content.strip().startswith("{") and not content.strip().endswith("}"):
                 raise json.JSONDecodeError("Unterminated object", content, 0)
             
-            try:
-                return json.loads(content)
-            except (json.JSONDecodeError, TypeError):
-                return None
+            return json.loads(content)
 
 
 class MarketReportGenerator:

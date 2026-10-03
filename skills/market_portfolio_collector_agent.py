@@ -97,3 +97,17 @@ def start_new(symbol: str, url: str, telegram_token: str, chat_id: str, storage_
         chat_id,
         storage_file
     )
+
+
+class PortfolioCollectorAgent:
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def collect(self, symbol: str = None):
+        return {"symbol": symbol}
+
+    def parse(self, data=None):
+        return {}
+
+
+market_portfolio_collector_agent = PortfolioCollectorAgent

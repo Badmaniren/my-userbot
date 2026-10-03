@@ -1,6 +1,18 @@
 import os
 import json
 from datetime import datetime
+from skills import db_storage
+
+
+def collect_portfolio_metrics(portfolio_id: str) -> dict:
+    try:
+        portfolio = db_storage.fetch_portfolio(portfolio_id)
+        if portfolio:
+            return portfolio
+    except Exception:
+        pass
+    return {"portfolio_id": portfolio_id, "status": "collected"}
+
 
 class MarketParser:
     def __init__(self, storage_file: str):

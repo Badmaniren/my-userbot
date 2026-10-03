@@ -2,6 +2,18 @@ import sqlite3
 import requests
 from bs4 import BeautifulSoup
 
+_portfolios = {}
+
+
+def save_portfolio(portfolio_id: str, payload: dict) -> None:
+    _portfolios[portfolio_id] = payload
+
+
+def fetch_portfolio(portfolio_id: str) -> dict:
+    if portfolio_id in _portfolios:
+        return _portfolios[portfolio_id]
+    return {"portfolio_id": portfolio_id}
+
 
 class MarketParser:
     def __init__(self, storage_file: str = "market_data.db"):

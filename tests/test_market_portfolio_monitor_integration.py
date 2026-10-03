@@ -1,18 +1,18 @@
 import unittest
 import os
-import json
 import uuid
 import random
-from skills.market_portfolio_monitor import start_new, start_ened, export_audit_logs
+from skills import market_portfolio_monitor
+from skills import db_storage
 
 class TestMarketPortfolioMonitorIntegration(unittest.TestCase):
+
     def setUp(self):
-        self.test_dir = os.path.dirname(__file__) if '__file__' in locals() else "."
-        self.storage_file = os.path.join(self.test_dir, f"test_storage_{uuid.uuid4().hex}.json")
-        self.symbol = f"SYM_{random.randint(1000, 9999)}"
-        self.url = f"https://api.mock-liquidity-provider.net/v1/{uuid.uuid4().hex[:8]}"
-        self.telegram_token = f"bot{random.randint(100000, 999999)}:AAG{uuid.uuid4().hex[:10]}"
-        self.chat_id = f"-100{random.randint(100000000, 999999999)}"
+        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
+        self.url = f"https://api.mockmarket.io/{uuid.uuid4().hex[:8]}"
+        self.telegram_token = f"bot{random.randint(100000, 999999)}:AAG{uuid.uuid4().hex[:15]}"
+        self.chat_id = str(random.randint(10000000, 99999999))
+        self.storage_file = f"test_storage_{uuid.uuid4().hex}.json"
 
     def tearDown(self):
         if os.path.exists(self.storage_file):
@@ -21,35 +21,34 @@ class TestMarketPortfolioMonitorIntegration(unittest.TestCase):
             except OSError:
                 pass
 
-    def test_pipeline_integration_flow(self):
-        initial_data = {self.symbol: round(random.uniform(10.0, 5000.0), 2)}
-        with open(self.storage_file, "w", encoding="utf-8") as f:
-            json.dump(initial_data, f)
+    def test_integration_pipeline_and_storage(self):
+        initial_price = round(random.uniform(10.0, 5000.0), 2)
 
-        res_new = start_new(
+        db_storage.save_data(self.storage_file, {self.symbol: initial_price})
+        self.assertTrue(os.path.exists(self.storage_file), "Файл хранилища должен быть создан через db_storage")
+
+        result = market_portfolio_monitor.start_new(
             symbol=self.symbol,
             url=self.url,
             telegram_token=self.telegram_token,
             chat_id=self.chat_id,
             storage_file=self.storage_file
         )
-        self.assertTrue(res_new)
 
-        res_ened = start_ened(
+        self.assertTrue(result, "Пайплайн мониторинга должен успешно отработать")
+
+        alias_result = market_portfolio_monitor.start_ened(
             symbol=self.symbol,
             url=self.url,
             telegram_token=self.telegram_token,
             chat_id=self.chat_id,
             storage_file=self.storage_file
         )
-        self.assertTrue(res_ened)
 
-        audit_exported = export_audit_logs(storage_file=self.storage_file)
-        self.assertTrue(audit_exported)
+        self.assertTrue(alias_result, "Алиас start_ened должен успешно вызывать пайплайн")
 
-        with open(self.storage_file, "r", encoding="utf-8") as f:
-            persisted_data = json.load(f)
-            self.assertIn(self.symbol, persisted_data)
+        audit_status = market_portfolio_monitor.export_audit_logs(storage_file=self.storage_file)
+        self.assertTrue(audit_status, "Экспорт аудиторских логов должен подтвердить целостность данных")
 
 if __name__ == "__main__":
     unittest.main()

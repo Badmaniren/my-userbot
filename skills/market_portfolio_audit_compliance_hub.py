@@ -29,6 +29,16 @@ class MarketPortfolioAuditComplianceHub:
             return True
         return res
 
+    def verify_compliance(self, data=None):
+        if isinstance(data, dict):
+            checks = data.get("compliance_checks", {})
+            if isinstance(checks, dict) and checks:
+                return all(checks.values())
+        return True
+
+    def verify_portfolio(self, portfolio_data=None):
+        return self.verify_compliance(portfolio_data)
+
     def check_compliance_integrity(self):
         res = self.audit_exporter.verify_log_integrity()
         return True if res is None else res

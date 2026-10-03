@@ -26,11 +26,18 @@ class MarketPortfolioBacktester:
             shifts = initial_capital_or_shifts
             result = {}
             symbol_data = self.data.get(symbol, [])
+            if isinstance(symbol_data, (int, float)):
+                data_length = 1
+            elif isinstance(symbol_data, (list, dict, tuple)):
+                data_length = len(symbol_data)
+            else:
+                data_length = 0
+
             for shift in shifts:
                 res_key = f"{symbol}_shift_{shift}"
                 result[res_key] = {
                     "shift": shift,
-                    "data_points": len(symbol_data)
+                    "data_points": data_length
                 }
             result[symbol] = {"status": "completed", "shifts_tested": len(shifts)}
             return result
@@ -42,7 +49,7 @@ class MarketPortfolioBacktester:
         sell_threshold = strategy_params.get("sell_threshold", float('inf'))
 
         symbol_data = self.data.get(symbol, [])
-        if not symbol_data:
+        if not symbol_data or not isinstance(symbol_data, list):
             return {
                 "final_portfolio_value": initial_capital,
                 "total_trades": 0,
@@ -54,6 +61,8 @@ class MarketPortfolioBacktester:
         total_trades = 0
 
         for item in symbol_data:
+            if not isinstance(item, dict):
+                continue
             price = item.get("price", 0.0)
             if price <= 0:
                 continue
@@ -66,7 +75,8 @@ class MarketPortfolioBacktester:
                 holding = 0.0
                 total_trades += 1
 
-        final_portfolio_value = cash + holding * symbol_data[-1].get("price", 0.0)
+        last_price = symbol_data[-1].get("price", 0.0) if isinstance(symbol_data[-1], dict) else 0.0
+        final_portfolio_value = cash + holding * last_price
         pnl_percentage = ((final_portfolio_value - initial_capital) / initial_capital) * 100.0 if initial_capital > 0 else 0.0
 
         return {
@@ -92,22 +102,25 @@ class MarketPortfolioBacktester:
     def simulate_historical_trades(self, symbol, allocation):
         symbol_data = self.data.get(symbol, [])
         trades = []
-        for i, item in enumerate(symbol_data):
-            price = item.get("price", 0.0)
-            action = "BUY" if i % 2 == 0 else "SELL"
-            trades.append({
-                "action": action,
-                "price": price,
-                "allocation": allocation,
-                "timestamp": item.get("timestamp", 0)
-            })
+        if isinstance(symbol_data, list):
+            for i, item in enumerate(symbol_data):
+                if isinstance(item, dict):
+                    price = item.get("price", 0.0)
+                    action = "BUY" if i % 2 == 0 else "SELL"
+                    trades.append({
+                        "action": action,
+                        "price": price,
+                        "allocation": allocation,
+                        "timestamp": item.get("timestamp", 0)
+                    })
         return trades
 
     def get_backtest_summary(self, symbol):
         symbol_data = self.data.get(symbol, [])
+        data_length = len(symbol_data) if isinstance(symbol_data, (list, dict, tuple)) else (1 if isinstance(symbol_data, (int, float)) else 0)
         return {
             "symbol": symbol,
-            "total_records": len(symbol_data),
+            "total_records": data_length,
             "status": "ready"
         }
 

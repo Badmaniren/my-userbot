@@ -8,25 +8,40 @@ class PortfolioValuation:
     def load_data(self, storage_file=None):
         file_to_load = storage_file or self.storage_file
         if hasattr(db_storage, 'load_portfolio'):
-            return db_storage.load_portfolio(file_to_load)
-        elif hasattr(db_storage, 'load_data'):
-            return db_storage.load_data(file_to_load)
+            res = db_storage.load_portfolio(file_to_load)
+            if isinstance(res, dict):
+                return res
+        if hasattr(db_storage, 'load_data'):
+            res = db_storage.load_data(file_to_load)
+            if isinstance(res, dict):
+                return res
         return {}
 
     def evaluate_portfolio(self, url):
         portfolio = self.load_data(self.storage_file)
-        if not portfolio:
+        if not portfolio or not isinstance(portfolio, dict):
             return {}
 
         parser = MarketParser()
         result = {}
 
         for symbol, data in portfolio.items():
-            quantity = data.get("quantity", 0.0)
-            buy_price = data.get("buy_price", 0.0)
+            if isinstance(data, dict):
+                quantity = data.get("quantity", 0.0)
+                buy_price = data.get("buy_price", 0.0)
+            elif isinstance(data, (int, float)):
+                quantity = 1.0
+                buy_price = float(data)
+            else:
+                quantity = 0.0
+                buy_price = 0.0
 
             try:
                 current_price = parser.fetch_price(url, symbol)
+                if isinstance(current_price, dict):
+                    current_price = current_price.get("price", buy_price)
+                elif not isinstance(current_price, (int, float)):
+                    current_price = buy_price
             except Exception as e:
                 result[symbol] = {"error": str(e)}
                 continue
@@ -52,7 +67,7 @@ class PortfolioValuation:
         total_invested = 0.0
 
         for symbol, data in evaluated.items():
-            if "error" not in data:
+            if isinstance(data, dict) and "error" not in data:
                 total_value += data.get("current_value", 0.0)
                 total_invested += data.get("invested", 0.0)
 

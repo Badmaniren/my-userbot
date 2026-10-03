@@ -1,5 +1,13 @@
 import json
 import os
+from skills.db_storage import (
+    save_to_db,
+    load_from_db,
+    save_data,
+    load_data,
+    MarketParser as DBMarketParser
+)
+
 
 def run_pipeline(symbol, url, telegram_token, chat_id, storage_file):
     """Выполняет основной конвейер мониторинга портфеля."""
@@ -22,6 +30,7 @@ def run_pipeline(symbol, url, telegram_token, chat_id, storage_file):
     )
     return True
 
+
 def start_new(symbol, url, telegram_token, chat_id, storage_file):
     """Точка входа для запуска нового мониторинга."""
     return run_pipeline(
@@ -31,6 +40,7 @@ def start_new(symbol, url, telegram_token, chat_id, storage_file):
         chat_id=chat_id,
         storage_file=storage_file
     )
+
 
 def start_ened(symbol, url, telegram_token, chat_id, storage_file):
     """Алиас для интеграционного теста."""
@@ -46,33 +56,31 @@ def start_ened(symbol, url, telegram_token, chat_id, storage_file):
 class MarketParser:
     def __init__(self, storage_file):
         self.storage_file = storage_file
+        self._db_parser = DBMarketParser(storage_file)
 
     def fetch_and_store(self, symbol, price):
-        data = {}
-        if os.path.exists(self.storage_file):
-            with open(self.storage_file, "r", encoding="utf-8") as f:
-                content = f.read()
-                if content.strip():
-                    try:
-                        data = json.loads(content)
-                    except (json.JSONDecodeError, TypeError):
-                        data = {}
-        
+        data = load_from_db(self.storage_file)
+        if not isinstance(data, dict):
+            data = {}
         data[symbol] = price
-        with open(self.storage_file, "w", encoding="utf-8") as f:
-            json.dump(data, f)
+        save_to_db(self.storage_file, data)
 
     def load_data(self, storage_file):
         if not os.path.exists(storage_file):
             return None
-        with open(storage_file, "r", encoding="utf-8") as f:
-            content = f.read()
-            if not content.strip():
-                return {}
-            try:
-                return json.loads(content)
-            except (json.JSONDecodeError, TypeError):
-                return None
+        data = load_from_db(storage_file)
+        if data is None:
+            if os.path.exists(storage_file):
+                try:
+                    with open(storage_file, "r", encoding="utf-8") as f:
+                        content = f.read()
+                        if not content.strip():
+                            return {}
+                        return json.loads(content)
+                except (json.JSONDecodeError, TypeError):
+                    return None
+            return None
+        return data
 
 
 class MarketReportGenerator:
@@ -112,15 +120,9 @@ def run_market_telegram_pipeline(storage_file, symbol, chat_id, url, telegram_to
 
 
 def export_audit_logs(storage_file=None):
-    """Экспорт аудиторских логов с явным возвратом результата."""
+    """Экспорт аудиторских логов с использованием db_storage."""
     if storage_file and os.path.exists(storage_file):
-        with open(storage_file, "r", encoding="utf-8") as f:
-            content = f.read()
-            if not content.strip():
-                return False
-            try:
-                json.loads(content)
-            except (json.JSONDecodeError, TypeError):
-                return False
+        data = load_from_db(storage_file)
+        if data is not None and isinstance(data, (dict, list)):
             return True
     return False

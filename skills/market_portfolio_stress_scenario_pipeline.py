@@ -3,10 +3,23 @@ from skills.market_portfolio_scenario_simulator import PortfolioScenarioSimulato
 from skills.market_portfolio_stress_reporter import StressReporter, PortfolioStressReporter
 
 class PortfolioStressScenarioPipeline:
-    def __init__(self, storage_file):
+    def __init__(self, storage_file="default.json"):
         self.storage_file = storage_file
         self.simulator = PortfolioScenarioSimulator(storage_file)
         self.reporter = PortfolioStressReporter(storage_file)
+
+    def inject_macro_shocks(self, shocks):
+        if isinstance(shocks, dict):
+            return shocks
+        result = {}
+        if isinstance(shocks, list):
+            for item in shocks:
+                if isinstance(item, dict):
+                    shock_type = item.get("shock_type", f"shock_{len(result)}")
+                    result[shock_type] = item
+                else:
+                    result[str(item)] = {"value": item}
+        return result
 
     def execute(self, symbol, percentage, shifts):
         try:
@@ -101,3 +114,6 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
         "stress_test": stress_test_result,
         "stress_report": stress_report_result
     }
+
+market_portfolio_stress_scenario_pipeline = PortfolioStressScenarioPipeline
+MarketPortfolioStressScenarioPipeline = PortfolioStressScenarioPipeline

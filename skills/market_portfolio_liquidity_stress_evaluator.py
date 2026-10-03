@@ -11,7 +11,6 @@ class PortfolioStressScenarioPipeline:
         self.storage_file = storage_file
 
     def execute(self, *args, **kwargs):
-        # Поддерживаем как позиционные, так и ключевые вызовы для совместимости с моками тестов
         if len(args) >= 3:
             symbol, percentage, shifts = args[0], args[1], args[2]
         else:
@@ -45,24 +44,18 @@ class MarketPortfolioLiquidityStressEvaluator:
             core_inst = market_portfolio_var_liquidity_core.market_portfolio_var_liquidity_core()
             var_func = getattr(core_inst, "calculate_var_and_liquidity", None)
 
-        try:
-            var_result = var_func(
-                portfolio_id=portfolio_id,
-                confidence_level=confidence_level,
-                export_target=export_target
-            ) if var_func else {}
-        except Exception as e:
-            return {"error": str(e)}
+        var_result = var_func(
+            portfolio_id=portfolio_id,
+            confidence_level=confidence_level,
+            export_target=export_target
+        ) if var_func else {}
 
         pipeline = PortfolioStressScenarioPipeline(self.storage_file)
-        try:
-            stress_result = pipeline.execute(
-                symbol,
-                percentage,
-                shifts
-            )
-        except Exception as e:
-            return {"error": str(e)}
+        stress_result = pipeline.execute(
+            symbol,
+            percentage,
+            shifts
+        )
 
         var_loss = 0.0
         if isinstance(var_result, dict):
@@ -113,6 +106,17 @@ class MarketPortfolioLiquidityStressEvaluator:
     def load_from_stream(self, stream: io.BytesIO):
         if stream:
             stream.seek(0, io.SEEK_END)
+
+
+def calculate_var_and_liquidity(*args, **kwargs):
+    func = getattr(market_portfolio_var_liquidity_core, "calculate_var_and_liquidity", None)
+    if func is not None:
+        return func(*args, **kwargs)
+    if hasattr(market_portfolio_var_liquidity_core, "market_portfolio_var_liquidity_core"):
+        inst = market_portfolio_var_liquidity_core.market_portfolio_var_liquidity_core()
+        if hasattr(inst, "calculate_var_and_liquidity"):
+            return inst.calculate_var_and_liquidity(*args, **kwargs)
+    return {}
 
 
 def evaluate_portfolio_liquidity_stress(

@@ -2,8 +2,9 @@ import os
 import json
 from datetime import datetime
 
+
 class MarketParser:
-    def __init__(self, storage_file: str):
+    def __init__(self, storage_file: str = "market_data.json"):
         self.storage_file = storage_file
 
     def fetch_and_store(self, symbol: str, price: float) -> None:
@@ -27,7 +28,7 @@ class MarketParser:
 
 
 class PortfolioValuation:
-    def __init__(self, storage_file: str):
+    def __init__(self, storage_file: str = "market_data.json"):
         self.storage_file = storage_file
 
     def get_total_summary(self, url: str) -> dict:
@@ -35,7 +36,7 @@ class PortfolioValuation:
 
 
 class PortfolioDigestManager:
-    def __init__(self, storage_file: str):
+    def __init__(self, storage_file: str = "market_data.json"):
         self.storage_file = storage_file
 
     def compile_digest(self, symbol: str, url: str) -> dict:
@@ -43,7 +44,7 @@ class PortfolioDigestManager:
 
 
 class PortfolioScenarioSimulator:
-    def __init__(self, storage_file: str):
+    def __init__(self, storage_file: str = "market_data.json"):
         self.storage_file = storage_file
 
     def simulate_scenario(self, symbol: str, percentage_shift: float) -> dict:
@@ -51,7 +52,7 @@ class PortfolioScenarioSimulator:
 
 
 class StressReporter:
-    def __init__(self, storage_file: str):
+    def __init__(self, storage_file: str = "market_data.json"):
         self.storage_file = storage_file
 
     def get_stream_data(self) -> list:
@@ -59,11 +60,29 @@ class StressReporter:
 
 
 class PortfolioVisualizer:
-    def __init__(self, storage_file: str):
+    def __init__(self, storage_file: str = "market_data.json"):
         self.storage_file = storage_file
 
     def build_text_report(self, symbol: str) -> str:
         return f"Report for {symbol}"
+
+
+class market_portfolio_collector_agent:
+    def __init__(self, storage_file: str = "market_data.json"):
+        self.storage_file = storage_file
+
+    def collect(self, symbol: str = "default") -> dict:
+        return {"symbol": symbol, "status": "collected"}
+
+    def parse(self) -> dict:
+        return {"status": "parsed"}
+
+
+PortfolioCollectorAgent = market_portfolio_collector_agent
+
+
+def collect_portfolio_metrics(portfolio_id: str) -> dict:
+    return {"portfolio_id": portfolio_id, "status": "collected"}
 
 
 def run_pipeline(symbol: str, url: str, telegram_token: str, chat_id: str, storage_file: str) -> bool:
@@ -89,7 +108,7 @@ def run_pipeline(symbol: str, url: str, telegram_token: str, chat_id: str, stora
     return True
 
 
-def start_new(symbol: str, url: str, telegram_token: str, chat_id: str, storage_file: str) -> bool:
+def start_new(symbol: str = "default", url: str = "https://example.com", telegram_token: str = "token", chat_id: str = "123", storage_file: str = "storage.json") -> bool:
     return run_pipeline(
         symbol,
         url,

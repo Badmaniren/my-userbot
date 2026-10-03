@@ -3,7 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ortfolio_scenario_simulator' глобальной переменной!; АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'market_portfolio_scenario_simulator' глобальной переменной!; АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'market_portfolio_scenario_simulator' глобальной переменной!
+ной переменной!; АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'market_portfolio_scenario_simulator' глобальной переменной!
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_stress_reporter (refactor) — раундов: 1
@@ -287,3 +287,7 @@ ortfolio_scenario_simulator' глобальной переменной!; АНТ�
 
 ## market_portfolio_stress_monte_carlo_engine (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_audit_visualizer (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

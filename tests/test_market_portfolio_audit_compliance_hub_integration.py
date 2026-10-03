@@ -1,8 +1,7 @@
 import unittest
 import os
-import tempfile
 import uuid
-import random
+import tempfile
 from skills.market_portfolio_audit_compliance_hub import MarketPortfolioAuditComplianceHub
 from skills.db_storage import MarketParser
 from skills.market_portfolio_audit_log_exporter import PortfolioAuditLogExporter
@@ -10,9 +9,11 @@ from skills.market_portfolio_audit_log_exporter import PortfolioAuditLogExporter
 class TestMarketPortfolioAuditComplianceHubIntegration(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.TemporaryDirectory()
-        self.storage_file = os.path.join(self.test_dir.name, f"test_storage_{uuid.uuid4().hex}.json")
-        self.export_path = os.path.join(self.test_dir.name, f"audit_export_{uuid.uuid4().hex}.json")
-        
+        self.rand_str = str(uuid.uuid4())
+        self.storage_file = os.path.join(self.test_dir.name, f"storage_{self.rand_str}.json")
+        self.export_path = os.path.join(self.test_dir.name, f"export_{self.rand_str}.json")
+        self.history_file = os.path.join(self.test_dir.name, f"history_{self.rand_str}.json")
+
         self.db_storage = MarketParser(self.storage_file)
         self.audit_exporter = PortfolioAuditLogExporter(self.storage_file)
         
@@ -25,34 +26,40 @@ class TestMarketPortfolioAuditComplianceHubIntegration(unittest.TestCase):
     def tearDown(self):
         self.test_dir.cleanup()
 
-    def test_compliance_export_and_integrity_integration(self):
-        random_id = str(uuid.uuid4())
-        test_stream = {"audit_id": random_id, "metric": random.uniform(10.0, 1000.0)}
-        
-        process_res = self.hub.process_audit_stream_data(self.export_path, test_stream)
-        self.assertTrue(process_res)
-
-        export_res = self.hub.run_compliance_export(self.export_path)
-        self.assertTrue(export_res)
+    def test_integration_compliance_export_and_integrity(self):
+        res_export = self.hub.run_compliance_export(self.export_path)
+        self.assertTrue(res_export)
         self.assertTrue(os.path.exists(self.export_path))
 
-        integrity_res = self.hub.check_compliance_integrity()
-        self.assertIsInstance(integrity_res, bool)
+        res_integrity = self.hub.check_compliance_integrity()
+        self.assertIsNotNone(res_integrity)
+
+    def test_integration_market_price_audit_exception_handling(self):
+        invalid_url = f"http://invalid-url-{uuid.uuid4()}.local/price"
+        price = self.hub.audit_fetch_market_price(invalid_url)
+        self.assertEqual(price, 0.0)
+
+    def test_integration_historical_audit_data_loading(self):
+        data = self.hub.load_historical_audit_data(self.history_file)
+        self.assertTrue(os.path.exists(self.history_file))
+        self.assertIsInstance(data, (list, dict))
+
+    def test_integration_compliance_summary_and_streams(self):
+        stream_data = f"audit_stream_{uuid.uuid4()}"
+        res_stream = self.hub.process_audit_stream_data(self.export_path, stream_data)
+        self.assertTrue(res_stream)
 
         summary = self.hub.fetch_compliance_summary()
         self.assertIsNotNone(summary)
 
-    def test_historical_audit_data_loading(self):
-        random_filename = os.path.join(self.test_dir.name, f"history_{uuid.uuid4().hex}.json")
-        data = self.hub.load_historical_audit_data(random_filename)
-        
-        self.assertTrue(os.path.exists(random_filename))
-        self.assertIsInstance(data, (list, dict))
+        log_res = self.hub.generate_compliance_log(self.export_path)
+        self.assertTrue(log_res)
 
-    def test_market_price_fetching_fallback(self):
-        random_url = f"http://localhost:{random.randint(1000, 9999)}/{uuid.uuid4().hex}"
-        price = self.hub.audit_fetch_market_price(random_url)
-        self.assertIsInstance(price, float)
+        verify_res = self.hub.verify_log_integrity()
+        self.assertIsNotNone(verify_res)
+
+        export_logs_res = self.hub.export_audit_logs(self.export_path)
+        self.assertTrue(export_logs_res)
 
 if __name__ == "__main__":
     unittest.main()

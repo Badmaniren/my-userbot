@@ -7,7 +7,10 @@ from skills.market_portfolio_alert_dispatcher import dispatch_portfolio_alerts
 class AutonomousSentinel:
     def __init__(self, storage_file="sentinel_storage.json", threshold=5.0):
         self.storage_file = storage_file
-        self.threshold = float(threshold)
+        try:
+            self.threshold = float(threshold)
+        except (ValueError, TypeError):
+            raise ValueError("Threshold must be a float")
 
     def run_surveillance(self, symbol, url, telegram_token, chat_id):
         parser = MarketParser(storage_file=self.storage_file)

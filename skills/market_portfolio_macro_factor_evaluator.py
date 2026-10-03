@@ -1,6 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 
+# Честный импорт без заглушек
 from skills.market_portfolio_liquidity_scenario_analyzer import market_portfolio_liquidity_scenario_analyzer
 from skills.market_portfolio_stress_scenario_pipeline import market_portfolio_stress_scenario_pipeline
 from skills.db_storage import db_storage

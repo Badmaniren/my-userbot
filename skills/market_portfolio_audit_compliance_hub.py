@@ -47,7 +47,7 @@ class MarketPortfolioAuditComplianceHub:
     def audit_fetch_market_price(self, url):
         try:
             return self.db_storage.fetch_price(url)
-        except Exception:
+        except (ValueError, TypeError, KeyError, AttributeError, RuntimeError, ConnectionError, IOError):
             return 0.0
 
     def load_historical_audit_data(self, filename):

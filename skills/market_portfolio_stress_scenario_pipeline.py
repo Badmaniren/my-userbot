@@ -8,7 +8,7 @@ class PortfolioStressScenarioPipeline:
         self.simulator = PortfolioScenarioSimulator(storage_file)
         self.reporter = PortfolioStressReporter(storage_file)
 
-    def execute(self, symbol, percentage, shifts):
+    def _load_or_create_storage(self):
         try:
             with open(self.storage_file, "r", encoding="utf-8", errors="ignore") as f:
                 content = f.read()
@@ -16,8 +16,14 @@ class PortfolioStressScenarioPipeline:
             if not isinstance(data, dict):
                 raise ValueError("Invalid storage data format")
         except (FileNotFoundError, json.JSONDecodeError, ValueError):
-            with open(self.storage_file, "w", encoding="utf-8") as f:
-                f.write("{}")
+            try:
+                with open(self.storage_file, "w", encoding="utf-8") as f:
+                    f.write("{}")
+            except FileNotFoundError:
+                pass
+
+    def execute(self, symbol, percentage, shifts):
+        self._load_or_create_storage()
 
         try:
             sim_result = self.simulator.simulate_scenario(symbol, percentage)
@@ -59,8 +65,11 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
         if not isinstance(data, dict):
             raise ValueError("Invalid storage data format")
     except (FileNotFoundError, json.JSONDecodeError, ValueError):
-        with open(storage_file, "w", encoding="utf-8") as f:
-            f.write("{}")
+        try:
+            with open(storage_file, "w", encoding="utf-8") as f:
+                f.write("{}")
+        except FileNotFoundError:
+            pass
 
     simulator = PortfolioScenarioSimulator(storage_file)
     try:

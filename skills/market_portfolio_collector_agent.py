@@ -66,6 +66,20 @@ class PortfolioVisualizer:
         return f"Report for {symbol}"
 
 
+class PortfolioCollectorAgent:
+    def __init__(self, storage_file: str = "collector.json"):
+        self.storage_file = storage_file
+
+    def collect(self, data):
+        if isinstance(data, dict):
+            return data
+        return {"data": data}
+
+
+def market_portfolio_collector_agent():
+    return PortfolioCollectorAgent()
+
+
 def run_pipeline(symbol: str, url: str, telegram_token: str, chat_id: str, storage_file: str) -> bool:
     parser = MarketParser(storage_file)
     if not os.path.exists(storage_file):

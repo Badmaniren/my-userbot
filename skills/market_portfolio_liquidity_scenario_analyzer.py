@@ -64,6 +64,13 @@ class MarketPortfolioLiquidityScenarioAnalyzer:
     def _calculate_required_reserve(self, var_val, stress_impact):
         return max(var_val, stress_impact) * 1.15
 
+    def evaluate(self, portfolio_id, scenario_params=None):
+        return {
+            "status": "evaluated",
+            "portfolio_id": portfolio_id,
+            "params": scenario_params or {}
+        }
+
     def evaluate_portfolio(
         self,
         portfolio_id,
@@ -94,3 +101,7 @@ class MarketPortfolioLiquidityScenarioAnalyzer:
             "var_result": var_result,
             "stress_result": stress_result
         }
+
+
+def market_portfolio_liquidity_scenario_analyzer():
+    return MarketPortfolioLiquidityScenarioAnalyzer()

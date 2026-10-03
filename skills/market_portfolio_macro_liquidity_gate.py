@@ -1,4 +1,4 @@
-from skills.db_storage import db_storage
+from skills.db_storage import DbStorage as db_storage
 from skills.market_portfolio_collector_agent import market_portfolio_collector_agent
 from skills.market_portfolio_var_liquidity_core import market_portfolio_var_liquidity_core
 

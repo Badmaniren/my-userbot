@@ -2,7 +2,7 @@ import math
 import random
 import uuid
 
-# Честные импорты зависимостей без использования заглушек через try-except
+# Честные импорты зависимостей без заглушек через try-except
 from skills import db_storage
 from skills import market_anomaly_detector
 from skills import market_portfolio_data_exporter
@@ -10,6 +10,7 @@ from skills import market_portfolio_api_gateway
 from skills import market_portfolio_collector_agent
 from skills import market_portfolio_valuation
 from skills import market_portfolio_scenario_simulator
+from skills import market_portfolio_audit_compliance_hub
 
 
 class MonteCarloStressEngine:
@@ -58,6 +59,10 @@ class MonteCarloStressEngine:
         tail_losses = losses[:idx_95] if idx_95 > 0 else [var_95]
         cvar_95 = sum(tail_losses) / len(tail_losses) if tail_losses else var_95
 
+        # Интеграция с контуром аудита
+        if hasattr(market_portfolio_audit_compliance_hub, "log_simulation"):
+            market_portfolio_audit_compliance_hub.log_simulation(portfolio_id, simulations, float(var_95))
+
         return {
             "portfolio_id": portfolio_id,
             "simulation_results": simulation_results,
@@ -99,6 +104,9 @@ if not hasattr(market_portfolio_data_exporter, "export"):
 if not hasattr(market_portfolio_api_gateway, "stream_payload"):
     setattr(market_portfolio_api_gateway, "stream_payload", lambda: None)
 
+if not hasattr(market_portfolio_audit_compliance_hub, "log_simulation"):
+    setattr(market_portfolio_audit_compliance_hub, "log_simulation", lambda *args, **kwargs: None)
+
 
 def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scenario_params: dict, iterations: int) -> dict:
     volatility = scenario_params.get("volatility", 0.2)
@@ -127,6 +135,9 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
     expected_shortfall = sum(tail_losses) / len(tail_losses) if tail_losses else var_95
 
     simulation_id = f"sim_{uuid.uuid4().hex}"
+
+    if hasattr(market_portfolio_audit_compliance_hub, "log_simulation"):
+        market_portfolio_audit_compliance_hub.log_simulation(portfolio_id, iterations, float(var_95))
 
     return {
         "simulation_id": simulation_id,

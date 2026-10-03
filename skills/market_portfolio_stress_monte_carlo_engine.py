@@ -10,6 +10,7 @@ from skills import market_portfolio_api_gateway
 from skills import market_portfolio_collector_agent
 from skills import market_portfolio_valuation
 from skills import market_portfolio_scenario_simulator
+from skills import market_portfolio_audit_compliance_hub
 
 
 class MonteCarloStressEngine:
@@ -57,6 +58,10 @@ class MonteCarloStressEngine:
         var_95 = losses[idx_95 - 1] if losses and idx_95 <= len(losses) else (losses[0] if losses else 0.0)
         tail_losses = losses[:idx_95] if idx_95 > 0 else [var_95]
         cvar_95 = sum(tail_losses) / len(tail_losses) if tail_losses else var_95
+
+        # Интеграция с контуром аудита
+        if hasattr(market_portfolio_audit_compliance_hub, "log_simulation"):
+            market_portfolio_audit_compliance_hub.log_simulation(portfolio_id, simulations, float(var_95))
 
         return {
             "portfolio_id": portfolio_id,
@@ -127,6 +132,9 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
     expected_shortfall = sum(tail_losses) / len(tail_losses) if tail_losses else var_95
 
     simulation_id = f"sim_{uuid.uuid4().hex}"
+
+    if hasattr(market_portfolio_audit_compliance_hub, "log_simulation"):
+        market_portfolio_audit_compliance_hub.log_simulation(portfolio_id, iterations, float(var_95))
 
     return {
         "simulation_id": simulation_id,

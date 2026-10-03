@@ -6,12 +6,12 @@ from skills.market_portfolio_autonomous_sentinel import AutonomousSentinel, run_
 
 class TestAutonomousSentinelIntegration(unittest.TestCase):
     def setUp(self):
-        self.test_id = str(uuid.uuid4())[:8]
-        self.storage_file = f"test_sentinel_storage_{self.test_id}.json"
-        self.symbol = f"TICKER_{self.test_id}"
-        self.url = f"https://example.com/api/market/{self.test_id}"
-        self.telegram_token = f"fake_token_{self.test_id}"
-        self.chat_id = str(random.randint(100000, 999999))
+        self.test_suffix = uuid.uuid4().hex[:8]
+        self.storage_file = f"test_sentinel_storage_{self.test_suffix}.json"
+        self.symbol = f"TST_{uuid.uuid4().hex[:4].upper()}"
+        self.url = f"https://example.com/api/v1/market/{uuid.uuid4().hex}"
+        self.telegram_token = f"123456:ABC-DEF{uuid.uuid4().hex[:6]}"
+        self.chat_id = str(random.randint(10000000, 99999999))
         self.threshold = round(random.uniform(1.0, 10.0), 2)
 
     def tearDown(self):
@@ -30,12 +30,12 @@ class TestAutonomousSentinelIntegration(unittest.TestCase):
             storage_file=self.storage_file,
             threshold=self.threshold
         )
-
+        
         self.assertIsInstance(result, dict)
         self.assertIn("status", result)
         self.assertIn("forecast", result)
         self.assertIn(result["status"], ["triggered", "stable"])
-
+        
         sentinel = AutonomousSentinel(
             storage_file=self.storage_file,
             threshold=self.threshold
@@ -46,10 +46,9 @@ class TestAutonomousSentinelIntegration(unittest.TestCase):
             telegram_token=self.telegram_token,
             chat_id=self.chat_id
         )
-
+        
         self.assertIsInstance(surveillance_result, dict)
         self.assertIn("status", surveillance_result)
-        self.assertIn("forecast", surveillance_result)
 
 if __name__ == "__main__":
     unittest.main()

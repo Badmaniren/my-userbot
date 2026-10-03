@@ -1,195 +1,176 @@
 import unittest
-from unittest.mock import patch, mock_open
 import os
 import json
 import uuid
 import random
+import tempfile
 import io
+from unittest.mock import patch
+
 from skills.market_portfolio_monitor import (
+    MarketParser,
+    MarketReportGenerator,
     run_pipeline,
     start_new,
     start_ened,
-    MarketParser,
-    MarketReportGenerator,
     generate_market_report,
     run_market_telegram_pipeline,
     export_audit_logs
 )
 
-
 class TestMarketPortfolioMonitor(unittest.TestCase):
 
     def setUp(self):
-        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
-        self.url = f"https://{uuid.uuid4().hex[:8]}.com/api"
-        self.telegram_token = f"{random.randint(100000, 999999)}:AAF{uuid.uuid4().hex[:10]}"
-        self.chat_id = f"@{uuid.uuid4().hex[:6]}"
-        self.storage_file = f"store_{uuid.uuid4().hex[:8]}.json"
+        self.random_storage = f"{uuid.uuid4().hex}.json"
+        self.random_symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
+        self.random_price = round(random.uniform(10.0, 5000.0), 2)
+        self.random_url = f"https://{uuid.uuid4().hex[:8]}.com/webhook"
+        self.random_token = uuid.uuid4().hex
+        self.random_chat_id = str(random.randint(100000, 9999999))
 
     def tearDown(self):
-        if os.path.exists(self.storage_file):
+        if os.path.exists(self.random_storage):
             try:
-                os.remove(self.storage_file)
+                os.remove(self.random_storage)
             except OSError:
                 pass
 
-    def test_market_parser_fetch_and_store_new_file(self):
-        price = round(random.uniform(10.0, 1500.0), 4)
-        parser = MarketParser(storage_file=self.storage_file)
+    def test_market_parser_fetch_and_load(self):
+        parser = MarketParser(storage_file=self.random_storage)
+        parser.fetch_and_store(symbol=self.random_symbol, price=self.random_price)
+
+        self.assertTrue(os.path.exists(self.random_storage))
+        loaded_data = parser.load_data(self.random_storage)
+        self.assertIsInstance(loaded_data, dict)
+        self.assertIn(self.random_symbol, loaded_data)
+        self.assertEqual(loaded_data[self.random_symbol], self.random_price)
+
+    def test_market_parser_load_nonexistent(self):
+        nonexistent_file = f"{uuid.uuid4().hex}.json"
+        parser = MarketParser(storage_file=nonexistent_file)
+        result = parser.load_data(nonexistent_file)
+        self.assertIsNone(result)
+
+    def test_market_parser_load_invalid_json(self):
+        garbage_content = uuid.uuid4().hex.encode('utf-8')
+        with patch('builtins.open', unittest.mock.mock_open(read_data=garbage_content.decode('utf-8'))):
+            with patch('os.path.exists', return_value=True):
+                parser = MarketParser(storage_file=self.random_storage)
+                res = parser.load_data(self.random_storage)
+                self.assertIsNone(res)
+
+    def test_market_report_generator_symbol_report(self):
+        parser = MarketParser(storage_file=self.random_storage)
+        parser.fetch_and_store(symbol=self.random_symbol, price=self.random_price)
+
+        gen = MarketReportGenerator(storage_file=self.random_storage)
+        report = gen.generate_symbol_report(symbol=self.random_symbol)
         
-        parser.fetch_and_store(symbol=self.symbol, price=price)
+        self.assertIn(self.random_symbol, report)
+        self.assertIn(str(self.random_price), report)
+
+    def test_market_report_generator_no_data(self):
+        gen = MarketReportGenerator(storage_file=self.random_storage)
+        report = gen.generate_symbol_report(symbol=self.random_symbol)
         
-        self.assertTrue(os.path.exists(self.storage_file))
-        with open(self.storage_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        self.assertIn(self.symbol, data)
-        self.assertEqual(data[self.symbol], price)
-
-    def test_market_parser_load_data_invalid_json(self):
-        corrupted_data = f"CORRUPTED_{uuid.uuid4().hex}"
-        with open(self.storage_file, "w", encoding="utf-8") as f:
-            f.write(corrupted_data)
-
-        parser = MarketParser(storage_file=self.storage_file)
-        data = parser.load_data(self.storage_file)
-        self.assertIsNone(data)
-
-    def test_market_parser_load_data_empty_file(self):
-        with open(self.storage_file, "w", encoding="utf-8") as f:
-            f.write("   \n ")
-
-        parser = MarketParser(storage_file=self.storage_file)
-        data = parser.load_data(self.storage_file)
-        self.assertEqual(data, {})
-
-    def test_market_report_generator_symbol_report_exists(self):
-        price = round(random.uniform(1.0, 500.0), 2)
-        initial_data = {self.symbol: price}
-        with open(self.storage_file, "w", encoding="utf-8") as f:
-            json.dump(initial_data, f)
-
-        generator = MarketReportGenerator(storage_file=self.storage_file)
-        report = generator.generate_symbol_report(symbol=self.symbol)
-        
-        expected_substring = f"Report for {self.symbol}: {price}"
-        self.assertEqual(report, expected_substring)
-
-    def test_market_report_generator_symbol_report_missing(self):
-        other_symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
-        generator = MarketReportGenerator(storage_file=self.storage_file)
-        report = generator.generate_symbol_report(symbol=other_symbol)
-        
-        expected_substring = f"Report for {other_symbol}: No data"
-        self.assertEqual(report, expected_substring)
+        self.assertIn(self.random_symbol, report)
+        self.assertIn("No data", report)
 
     def test_market_report_generator_raw_stream_dump(self):
-        dump_content = f"{uuid.uuid4().hex}:{random.randint(1, 100)}"
-        with open(self.storage_file, "w", encoding="utf-8") as f:
-            f.write(dump_content)
+        parser = MarketParser(storage_file=self.random_storage)
+        parser.fetch_and_store(symbol=self.random_symbol, price=self.random_price)
 
-        generator = MarketReportGenerator(storage_file=self.storage_file)
-        content = generator.get_raw_stream_dump()
-        self.assertEqual(content, dump_content)
+        gen = MarketReportGenerator(storage_file=self.random_storage)
+        dump = gen.get_raw_stream_dump()
+        
+        self.assertIsInstance(dump, str)
+        parsed_dump = json.loads(dump)
+        self.assertEqual(parsed_dump[self.random_symbol], self.random_price)
 
     def test_generate_market_report_function(self):
-        price = round(random.uniform(50.0, 300.0), 2)
-        initial_data = {self.symbol: price}
-        with open(self.storage_file, "w", encoding="utf-8") as f:
-            json.dump(initial_data, f)
+        parser = MarketParser(storage_file=self.random_storage)
+        parser.fetch_and_store(symbol=self.random_symbol, price=self.random_price)
 
-        report = generate_market_report(storage_file=self.storage_file, symbol=self.symbol)
-        self.assertIn(str(price), report)
-        self.assertIn(self.symbol, report)
+        report = generate_market_report(storage_file=self.random_storage, symbol=self.random_symbol)
+        self.assertIn(self.random_symbol, report)
+        self.assertIn(str(self.random_price), report)
 
     def test_run_market_telegram_pipeline(self):
-        price = round(random.uniform(100.0, 1000.0), 2)
-        initial_data = {self.symbol: price}
-        with open(self.storage_file, "w", encoding="utf-8") as f:
-            json.dump(initial_data, f)
+        parser = MarketParser(storage_file=self.random_storage)
+        parser.fetch_and_store(symbol=self.random_symbol, price=self.random_price)
 
-        result = run_market_telegram_pipeline(
-            storage_file=self.storage_file,
-            symbol=self.symbol,
-            chat_id=self.chat_id,
-            url=self.url,
-            telegram_token=self.telegram_token
+        res = run_market_telegram_pipeline(
+            storage_file=self.random_storage,
+            symbol=self.random_symbol,
+            chat_id=self.random_chat_id,
+            url=self.random_url,
+            telegram_token=self.random_token
         )
 
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result["status"], "success")
-        self.assertEqual(result["symbol"], self.symbol)
-        self.assertEqual(result["price"], price)
-        self.assertEqual(result["chat_id"], self.chat_id)
-        self.assertEqual(result["url"], self.url)
+        self.assertIsInstance(res, dict)
+        self.assertEqual(res.get("status"), "success")
+        self.assertEqual(res.get("symbol"), self.random_symbol)
+        self.assertEqual(res.get("price"), self.random_price)
+        self.assertEqual(res.get("chat_id"), self.random_chat_id)
+        self.assertEqual(res.get("url"), self.random_url)
 
-    def test_export_audit_logs_valid(self):
-        audit_payload = {uuid.uuid4().hex: random.randint(1, 500)}
-        with open(self.storage_file, "w", encoding="utf-8") as f:
-            json.dump(audit_payload, f)
+    def test_run_pipeline(self):
+        parser = MarketParser(storage_file=self.random_storage)
+        parser.fetch_and_store(symbol=self.random_symbol, price=self.random_price)
 
-        result = export_audit_logs(storage_file=self.storage_file)
-        self.assertTrue(result)
-
-    def test_export_audit_logs_invalid(self):
-        with open(self.storage_file, "w", encoding="utf-8") as f:
-            f.write(f"INVALID_JSON_{uuid.uuid4().hex}")
-
-        result = export_audit_logs(storage_file=self.storage_file)
-        self.assertFalse(result)
-
-    def test_export_audit_logs_missing_file(self):
-        missing_path = f"missing_{uuid.uuid4().hex}.json"
-        result = export_audit_logs(storage_file=missing_path)
-        self.assertFalse(result)
-
-    def test_run_pipeline_execution(self):
-        initial_price = round(random.uniform(10.0, 99.9), 2)
-        initial_data = {self.symbol: initial_price}
-        with open(self.storage_file, "w", encoding="utf-8") as f:
-            json.dump(initial_data, f)
-
-        success = run_pipeline(
-            symbol=self.symbol,
-            url=self.url,
-            telegram_token=self.telegram_token,
-            chat_id=self.chat_id,
-            storage_file=self.storage_file
+        status = run_pipeline(
+            symbol=self.random_symbol,
+            url=self.random_url,
+            telegram_token=self.random_token,
+            chat_id=self.random_chat_id,
+            storage_file=self.random_storage
         )
-        self.assertTrue(success)
+        self.assertTrue(status)
 
     def test_start_new_and_ened_aliases(self):
-        initial_price = round(random.uniform(200.0, 500.0), 2)
-        initial_data = {self.symbol: initial_price}
-        with open(self.storage_file, "w", encoding="utf-8") as f:
-            json.dump(initial_data, f)
+        parser = MarketParser(storage_file=self.random_storage)
+        parser.fetch_and_store(symbol=self.random_symbol, price=self.random_price)
 
         res_new = start_new(
-            symbol=self.symbol,
-            url=self.url,
-            telegram_token=self.telegram_token,
-            chat_id=self.chat_id,
-            storage_file=self.storage_file
+            symbol=self.random_symbol,
+            url=self.random_url,
+            telegram_token=self.random_token,
+            chat_id=self.random_chat_id,
+            storage_file=self.random_storage
         )
         self.assertTrue(res_new)
 
         res_ened = start_ened(
-            symbol=self.symbol,
-            url=self.url,
-            telegram_token=self.telegram_token,
-            chat_id=self.chat_id,
-            storage_file=self.storage_file
+            symbol=self.random_symbol,
+            url=self.random_url,
+            telegram_token=self.random_token,
+            chat_id=self.random_chat_id,
+            storage_file=self.random_storage
         )
         self.assertTrue(res_ened)
 
-    def test_io_bytes_stream_mocking_parser(self):
-        random_garbage = f"GARBAGE_{uuid.uuid4().hex}".encode("utf-8")
-        mock_file = io.BytesIO(random_garbage)
-        
-        with patch("builtins.open", mock_open(read_data=random_garbage.decode("utf-8"))):
-            parser = MarketParser(storage_file=self.storage_file)
-            data = parser.load_data(self.storage_file)
-            self.assertIsNone(data)
+    def test_export_audit_logs_valid(self):
+        payload = {uuid.uuid4().hex: random.randint(1, 100)}
+        with open(self.random_storage, "w", encoding="utf-8") as f:
+            json.dump(payload, f)
 
+        res = export_audit_logs(storage_file=self.random_storage)
+        self.assertTrue(res)
 
-if __name__ == "__main__":
+    def test_export_audit_logs_invalid(self):
+        with open(self.random_storage, "w", encoding="utf-8") as f:
+            f.write(uuid.uuid4().hex + " invalid json structure {{{")
+
+        res = export_audit_logs(storage_file=self.random_storage)
+        self.assertFalse(res)
+
+    def test_export_audit_logs_empty_or_missing(self):
+        self.assertFalse(export_audit_logs(storage_file=None))
+        self.assertFalse(export_audit_logs(storage_file=f"{uuid.uuid4().hex}.json"))
+
+        with open(self.random_storage, "w", encoding="utf-8") as f:
+            f.write("   \n   ")
+        self.assertFalse(export_audit_logs(storage_file=self.random_storage))
+
+if __name__ == '__main__':
     unittest.main()

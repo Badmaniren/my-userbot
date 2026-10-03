@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-з raise.
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+скалацию
 
 ## market_portfolio_monte_carlo_regime_switch (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
@@ -295,4 +293,7 @@
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_autonomous_sentinel (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_monitor (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

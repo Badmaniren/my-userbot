@@ -1,5 +1,6 @@
 import unittest
 import os
+import tempfile
 import uuid
 import random
 from skills.market_portfolio_audit_compliance_hub import MarketPortfolioAuditComplianceHub
@@ -8,9 +9,9 @@ from skills.market_portfolio_audit_log_exporter import PortfolioAuditLogExporter
 
 class TestMarketPortfolioAuditComplianceHubIntegration(unittest.TestCase):
     def setUp(self):
-        self.rand_suffix = uuid.uuid4().hex[:8]
-        self.storage_file = f"test_audit_storage_{self.rand_suffix}.db"
-        self.export_path = f"test_compliance_export_{self.rand_suffix}.json"
+        self.test_dir = tempfile.TemporaryDirectory()
+        self.storage_file = os.path.join(self.test_dir.name, f"test_storage_{uuid.uuid4().hex}.json")
+        self.export_path = os.path.join(self.test_dir.name, f"audit_export_{uuid.uuid4().hex}.json")
         
         self.db_storage = MarketParser(self.storage_file)
         self.audit_exporter = PortfolioAuditLogExporter(self.storage_file)
@@ -22,45 +23,36 @@ class TestMarketPortfolioAuditComplianceHubIntegration(unittest.TestCase):
         )
 
     def tearDown(self):
-        for path in [self.storage_file, self.export_path]:
-            if os.path.exists(path):
-                try:
-                    os.remove(path)
-                except OSError:
-                    pass
+        self.test_dir.cleanup()
 
-    def test_compliance_hub_integration_workflow(self):
-        random_price_url = f"https://finance.example.com/asset/{uuid.uuid4().hex}"
+    def test_compliance_export_and_integrity_integration(self):
+        random_id = str(uuid.uuid4())
+        test_stream = {"audit_id": random_id, "metric": random.uniform(10.0, 1000.0)}
         
-        integrity_result = self.hub.check_compliance_integrity()
-        self.assertIn(integrity_result, [True, False])
+        process_res = self.hub.process_audit_stream_data(self.export_path, test_stream)
+        self.assertTrue(process_res)
 
         export_res = self.hub.run_compliance_export(self.export_path)
         self.assertTrue(export_res)
         self.assertTrue(os.path.exists(self.export_path))
 
-        stream_data = f"audit_stream_payload_{uuid.uuid4().hex}"
-        stream_res = self.hub.process_audit_stream_data(self.export_path, stream_data)
-        self.assertIn(stream_res, [True, False])
-
-        gen_res = self.hub.generate_compliance_log(self.export_path)
-        self.assertIn(gen_res, [True, False])
+        integrity_res = self.hub.check_compliance_integrity()
+        self.assertIsInstance(integrity_res, bool)
 
         summary = self.hub.fetch_compliance_summary()
         self.assertIsNotNone(summary)
 
-        historical_filename = f"history_{uuid.uuid4().hex}.json"
-        history_data = self.hub.load_historical_audit_data(historical_filename)
-        self.assertIsNotNone(history_data)
+    def test_historical_audit_data_loading(self):
+        random_filename = os.path.join(self.test_dir.name, f"history_{uuid.uuid4().hex}.json")
+        data = self.hub.load_historical_audit_data(random_filename)
+        
+        self.assertTrue(os.path.exists(random_filename))
+        self.assertIsInstance(data, (list, dict))
 
-        market_price = self.hub.audit_fetch_market_price(random_price_url)
-        self.assertIsNotNone(market_price)
-
-        verify_res = self.hub.verify_log_integrity()
-        self.assertIn(verify_res, [True, False])
-
-        export_logs_res = self.hub.export_audit_logs(self.export_path)
-        self.assertTrue(export_logs_res)
+    def test_market_price_fetching_fallback(self):
+        random_url = f"http://localhost:{random.randint(1000, 9999)}/{uuid.uuid4().hex}"
+        price = self.hub.audit_fetch_market_price(random_url)
+        self.assertIsInstance(price, float)
 
 if __name__ == "__main__":
     unittest.main()

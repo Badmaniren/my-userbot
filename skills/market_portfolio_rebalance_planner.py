@@ -3,7 +3,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Dict, List, Any, Union
 
-from skills.db_storage import DbStorage, db_storage
+from skills.db_storage import db_storage
 from skills.market_portfolio_valuation import market_portfolio_valuation
 from skills.market_portfolio_var_liquidity_core import market_portfolio_var_liquidity_core
 

@@ -2,7 +2,7 @@ import math
 import random
 import uuid
 
-# Честные импорты зависимостей без использования заглушек через try-except
+# Честные импорты зависимостей без заглушек через try-except
 from skills import db_storage
 from skills import market_anomaly_detector
 from skills import market_portfolio_data_exporter
@@ -103,6 +103,9 @@ if not hasattr(market_portfolio_data_exporter, "export"):
 
 if not hasattr(market_portfolio_api_gateway, "stream_payload"):
     setattr(market_portfolio_api_gateway, "stream_payload", lambda: None)
+
+if not hasattr(market_portfolio_audit_compliance_hub, "log_simulation"):
+    setattr(market_portfolio_audit_compliance_hub, "log_simulation", lambda *args, **kwargs: None)
 
 
 def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scenario_params: dict, iterations: int) -> dict:

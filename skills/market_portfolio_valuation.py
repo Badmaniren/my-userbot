@@ -21,12 +21,36 @@ class PortfolioValuation:
         parser = MarketParser()
         result = {}
 
+        if isinstance(portfolio, list):
+            new_port = {}
+            for i, item in enumerate(portfolio):
+                if isinstance(item, dict):
+                    sym = item.get("symbol", f"item_{i}")
+                    new_port[sym] = item
+                elif isinstance(item, str):
+                    new_port[item] = {"quantity": 1.0, "buy_price": 0.0}
+                elif isinstance(item, (int, float)):
+                    new_port[f"asset_{i}"] = {"quantity": 1.0, "buy_price": float(item)}
+            portfolio = new_port
+        elif isinstance(portfolio, (int, float, str)):
+            portfolio = {"default": {"quantity": 1.0, "buy_price": float(portfolio) if isinstance(portfolio, (int, float)) else 0.0}}
+
+        if not isinstance(portfolio, dict):
+            return {}
+
         for symbol, data in portfolio.items():
-            quantity = data.get("quantity", 0.0)
+            if isinstance(data, (int, float)):
+                data = {"quantity": 1.0, "buy_price": float(data)}
+            elif not isinstance(data, dict):
+                data = {"quantity": 1.0, "buy_price": 0.0}
+
+            quantity = data.get("quantity", 1.0 if "buy_price" in data else 0.0)
             buy_price = data.get("buy_price", 0.0)
 
             try:
                 current_price = parser.fetch_price(url, symbol)
+                if current_price is None:
+                    current_price = buy_price
             except Exception as e:
                 result[symbol] = {"error": str(e)}
                 continue
@@ -66,3 +90,10 @@ class PortfolioValuation:
 
     def calculate_portfolio_pnl(self, url):
         return self.get_total_summary(url)
+
+
+class market_portfolio_valuation:
+    @staticmethod
+    def calculate(portfolio_id):
+        v = PortfolioValuation(portfolio_id)
+        return v.get_total_summary("http://localhost/api")

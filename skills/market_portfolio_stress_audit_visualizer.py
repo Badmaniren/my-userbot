@@ -11,6 +11,18 @@ class MarketPortfolioStressAuditVisualizer:
     def visualize(self, payload):
         return market_portfolio_stress_audit_visualizer(payload)
 
+    def generate_report(self, raw_data, mc_results=None):
+        portfolio_id = raw_data.get("portfolio_id") if isinstance(raw_data, dict) else "UNKNOWN"
+        var_99 = mc_results.get("var_99", 0.0) if isinstance(mc_results, dict) else 0.0
+        return {
+            "report_id": f"REPORT-{portfolio_id}",
+            "status": "generated",
+            "portfolio_id": portfolio_id,
+            "var_99": var_99,
+            "raw_data": raw_data,
+            "mc_results": mc_results
+        }
+
 
 def market_portfolio_stress_audit_visualizer(payload):
     if not isinstance(payload, dict):

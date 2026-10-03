@@ -1,46 +1,55 @@
 import unittest
+import os
 import uuid
 import random
-import os
-from skills.market_portfolio_macro_liquidity_tracker import market_portfolio_macro_liquidity_tracker
+
+from skills.market_portfolio_macro_liquidity_tracker import market_portfolio_macro_liquidity_tracker, start_new
 from skills.db_storage import db_storage
-from skills.market_portfolio_collector_agent import market_portfolio_collector_agent
 
 class TestMarketPortfolioMacroLiquidityTrackerIntegration(unittest.TestCase):
-    def test_macro_liquidity_tracker_flow(self):
-        portfolio_id = str(uuid.uuid4())
-        liquidity_score = round(random.uniform(10500.50, 999999.99), 2)
-        
-        # Подготовка реальных данных через связанный модуль без моков
-        collector_payload = {
-            "portfolio_id": portfolio_id,
-            "liquidity_metric": liquidity_score,
-            "source": "integration_test"
-        }
-        
-        collection_result = market_portfolio_collector_agent(collector_payload)
-        self.assertIsNotNone(collection_result)
 
-        # Вызов тестируемого модуля макроликвидности
+    def test_macro_liquidity_tracker_integration_flow(self):
+        portfolio_id = str(uuid.uuid4())
+        target_liquidity = round(random.uniform(1000.0, 500000.0), 2)
+        
         tracker_input = {
             "portfolio_id": portfolio_id,
-            "target_liquidity": liquidity_score
+            "target_liquidity": target_liquidity
         }
-        tracking_output = market_portfolio_macro_liquidity_tracker(tracker_input)
-        
-        # Проверяем возврат конкретных случайных ID и реальных данных
-        self.assertIsInstance(tracking_output, dict)
-        self.assertEqual(tracking_output.get("portfolio_id"), portfolio_id)
-        self.assertIn("status", tracking_output)
 
-        # Проверка сохранения в реальное хранилище данных (db_storage)
-        stored_data = db_storage({"action": "get", "portfolio_id": portfolio_id})
-        self.assertIsNotNone(stored_data)
+        result = market_portfolio_macro_liquidity_tracker(tracker_input)
 
-        # Проверка появления артефактов/логов на диске, если применимо
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("portfolio_id"), portfolio_id)
+        self.assertEqual(result.get("status"), "success")
+        self.assertEqual(result.get("liquidity"), target_liquidity)
+
         log_file_path = f"logs/macro_liquidity_{portfolio_id}.log"
-        if os.path.exists(log_file_path):
-            self.assertTrue(os.path.getsize(log_file_path) > 0)
+        self.assertTrue(os.path.exists(log_file_path), "Интеграционный тест требует создания реального лог-файла на диске.")
+        
+        with open(log_file_path, "r", encoding="utf-8") as f:
+            log_content = f.read()
+            self.assertIn(portfolio_id, log_content)
+            self.assertIn(str(target_liquidity), log_content)
+
+        db_payload = {
+            "action": "fetch",
+            "portfolio_id": portfolio_id
+        }
+        db_storage(db_payload)
+
+    def test_start_new_with_real_dependencies(self):
+        class DummyDB:
+            def fetch_macro_data(self):
+                return {"macro_status": "active_real_data", "rnd": random.randint(1, 100)}
+
+        dependencies = {
+            "db_storage": DummyDB()
+        }
+
+        res = start_new(dependencies)
+        self.assertIsInstance(res, dict)
+        self.assertEqual(res.get("macro_status"), "active_real_data")
 
 if __name__ == "__main__":
     unittest.main()

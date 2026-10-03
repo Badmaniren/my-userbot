@@ -89,10 +89,14 @@ class MarketReportGenerator:
         return f"Report for {symbol}: No data"
 
     def get_raw_stream_dump(self):
-        if os.path.exists(self.storage_file):
+        if self.storage_file and os.path.exists(self.storage_file):
             with open(self.storage_file, "r", encoding="utf-8") as f:
                 return f.read()
-        return "{}"
+        try:
+            with open(self.storage_file, "r", encoding="utf-8") as f:
+                return f.read()
+        except Exception:
+            return "{}"
 
 
 def generate_market_report(storage_file, symbol):

@@ -32,55 +32,51 @@ class MarketPortfolioLiquidityStressEvaluator:
         confidence_level=0.95,
         export_target=None
     ):
-        try:
-            var_func = getattr(market_portfolio_var_liquidity_core, "calculate_var_and_liquidity", None)
-            if var_func is None and hasattr(market_portfolio_var_liquidity_core, "market_portfolio_var_liquidity_core"):
-                core_inst = market_portfolio_var_liquidity_core.market_portfolio_var_liquidity_core()
-                var_func = getattr(core_inst, "calculate_var_and_liquidity", None)
+        var_func = getattr(market_portfolio_var_liquidity_core, "calculate_var_and_liquidity", None)
+        if var_func is None and hasattr(market_portfolio_var_liquidity_core, "market_portfolio_var_liquidity_core"):
+            core_inst = market_portfolio_var_liquidity_core.market_portfolio_var_liquidity_core()
+            var_func = getattr(core_inst, "calculate_var_and_liquidity", None)
 
-            var_result = var_func(
-                portfolio_id=portfolio_id,
-                confidence_level=confidence_level,
-                export_target=export_target
-            ) if var_func else {}
+        var_result = var_func(
+            portfolio_id=portfolio_id,
+            confidence_level=confidence_level,
+            export_target=export_target
+        ) if var_func else {}
 
-            pipeline = PortfolioStressScenarioPipeline(storage_file=self.storage_file)
-            stress_result = pipeline.execute(
-                symbol=symbol,
-                percentage=percentage,
-                shifts=shifts
+        pipeline = PortfolioStressScenarioPipeline(self.storage_file)
+        stress_result = pipeline.execute(
+            symbol=symbol,
+            percentage=percentage,
+            shifts=shifts
+        )
+
+        var_loss = 0.0
+        if isinstance(var_result, dict):
+            var_loss = float(
+                var_result.get("var_value") or
+                var_result.get("var_loss") or
+                0.0
             )
 
-            var_loss = 0.0
-            if isinstance(var_result, dict):
-                var_loss = float(
-                    var_result.get("var_value") or
-                    var_result.get("var_loss") or
-                    0.0
-                )
+        stress_loss = 0.0
+        if isinstance(stress_result, dict):
+            stress_loss = float(
+                stress_result.get("projected_loss") or
+                stress_result.get("scenario_loss") or
+                0.0
+            )
 
-            stress_loss = 0.0
-            if isinstance(stress_result, dict):
-                stress_loss = float(
-                    stress_result.get("projected_loss") or
-                    stress_result.get("scenario_loss") or
-                    0.0
-                )
+        aggregate_loss = var_loss + stress_loss
 
-            aggregate_loss = var_loss + stress_loss
+        result = dict(var_result) if isinstance(var_result, dict) else {}
+        if isinstance(stress_result, dict):
+            result.update(stress_result)
 
-            result = dict(var_result) if isinstance(var_result, dict) else {}
-            if isinstance(stress_result, dict):
-                result.update(stress_result)
-
-            result["portfolio_id"] = portfolio_id
-            result["aggregate_loss"] = aggregate_loss
-            result["total_loss"] = aggregate_loss
-            result["total_losses"] = aggregate_loss
-            return result
-
-        except Exception as e:
-            return {"portfolio_id": portfolio_id, "error": str(e)}
+        result["portfolio_id"] = portfolio_id
+        result["aggregate_loss"] = aggregate_loss
+        result["total_loss"] = aggregate_loss
+        result["total_losses"] = aggregate_loss
+        return result
 
     def execute(
         self,

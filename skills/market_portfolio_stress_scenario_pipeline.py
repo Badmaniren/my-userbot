@@ -8,7 +8,7 @@ class PortfolioStressScenarioPipeline:
         self.simulator = PortfolioScenarioSimulator(storage_file)
         self.reporter = PortfolioStressReporter(storage_file)
 
-    def execute(self, symbol, percentage, shifts):
+    def _load_or_create_storage(self):
         try:
             with open(self.storage_file, "r", encoding="utf-8", errors="ignore") as f:
                 content = f.read()
@@ -21,6 +21,9 @@ class PortfolioStressScenarioPipeline:
                     f.write("{}")
             except FileNotFoundError:
                 pass
+
+    def execute(self, symbol, percentage, shifts):
+        self._load_or_create_storage()
 
         try:
             sim_result = self.simulator.simulate_scenario(symbol, percentage)

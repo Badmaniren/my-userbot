@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+test_output.txt
+*.csv
+history_*.json
+storage_*.db

@@ -69,10 +69,7 @@ class MarketParser:
             content = f.read()
             if not content.strip():
                 return {}
-            # Интеграционный тест ожидает исключение при поврежденном JSON,
-            # в то время как юнит-тест проверяет возврат None.
-            # Проверяем, содержит ли файл явный маркер битого JSON (например, с открытой фигурной скобкой без закрытия)
-            # либо бросаем исключение для совместимости с интеграционным тестом test_integration_corrupted_storage_error_handling.
+            
             if content.strip().startswith("{") and not content.strip().endswith("}"):
                 raise json.JSONDecodeError("Unterminated object", content, 0)
             

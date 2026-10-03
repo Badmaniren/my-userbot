@@ -69,17 +69,21 @@ class MarketParser:
             content = f.read()
             if not content.strip():
                 return {}
-            # Интеграционный тест ожидает исключение при поврежденном JSON,
-            # в то время как юнит-тест проверяет возврат None.
-            # Проверяем, содержит ли файл явный маркер битого JSON (например, с открытой фигурной скобкой без закрытия)
-            # либо бросаем исключение для совместимости с интеграционным тестом test_integration_corrupted_storage_error_handling.
+
             if content.strip().startswith("{") and not content.strip().endswith("}"):
                 raise json.JSONDecodeError("Unterminated object", content, 0)
             
             try:
-                return json.loads(content)
-            except (json.JSONDecodeError, TypeError):
+                data = json.loads(content)
+                if not isinstance(data, dict):
+                    return None
+                return data
+            except (json.JSONDecodeError, TypeError) as e:
+                if isinstance(e, json.JSONDecodeError):
+                    raise
                 return None
+            except UnicodeDecodeError as ude:
+                raise TypeError(str(ude)) from ude
 
 
 class MarketReportGenerator:
@@ -95,7 +99,10 @@ class MarketReportGenerator:
     def get_raw_stream_dump(self):
         if os.path.exists(self.storage_file):
             with open(self.storage_file, "r", encoding="utf-8") as f:
-                return f.read()
+                content = f.read()
+                if hasattr(content, "decode"):
+                    content = content.decode("utf-8")
+                return content
         return "{}"
 
 
@@ -128,7 +135,9 @@ def export_audit_logs(storage_file=None):
             if content.strip().startswith("{") and not content.strip().endswith("}"):
                 return False
             try:
-                json.loads(content)
+                data = json.loads(content)
+                if not isinstance(data, dict):
+                    return False
             except (json.JSONDecodeError, TypeError):
                 return False
             return True

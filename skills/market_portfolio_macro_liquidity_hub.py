@@ -33,13 +33,16 @@ class market_portfolio_macro_liquidity_hub:
         record = None
         if self.db and hasattr(self.db, 'get_record'):
             record = self.db.get_record(portfolio_id)
+        elif self.db and hasattr(self.db, 'get'):
+            record = self.db.get(portfolio_id)
             
         liquidity_factor = 0.0
         aggregate_volume = 0
         
         if record:
-            liquidity_factor = record.get("liquidity_factor", 0.0)
-            aggregate_volume = record.get("aggregate_volume", 0)
+            if isinstance(record, dict):
+                liquidity_factor = record.get("liquidity_factor", 0.0)
+                aggregate_volume = record.get("aggregate_volume", 0)
 
         return {
             "status": "success",

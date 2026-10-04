@@ -8,3 +8,4 @@
 - market_portfolio_liquidity_scenario_analyzer: Расширяем market_portfolio_liquidity_scenario_analyzer макро-сценарными шоками ликвидности и строгим расчетом горизонта ликвидации позиций.
 - market_portfolio_liquidity_scenario_analyzer: Укрепляем и стабилизируем market_portfolio_liquidity_scenario_analyzer после эскалации для продолжения сборки автономного контура макро-ликвидности портфеля.
 - market_portfolio_liquidity_scenario_analyzer: Окончательное исправление падений тестов в market_portfolio_liquidity_scenario_analyzer для беспрепятственного продвижения автономного контура макро-ликвидности портфеля.
+- market_portfolio_liquidity_scenario_analyzer: Проводим финальный стабильный рефакторинг market_portfolio_liquidity_scenario_analyzer без падений тестов для продвижения контура макро-ликвидности.

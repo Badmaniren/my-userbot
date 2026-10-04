@@ -23,7 +23,7 @@ class MarketParser:
     def fetch_and_store(self, symbol: str, price: float):
         conn = sqlite3.connect(self.storage_file)
         cursor = conn.cursor()
-        
+
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS market_data (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -31,12 +31,12 @@ class MarketParser:
                 price REAL NOT NULL
             )
         ''')
-        
+
         cursor.execute(
             'INSERT INTO market_data (symbol, price) VALUES (?, ?)',
             (symbol, price)
         )
-        
+
         conn.commit()
         conn.close()
 

@@ -17,7 +17,8 @@ class MonteCarloStressEngine:
     """Движок стресс-тестирования портфеля методом Монте-Карло."""
 
     def run_simulation(self, portfolio_id: str, simulations: int, horizon_days: int) -> dict:
-        portfolio_data = db_storage.fetch_portfolio(portfolio_id)
+        fetch_func = getattr(db_storage, "fetch_portfolio", None)
+        portfolio_data = fetch_func(portfolio_id) if callable(fetch_func) else None
 
         if not portfolio_data or not isinstance(portfolio_data, dict) or "initial_value" not in portfolio_data:
             in_mem = getattr(db_storage, "_in_memory_db", None)

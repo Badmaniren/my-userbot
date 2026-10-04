@@ -110,8 +110,6 @@ def run_stress_recovery_coordinator_pipeline(
         with open(storage_file, "w") as f:
             f.write("{}")
 
-    coordinator = StressRecoveryCoordinatorBridge(storage_file=storage_file)
-    
     shifts_iterable = list(range(shifts)) if isinstance(shifts, int) else shifts
 
     try:
@@ -119,7 +117,7 @@ def run_stress_recovery_coordinator_pipeline(
         logger.info(f"Stress scenario pipeline function executed successfully for {symbol}")
     except (KeyError, TypeError) as e:
         logger.warning(f"Caught exception {type(e).__name__} in pipeline for {symbol}: {e}. Providing fallback.")
-        stress_result = {"status": "simulated", "symbol": symbol, "shifts": list(range(shifts)) if isinstance(shifts, int) else shifts}
+        stress_result = {"status": "simulated", "symbol": symbol, "shifts": shifts_iterable}
 
     recovery_result = start_new(symbol, url, telegram_token, chat_id, storage_file)
     logger.info(f"Monitor start_new completed for pipeline execution on {symbol}")

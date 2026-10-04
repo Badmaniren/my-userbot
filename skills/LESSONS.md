@@ -3,7 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ть системный модуль 'market_anomaly_detector' глобальной переменной!; АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'market_anomaly_detector' глобальной переменной!
+вать системный модуль 'market_anomaly_detector' глобальной переменной!
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_monitor (refactor) — раундов: 4
@@ -268,3 +268,6 @@
 ## market_portfolio_yield_evaluator (compose) — раундов: 4
 - Последняя ошибка перед фиксом: result = self.evaluator.evaluate_portfolio_yield(
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_monte_carlo_engine (start_new) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

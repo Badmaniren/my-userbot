@@ -27,7 +27,7 @@ class PortfolioStressScenarioPipeline:
 
         try:
             sim_result = self.simulator.simulate_scenario(symbol, percentage)
-        except KeyError:
+        except (KeyError, RuntimeError, AttributeError):
             sim_result = {"symbol": symbol, "percentage": percentage, "simulated_value": 0.0}
 
         if isinstance(sim_result, dict):
@@ -40,7 +40,7 @@ class PortfolioStressScenarioPipeline:
             stress_test_result = self.simulator.run_stress_test(symbol, shifts)
             if isinstance(stress_test_result, list):
                 stress_test_result = {"symbol": symbol, "shifts": shifts, "results": stress_test_result}
-        except KeyError:
+        except (KeyError, RuntimeError, AttributeError):
             stress_test_result = {"symbol": symbol, "shifts": shifts, "results": []}
 
         if isinstance(stress_test_result, dict):
@@ -79,7 +79,7 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
     simulator = PortfolioScenarioSimulator(storage_file)
     try:
         sim_result = simulator.simulate_scenario(symbol, percentage)
-    except KeyError:
+    except (KeyError, RuntimeError, AttributeError):
         sim_result = {"symbol": symbol, "percentage": percentage, "simulated_value": 0.0}
 
     if isinstance(sim_result, dict):
@@ -92,7 +92,7 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
         stress_test_result = simulator.run_stress_test(symbol, shifts)
         if isinstance(stress_test_result, list):
             stress_test_result = {"symbol": symbol, "shifts": shifts, "results": stress_test_result}
-    except KeyError:
+    except (KeyError, RuntimeError, AttributeError):
         stress_test_result = {"symbol": symbol, "shifts": shifts, "results": []}
     
     if isinstance(stress_test_result, dict):

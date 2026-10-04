@@ -23,16 +23,16 @@ def analyze_liquidity_stress_scenarios(
     _ensure_dir_exists(export_target)
     _ensure_dir_exists(storage_file)
 
-    if hasattr(market_portfolio_var_liquidity_core, "calculate_var_and_liquidity"):
-        var_liquidity_data = market_portfolio_var_liquidity_core.calculate_var_and_liquidity(
-            portfolio_id, confidence_level, export_target
-        )
-    elif hasattr(market_portfolio_var_liquidity_core, "calculate_var_liquidity"):
+    if hasattr(market_portfolio_var_liquidity_core, "calculate_var_liquidity"):
         var_liquidity_data = market_portfolio_var_liquidity_core.calculate_var_liquidity(
             portfolio_id, confidence_level, export_target
         )
+    elif hasattr(market_portfolio_var_liquidity_core, "calculate_var_and_liquidity"):
+        var_liquidity_data = market_portfolio_var_liquidity_core.calculate_var_and_liquidity(
+            portfolio_id, confidence_level, export_target
+        )
     else:
-        func = getattr(market_portfolio_var_liquidity_core, "calculate_var_and_liquidity")
+        func = getattr(market_portfolio_var_liquidity_core, "calculate_var_liquidity")
         var_liquidity_data = func(portfolio_id, confidence_level, export_target)
     
     if hasattr(market_portfolio_stress_scenario_pipeline, "run_stress_scenario_pipeline"):
@@ -86,16 +86,16 @@ class MarketPortfolioLiquidityScenarioAnalyzer:
         _ensure_dir_exists(export_target)
         _ensure_dir_exists(self.storage_file)
 
-        if hasattr(market_portfolio_var_liquidity_core, "calculate_var_and_liquidity"):
-            var_result = market_portfolio_var_liquidity_core.calculate_var_and_liquidity(
-                portfolio_id, confidence_level, export_target
-            )
-        elif hasattr(market_portfolio_var_liquidity_core, "calculate_var_liquidity"):
+        if hasattr(market_portfolio_var_liquidity_core, "calculate_var_liquidity"):
             var_result = market_portfolio_var_liquidity_core.calculate_var_liquidity(
                 portfolio_id, confidence_level, export_target
             )
+        elif hasattr(market_portfolio_var_liquidity_core, "calculate_var_and_liquidity"):
+            var_result = market_portfolio_var_liquidity_core.calculate_var_and_liquidity(
+                portfolio_id, confidence_level, export_target
+            )
         else:
-            func = getattr(market_portfolio_var_liquidity_core, "calculate_var_and_liquidity")
+            func = getattr(market_portfolio_var_liquidity_core, "calculate_var_liquidity")
             var_result = func(portfolio_id, confidence_level, export_target)
         
         pipeline_class = market_portfolio_stress_scenario_pipeline.PortfolioStressScenarioPipeline(self.storage_file)

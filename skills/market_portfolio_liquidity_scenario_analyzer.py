@@ -3,6 +3,12 @@ import json
 from skills import market_portfolio_var_liquidity_core
 from skills import market_portfolio_stress_scenario_pipeline
 
+def _ensure_dir_exists(target_path):
+    if target_path and not str(target_path).startswith("s3://"):
+        export_dir = os.path.dirname(target_path)
+        if export_dir and not os.path.exists(export_dir):
+            os.makedirs(export_dir, exist_ok=True)
+
 def analyze_liquidity_stress_scenarios(
     portfolio_id,
     confidence_level=None,
@@ -12,6 +18,9 @@ def analyze_liquidity_stress_scenarios(
     shifts=None,
     storage_file=None
 ):
+    _ensure_dir_exists(export_target)
+    _ensure_dir_exists(storage_file)
+
     if hasattr(market_portfolio_var_liquidity_core, "calculate_var_and_liquidity"):
         var_liquidity_data = market_portfolio_var_liquidity_core.calculate_var_and_liquidity(
             portfolio_id, confidence_level, export_target
@@ -35,18 +44,14 @@ def analyze_liquidity_stress_scenarios(
     reserve_capital_requirement = max(var_val, impact) * 1.15
     
     if export_target and not str(export_target).startswith("s3://"):
-        export_dir = os.path.dirname(export_target)
-        if export_dir and not os.path.exists(export_dir):
-            os.makedirs(export_dir, exist_ok=True)
-        with open(export_target, 'w') as f:
-            json.dump(var_liquidity_data, f)
+        if not os.path.exists(export_target):
+            with open(export_target, 'w') as f:
+                json.dump(var_liquidity_data, f)
 
     if storage_file:
-        storage_dir = os.path.dirname(storage_file)
-        if storage_dir and not os.path.exists(storage_dir):
-            os.makedirs(storage_dir, exist_ok=True)
-        with open(storage_file, 'w') as f:
-            json.dump(stress_pipeline_data, f)
+        if not os.path.exists(storage_file):
+            with open(storage_file, 'w') as f:
+                json.dump(stress_pipeline_data, f)
 
     return {
         "portfolio_id": portfolio_id,
@@ -73,6 +78,9 @@ class MarketPortfolioLiquidityScenarioAnalyzer:
         percentage,
         shifts
     ):
+        _ensure_dir_exists(export_target)
+        _ensure_dir_exists(self.storage_file)
+
         if hasattr(market_portfolio_var_liquidity_core, "market_portfolio_var_liquidity_core"):
             core_module = market_portfolio_var_liquidity_core.market_portfolio_var_liquidity_core()
             var_result = core_module.calculate_var_and_liquidity(portfolio_id, confidence_level, export_target)

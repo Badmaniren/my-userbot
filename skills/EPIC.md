@@ -4,3 +4,4 @@
 
 - market_portfolio_stress_scenario_pipeline: Запускаем новый эпик оркестрации стресс-тестирования для объединения симуляций Монте-Карло с рыночными сценариями.
 - market_portfolio_stress_scenario_pipeline: Оптимизация и стабилизация конвейера оркестрации стресс-тестирования после недавних правок.
+- market_portfolio_stress_scenario_pipeline: Продолжаем стабилизацию и развитие market_portfolio_stress_scenario_pipeline в рамках текущего эпика оркестрации стресс-тестирования.

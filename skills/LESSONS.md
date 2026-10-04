@@ -3,7 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-torage import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'market_parser'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.market_parser import ...'
+..'
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -283,4 +283,8 @@ torage import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен ф
 
 ## market_portfolio_stress_recovery_coordinator_bridge (refactor) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (failures=3)
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_auto_rebalance_trigger (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: успешно прошёл тесты и влит в main

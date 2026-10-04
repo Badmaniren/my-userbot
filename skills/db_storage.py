@@ -1,6 +1,20 @@
 import sqlite3
+import io
 import requests
 from bs4 import BeautifulSoup
+
+_LOG_STREAMS = {}
+
+
+def save_log_stream(scenario_id: str, data: str | bytes):
+    if isinstance(data, str):
+        data = data.encode('utf-8')
+    _LOG_STREAMS[scenario_id] = data
+
+
+def fetch_log_stream(scenario_id: str):
+    data = _LOG_STREAMS.get(scenario_id, b"")
+    return io.BytesIO(data)
 
 
 class MarketParser:

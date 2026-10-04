@@ -112,3 +112,42 @@ def run_stress_test(storage_file, symbol, range_min, range_max, step):
         "symbol": symbol,
         "scenarios": scenarios
     }
+
+
+def analyze_failure_signature(scenario_id, log_data):
+    if isinstance(log_data, (bytes, bytearray)):
+        text = log_data.decode('utf-8', errors='ignore')
+    elif isinstance(log_data, str):
+        text = log_data
+    elif hasattr(log_data, 'read'):
+        raw = log_data.read()
+        text = raw.decode('utf-8', errors='ignore') if isinstance(raw, bytes) else str(raw)
+    else:
+        text = str(log_data) if log_data is not None else ""
+
+    if not text or not text.strip() or log_data == b"":
+        return {
+            "scenario_id": str(scenario_id),
+            "status": "unknown",
+            "signature": "EMPTY_LOG"
+        }
+
+    text_upper = text.upper()
+    if "TIMEOUT" in text_upper:
+        signature = "TIMEOUT"
+    elif "NULL_POINTER" in text_upper or "NULLPOINTER" in text_upper:
+        signature = "NULL_POINTER"
+    elif "SEGFAULT" in text_upper or "SEGMENTATION FAULT" in text_upper:
+        signature = "SEGFAULT"
+    elif "OUT_OF_MEMORY" in text_upper or "OOM" in text_upper:
+        signature = "OUT_OF_MEMORY"
+    elif "CRITICAL_FAILURE" in text_upper:
+        signature = "CRITICAL_FAILURE"
+    else:
+        signature = "FAILURE_DETECTED"
+
+    return {
+        "scenario_id": str(scenario_id),
+        "status": "failed",
+        "signature": signature
+    }

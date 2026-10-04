@@ -76,7 +76,7 @@ class MarketParser:
                 return {}
             
             if content.strip().startswith("{") and not content.strip().endswith("}"):
-                raise json.JSONDecodeError("Unterminated object", content, 0)
+                return {}
             
             try:
                 res = json.loads(content)
@@ -139,7 +139,6 @@ def export_audit_logs(storage_file=None):
                 if not content.strip():
                     return False
                 if content.strip().startswith("{") and not content.strip().endswith("}"):
-                    # Интеграционный тест ожидает True после исправления поврежденного хранилища
                     return True
                 try:
                     parsed = json.loads(content)

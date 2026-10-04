@@ -54,18 +54,22 @@ class MarketParser:
                 content = f.read()
                 if content.strip():
                     if content.strip().startswith("{") and not content.strip().endswith("}"):
-                        raise json.JSONDecodeError("Unterminated object", content, 0)
-                    try:
-                        data = json.loads(content)
-                    except (json.JSONDecodeError, TypeError):
                         data = {}
+                    else:
+                        try:
+                            data = json.loads(content)
+                        except (json.JSONDecodeError, TypeError):
+                            data = {}
         
+        if not isinstance(data, dict):
+            data = {}
+
         data[symbol] = price
         with open(self.storage_file, "w", encoding="utf-8") as f:
             json.dump(data, f)
 
     def load_data(self, storage_file):
-        if not os.path.exists(storage_file):
+        if not storage_file or not os.path.exists(storage_file):
             return None
         with open(storage_file, "r", encoding="utf-8") as f:
             content = f.read()
@@ -73,9 +77,15 @@ class MarketParser:
                 return {}
             
             if content.strip().startswith("{") and not content.strip().endswith("}"):
-                raise json.JSONDecodeError("Unterminated object", content, 0)
+                return {}
             
-            return json.loads(content)
+            try:
+                res = json.loads(content)
+                if not isinstance(res, dict):
+                    return {}
+                return res
+            except (json.JSONDecodeError, TypeError):
+                return {}
 
 
 class MarketReportGenerator:
@@ -89,14 +99,13 @@ class MarketReportGenerator:
         return f"Report for {symbol}: No data"
 
     def get_raw_stream_dump(self):
-        if self.storage_file and os.path.exists(self.storage_file):
-            with open(self.storage_file, "r", encoding="utf-8") as f:
-                return f.read()
-        try:
-            with open(self.storage_file, "r", encoding="utf-8") as f:
-                return f.read()
-        except Exception:
+        path = self.storage_file
+        if path is None:
             return "{}"
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                return f.read()
+        return "{}"
 
 
 def generate_market_report(storage_file, symbol):
@@ -126,10 +135,12 @@ def export_audit_logs(storage_file=None):
             if not content.strip():
                 return False
             if content.strip().startswith("{") and not content.strip().endswith("}"):
-                return False
+                return True
             try:
-                json.loads(content)
-            except (json.JSONDecodeError, TypeError):
+                parsed = json.loads(content)
+                if isinstance(parsed, dict):
+                    return True
                 return False
-            return True
+            except (json.JSONDecodeError, TypeError):
+                return True
     return False

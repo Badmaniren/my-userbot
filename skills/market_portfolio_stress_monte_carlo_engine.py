@@ -16,7 +16,14 @@ from skills import market_portfolio_audit_compliance_hub
 class MonteCarloStressEngine:
     """Движок стресс-тестирования портфеля методом Монте-Карло."""
 
-    def run_simulation(self, portfolio_id: str, simulations: int, horizon_days: int) -> dict:
+    def __init__(self, simulations: int = 1000, **kwargs):
+        self.simulations = simulations
+        self.kwargs = kwargs
+
+    def run_simulation(self, portfolio_id: str, simulations: int = None, horizon_days: int = 1) -> dict:
+        if simulations is None:
+            simulations = self.simulations
+
         try:
             portfolio_data = db_storage.fetch_portfolio(portfolio_id)
         except AttributeError:
@@ -70,6 +77,40 @@ class MonteCarloStressEngine:
             "cvar_95": float(cvar_95)
         }
 
+    def evaluate_tail_risk(self, portfolio_data: dict = None, simulation_result: dict = None) -> dict:
+        if portfolio_data is None:
+            portfolio_data = {}
+        if simulation_result is None:
+            simulation_result = {}
+
+        total_value = portfolio_data.get("total_value", 100000.0)
+        market_shock_pct = simulation_result.get("market_shock_pct", -20.0)
+        horizon_days = simulation_result.get("horizon_days", 10)
+
+        vol = abs(market_shock_pct) / 100.0
+        dt = float(horizon_days) / 365.0
+
+        sims = self.simulations
+        final_losses = []
+        for _ in range(sims):
+            rand_norm = random.gauss(0, 1)
+            ret = -0.5 * (vol ** 2) * dt + vol * math.sqrt(dt) * rand_norm
+            sim_val = total_value * math.exp(ret)
+            final_losses.append(total_value - sim_val)
+
+        final_losses.sort(reverse=True)
+        idx_99 = max(1, int(0.01 * len(final_losses)))
+        var_99 = final_losses[idx_99 - 1]
+        tail_losses = final_losses[:idx_99]
+        expected_shortfall = sum(tail_losses) / len(tail_losses) if tail_losses else var_99
+
+        return {
+            "portfolio_id": portfolio_data.get("portfolio_id", "DEFAULT"),
+            "var_99": float(round(var_99, 2)),
+            "expected_shortfall": float(round(expected_shortfall, 2)),
+            "simulations": sims
+        }
+
     def _get_anomaly_adjustment(self) -> float:
         try:
             return market_anomaly_detector.get_current_anomaly_multiplier()
@@ -87,6 +128,9 @@ class MonteCarloStressEngine:
             return market_portfolio_api_gateway.stream_payload()
         except AttributeError:
             return None
+
+
+MarketPortfolioStressMonteCarloEngine = MonteCarloStressEngine
 
 
 if not hasattr(db_storage, "fetch_portfolio"):

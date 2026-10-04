@@ -14,16 +14,19 @@ if not logger.handlers:
     logger.setLevel(logging.INFO)
 
 class PortfolioScenarioSimulator:
-    def __init__(self, storage_file):
+    def __init__(self, storage_file=None):
         self.storage_file = storage_file
 
-    def load_data(self, storage_file):
-        logger.info("Loading portfolio data from %s", storage_file)
+    def load_data(self, storage_file=None):
+        target_file = storage_file or self.storage_file
+        if not target_file:
+            return {}
+        logger.info("Loading portfolio data from %s", target_file)
         try:
-            with open(storage_file, 'r') as f:
+            with open(target_file, 'r') as f:
                 return json.load(f)
         except (IOError, OSError, json.JSONDecodeError) as e:
-            logger.error("Failed to load data from %s: %s", storage_file, e)
+            logger.error("Failed to load data from %s: %s", target_file, e)
             return {}
 
     def simulate_scenario(self, symbol, percentage, slippage_factor=0.0):
@@ -97,6 +100,36 @@ class PortfolioScenarioSimulator:
             })
         logger.info("Stress test completed for symbol: %s", symbol)
         return report
+
+    def run_scenario(self, portfolio_data=None, stress_params=None, **kwargs):
+        if portfolio_data is None:
+            portfolio_data = {}
+        if stress_params is None:
+            stress_params = {}
+
+        market_shock_pct = stress_params.get("market_shock_pct", -10.0)
+        total_value = portfolio_data.get("total_value", 100000.0)
+        pnl_impact = total_value * (market_shock_pct / 100.0)
+        simulated_value = total_value + pnl_impact
+        drawdown_pct = abs(market_shock_pct) if market_shock_pct < 0 else 0.0
+
+        return {
+            "portfolio_id": portfolio_data.get("portfolio_id", "DEFAULT"),
+            "scenario_type": stress_params.get("scenario_type", "stress_scenario"),
+            "market_shock_pct": market_shock_pct,
+            "initial_value": total_value,
+            "simulated_value": simulated_value,
+            "pnl_impact": pnl_impact,
+            "drawdown_pct": drawdown_pct,
+            "horizon_days": stress_params.get("horizon_days", 1),
+            "confidence_level": stress_params.get("confidence_level", 0.95),
+            "assets": portfolio_data.get("assets", [])
+        }
+
+
+MarketPortfolioScenarioSimulator = PortfolioScenarioSimulator
+market_portfolio_scenario_simulator = PortfolioScenarioSimulator
+
 
 def simulate_market_scenario(storage_file, symbol, percentage):
     logger.info("Wrapper simulate_market_scenario invoked for %s", symbol)

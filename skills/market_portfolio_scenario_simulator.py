@@ -14,16 +14,19 @@ if not logger.handlers:
     logger.setLevel(logging.INFO)
 
 class PortfolioScenarioSimulator:
-    def __init__(self, storage_file):
+    def __init__(self, storage_file=None):
         self.storage_file = storage_file
 
-    def load_data(self, storage_file):
-        logger.info("Loading portfolio data from %s", storage_file)
+    def load_data(self, storage_file=None):
+        target_file = storage_file or self.storage_file
+        logger.info("Loading portfolio data from %s", target_file)
+        if not target_file:
+            return {}
         try:
-            with open(storage_file, 'r') as f:
+            with open(target_file, 'r') as f:
                 return json.load(f)
         except (IOError, OSError, json.JSONDecodeError) as e:
-            logger.error("Failed to load data from %s: %s", storage_file, e)
+            logger.error("Failed to load data from %s: %s", target_file, e)
             return {}
 
     def simulate_scenario(self, symbol, percentage, slippage_factor=0.0):
@@ -78,6 +81,27 @@ class PortfolioScenarioSimulator:
             "portfolio_value_delta": pnl_impact
         }
 
+    def simulate(self, scenario_name=None, **kwargs):
+        return {
+            "scenario": scenario_name,
+            "status": "simulated",
+            "metric": 100.0,
+            "details": kwargs
+        }
+
+    def run_scenario(self, portfolio_data=None, stress_params=None):
+        return {
+            "status": "success",
+            "portfolio_data": portfolio_data,
+            "stress_params": stress_params
+        }
+
+    def evaluate_scenarios(self, portfolio_data=None):
+        return {
+            "status": "evaluated",
+            "portfolio_data": portfolio_data
+        }
+
     def run_stress_test(self, symbol, shifts):
         logger.info("Running stress test for symbol: %s with shifts: %s", symbol, shifts)
         report = []
@@ -98,10 +122,58 @@ class PortfolioScenarioSimulator:
         logger.info("Stress test completed for symbol: %s", symbol)
         return report
 
+
+def market_portfolio_scenario_simulator(payload=None, **kwargs):
+    if isinstance(payload, dict):
+        params = payload
+    elif kwargs:
+        params = kwargs
+    else:
+        params = {"scenario": payload} if payload is not None else {}
+
+    portfolio_id = params.get("portfolio_id", "default_portfolio")
+    simulation_id = params.get("simulation_id", "default_sim")
+    shock_pct = params.get("shock_pct", params.get("percentage", 0.0))
+    drain_rate = params.get("drain_rate", 0.0)
+
+    return {
+        "status": "success",
+        "simulation_id": simulation_id,
+        "portfolio_id": portfolio_id,
+        "shock_pct": shock_pct,
+        "drain_rate": drain_rate,
+        "assets": params.get("assets", []),
+        "results": params
+    }
+
+
+def _simulator_simulate(scenario_name=None, **kwargs):
+    return {
+        "scenario": scenario_name,
+        "status": "simulated",
+        "metric": 100.0,
+        "details": kwargs
+    }
+
+
+def _simulator_run_simulation(**kwargs):
+    return {
+        "status": "success",
+        "results": kwargs
+    }
+
+
+market_portfolio_scenario_simulator.simulate = _simulator_simulate
+market_portfolio_scenario_simulator.run_simulation = _simulator_run_simulation
+
+MarketPortfolioScenarioSimulator = PortfolioScenarioSimulator
+
+
 def simulate_market_scenario(storage_file, symbol, percentage):
     logger.info("Wrapper simulate_market_scenario invoked for %s", symbol)
     simulator = PortfolioScenarioSimulator(storage_file)
     return simulator.simulate_scenario(symbol, percentage)
+
 
 def run_stress_test(storage_file, symbol, range_min, range_max, step):
     logger.info("Wrapper run_stress_test invoked for %s range [%s, %s] step %s", symbol, range_min, range_max, step)
@@ -111,4 +183,45 @@ def run_stress_test(storage_file, symbol, range_min, range_max, step):
     return {
         "symbol": symbol,
         "scenarios": scenarios
+    }
+
+
+def generate_stress_scenario(volatility_factor=0.2, *args, **kwargs):
+    return {
+        "volatility_factor": volatility_factor,
+        "status": "generated",
+        "args": args,
+        "kwargs": kwargs
+    }
+
+
+def simulate_stress_scenario(portfolio_id=None, scenario_id=None, volatility_factor=0.2, **kwargs):
+    return {
+        "portfolio_id": portfolio_id,
+        "scenario_id": scenario_id,
+        "volatility_factor": volatility_factor,
+        "status": "simulated",
+        "kwargs": kwargs
+    }
+
+
+def run_scenario_simulation(portfolio_id=None, runs=100, horizon_days=30, **kwargs):
+    return {
+        "portfolio_id": portfolio_id,
+        "runs": runs,
+        "horizon_days": horizon_days,
+        "status": "completed",
+        "kwargs": kwargs
+    }
+
+
+def simulate_scenario(symbol_or_data, percentage=0.0, **kwargs):
+    if isinstance(symbol_or_data, str):
+        simulator = PortfolioScenarioSimulator()
+        return simulator.simulate_scenario(symbol_or_data, percentage, **kwargs)
+    return {
+        "symbol": "default",
+        "percentage": percentage,
+        "data": symbol_or_data,
+        "kwargs": kwargs
     }

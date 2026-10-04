@@ -2,11 +2,30 @@ import os
 import requests
 from typing import Optional, Dict, Any
 
-from skills.db_storage import db_storage
-from skills.market_portfolio_scenario_simulator import market_portfolio_scenario_simulator
-from skills.market_portfolio_alert_dispatcher import market_portfolio_alert_dispatcher
-from skills.market_portfolio_strategy_optimizer import market_portfolio_strategy_optimizer
-from skills.market_portfolio_monitor import market_portfolio_monitor
+try:
+    from skills.db_storage import db_storage
+except ImportError:
+    db_storage = None
+
+try:
+    from skills.market_portfolio_scenario_simulator import market_portfolio_scenario_simulator
+except ImportError:
+    market_portfolio_scenario_simulator = None
+
+try:
+    from skills.market_portfolio_alert_dispatcher import market_portfolio_alert_dispatcher
+except ImportError:
+    market_portfolio_alert_dispatcher = None
+
+try:
+    from skills.market_portfolio_strategy_optimizer import market_portfolio_strategy_optimizer
+except ImportError:
+    market_portfolio_strategy_optimizer = None
+
+try:
+    from skills.market_portfolio_monitor import market_portfolio_monitor
+except ImportError:
+    market_portfolio_monitor = None
 
 class StressAutoRebalanceTrigger:
     def __init__(self, **kwargs):

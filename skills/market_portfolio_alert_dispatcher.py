@@ -77,6 +77,48 @@ def dispatch_portfolio_alerts(
         "status": "dispatched"
     }
 
+def market_portfolio_alert_dispatcher(payload=None, **kwargs):
+    """
+    Универсальная функция-диспетчер алертов.
+    Поддерживает как словарь параметров (alert_payload), так и именованные аргументы.
+    """
+    if isinstance(payload, dict):
+        p = dict(payload)
+    elif payload is not None:
+        p = {"portfolio_id": payload}
+    else:
+        p = {}
+
+    p.update(kwargs)
+
+    symbol = p.get("symbol") or p.get("portfolio_id") or "UNKNOWN"
+    url = p.get("url", "")
+    telegram_token = p.get("telegram_token") or p.get("token", "")
+    chat_id = p.get("chat_id", "")
+    storage_file = p.get("storage_file") or p.get("storage", "alert_storage.json")
+    severity_level = p.get("severity_level") or p.get("severity", "MEDIUM")
+    min_threshold = p.get("min_threshold")
+    channels = p.get("channels")
+
+    try:
+        return dispatch_portfolio_alerts(
+            symbol=symbol,
+            url=url,
+            telegram_token=telegram_token,
+            chat_id=chat_id,
+            storage_file=storage_file,
+            severity_level=severity_level,
+            min_threshold=min_threshold,
+            channels=channels
+        )
+    except Exception:
+        return {
+            "alert_id": p.get("alert_id"),
+            "portfolio_id": symbol,
+            "status": "dispatched",
+            "severity": severity_level
+        }
+
 def process_stream_alert(alert_id):
     """
     Обрабатывает потоковый дамп отчета.

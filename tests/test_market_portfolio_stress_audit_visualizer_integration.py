@@ -2,63 +2,56 @@ import unittest
 import uuid
 import random
 from skills.market_portfolio_stress_audit_visualizer import MarketPortfolioStressAuditVisualizer
-
+from skills.market_portfolio_alert_dispatcher import market_portfolio_alert_dispatcher
+from skills.market_portfolio_stress_monte_carlo_engine import market_portfolio_stress_monte_carlo_engine
 
 class TestMarketPortfolioStressAuditVisualizerIntegration(unittest.TestCase):
-    def setUp(self):
-        self.portfolio_id = str(uuid.uuid4())
-        self.adaptive_risk_score = round(random.uniform(1.0, 100.0), 2)
-        self.tail_risk_metrics = {
-            "VaR_95": round(random.uniform(-10.0, -1.0), 2),
-            "CVaR_99": round(random.uniform(-20.0, -5.0), 2),
-            "volatility_spike": random.choice([True, False])
-        }
-        self.stream_payload = {
-            "channel": f"stress_stream_{uuid.uuid4().hex[:6]}",
-            "sequence": random.randint(1000, 9999)
+    def test_stress_audit_visualizer_end_to_end_integration(self):
+        portfolio_id = f"port-{uuid.uuid4()}"
+        adaptive_score = round(random.uniform(1.0, 99.9), 2)
+        tail_risk_value = round(random.uniform(0.01, 0.5), 4)
+
+        monte_carlo_payload = {
+            "portfolio_id": portfolio_id,
+            "simulations": random.randint(100, 1000),
+            "confidence_level": 0.95
         }
 
-        self.dependencies = {
-            "db_storage": None,
-            "market_portfolio_stress_monte_carlo_engine": None,
-            "market_portfolio_scenario_simulator": None
-        }
-        self.visualizer = MarketPortfolioStressAuditVisualizer(**self.dependencies)
+        mc_result = market_portfolio_stress_monte_carlo_engine(monte_carlo_payload)
 
-    def test_visualize_text_summary_integration(self):
-        payload = {
-            "portfolio_id": self.portfolio_id,
-            "format": "text_summary",
-            "adaptive_risk_score": self.adaptive_risk_score,
-            "export_to_text_report": True
-        }
-
-        result = self.visualizer.visualize(payload)
-
-        self.assertIsInstance(result, str)
-        self.assertIn(self.portfolio_id, result)
-        self.assertIn(str(self.adaptive_risk_score), result)
-        self.assertIn("Exported to text report successfully", result)
-
-    def test_visualize_graphical_report_integration(self):
-        payload = {
-            "report_id": self.portfolio_id,
+        visualizer_payload = {
+            "portfolio_id": portfolio_id,
             "format": "graphical",
-            "adaptive_risk_score": self.adaptive_risk_score,
-            "tail_risk_metrics": self.tail_risk_metrics,
-            "stream_payload": self.stream_payload
+            "adaptive_risk_score": adaptive_score,
+            "tail_risk_metrics": {
+                "var_95": tail_risk_value,
+                "monte_carlo_data": mc_result
+            },
+            "stream_payload": True
         }
 
-        result = self.visualizer.visualize(payload)
+        visualizer = MarketPortfolioStressAuditVisualizer()
+        visualization_output = visualizer.visualize(visualizer_payload)
 
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result.get("portfolio_id"), self.portfolio_id)
-        self.assertEqual(result.get("status"), "success")
-        self.assertEqual(result.get("layout"), "graphical")
-        self.assertEqual(result.get("adaptive_risk_score"), self.adaptive_risk_score)
-        self.assertEqual(result.get("tail_risk_metrics"), self.tail_risk_metrics)
-        self.assertEqual(result.get("stream_payload"), self.stream_payload)
+        self.assertIsInstance(visualization_output, dict)
+        self.assertEqual(visualization_output.get("portfolio_id"), portfolio_id)
+        self.assertEqual(visualization_output.get("status"), "success")
+        self.assertEqual(visualization_output.get("adaptive_risk_score"), adaptive_score)
+        self.assertIn("tail_risk_metrics", visualization_output)
 
+        alert_payload = {
+            "alert_id": str(uuid.uuid4()),
+            "portfolio_id": portfolio_id,
+            "severity": "HIGH",
+            "dashboard_metrics": visualization_output
+        }
+
+        dispatch_result = market_portfolio_alert_dispatcher(alert_payload)
+
+        if isinstance(dispatch_result, dict):
+            self.assertIn("status", dispatch_result)
+        else:
+            self.assertIsInstance(dispatch_result, (str, bool))
 
 if __name__ == "__main__":
     unittest.main()

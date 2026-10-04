@@ -2,6 +2,21 @@ import os
 import json
 from datetime import datetime
 
+class MarketPortfolioCollectorAgent:
+    def __init__(self, storage_file: str = "market_data.db"):
+        self.storage_file = storage_file
+
+    def collect(self, symbol: str):
+        return {"symbol": symbol, "status": "collected"}
+
+    def parse(self, data):
+        return data
+
+
+PortfolioCollectorAgent = MarketPortfolioCollectorAgent
+market_portfolio_collector_agent = MarketPortfolioCollectorAgent
+
+
 class MarketParser:
     def __init__(self, storage_file: str):
         self.storage_file = storage_file

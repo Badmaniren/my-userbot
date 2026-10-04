@@ -30,8 +30,11 @@ class PortfolioStressScenarioPipeline:
         except KeyError:
             sim_result = {"symbol": symbol, "percentage": percentage, "simulated_value": 0.0}
 
-        if isinstance(sim_result, dict) and "symbol" not in sim_result:
-            sim_result["symbol"] = symbol
+        if isinstance(sim_result, dict):
+            if "symbol" not in sim_result:
+                sim_result["symbol"] = symbol
+            if "percentage" not in sim_result:
+                sim_result["percentage"] = percentage
 
         try:
             stress_test_result = self.simulator.run_stress_test(symbol, shifts)
@@ -40,8 +43,13 @@ class PortfolioStressScenarioPipeline:
         except KeyError:
             stress_test_result = {"symbol": symbol, "shifts": shifts, "results": []}
 
-        if isinstance(stress_test_result, dict) and "symbol" not in stress_test_result:
-            stress_test_result["symbol"] = symbol
+        if isinstance(stress_test_result, dict):
+            if "symbol" not in stress_test_result:
+                stress_test_result["symbol"] = symbol
+            if "shifts" not in stress_test_result:
+                stress_test_result["shifts"] = shifts
+            if "results" not in stress_test_result:
+                stress_test_result["results"] = []
 
         try:
             stress_report_result = self.reporter.run_stress_report(symbol, shifts)
@@ -74,8 +82,11 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
     except KeyError:
         sim_result = {"symbol": symbol, "percentage": percentage, "simulated_value": 0.0}
 
-    if isinstance(sim_result, dict) and "symbol" not in sim_result:
-        sim_result["symbol"] = symbol
+    if isinstance(sim_result, dict):
+        if "symbol" not in sim_result:
+            sim_result["symbol"] = symbol
+        if "percentage" not in sim_result:
+            sim_result["percentage"] = percentage
 
     try:
         stress_test_result = simulator.run_stress_test(symbol, shifts)
@@ -84,8 +95,13 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
     except KeyError:
         stress_test_result = {"symbol": symbol, "shifts": shifts, "results": []}
     
-    if isinstance(stress_test_result, dict) and "symbol" not in stress_test_result:
-        stress_test_result["symbol"] = symbol
+    if isinstance(stress_test_result, dict):
+        if "symbol" not in stress_test_result:
+            stress_test_result["symbol"] = symbol
+        if "shifts" not in stress_test_result:
+            stress_test_result["shifts"] = shifts
+        if "results" not in stress_test_result:
+            stress_test_result["results"] = []
 
     reporter = StressReporter(storage_file)
     try:

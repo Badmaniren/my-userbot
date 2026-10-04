@@ -2,6 +2,16 @@ import sqlite3
 import requests
 from bs4 import BeautifulSoup
 
+_AUDIT_RECORDS = {}
+
+
+def save_audit_record(audit_key: str, audit_data: dict) -> None:
+    _AUDIT_RECORDS[audit_key] = audit_data
+
+
+def fetch_audit_record(audit_key: str):
+    return _AUDIT_RECORDS.get(audit_key)
+
 
 class MarketParser:
     def __init__(self, storage_file: str = "market_data.db"):

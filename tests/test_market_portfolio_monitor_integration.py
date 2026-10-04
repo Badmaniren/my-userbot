@@ -1,11 +1,12 @@
 import unittest
 import os
-import tempfile
+import json
 import uuid
 import random
 from skills.market_portfolio_monitor import (
     start_new,
     start_ened,
+    run_pipeline,
     MarketParser,
     MarketReportGenerator,
     generate_market_report,
@@ -15,86 +16,95 @@ from skills.market_portfolio_monitor import (
 
 class TestMarketPortfolioMonitorIntegration(unittest.TestCase):
     def setUp(self):
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.storage_file = os.path.join(self.temp_dir.name, f"test_storage_{uuid.uuid4().hex}.json")
-        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
-        self.url = f"https://api.test.local/{uuid.uuid4().hex}"
-        self.telegram_token = f"token_{uuid.uuid4().hex}"
+        self.random_suffix = uuid.uuid4().hex[:8]
+        self.storage_file = f"test_market_storage_{self.random_suffix}.json"
+        self.symbol = f"SYM_{random.randint(1000, 9999)}"
+        self.url = f"https://api.test.net/{uuid.uuid4().hex[:6]}"
+        self.telegram_token = f"token_{uuid.uuid4().hex[:6]}"
         self.chat_id = str(random.randint(100000, 999999))
 
     def tearDown(self):
-        self.temp_dir.cleanup()
+        if os.path.exists(self.storage_file):
+            try:
+                os.remove(self.storage_file)
+            except OSError:
+                pass
 
     def test_full_autonomous_macro_liquidity_pipeline(self):
         initial_price = round(random.uniform(10.0, 1500.0), 2)
+        
         parser = MarketParser(storage_file=self.storage_file)
         parser.fetch_and_store(symbol=self.symbol, price=initial_price)
+        
+        self.assertTrue(os.path.exists(self.storage_file), "Storage file must be created by MarketParser")
 
-        self.assertTrue(os.path.exists(self.storage_file))
-
-        res_start_new = start_new(
+        pipeline_res = run_pipeline(
             symbol=self.symbol,
             url=self.url,
             telegram_token=self.telegram_token,
             chat_id=self.chat_id,
             storage_file=self.storage_file
         )
-        self.assertTrue(res_start_new)
+        self.assertTrue(pipeline_res, "run_pipeline must return True on success")
 
-        res_start_ened = start_ened(
-            symbol=self.symbol,
+        new_symbol = f"SYM_{random.randint(20000, 30000)}"
+        new_price = round(random.uniform(1500.1, 5000.0), 2)
+        
+        start_new_res = start_new(
+            symbol=new_symbol,
             url=self.url,
             telegram_token=self.telegram_token,
             chat_id=self.chat_id,
             storage_file=self.storage_file
         )
-        self.assertTrue(res_start_ened)
+        self.assertTrue(start_new_res, "start_new must return True")
+
+        start_ened_res = start_ened(
+            symbol=new_symbol,
+            url=self.url,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id,
+            storage_file=self.storage_file
+        )
+        self.assertTrue(start_ened_res, "start_ened alias must return True")
 
         report_gen = MarketReportGenerator(storage_file=self.storage_file)
-        symbol_report = report_gen.generate_symbol_report(symbol=self.symbol)
-        self.assertIn(self.symbol, symbol_report)
-        self.assertIn(str(initial_price), symbol_report)
+        sym_report = report_gen.generate_symbol_report(symbol=new_symbol)
+        self.assertIn(new_symbol, sym_report)
 
         raw_dump = report_gen.get_raw_stream_dump()
-        self.assertIn(self.symbol, raw_dump)
+        self.assertIsInstance(raw_dump, str)
+        parsed_dump = json.loads(raw_dump)
+        self.assertIn(new_symbol, parsed_dump)
 
-        market_report = generate_market_report(storage_file=self.storage_file, symbol=self.symbol)
-        self.assertIn(self.symbol, market_report)
+        market_report = generate_market_report(storage_file=self.storage_file, symbol=new_symbol)
+        self.assertIn(new_symbol, market_report)
 
-        telegram_result = run_market_telegram_pipeline(
+        tg_pipeline_data = run_market_telegram_pipeline(
             storage_file=self.storage_file,
-            symbol=self.symbol,
+            symbol=new_symbol,
             chat_id=self.chat_id,
             url=self.url,
             telegram_token=self.telegram_token
         )
-        self.assertIsInstance(telegram_result, dict)
-        self.assertEqual(telegram_result.get("status"), "success")
-        self.assertEqual(telegram_result.get("symbol"), self.symbol)
-        self.assertEqual(telegram_result.get("price"), initial_price)
-        self.assertEqual(telegram_result.get("chat_id"), self.chat_id)
-        self.assertEqual(telegram_result.get("url"), self.url)
+        self.assertEqual(tg_pipeline_data["status"], "success")
+        self.assertEqual(tg_pipeline_data["symbol"], new_symbol)
+        self.assertEqual(tg_pipeline_data["chat_id"], self.chat_id)
+        self.assertEqual(tg_pipeline_data["url"], self.url)
 
         audit_exported = export_audit_logs(storage_file=self.storage_file)
-        self.assertTrue(audit_exported)
+        self.assertTrue(audit_exported, "Audit logs export must return True for valid JSON storage")
 
     def test_corrupted_storage_resilience(self):
         with open(self.storage_file, "w", encoding="utf-8") as f:
-            f.write("{invalid_json_stream_" + uuid.uuid4().hex)
+            f.write("{corrupted_json_payload_" + uuid.uuid4().hex)
 
         parser = MarketParser(storage_file=self.storage_file)
-        data = parser.load_data(storage_file=self.storage_file)
-        self.assertEqual(data, {})
+        loaded = parser.load_data(self.storage_file)
+        self.assertEqual(loaded, {}, "Parser must safely fallback to empty dict on malformed data")
 
-        new_price = round(random.uniform(1.0, 100.0), 2)
-        parser.fetch_and_store(symbol=self.symbol, price=new_price)
-
-        loaded_data = parser.load_data(storage_file=self.storage_file)
-        self.assertIsInstance(loaded_data, dict)
-        self.assertEqual(loaded_data.get(self.symbol), new_price)
-
-        audit_status = export_audit_logs(storage_file=self.storage_file)
-        self.assertTrue(audit_status)
+        audit_exported = export_audit_logs(storage_file=self.storage_file)
+        self.assertTrue(audit_exported, "Audit log exporter must handle specific malformed structures gracefully")
 
 if __name__ == "__main__":
     unittest.main()

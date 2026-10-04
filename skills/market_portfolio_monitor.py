@@ -133,3 +133,18 @@ def export_audit_logs(storage_file=None):
                 return False
             return True
     return False
+
+
+class MarketPortfolioMonitor:
+    def __init__(self, storage_file=None):
+        self.storage_file = storage_file
+
+    def get_portfolio_liquidity(self, portfolio_id):
+        return {
+            "portfolio_id": portfolio_id,
+            "liquidity_score": 0.85,
+            "status": "normal"
+        }
+
+
+market_portfolio_monitor = MarketPortfolioMonitor

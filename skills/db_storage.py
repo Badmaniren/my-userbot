@@ -55,3 +55,29 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+class DBStorage:
+    def __init__(self, storage_file: str = "market_data.db"):
+        self.storage_file = storage_file
+        self._alerts = {}
+        self._errors = {}
+
+    def save_alert(self, alert_data):
+        alert_id = alert_data.get("id") if isinstance(alert_data, dict) else str(len(self._alerts))
+        self._alerts[alert_id] = alert_data
+        return True
+
+    def log_error(self, error_data):
+        error_id = error_data.get("error_id") if isinstance(error_data, dict) else str(len(self._errors))
+        self._errors[error_id] = error_data
+        return True
+
+    def get_alerts(self):
+        return list(self._alerts.values())
+
+    def get_errors(self):
+        return list(self._errors.values())
+
+
+db_storage = DBStorage

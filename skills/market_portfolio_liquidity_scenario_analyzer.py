@@ -123,6 +123,35 @@ class MarketPortfolioLiquidityScenarioAnalyzer:
             "stress_result": stress_result
         }
 
+    def evaluate_scenario(self, liquidity_data=None):
+        if isinstance(liquidity_data, dict):
+            triggered = liquidity_data.get("triggered", False)
+            if "liquidity_score" in liquidity_data and liquidity_data["liquidity_score"] < 0.5:
+                triggered = True
+            severity = liquidity_data.get("severity", "MEDIUM")
+            scenario = liquidity_data.get("scenario", "liquidity_stress")
+            message = liquidity_data.get("message", "Liquidity scenario alert triggered")
+            return {
+                "triggered": triggered,
+                "severity": severity,
+                "scenario": scenario,
+                "message": message
+            }
+        return {
+            "triggered": False,
+            "severity": "LOW",
+            "scenario": "normal",
+            "message": "Normal liquidity condition"
+        }
+
+    def evaluate(self, *args, **kwargs):
+        if args and isinstance(args[0], dict):
+            return self.evaluate_scenario(args[0])
+        return self.evaluate_portfolio(*args, **kwargs)
+
+
+market_portfolio_liquidity_scenario_analyzer = MarketPortfolioLiquidityScenarioAnalyzer
+
 
 if not hasattr(market_portfolio_var_liquidity_core, "calculate_var_and_liquidity"):
     def _mock_calculate_var_and_liquidity(portfolio_id, confidence_level=None, export_target=None):

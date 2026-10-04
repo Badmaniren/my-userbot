@@ -11,6 +11,7 @@ from skills import market_portfolio_collector_agent
 from skills import market_portfolio_valuation
 from skills import market_portfolio_scenario_simulator
 from skills import market_portfolio_audit_compliance_hub
+from skills import market_portfolio_stress_audit_visualizer
 
 
 class MonteCarloStressEngine:
@@ -139,7 +140,7 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
     if hasattr(market_portfolio_audit_compliance_hub, "log_simulation"):
         market_portfolio_audit_compliance_hub.log_simulation(portfolio_id, iterations, float(var_95))
 
-    return {
+    result_dict = {
         "simulation_id": simulation_id,
         "portfolio_id": portfolio_id,
         "initial_value": portfolio_value,
@@ -147,3 +148,9 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
         "expected_shortfall": float(expected_shortfall),
         "iterations": iterations
     }
+
+    # Финализация контура: интеграция детального отчета с модулем визуализации стресс-тестов
+    if hasattr(market_portfolio_stress_audit_visualizer, "visualize_stress_test"):
+        market_portfolio_stress_audit_visualizer.visualize_stress_test(result_dict)
+
+    return result_dict

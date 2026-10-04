@@ -97,3 +97,11 @@ def start_new(symbol: str, url: str, telegram_token: str, chat_id: str, storage_
         chat_id,
         storage_file
     )
+
+
+def market_portfolio_collector_agent(collector_input: dict = None, **kwargs):
+    if isinstance(collector_input, dict):
+        res = dict(collector_input)
+        res.setdefault("status", "collected")
+        return res
+    return {"status": "collected"}

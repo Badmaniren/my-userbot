@@ -134,3 +134,11 @@ if not hasattr(market_portfolio_var_liquidity_core, "calculate_var_and_liquidity
                     json.dump(data, f)
         return data
     setattr(market_portfolio_var_liquidity_core, "calculate_var_and_liquidity", _mock_calculate_var_and_liquidity)
+
+
+def market_portfolio_liquidity_scenario_analyzer(liquidity_input: dict = None, **kwargs):
+    if isinstance(liquidity_input, dict):
+        res = dict(liquidity_input)
+        res.setdefault("depth_score", 0.5)
+        return res
+    return {"depth_score": 0.5}

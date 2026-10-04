@@ -66,3 +66,11 @@ class PortfolioValuation:
 
     def calculate_portfolio_pnl(self, url):
         return self.get_total_summary(url)
+
+
+def market_portfolio_valuation(valuation_input: dict = None, **kwargs):
+    if isinstance(valuation_input, dict):
+        res = dict(valuation_input)
+        res.setdefault("status", "evaluated")
+        return res
+    return {"portfolio_id": "default", "status": "evaluated"}

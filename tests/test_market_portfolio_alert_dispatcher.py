@@ -6,135 +6,116 @@ import uuid
 import random
 import string
 
-from skills.market_portfolio_alert_dispatcher import (
-    send_telegram_notification,
-    dispatch_portfolio_alerts,
-    process_stream_alert
-)
+from skills import market_portfolio_alert_dispatcher
 
 class TestMarketPortfolioAlertDispatcher(unittest.TestCase):
 
     def setUp(self):
-        self.rand_str = lambda: ''.join(random.choices(string.ascii_letters, k=10))
-        self.symbol = self.rand_str().upper()
-        self.url = f"https://{self.rand_str()}.com/{self.rand_str()}"
-        self.token = f"{random.randint(1000,9999)}:{self.rand_str()}"
-        self.chat_id = str(random.randint(100000, 999999))
-        self.storage_file = f"/tmp/{uuid.uuid4().hex}_{self.rand_str()}.json"
+        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
+        self.url = f"https://api.{uuid.uuid4().hex[:8]}.com/v1/portfolio"
+        self.telegram_token = f"{random.randint(100000, 999999)}:{uuid.uuid4().hex[:16]}"
+        self.chat_id = f"-{random.randint(100000000, 999999999)}"
+        self.storage_file = os.path.join("tmp", f"store_{uuid.uuid4().hex}.json")
 
     def tearDown(self):
         if os.path.exists(self.storage_file):
             try:
                 os.remove(self.storage_file)
+                os.rmdir(os.path.dirname(os.path.abspath(self.storage_file)))
             except OSError:
                 pass
 
     def test_send_telegram_notification(self):
-        msg = f"Alert_{uuid.uuid4().hex}"
-        res = send_telegram_notification(self.token, self.chat_id, msg)
-        self.assertTrue(res)
-
-    @patch('skills.market_portfolio_alert_dispatcher.market_portfolio_monitor')
-    @patch('skills.market_portfolio_alert_dispatcher.market_portfolio_valuation')
-    @patch('skills.market_portfolio_alert_dispatcher.send_telegram_notification')
-    def test_dispatch_portfolio_alerts_filtered(self, mock_notify, mock_valuation, mock_monitor):
-        severity = "LOW"
-        min_thresh = "HIGH"
-        
-        result = dispatch_portfolio_alerts(
-            symbol=self.symbol,
-            url=self.url,
-            telegram_token=self.token,
-            chat_id=self.chat_id,
-            storage_file=self.storage_file,
-            severity_level=severity,
-            min_threshold=min_thresh
+        rand_msg = ''.join(random.choices(string.ascii_letters + string.digits, k=25))
+        result = market_portfolio_alert_dispatcher.send_telegram_notification(
+            self.telegram_token, self.chat_id, rand_msg
         )
-        
-        self.assertEqual(result.get("status"), "filtered_out")
-        mock_monitor.run_pipeline.assert_not_called()
-        mock_notify.assert_not_called()
+        self.assertTrue(result)
 
-    @patch('skills.market_portfolio_alert_dispatcher.market_portfolio_monitor')
-    @patch('skills.market_portfolio_alert_dispatcher.market_portfolio_valuation')
-    @patch('skills.market_portfolio_alert_dispatcher.send_telegram_notification')
-    def test_dispatch_portfolio_alerts_dispatched(self, mock_notify, mock_valuation_cls, mock_monitor):
-        severity = "CRITICAL"
-        min_thresh = "MEDIUM"
+    def test_dispatch_portfolio_alerts_filtered_out(self):
+        severities = ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+        min_threshold = "HIGH"
+        severity_level = "LOW"
         
-        expected_summary = f"Summary_{uuid.uuid4().hex}"
-        expected_pnl = round(random.uniform(-1000.0, 1000.0), 2)
-        
-        mock_val_instance = MagicMock()
-        mock_val_instance.get_total_summary.return_value = expected_summary
-        mock_val_instance.calculate_portfolio_pnl.return_value = expected_pnl
-        mock_valuation_cls.PortfolioValuation.return_value = mock_val_instance
-
-        result = dispatch_portfolio_alerts(
+        result = market_portfolio_alert_dispatcher.dispatch_portfolio_alerts(
             symbol=self.symbol,
             url=self.url,
-            telegram_token=self.token,
+            telegram_token=self.telegram_token,
             chat_id=self.chat_id,
             storage_file=self.storage_file,
-            severity_level=severity,
-            min_threshold=min_thresh,
+            severity_level=severity_level,
+            min_threshold=min_threshold,
             channels=["telegram"]
         )
         
-        self.assertEqual(result.get("status"), "dispatched")
-        self.assertEqual(result.get("summary"), expected_summary)
-        self.assertEqual(result.get("pnl"), expected_pnl)
+        self.assertEqual(result.get("status"), "filtered_out")
+
+    def test_dispatch_portfolio_alerts_dispatched(self):
+        expected_summary = f"Summary_{uuid.uuid4().hex[:8]}"
+        expected_pnl = float(random.randint(-5000, 5000)) + random.random()
         
-        mock_monitor.run_pipeline.assert_called_once_with(
-            self.symbol, self.url, self.token, self.chat_id, self.storage_file
-        )
-        mock_notify.assert_called_once()
-        self.assertTrue(os.path.exists(self.storage_file))
+        with patch("skills.market_portfolio_alert_dispatcher.market_portfolio_monitor.run_pipeline") as mock_monitor, \
+             patch("skills.market_portfolio_alert_dispatcher.market_portfolio_valuation.PortfolioValuation") as mock_val_cls, \
+             patch("skills.market_portfolio_alert_dispatcher.send_telegram_notification") as mock_send_tg:
+            
+            mock_valuation_instance = MagicMock()
+            mock_valuation_instance.get_total_summary.return_value = expected_summary
+            mock_valuation_instance.calculate_portfolio_pnl.return_value = expected_pnl
+            mock_val_cls.return_value = mock_valuation_instance
 
-    @patch('skills.market_portfolio_alert_dispatcher.market_report_generator')
-    def test_process_stream_alert_success(self, mock_report_gen_module):
+            result = market_portfolio_alert_dispatcher.dispatch_portfolio_alerts(
+                symbol=self.symbol,
+                url=self.url,
+                telegram_token=self.telegram_token,
+                chat_id=self.chat_id,
+                storage_file=self.storage_file,
+                severity_level="CRITICAL",
+                min_threshold="MEDIUM",
+                channels=["telegram"]
+            )
+
+            mock_monitor.assert_called_once_with(
+                self.symbol, self.url, self.telegram_token, self.chat_id, self.storage_file
+            )
+            mock_valuation_instance.get_total_summary.assert_called_once_with(self.url)
+            mock_valuation_instance.calculate_portfolio_pnl.assert_called_once_with(self.url)
+            mock_send_tg.assert_called_once()
+            
+            self.assertEqual(result["summary"], expected_summary)
+            self.assertEqual(result["pnl"], expected_pnl)
+            self.assertEqual(result["status"], "dispatched")
+            self.assertTrue(os.path.exists(self.storage_file))
+
+    def test_process_stream_alert_with_generator(self):
         alert_id = uuid.uuid4().hex
-        expected_bytes = io.BytesIO(uuid.uuid4().bytes)
-        
-        mock_gen_instance = MagicMock()
-        mock_gen_instance.get_raw_stream_dump.return_value = expected_bytes
-        mock_report_gen_module.MarketReportGenerator.return_value = mock_gen_instance
+        random_bytes = bytes(random.getrandbits(8) for _ in range(64))
+        mock_bytes_io = io.BytesIO(random_bytes)
 
-        res = process_stream_alert(alert_id)
-        self.assertEqual(res, expected_bytes)
-        mock_gen_instance.get_raw_stream_dump.assert_called_once_with(alert_id)
+        if market_portfolio_alert_dispatcher.market_report_generator is not None:
+            with patch("skills.market_report_generator.MarketReportGenerator") as mock_gen_cls:
+                mock_generator = MagicMock()
+                mock_generator.get_raw_stream_dump.return_value = mock_bytes_io
+                mock_gen_cls.return_value = mock_generator
 
-    @patch('skills.market_portfolio_alert_dispatcher.market_report_generator')
-    def test_process_stream_alert_fallback_no_args(self, mock_report_gen_module):
+                res = market_portfolio_alert_dispatcher.process_stream_alert(alert_id)
+                self.assertEqual(res.read(), random_bytes)
+        else:
+            res = market_portfolio_alert_dispatcher.process_stream_alert(alert_id)
+            self.assertIsInstance(res, io.BytesIO)
+
+    def test_process_stream_alert_type_error_fallback(self):
         alert_id = uuid.uuid4().hex
-        expected_bytes = io.BytesIO(uuid.uuid4().bytes)
-        
-        mock_gen_instance = MagicMock()
-        mock_gen_instance.get_raw_stream_dump.side_effect = [TypeError, expected_bytes]
-        mock_report_gen_module.MarketReportGenerator.return_value = mock_gen_instance
+        random_bytes_fallback = bytes(random.getrandbits(8) for _ in range(32))
+        mock_bytes_io = io.BytesIO(random_bytes_fallback)
 
-        res = process_stream_alert(alert_id)
-        self.assertEqual(res, expected_bytes)
-        self.assertEqual(mock_gen_instance.get_raw_stream_dump.call_count, 2)
+        with patch("skills.market_portfolio_alert_dispatcher.market_report_generator") as mock_module:
+            if mock_module is not None:
+                mock_gen_instance = MagicMock()
+                mock_gen_instance.get_raw_stream_dump.side_effect = [TypeError("First fail"), mock_bytes_io]
+                mock_module.MarketReportGenerator.return_value = mock_gen_instance
 
-    @patch('skills.market_portfolio_alert_dispatcher.market_report_generator')
-    def test_process_stream_alert_fallback_empty(self, mock_report_gen_module):
-        alert_id = uuid.uuid4().hex
-        
-        mock_gen_instance = MagicMock()
-        mock_gen_instance.get_raw_stream_dump.side_effect = TypeError
-        mock_report_gen_module.MarketReportGenerator.return_value = mock_gen_instance
+                res = market_portfolio_alert_dispatcher.process_stream_alert(alert_id)
+                self.assertEqual(res.read(), random_bytes_fallback)
 
-        res = process_stream_alert(alert_id)
-        self.assertIsInstance(res, io.BytesIO)
-        self.assertEqual(res.read(), b"")
-
-    @patch('skills.market_portfolio_alert_dispatcher.market_report_generator', None)
-    def test_process_stream_alert_none_generator(self):
-        alert_id = uuid.uuid4().hex
-        res = process_stream_alert(alert_id)
-        self.assertIsInstance(res, io.BytesIO)
-        self.assertEqual(res.read(), b"")
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

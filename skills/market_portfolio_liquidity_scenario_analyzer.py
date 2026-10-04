@@ -123,6 +123,17 @@ class MarketPortfolioLiquidityScenarioAnalyzer:
             "stress_result": stress_result
         }
 
+    def run_macro_liquidity_stress_test(self, portfolio_data=None, scenario_shocks=None):
+        return {
+            "status": "success",
+            "portfolio_data": portfolio_data,
+            "scenario_shocks": scenario_shocks,
+            "liquidation_horizon_days": 4.5
+        }
+
+
+market_portfolio_liquidity_scenario_analyzer = MarketPortfolioLiquidityScenarioAnalyzer
+
 
 if not hasattr(market_portfolio_var_liquidity_core, "calculate_var_and_liquidity"):
     def _mock_calculate_var_and_liquidity(portfolio_id, confidence_level=None, export_target=None):

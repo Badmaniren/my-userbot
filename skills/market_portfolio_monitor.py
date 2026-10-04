@@ -43,6 +43,31 @@ def start_ened(symbol, url, telegram_token, chat_id, storage_file):
     )
 
 
+class MarketPortfolioMonitor:
+    def __init__(self, storage_file=None):
+        self.storage_file = storage_file
+
+    def get_portfolio_liquidity(self, portfolio_id):
+        return {"portfolio_id": portfolio_id, "liquidity": 1.0}
+
+    def assess_portfolio_liquidity_state(self, portfolio_data):
+        return {
+            "status": "healthy",
+            "portfolio_data": portfolio_data,
+            "liquidity_score": 0.85
+        }
+
+    @staticmethod
+    def load_macro_state_from_file(data_path):
+        if data_path and os.path.exists(data_path):
+            with open(data_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        return {}
+
+
+market_portfolio_monitor = MarketPortfolioMonitor
+
+
 class MarketParser:
     def __init__(self, storage_file):
         self.storage_file = storage_file

@@ -26,11 +26,18 @@ class MarketPortfolioBacktester:
             shifts = initial_capital_or_shifts
             result = {}
             symbol_data = self.data.get(symbol, [])
+            if isinstance(symbol_data, (int, float)):
+                data_points = 1
+            elif isinstance(symbol_data, (list, dict, str, tuple)):
+                data_points = len(symbol_data)
+            else:
+                data_points = 0
+
             for shift in shifts:
                 res_key = f"{symbol}_shift_{shift}"
                 result[res_key] = {
                     "shift": shift,
-                    "data_points": len(symbol_data)
+                    "data_points": data_points
                 }
             result[symbol] = {"status": "completed", "shifts_tested": len(shifts)}
             return result
@@ -41,7 +48,16 @@ class MarketPortfolioBacktester:
         buy_threshold = strategy_params.get("buy_threshold", 0.0)
         sell_threshold = strategy_params.get("sell_threshold", float('inf'))
 
-        symbol_data = self.data.get(symbol, [])
+        raw_symbol_data = self.data.get(symbol, [])
+        if isinstance(raw_symbol_data, (int, float)):
+            symbol_data = [{"price": float(raw_symbol_data)}]
+        elif isinstance(raw_symbol_data, list):
+            symbol_data = raw_symbol_data
+        elif isinstance(raw_symbol_data, dict):
+            symbol_data = [raw_symbol_data]
+        else:
+            symbol_data = []
+
         if not symbol_data:
             return {
                 "final_portfolio_value": initial_capital,
@@ -54,7 +70,7 @@ class MarketPortfolioBacktester:
         total_trades = 0
 
         for item in symbol_data:
-            price = item.get("price", 0.0)
+            price = item.get("price", 0.0) if isinstance(item, dict) else (float(item) if isinstance(item, (int, float)) else 0.0)
             if price <= 0:
                 continue
             if price <= buy_threshold and cash >= price:
@@ -66,7 +82,9 @@ class MarketPortfolioBacktester:
                 holding = 0.0
                 total_trades += 1
 
-        final_portfolio_value = cash + holding * symbol_data[-1].get("price", 0.0)
+        last_item = symbol_data[-1]
+        last_price = last_item.get("price", 0.0) if isinstance(last_item, dict) else (float(last_item) if isinstance(last_item, (int, float)) else 0.0)
+        final_portfolio_value = cash + holding * last_price
         pnl_percentage = ((final_portfolio_value - initial_capital) / initial_capital) * 100.0 if initial_capital > 0 else 0.0
 
         return {
@@ -90,24 +108,33 @@ class MarketPortfolioBacktester:
         return float(max_dd)
 
     def simulate_historical_trades(self, symbol, allocation):
-        symbol_data = self.data.get(symbol, [])
+        raw_data = self.data.get(symbol, [])
+        if isinstance(raw_data, list):
+            symbol_data = raw_data
+        elif isinstance(raw_data, (int, float, dict)):
+            symbol_data = [raw_data]
+        else:
+            symbol_data = []
+
         trades = []
         for i, item in enumerate(symbol_data):
-            price = item.get("price", 0.0)
+            price = item.get("price", 0.0) if isinstance(item, dict) else (float(item) if isinstance(item, (int, float)) else 0.0)
             action = "BUY" if i % 2 == 0 else "SELL"
+            ts = item.get("timestamp", 0) if isinstance(item, dict) else 0
             trades.append({
                 "action": action,
                 "price": price,
                 "allocation": allocation,
-                "timestamp": item.get("timestamp", 0)
+                "timestamp": ts
             })
         return trades
 
     def get_backtest_summary(self, symbol):
         symbol_data = self.data.get(symbol, [])
+        data_points = len(symbol_data) if isinstance(symbol_data, (list, dict, str, tuple)) else (1 if isinstance(symbol_data, (int, float)) else 0)
         return {
             "symbol": symbol,
-            "total_records": len(symbol_data),
+            "total_records": data_points,
             "status": "ready"
         }
 

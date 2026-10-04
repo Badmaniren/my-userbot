@@ -21,12 +21,35 @@ class PortfolioValuation:
         parser = MarketParser()
         result = {}
 
-        for symbol, data in portfolio.items():
-            quantity = data.get("quantity", 0.0)
-            buy_price = data.get("buy_price", 0.0)
+        if isinstance(portfolio, list):
+            items = [(f"asset_{i}", item) for i, item in enumerate(portfolio)]
+        elif isinstance(portfolio, dict):
+            items = portfolio.items()
+        else:
+            items = [("asset_0", portfolio)]
+
+        for symbol, data in items:
+            if isinstance(data, dict):
+                quantity = float(data.get("quantity", 0.0))
+                buy_price = float(data.get("buy_price", 0.0))
+            elif isinstance(data, (int, float)):
+                quantity = 1.0
+                buy_price = float(data)
+            elif isinstance(data, list):
+                quantity = float(len(data))
+                buy_price = 0.0
+            else:
+                quantity = 0.0
+                buy_price = 0.0
 
             try:
                 current_price = parser.fetch_price(url, symbol)
+                if isinstance(current_price, dict):
+                    current_price = float(current_price.get("price", 0.0))
+                elif not isinstance(current_price, (int, float)):
+                    current_price = 0.0
+                else:
+                    current_price = float(current_price)
             except Exception as e:
                 result[symbol] = {"error": str(e)}
                 continue
@@ -52,7 +75,7 @@ class PortfolioValuation:
         total_invested = 0.0
 
         for symbol, data in evaluated.items():
-            if "error" not in data:
+            if isinstance(data, dict) and "error" not in data:
                 total_value += data.get("current_value", 0.0)
                 total_invested += data.get("invested", 0.0)
 

@@ -3,7 +3,12 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-o_stress_monte_carlo_engine (refactor) — раундов: 1
+ прошёл тесты и влит в main
+
+## market_portfolio_stress_monte_carlo_engine (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_monte_carlo_engine (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_monte_carlo_engine (refactor) — раундов: 3
@@ -263,7 +268,3 @@ o_stress_monte_carlo_engine (refactor) — раундов: 1
 ## market_portfolio_monitor (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_monitor (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

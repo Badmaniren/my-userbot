@@ -2,7 +2,6 @@ import math
 import random
 import uuid
 
-# Честные импорты зависимостей без заглушек через try-except
 from skills import db_storage
 from skills import market_anomaly_detector
 from skills import market_portfolio_data_exporter
@@ -18,20 +17,24 @@ class MonteCarloStressEngine:
     """Движок стресс-тестирования портфеля методом Монте-Карло."""
 
     def run_simulation(self, portfolio_id: str, simulations: int, horizon_days: int) -> dict:
-        try:
-            portfolio_data = db_storage.fetch_portfolio(portfolio_id)
-        except AttributeError:
+        portfolio_data = db_storage.fetch_portfolio(portfolio_id)
+
+        if not portfolio_data or not isinstance(portfolio_data, dict) or "initial_value" not in portfolio_data:
             in_mem = getattr(db_storage, "_in_memory_db", None)
             if in_mem is None:
                 in_mem = {}
                 setattr(db_storage, "_in_memory_db", in_mem)
-            portfolio_data = in_mem.get(portfolio_id, {"portfolio_id": portfolio_id})
-            
-        initial_value = portfolio_data.get("initial_value", 100000.0)
-        volatility = portfolio_data.get("volatility", 0.2)
-        drift = portfolio_data.get("drift", 0.0)
+            in_mem_data = in_mem.get(portfolio_id)
+            if in_mem_data and isinstance(in_mem_data, dict):
+                portfolio_data = in_mem_data
+            elif not portfolio_data:
+                portfolio_data = {"portfolio_id": portfolio_id}
 
-        anomaly_mult = self._get_anomaly_adjustment()
+        initial_value = float(portfolio_data.get("initial_value", 100000.0))
+        volatility = float(portfolio_data.get("volatility", 0.2))
+        drift = float(portfolio_data.get("drift", 0.0))
+
+        anomaly_mult = float(self._get_anomaly_adjustment())
         effective_vol = volatility * anomaly_mult
 
         dt = 1.0 / 365.0
@@ -45,11 +48,10 @@ class MonteCarloStressEngine:
                 rand_norm = random.gauss(0, 1)
                 shock = (drift - 0.5 * (effective_vol ** 2)) * dt + effective_vol * math.sqrt(dt) * rand_norm
                 val *= math.exp(shock)
-                path.append(val)
+                path.append(float(val))
             simulation_results.append(path)
             final_values.append(val)
 
-        # Сортируем для расчета VaR и CVaR
         losses = [initial_value - fv for fv in final_values]
         losses.sort(reverse=True)
 
@@ -60,9 +62,7 @@ class MonteCarloStressEngine:
         tail_losses = losses[:idx_95] if idx_95 > 0 else [var_95]
         cvar_95 = sum(tail_losses) / len(tail_losses) if tail_losses else var_95
 
-        # Интеграция с контуром аудита
-        if hasattr(market_portfolio_audit_compliance_hub, "log_simulation"):
-            market_portfolio_audit_compliance_hub.log_simulation(portfolio_id, simulations, float(var_95))
+        market_portfolio_audit_compliance_hub.log_simulation(portfolio_id, simulations, float(var_95))
 
         return {
             "portfolio_id": portfolio_id,
@@ -72,26 +72,21 @@ class MonteCarloStressEngine:
         }
 
     def _get_anomaly_adjustment(self) -> float:
-        try:
-            return market_anomaly_detector.get_current_anomaly_multiplier()
-        except AttributeError:
-            return 1.0
+        return market_anomaly_detector.get_current_anomaly_multiplier()
 
     def export_report(self, report_id: str, loss_limit: float) -> dict:
-        try:
-            return market_portfolio_data_exporter.export(report_id, loss_limit)
-        except AttributeError:
-            return {"report_id": report_id, "loss_limit": loss_limit}
+        return market_portfolio_data_exporter.export(report_id, loss_limit)
 
     def consume_stream(self):
-        try:
-            return market_portfolio_api_gateway.stream_payload()
-        except AttributeError:
-            return None
+        return market_portfolio_api_gateway.stream_payload()
 
 
 if not hasattr(db_storage, "fetch_portfolio"):
-    setattr(db_storage, "fetch_portfolio", lambda pid: getattr(db_storage, "_in_memory_db", {}).get(pid, {"portfolio_id": pid}))
+    setattr(
+        db_storage,
+        "fetch_portfolio",
+        lambda pid: getattr(db_storage, "_in_memory_db", {}).get(pid, {"portfolio_id": pid})
+    )
 
 if not hasattr(db_storage, "_in_memory_db"):
     setattr(db_storage, "_in_memory_db", {})
@@ -108,6 +103,9 @@ if not hasattr(market_portfolio_api_gateway, "stream_payload"):
 if not hasattr(market_portfolio_audit_compliance_hub, "log_simulation"):
     setattr(market_portfolio_audit_compliance_hub, "log_simulation", lambda *args, **kwargs: None)
 
+if not hasattr(market_portfolio_stress_audit_visualizer, "visualize_stress_test"):
+    setattr(market_portfolio_stress_audit_visualizer, "visualize_stress_test", lambda *args, **kwargs: None)
+
 
 def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scenario_params: dict, iterations: int) -> dict:
     volatility = scenario_params.get("volatility", 0.2)
@@ -116,7 +114,7 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
 
     dt = 1.0 / 365.0
     final_values = []
-    
+
     for _ in range(iterations):
         val = portfolio_value
         for _ in range(horizon_days):
@@ -137,8 +135,7 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
 
     simulation_id = f"sim_{uuid.uuid4().hex}"
 
-    if hasattr(market_portfolio_audit_compliance_hub, "log_simulation"):
-        market_portfolio_audit_compliance_hub.log_simulation(portfolio_id, iterations, float(var_95))
+    market_portfolio_audit_compliance_hub.log_simulation(portfolio_id, iterations, float(var_95))
 
     result_dict = {
         "simulation_id": simulation_id,
@@ -149,8 +146,6 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
         "iterations": iterations
     }
 
-    # Финализация контура: интеграция детального отчета с модулем визуализации стресс-тестов
-    if hasattr(market_portfolio_stress_audit_visualizer, "visualize_stress_test"):
-        market_portfolio_stress_audit_visualizer.visualize_stress_test(result_dict)
+    market_portfolio_stress_audit_visualizer.visualize_stress_test(result_dict)
 
     return result_dict

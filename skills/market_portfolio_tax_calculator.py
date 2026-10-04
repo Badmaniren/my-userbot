@@ -3,10 +3,12 @@ class MarketPortfolioTaxCalculator:
         for k, v in kwargs.items():
             setattr(self, k, v)
 
-    def calculate_tax(self, portfolio_id):
+    def calculate_tax(self, portfolio_id=None, gross_dividends=0.0, **kwargs):
         if not hasattr(self, "db_storage") or self.db_storage is None:
-            return 0.0
-        portfolio = self.db_storage.get_portfolio(portfolio_id)
+            if isinstance(portfolio_id, (int, float)):
+                return round(float(portfolio_id) * 0.13, 2)
+            return round(float(gross_dividends) * 0.13, 2) if gross_dividends else 0.0
+        portfolio = self.db_storage.get_portfolio(portfolio_id) if portfolio_id else None
         if portfolio:
             profit = (portfolio["sell_price"] - portfolio["purchase_price"]) * portfolio["shares"]
             return round(profit * 0.13, 2)

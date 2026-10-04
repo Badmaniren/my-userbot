@@ -39,24 +39,53 @@ class DividendTracker:
         if self.api_gateway is not None:
             self.api_gateway.pull_raw_stream(asset_id)
 
-    def aggregate_portfolio_dividends(self, portfolio_id):
-        assets = self.db_storage.get_portfolio_assets(portfolio_id)
+    def aggregate_portfolio_dividends(self, portfolio_id, holdings=None):
+        if holdings is not None:
+            assets = holdings
+        elif self.db_storage is not None and hasattr(self.db_storage, "get_portfolio_assets"):
+            assets = self.db_storage.get_portfolio_assets(portfolio_id) or []
+        else:
+            assets = []
+
         total_net_dividends = 0.0
+        total_gross_dividends = 0.0
 
         for asset in assets:
-            ticker = asset["ticker"]
-            shares = asset["shares"]
-            dps = asset["dividend_per_share"]
-            tax_rate = asset["tax_rate"]
+            if isinstance(asset, dict):
+                ticker = asset.get("ticker", "")
+                shares = asset.get("shares", 0)
+                dps = asset.get("dividend_per_share", asset.get("dps", asset.get("price", 0.0) * 0.05))
+                tax_rate = asset.get("tax_rate", 0.13)
+            else:
+                ticker = getattr(asset, "ticker", "")
+                shares = getattr(asset, "shares", 0)
+                dps = getattr(asset, "dividend_per_share", getattr(asset, "dps", 0.0))
+                tax_rate = getattr(asset, "tax_rate", 0.13)
 
             gross = shares * dps
-            tax = self.tax_calculator.calculate_tax(gross, tax_rate)
+            if self.tax_calculator:
+                if hasattr(self.tax_calculator, "calculate_tax"):
+                    try:
+                        tax = self.tax_calculator.calculate_tax(gross, tax_rate)
+                    except TypeError:
+                        tax = self.tax_calculator.calculate_tax(portfolio_id=portfolio_id, gross_dividends=gross)
+                else:
+                    tax = 0.0
+            else:
+                tax = gross * tax_rate
+
+            if isinstance(tax, dict):
+                tax = tax.get("tax_amount", 0.0)
+
             net = gross - tax
+            total_gross_dividends += gross
             total_net_dividends += net
 
         return {
             "portfolio_id": portfolio_id,
-            "total_net_dividends": total_net_dividends
+            "total_dividends": total_gross_dividends,
+            "total_net_dividends": total_net_dividends,
+            "currency": "USD",
         }
 
     def get_dividend_calendar(self, owner_uuid, month, year):

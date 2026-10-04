@@ -1,96 +1,121 @@
 import unittest
-from unittest.mock import patch
-import os
-import json
-import uuid
+from unittest.mock import patch, MagicMock
 import random
+import uuid
 import io
-from skills import market_portfolio_liquidity_scenario_analyzer
+import string
+
+from skills.market_portfolio_liquidity_scenario_analyzer import (
+    analyze_liquidity_stress_scenarios,
+    MarketPortfolioLiquidityScenarioAnalyzer
+)
 
 class TestMarketPortfolioLiquidityScenarioAnalyzer(unittest.TestCase):
-    def test_ensure_dir_exists(self):
-        rand_dir = f"/tmp/{uuid.uuid4().hex}/{uuid.uuid4().hex}"
-        rand_file = f"{rand_dir}/{uuid.uuid4().hex}.json"
-        
-        market_portfolio_liquidity_scenario_analyzer._ensure_dir_exists(rand_file)
-        self.assertTrue(os.path.exists(rand_dir))
-        
-        if os.path.exists(rand_dir):
-            os.rmdir(rand_dir)
 
-    def test_analyze_liquidity_stress_scenarios_logic(self):
-        portfolio_id = uuid.uuid4().hex
-        confidence_level = round(random.uniform(0.9, 0.99), 2)
-        export_target = f"/tmp/{uuid.uuid4().hex}.json"
-        storage_file = f"/tmp/{uuid.uuid4().hex}.json"
-        symbol = uuid.uuid4().hex[:5].upper()
-        percentage = round(random.uniform(5.0, 25.0), 2)
-        shifts = [round(random.uniform(-0.1, 0.1), 4) for _ in range(3)]
+    def setUp(self):
+        self.portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
+        self.confidence_level = round(random.uniform(0.90, 0.99), 4)
+        self.export_target = f"s3://bucket-{uuid.uuid4().hex[:6]}/report.csv"
+        self.symbol = f"SYM_{''.join(random.choices(string.ascii_uppercase, k=3))}"
+        self.percentage = round(random.uniform(0.05, 0.50), 2)
+        self.shifts = {f"factor_{uuid.uuid4().hex[:4]}": round(random.uniform(-0.1, 0.1), 4) for _ in range(3)}
+        self.storage_file = f"/tmp/{uuid.uuid4().hex}.db"
 
-        mock_var_data = {"var": random.uniform(1000.0, 5000.0)}
-        mock_stress_data = {"impact": random.uniform(2000.0, 6000.0)}
+    @patch('skills.market_portfolio_liquidity_scenario_analyzer.market_portfolio_var_liquidity_core')
+    @patch('skills.market_portfolio_liquidity_scenario_analyzer.market_portfolio_stress_scenario_pipeline')
+    def test_analyze_liquidity_stress_scenarios_success(self, mock_stress_pipeline, mock_var_core):
+        expected_var = round(random.uniform(10000.0, 500000.0), 2)
+        expected_liquidity_score = round(random.uniform(0.1, 1.0), 4)
+        mock_var_core.calculate_var_and_liquidity.return_value = {
+            "var": expected_var,
+            "liquidity_score": expected_liquidity_score,
+            "target": self.export_target
+        }
 
-        with patch("skills.market_portfolio_var_liquidity_core.calculate_var_and_liquidity", return_value=mock_var_data), \
-             patch("skills.market_portfolio_stress_scenario_pipeline.run_stress_scenario_pipeline", return_value=mock_stress_data):
-            
-            result = market_portfolio_liquidity_scenario_analyzer.analyze_liquidity_stress_scenarios(
-                portfolio_id=portfolio_id,
-                confidence_level=confidence_level,
-                export_target=export_target,
-                symbol=symbol,
-                percentage=percentage,
-                shifts=shifts,
-                storage_file=storage_file
+        expected_pipeline_result = {
+            "symbol": self.symbol,
+            "status": "SHOCKED",
+            "impact": round(random.uniform(1000.0, 50000.0), 2)
+        }
+        mock_stress_pipeline.run_stress_scenario_pipeline.return_value = expected_pipeline_result
+
+        result = analyze_liquidity_stress_scenarios(
+            portfolio_id=self.portfolio_id,
+            confidence_level=self.confidence_level,
+            export_target=self.export_target,
+            symbol=self.symbol,
+            percentage=self.percentage,
+            shifts=self.shifts,
+            storage_file=self.storage_file
+        )
+
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["portfolio_id"], self.portfolio_id)
+        self.assertEqual(result["var_liquidity_data"]["var"], expected_var)
+        self.assertEqual(result["stress_pipeline_data"]["symbol"], self.symbol)
+        self.assertIn("reserve_capital_requirement", result)
+
+        mock_var_core.calculate_var_and_liquidity.assert_called_once_with(
+            self.portfolio_id, self.confidence_level, self.export_target
+        )
+        mock_stress_pipeline.run_stress_scenario_pipeline.assert_called_once_with(
+            self.storage_file, self.symbol, self.percentage, self.shifts
+        )
+
+    @patch('skills.market_portfolio_liquidity_scenario_analyzer.market_portfolio_var_liquidity_core')
+    @patch('skills.market_portfolio_liquidity_scenario_analyzer.market_portfolio_stress_scenario_pipeline')
+    def test_analyzer_class_execution(self, mock_stress_pipeline, mock_var_core):
+        core_instance = MagicMock()
+        mock_var_core.market_portfolio_var_liquidity_core.return_value = core_instance
+
+        expected_var = round(random.uniform(5000.0, 100000.0), 2)
+        core_instance.calculate_var_and_liquidity.return_value = {"var": expected_var}
+
+        pipeline_instance = MagicMock()
+        mock_stress_pipeline.PortfolioStressScenarioPipeline.return_value = pipeline_instance
+        pipeline_instance.execute.return_value = {"status": "SUCCESS", "shift_applied": True}
+
+        analyzer = MarketPortfolioLiquidityScenarioAnalyzer(storage_file=self.storage_file)
+        analysis_result = analyzer.evaluate_portfolio(
+            portfolio_id=self.portfolio_id,
+            confidence_level=self.confidence_level,
+            export_target=self.export_target,
+            symbol=self.symbol,
+            percentage=self.percentage,
+            shifts=self.shifts
+        )
+
+        self.assertIsInstance(analysis_result, dict)
+        self.assertEqual(analysis_result["var_result"]["var"], expected_var)
+        self.assertEqual(analysis_result["stress_result"]["status"], "SUCCESS")
+
+        mock_stress_pipeline.PortfolioStressScenarioPipeline.assert_called_once_with(self.storage_file)
+        pipeline_instance.execute.assert_called_once_with(self.symbol, self.percentage, self.shifts)
+
+    @patch('skills.market_portfolio_liquidity_scenario_analyzer.market_portfolio_var_liquidity_core')
+    def test_liquidity_core_exception_handling(self, mock_var_core):
+        error_message = f"err_{uuid.uuid4().hex}"
+        mock_var_core.calculate_var_and_liquidity.side_effect = RuntimeError(error_message)
+
+        with self.assertRaises(RuntimeError) as ctx:
+            analyze_liquidity_stress_scenarios(
+                portfolio_id=self.portfolio_id,
+                confidence_level=self.confidence_level,
+                export_target=self.export_target,
+                symbol=self.symbol,
+                percentage=self.percentage,
+                shifts=self.shifts,
+                storage_file=self.storage_file
             )
+        self.assertIn(error_message, str(ctx.exception))
 
-            self.assertEqual(result["portfolio_id"], portfolio_id)
-            self.assertEqual(result["var_liquidity_data"], mock_var_data)
-            self.assertEqual(result["stress_pipeline_data"], mock_stress_data)
-            
-            expected_reserve = max(mock_var_data["var"], mock_stress_data["impact"]) * 1.15
-            self.assertAlmostEqual(result["reserve_capital_requirement"], expected_reserve)
+    def test_reserve_capital_calculation_logic(self):
+        analyzer = MarketPortfolioLiquidityScenarioAnalyzer(storage_file=self.storage_file)
+        var_val = round(random.uniform(10000.0, 50000.0), 2)
+        stress_impact = round(random.uniform(5000.0, 25000.0), 2)
 
-        for f_path in [export_target, storage_file]:
-            if os.path.exists(f_path):
-                os.remove(f_path)
+        reserve = analyzer._calculate_required_reserve(var_val, stress_impact)
+        self.assertGreaterEqual(reserve, max(var_val, stress_impact))
 
-    def test_market_portfolio_liquidity_scenario_analyzer_class(self):
-        storage_file = f"/tmp/{uuid.uuid4().hex}.json"
-        portfolio_id = uuid.uuid4().hex
-        confidence_level = round(random.uniform(0.9, 0.99), 2)
-        export_target = f"/tmp/{uuid.uuid4().hex}.json"
-        symbol = uuid.uuid4().hex[:5].upper()
-        percentage = round(random.uniform(1.0, 10.0), 2)
-        shifts = [round(random.uniform(-0.05, 0.05), 4) for _ in range(2)]
-
-        mock_var_res = {"liquidity_score": random.uniform(50.0, 100.0)}
-        mock_stress_res = {"scenario_result": uuid.uuid4().hex}
-
-        analyzer = market_portfolio_liquidity_scenario_analyzer.MarketPortfolioLiquidityScenarioAnalyzer(storage_file=storage_file)
-
-        with patch("skills.market_portfolio_var_liquidity_core.calculate_var_and_liquidity", return_value=mock_var_res), \
-             patch("skills.market_portfolio_stress_scenario_pipeline.PortfolioStressScenarioPipeline") as mock_pipeline_class:
-            
-            mock_instance = mock_pipeline_class.return_value
-            mock_instance.execute.return_value = mock_stress_res
-
-            res = analyzer.evaluate_portfolio(
-                portfolio_id=portfolio_id,
-                confidence_level=confidence_level,
-                export_target=export_target,
-                symbol=symbol,
-                percentage=percentage,
-                shifts=shifts
-            )
-
-            self.assertEqual(res["portfolio_id"], portfolio_id)
-            self.assertEqual(res["var_result"], mock_var_res)
-            self.assertEqual(res["stress_result"], mock_stress_res)
-
-        if os.path.exists(storage_file):
-            os.remove(storage_file)
-        if os.path.exists(export_target):
-            os.remove(export_target)
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

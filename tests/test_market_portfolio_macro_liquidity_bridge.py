@@ -1,122 +1,216 @@
 import unittest
 from unittest.mock import patch, MagicMock
-import uuid
-import random
-import string
 import io
-import os
+import random
+import uuid
+import string
+import requests
+from bs4 import BeautifulSoup
 
-from skills.market_portfolio_macro_liquidity_bridge import MarketPortfolioMacroLiquidityBridge
+from skills.market_portfolio_macro_liquidity_bridge import MacroLiquidityBridge
 
 class TestMarketPortfolioMacroLiquidityBridge(unittest.TestCase):
 
     def setUp(self):
-        self.portfolio_id = uuid.uuid4().hex
-        self.threshold = random.uniform(0.1, 99.9)
-        self.chat_id = str(random.randint(100000, 999999))
-        self.message = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
-        self.export_path = f"test_export_{uuid.uuid4().hex}.log"
-        self.stream_data = ''.join(random.choices(string.ascii_letters, k=32)).encode('utf-8')
+        self.db_storage = MagicMock()
+        self.extractor_tool_1 = MagicMock()
+        self.extractor_tool_2 = MagicMock()
+        self.extractor_tool_3 = MagicMock()
+        self.extractor_tool_4 = MagicMock()
+        self.market_anomaly_detector = MagicMock()
+        self.market_insider_activity_tracker = MagicMock()
+        self.market_insider_alert_pipeline = MagicMock()
+        self.market_insider_anomaly_analyzer = MagicMock()
+        self.market_insider_anomaly_report_bridge = MagicMock()
+        self.market_news_sentiment_analyzer = MagicMock()
+        self.market_parser = MagicMock()
+        self.market_portfolio_alert_dispatcher = MagicMock()
+        self.market_portfolio_alert_event_sink = MagicMock()
+        self.market_portfolio_alert_filter_router = MagicMock()
+        self.market_portfolio_api_gateway = MagicMock()
+        self.market_portfolio_audit_alert_notifier = MagicMock()
+        self.market_portfolio_audit_compliance_hub = MagicMock()
+        self.market_portfolio_audit_log_exporter = MagicMock()
+        self.market_portfolio_autonomous_sentinel = MagicMock()
+        self.market_portfolio_backtest_evaluator_bridge = MagicMock()
+        self.market_portfolio_backtester = MagicMock()
+        self.market_portfolio_collector_agent = MagicMock()
+        self.market_portfolio_data_exporter = MagicMock()
+        self.market_portfolio_digest = MagicMock()
+        self.market_portfolio_dividend_tracker = MagicMock()
+        self.market_portfolio_event_intelligence_hub = MagicMock()
+        self.market_portfolio_execution_cost_optimizer = MagicMock()
+        self.market_portfolio_execution_pipeline = MagicMock()
+        self.market_portfolio_integration_hub = MagicMock()
+        self.market_portfolio_liquidity_scenario_analyzer = MagicMock()
+        self.market_portfolio_monitor = MagicMock()
+        self.market_portfolio_performance_analytics = MagicMock()
+        self.market_portfolio_predictive_aggregator = MagicMock()
+        self.market_portfolio_scenario_simulator = MagicMock()
+        self.market_portfolio_slippage_model = MagicMock()
+        self.market_portfolio_strategy_optimizer = MagicMock()
+        self.market_portfolio_stress_audit_visualizer = MagicMock()
+        self.market_portfolio_stress_monte_carlo_engine = MagicMock()
+        self.market_portfolio_stress_recovery_coordinator_bridge = MagicMock()
+        self.market_portfolio_stress_reporter = MagicMock()
+        self.market_portfolio_stress_scenario_pipeline = MagicMock()
+        self.market_portfolio_tax_calculator = MagicMock()
+        self.market_portfolio_telegram_command_center = MagicMock()
+        self.market_portfolio_telegram_notifier = MagicMock()
+        self.market_portfolio_valuation = MagicMock()
+        self.market_portfolio_var_liquidity_core = MagicMock()
+        self.market_portfolio_visualizer_v2 = MagicMock()
+        self.market_portfolio_webhook_event_logger = MagicMock()
+        self.market_portfolio_webhook_sync = MagicMock()
+        self.market_report_generator = MagicMock()
+        self.market_sentiment_digest = MagicMock()
+        self.market_sentiment_risk_alert_bridge = MagicMock()
+        self.market_sentiment_risk_hub = MagicMock()
+        self.market_sentiment_telegram_publisher = MagicMock()
+        self.market_telegram_pipeline = MagicMock()
 
-        self.mock_db_storage = MagicMock()
-        self.mock_var_liquidity_core = MagicMock()
-        self.mock_market_parser = MagicMock()
-        self.mock_anomaly_detector = MagicMock()
-        self.mock_alert_dispatcher = MagicMock()
-        self.mock_audit_exporter = MagicMock()
-        self.mock_telegram_pipeline = MagicMock()
-
-        self.bridge = MarketPortfolioMacroLiquidityBridge(
-            db_storage=self.mock_db_storage,
-            market_portfolio_var_liquidity_core=self.mock_var_liquidity_core,
-            market_parser=self.mock_market_parser,
-            market_anomaly_detector=self.mock_anomaly_detector,
-            market_portfolio_alert_dispatcher=self.mock_alert_dispatcher,
-            market_portfolio_audit_log_exporter=self.mock_audit_exporter,
-            market_telegram_pipeline=self.mock_telegram_pipeline
+        self.bridge = MacroLiquidityBridge(
+            db_storage=self.db_storage,
+            extractor_tool_1790087207=self.extractor_tool_1,
+            extractor_tool_1790102839=self.extractor_tool_2,
+            extractor_tool_1790262909=self.extractor_tool_3,
+            extractor_tool_1790621808=self.extractor_tool_4,
+            market_anomaly_detector=self.market_anomaly_detector,
+            market_insider_activity_tracker=self.market_insider_activity_tracker,
+            market_insider_alert_pipeline=self.market_insider_alert_pipeline,
+            market_insider_anomaly_analyzer=self.market_insider_anomaly_analyzer,
+            market_insider_anomaly_report_bridge=self.market_insider_anomaly_report_bridge,
+            market_news_sentiment_analyzer=self.market_news_sentiment_analyzer,
+            market_parser=self.market_parser,
+            market_portfolio_alert_dispatcher=self.market_portfolio_alert_dispatcher,
+            market_portfolio_alert_event_sink=self.market_portfolio_alert_event_sink,
+            market_portfolio_alert_filter_router=self.market_portfolio_alert_filter_router,
+            market_portfolio_api_gateway=self.market_portfolio_api_gateway,
+            market_portfolio_audit_alert_notifier=self.market_portfolio_audit_alert_notifier,
+            market_portfolio_audit_compliance_hub=self.market_portfolio_audit_compliance_hub,
+            market_portfolio_audit_log_exporter=self.market_portfolio_audit_log_exporter,
+            market_portfolio_autonomous_sentinel=self.market_portfolio_autonomous_sentinel,
+            market_portfolio_backtest_evaluator_bridge=self.market_portfolio_backtest_evaluator_bridge,
+            market_portfolio_backtester=self.market_portfolio_backtester,
+            market_portfolio_collector_agent=self.market_portfolio_collector_agent,
+            market_portfolio_data_exporter=self.market_portfolio_data_exporter,
+            market_portfolio_digest=self.market_portfolio_digest,
+            market_portfolio_dividend_tracker=self.market_portfolio_dividend_tracker,
+            market_portfolio_event_intelligence_hub=self.market_portfolio_event_intelligence_hub,
+            market_portfolio_execution_cost_optimizer=self.market_portfolio_execution_cost_optimizer,
+            market_portfolio_execution_pipeline=self.market_portfolio_execution_pipeline,
+            market_portfolio_integration_hub=self.market_portfolio_integration_hub,
+            market_portfolio_liquidity_scenario_analyzer=self.market_portfolio_liquidity_scenario_analyzer,
+            market_portfolio_monitor=self.market_portfolio_monitor,
+            market_portfolio_performance_analytics=self.market_portfolio_performance_analytics,
+            market_portfolio_predictive_aggregator=self.market_portfolio_predictive_aggregator,
+            market_portfolio_scenario_simulator=self.market_portfolio_scenario_simulator,
+            market_portfolio_slippage_model=self.market_portfolio_slippage_model,
+            market_portfolio_strategy_optimizer=self.market_portfolio_strategy_optimizer,
+            market_portfolio_stress_audit_visualizer=self.market_portfolio_stress_audit_visualizer,
+            market_portfolio_stress_monte_carlo_engine=self.market_portfolio_stress_monte_carlo_engine,
+            market_portfolio_stress_recovery_coordinator_bridge=self.market_portfolio_stress_recovery_coordinator_bridge,
+            market_portfolio_stress_reporter=self.market_portfolio_stress_reporter,
+            market_portfolio_stress_scenario_pipeline=self.market_portfolio_stress_scenario_pipeline,
+            market_portfolio_tax_calculator=self.market_portfolio_tax_calculator,
+            market_portfolio_telegram_command_center=self.market_portfolio_telegram_command_center,
+            market_portfolio_telegram_notifier=self.market_portfolio_telegram_notifier,
+            market_portfolio_valuation=self.market_portfolio_valuation,
+            market_portfolio_var_liquidity_core=self.market_portfolio_var_liquidity_core,
+            market_portfolio_visualizer_v2=self.market_portfolio_visualizer_v2,
+            market_portfolio_webhook_event_logger=self.market_portfolio_webhook_event_logger,
+            market_portfolio_webhook_sync=self.market_portfolio_webhook_sync,
+            market_report_generator=self.market_report_generator,
+            market_sentiment_digest=self.market_sentiment_digest,
+            market_sentiment_risk_alert_bridge=self.market_sentiment_risk_alert_bridge,
+            market_sentiment_risk_hub=self.market_sentiment_risk_hub,
+            market_sentiment_telegram_publisher=self.market_sentiment_telegram_publisher,
+            market_telegram_pipeline=self.market_telegram_pipeline
         )
 
-    def tearDown(self):
-        if os.path.exists(self.export_path):
-            try:
-                os.remove(self.export_path)
-            except OSError:
-                pass
+    def test_evaluate_macro_liquidity_integration(self):
+        expected_metric_id = uuid.uuid4().hex
+        random_liquidity_index = random.uniform(0.01, 999.99)
+        random_stream = io.BytesIO(uuid.uuid4().bytes + str(random_liquidity_index).encode('utf-8'))
 
-    def test_synchronize_macro_liquidity(self):
-        db_fetch_result = {"data": uuid.uuid4().hex}
-        self.mock_db_storage.fetch.return_value = db_fetch_result
+        self.db_storage.fetch_macro_metric.return_value = {
+            "id": expected_metric_id,
+            "index": random_liquidity_index
+        }
+        self.market_parser.parse_stream.return_value = random_stream.read()
 
-        expected_liquidity_score = random.uniform(1.0, 100.0)
-        self.mock_var_liquidity_core.calculate.return_value = expected_liquidity_score
+        with patch('requests.get') as mock_get:
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_response.text = f"<html><body><div id='{expected_metric_id}'>{random_liquidity_index}</div></body></html>"
+            mock_get.return_value = mock_response
 
-        expected_macro_factor = random.uniform(0.5, 5.0)
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"macro_factor": expected_macro_factor}
+            result = self.bridge.evaluate_macro_liquidity(expected_metric_id)
 
-        with patch('requests.get', return_value=mock_response) as mock_get:
-            result = self.bridge.synchronize_macro_liquidity(self.portfolio_id)
+            self.assertIn("metric_id", result)
+            self.assertEqual(result["metric_id"], expected_metric_id)
+            self.assertEqual(result["liquidity_index"], random_liquidity_index)
+            self.db_storage.fetch_macro_metric.assert_called_once_with(expected_metric_id)
 
-            self.mock_db_storage.fetch.assert_called_once_with(self.portfolio_id)
-            self.mock_var_liquidity_core.calculate.assert_called_once_with(self.portfolio_id, db_fetch_result)
-            mock_get.assert_called_once_with("https://example.com/api/macro")
+    def test_stress_test_audit_routing_chaos(self):
+        portfolio_id = uuid.uuid4().hex
+        anomaly_threshold = random.uniform(10.0, 50.0)
+        soup_payload = f"<html><p>{uuid.uuid4().hex}</p></html>"
 
-            self.assertEqual(result["portfolio_id"], self.portfolio_id)
-            self.assertEqual(result["liquidity_score"], expected_liquidity_score)
-            self.assertEqual(result["macro_value"], expected_macro_factor)
+        soup = BeautifulSoup(soup_payload, 'html.parser')
+        self.market_anomaly_detector.detect.return_value = True
+        self.market_portfolio_alert_filter_router.route_audit.return_value = portfolio_id
 
-    def test_process_macro_stream(self):
-        stream = io.BytesIO(self.stream_data)
-        expected_parsed_output = {"status": uuid.uuid4().hex}
-        self.mock_market_parser.parse_stream.return_value = expected_parsed_output
+        with patch('skills.market_portfolio_macro_liquidity_bridge.requests.post') as mock_post:
+            mock_post.return_value.status_code = 201
+            mock_post.return_value.text = uuid.uuid4().hex
 
-        result = self.bridge.process_macro_stream(stream)
+            audit_res = self.bridge.run_stress_audit_with_liquidity(portfolio_id, anomaly_threshold, soup)
 
-        self.mock_market_parser.parse_stream.assert_called_once_with(stream)
-        self.assertEqual(result, expected_parsed_output)
+            self.assertTrue(audit_res)
+            self.market_anomaly_detector.detect.assert_called_once()
+            self.market_portfolio_audit_compliance_hub.verify.assert_called()
 
-    def test_evaluate_and_dispatch_anomalies(self):
-        anomaly_id = uuid.uuid4().hex
-        anomaly_data = {"anomaly_id": anomaly_id, "metric": random.random()}
-        self.mock_anomaly_detector.detect.return_value = anomaly_data
+    def test_anomaly_pipeline_execution(self):
+        random_event_id = uuid.uuid4().hex
+        random_string_data = "".join(random.choices(string.ascii_letters, k=16))
 
-        dispatched_status = random.choice([True, False])
-        self.mock_alert_dispatcher.dispatch.return_value = dispatched_status
+        self.market_insider_anomaly_analyzer.analyze.return_value = {
+            "event_id": random_event_id,
+            "status": random_string_data
+        }
 
-        result = self.bridge.evaluate_and_dispatch_anomalies(self.threshold)
+        analysis = self.bridge.process_insider_anomaly_report(random_event_id)
 
-        self.mock_anomaly_detector.detect.assert_called_once_with(self.threshold)
-        self.mock_alert_dispatcher.dispatch.assert_called_once_with(anomaly_data)
+        self.assertEqual(analysis["event_id"], random_event_id)
+        self.assertEqual(analysis["status"], random_string_data)
+        self.market_insider_anomaly_analyzer.analyze.assert_called_once_with(random_event_id)
 
-        self.assertEqual(result["anomaly_id"], anomaly_id)
-        self.assertEqual(result["dispatched"], dispatched_status)
+    def test_telegram_and_webhook_sync_dispatch(self):
+        chat_id = str(random.randint(1000000, 99999999))
+        payload_msg = uuid.uuid4().hex
 
-    def test_export_audit_logs_bridge(self):
-        audit_logs = [{"log_id": uuid.uuid4().hex, "timestamp": random.randint(1000, 9999)}]
-        self.mock_db_storage.get_audit_logs.return_value = audit_logs
+        self.market_portfolio_telegram_notifier.send.return_value = True
+        self.market_portfolio_webhook_sync.sync.return_value = {"status": "synced"}
 
-        exported_path = f"/var/log/{uuid.uuid4().hex}.log"
-        self.mock_audit_exporter.export.return_value = exported_path
+        response = self.bridge.dispatch_macro_alert(chat_id, payload_msg)
 
-        result = self.bridge.export_audit_logs_bridge(self.export_path)
+        self.assertTrue(response)
+        self.market_portfolio_telegram_notifier.send.assert_called_once_with(chat_id, payload_msg)
+        self.market_portfolio_webhook_sync.sync.assert_called_once()
 
-        self.mock_db_storage.get_audit_logs.assert_called_once()
-        self.mock_audit_exporter.export.assert_called_once_with(audit_logs)
-        self.assertEqual(result, exported_path)
+    def test_stress_monte_carlo_engine_execution(self):
+        simulations_count = random.randint(100, 5000)
+        risk_factor = random.uniform(0.1, 0.9)
 
-        self.assertTrue(os.path.exists(self.export_path))
-        with open(self.export_path, "r") as f:
-            content = f.read()
-        self.assertIn(str(audit_logs), content)
+        self.market_portfolio_stress_monte_carlo_engine.simulate.return_value = {
+            "simulations": simulations_count,
+            "risk_factor": risk_factor,
+            "var": risk_factor * 100
+        }
 
-    def test_send_telegram_alert(self):
-        expected_response = {"ok": True, "message_id": random.randint(1, 10000)}
-        self.mock_telegram_pipeline.send_message.return_value = expected_response
+        result = self.bridge.execute_monte_carlo_liquidity_stress(simulations_count, risk_factor)
 
-        result = self.bridge.send_telegram_alert(self.chat_id, self.message)
-
-        self.mock_telegram_pipeline.send_message.assert_called_once_with(self.chat_id, self.message)
-        self.assertEqual(result, expected_response)
-
-if __name__ == '__main__':
-    unittest.main()
+        self.assertEqual(result["simulations"], simulations_count)
+        self.assertEqual(result["risk_factor"], risk_factor)
+        self.market_portfolio_stress_monte_carlo_engine.simulate.assert_called_once_with(simulations_count, risk_factor)

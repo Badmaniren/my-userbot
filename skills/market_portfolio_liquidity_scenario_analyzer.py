@@ -3,38 +3,6 @@ import json
 from skills import market_portfolio_var_liquidity_core
 from skills import market_portfolio_stress_scenario_pipeline
 
-# Ensure calculate_var_and_liquidity exists on the core module to satisfy unittest.mock.patch targets
-if not hasattr(market_portfolio_var_liquidity_core, "calculate_var_and_liquidity"):
-    if hasattr(market_portfolio_var_liquidity_core, "market_portfolio_var_liquidity_core"):
-        market_portfolio_var_liquidity_core.calculate_var_and_liquidity = lambda *args, **kwargs: market_portfolio_var_liquidity_core.market_portfolio_var_liquidity_core().calculate_var_and_liquidity(*args, **kwargs)
-    else:
-        market_portfolio_var_liquidity_core.calculate_var_and_liquidity = lambda *args, **kwargs: {}
-
-# Ensure run_stress_scenario_pipeline exists on the pipeline module
-if not hasattr(market_portfolio_stress_scenario_pipeline, "run_stress_scenario_pipeline"):
-    if hasattr(market_portfolio_stress_scenario_pipeline, "PortfolioStressScenarioPipeline"):
-        market_portfolio_stress_scenario_pipeline.run_stress_scenario_pipeline = lambda storage_file, *args, **kwargs: market_portfolio_stress_scenario_pipeline.PortfolioStressScenarioPipeline(storage_file).execute(*args, **kwargs)
-    else:
-        market_portfolio_stress_scenario_pipeline.run_stress_scenario_pipeline = lambda *args, **kwargs: {}
-
-# Ensure PortfolioStressScenarioPipeline exists on the pipeline module
-if not hasattr(market_portfolio_stress_scenario_pipeline, "PortfolioStressScenarioPipeline"):
-    class _PortfolioStressScenarioPipelineStub:
-        def __init__(self, storage_file=None):
-            self.storage_file = storage_file
-        def execute(self, symbol, percentage, shifts):
-            if hasattr(market_portfolio_stress_scenario_pipeline, "run_stress_scenario_pipeline"):
-                return market_portfolio_stress_scenario_pipeline.run_stress_scenario_pipeline(self.storage_file, symbol, percentage, shifts)
-            return {}
-    market_portfolio_stress_scenario_pipeline.PortfolioStressScenarioPipeline = _PortfolioStressScenarioPipelineStub
-
-
-def _ensure_dir_exists(target_path):
-    if target_path and not str(target_path).startswith("s3://"):
-        export_dir = os.path.dirname(target_path)
-        if export_dir and not os.path.exists(export_dir):
-            os.makedirs(export_dir, exist_ok=True)
-
 def analyze_liquidity_stress_scenarios(
     portfolio_id,
     confidence_level=None,
@@ -44,30 +12,41 @@ def analyze_liquidity_stress_scenarios(
     shifts=None,
     storage_file=None
 ):
-    _ensure_dir_exists(export_target)
-    _ensure_dir_exists(storage_file)
-
-    var_liquidity_data = market_portfolio_var_liquidity_core.calculate_var_and_liquidity(
-        portfolio_id, confidence_level, export_target
-    )
+    if hasattr(market_portfolio_var_liquidity_core, "calculate_var_and_liquidity"):
+        var_liquidity_data = market_portfolio_var_liquidity_core.calculate_var_and_liquidity(
+            portfolio_id, confidence_level, export_target
+        )
+    else:
+        core_instance = market_portfolio_var_liquidity_core.market_portfolio_var_liquidity_core()
+        var_liquidity_data = core_instance.calculate_var_and_liquidity(
+            portfolio_id, confidence_level, export_target
+        )
     
-    stress_pipeline_data = market_portfolio_stress_scenario_pipeline.run_stress_scenario_pipeline(
-        storage_file, symbol, percentage, shifts
-    )
+    if hasattr(market_portfolio_stress_scenario_pipeline, "run_stress_scenario_pipeline"):
+        stress_pipeline_data = market_portfolio_stress_scenario_pipeline.run_stress_scenario_pipeline(
+            storage_file, symbol, percentage, shifts
+        )
+    else:
+        pipeline_instance = market_portfolio_stress_scenario_pipeline.PortfolioStressScenarioPipeline(storage_file)
+        stress_pipeline_data = pipeline_instance.execute(symbol, percentage, shifts)
     
-    var_val = var_liquidity_data.get("var", 0.0) if isinstance(var_liquidity_data, dict) else 0.0
-    impact = stress_pipeline_data.get("impact", 0.0) if isinstance(stress_pipeline_data, dict) else 0.0
-    reserve_capital_requirement = float(round(max(var_val, impact) * 1.15, 10))
+    var_val = var_liquidity_data.get("var", 0.0)
+    impact = stress_pipeline_data.get("impact", 0.0)
+    reserve_capital_requirement = max(var_val, impact) * 1.15
     
     if export_target and not str(export_target).startswith("s3://"):
-        if not os.path.exists(export_target):
-            with open(export_target, 'w') as f:
-                json.dump(var_liquidity_data, f)
+        export_dir = os.path.dirname(export_target)
+        if export_dir and not os.path.exists(export_dir):
+            os.makedirs(export_dir, exist_ok=True)
+        with open(export_target, 'w') as f:
+            json.dump(var_liquidity_data, f)
 
-    if storage_file and not str(storage_file).startswith("s3://"):
-        if not os.path.exists(storage_file):
-            with open(storage_file, 'w') as f:
-                json.dump(stress_pipeline_data, f)
+    if storage_file:
+        storage_dir = os.path.dirname(storage_file)
+        if storage_dir and not os.path.exists(storage_dir):
+            os.makedirs(storage_dir, exist_ok=True)
+        with open(storage_file, 'w') as f:
+            json.dump(stress_pipeline_data, f)
 
     return {
         "portfolio_id": portfolio_id,
@@ -83,7 +62,7 @@ class MarketPortfolioLiquidityScenarioAnalyzer:
         self.storage_file = storage_file
 
     def _calculate_required_reserve(self, var_val, stress_impact):
-        return float(round(max(var_val, stress_impact) * 1.15, 10))
+        return max(var_val, stress_impact) * 1.15
 
     def evaluate_portfolio(
         self,
@@ -94,15 +73,21 @@ class MarketPortfolioLiquidityScenarioAnalyzer:
         percentage,
         shifts
     ):
-        _ensure_dir_exists(export_target)
-        _ensure_dir_exists(self.storage_file)
-
-        var_result = market_portfolio_var_liquidity_core.calculate_var_and_liquidity(
-            portfolio_id, confidence_level, export_target
-        )
+        if hasattr(market_portfolio_var_liquidity_core, "market_portfolio_var_liquidity_core"):
+            core_module = market_portfolio_var_liquidity_core.market_portfolio_var_liquidity_core()
+            var_result = core_module.calculate_var_and_liquidity(portfolio_id, confidence_level, export_target)
+        else:
+            var_result = market_portfolio_var_liquidity_core.calculate_var_and_liquidity(
+                portfolio_id, confidence_level, export_target
+            )
         
-        pipeline_class = market_portfolio_stress_scenario_pipeline.PortfolioStressScenarioPipeline(self.storage_file)
-        stress_result = pipeline_class.execute(symbol, percentage, shifts)
+        if hasattr(market_portfolio_stress_scenario_pipeline, "PortfolioStressScenarioPipeline"):
+            pipeline_class = market_portfolio_stress_scenario_pipeline.PortfolioStressScenarioPipeline(self.storage_file)
+            stress_result = pipeline_class.execute(symbol, percentage, shifts)
+        else:
+            stress_result = market_portfolio_stress_scenario_pipeline.run_stress_scenario_pipeline(
+                self.storage_file, symbol, percentage, shifts
+            )
         
         return {
             "portfolio_id": portfolio_id,

@@ -41,11 +41,9 @@ class StressRecoveryCoordinatorBridge:
             logger.debug(f"Storage file {self.storage_file} does not exist. Creating default empty structure.")
             with open(self.storage_file, "w") as f:
                 f.write("{}")
-        
-        shifts_iterable = list(range(shifts)) if isinstance(shifts, int) else shifts
 
         try:
-            stress_result = self.pipeline.execute(symbol, percentage, shifts_iterable)
+            stress_result = self.pipeline.execute(symbol, percentage, shifts)
             logger.info(f"Stress scenario pipeline executed successfully for {symbol}")
         except (KeyError, TypeError) as e:
             logger.warning(f"Exception encountered during stress pipeline execution for {symbol}: {e}. Falling back to simulation.")
@@ -77,10 +75,8 @@ def run_stress_recovery_coordinator(
         with open(storage_file, "w") as f:
             f.write("{}")
 
-    shifts_iterable = list(range(shifts)) if isinstance(shifts, int) else shifts
-
     try:
-        stress_output = run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts_iterable)
+        stress_output = run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts)
         logger.info(f"Stress scenario run successfully for {symbol}")
     except (KeyError, TypeError) as e:
         logger.warning(f"Caught exception {type(e).__name__} during stress scenario execution for {symbol}: {e}. Falling back.")
@@ -114,14 +110,14 @@ def run_stress_recovery_coordinator_pipeline(
         with open(storage_file, "w") as f:
             f.write("{}")
 
-    shifts_iterable = list(range(shifts)) if isinstance(shifts, int) else shifts
+    shifts_arg = list(range(shifts)) if isinstance(shifts, int) else shifts
 
     try:
-        stress_result = run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts_iterable)
+        stress_result = run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts_arg)
         logger.info(f"Stress scenario pipeline function executed successfully for {symbol}")
     except (KeyError, TypeError) as e:
         logger.warning(f"Caught exception {type(e).__name__} in pipeline for {symbol}: {e}. Providing fallback.")
-        stress_result = {"status": "simulated", "symbol": symbol, "shifts": shifts_iterable}
+        stress_result = {"status": "simulated", "symbol": symbol, "shifts": shifts_arg}
 
     recovery_result = start_new(symbol, url, telegram_token, chat_id, storage_file)
     logger.info(f"Monitor start_new completed for pipeline execution on {symbol}")

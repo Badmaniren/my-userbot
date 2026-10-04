@@ -80,6 +80,8 @@ class PortfolioScenarioSimulator:
 
     def run_stress_test(self, symbol, shifts):
         logger.info("Running stress test for symbol: %s with shifts: %s", symbol, shifts)
+        if isinstance(shifts, int):
+            shifts = list(range(shifts))
         report = []
         for shift in shifts:
             try:

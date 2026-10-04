@@ -4,17 +4,19 @@ import uuid
 import random
 import unittest
 from skills import market_portfolio_liquidity_scenario_analyzer
+from skills import market_portfolio_var_liquidity_core
+from skills import market_portfolio_stress_scenario_pipeline
 
 class TestMarketPortfolioLiquidityScenarioAnalyzerIntegration(unittest.TestCase):
     def setUp(self):
-        self.portfolio_id = f"port-{uuid.uuid4()}"
+        self.portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
         self.symbol = f"SYM{random.randint(10, 99)}"
         self.confidence_level = round(random.uniform(0.90, 0.99), 2)
-        self.percentage = round(random.uniform(0.05, 0.25), 2)
-        self.shifts = [round(random.uniform(-0.1, -0.01), 2), round(random.uniform(0.01, 0.1), 2)]
+        self.percentage = round(random.uniform(5.0, 25.0), 2)
+        self.shifts = [round(random.uniform(-0.1, 0.1), 4) for _ in range(3)]
         
-        self.export_target = f"test_output/export_{uuid.uuid4()}.json"
-        self.storage_file = f"test_output/storage_{uuid.uuid4()}.json"
+        self.export_target = f"test_exports_{uuid.uuid4().hex[:6]}/var_export.json"
+        self.storage_file = f"test_storage_{uuid.uuid4().hex[:6]}/stress_storage.json"
 
     def tearDown(self):
         for path in [self.export_target, self.storage_file]:
@@ -23,11 +25,13 @@ class TestMarketPortfolioLiquidityScenarioAnalyzerIntegration(unittest.TestCase)
                     os.remove(path)
                 except OSError:
                     pass
-        if os.path.exists("test_output"):
-            try:
-                os.rmdir("test_output")
-            except OSError:
-                pass
+            if path and not str(path).startswith("s3://"):
+                dir_name = os.path.dirname(path)
+                if dir_name and os.path.exists(dir_name):
+                    try:
+                        os.rmdir(dir_name)
+                    except OSError:
+                        pass
 
     def test_analyze_liquidity_stress_scenarios_integration(self):
         result = market_portfolio_liquidity_scenario_analyzer.analyze_liquidity_stress_scenarios(
@@ -45,7 +49,8 @@ class TestMarketPortfolioLiquidityScenarioAnalyzerIntegration(unittest.TestCase)
         self.assertIn("var_liquidity_data", result)
         self.assertIn("stress_pipeline_data", result)
         self.assertIn("reserve_capital_requirement", result)
-        
+        self.assertIsInstance(result["reserve_capital_requirement"], float)
+
         self.assertTrue(os.path.exists(self.export_target))
         self.assertTrue(os.path.exists(self.storage_file))
 
@@ -61,7 +66,7 @@ class TestMarketPortfolioLiquidityScenarioAnalyzerIntegration(unittest.TestCase)
         analyzer = market_portfolio_liquidity_scenario_analyzer.MarketPortfolioLiquidityScenarioAnalyzer(
             storage_file=self.storage_file
         )
-        
+
         eval_result = analyzer.evaluate_portfolio(
             portfolio_id=self.portfolio_id,
             confidence_level=self.confidence_level,

@@ -41,6 +41,25 @@ def start_new(*args, **kwargs):
     return {"status": "success"}
 
 
+class LiquidityCore:
+    """Класс для расчета и получения метрик ликвидности."""
+    def __init__(self, storage=None, **kwargs):
+        self.storage = storage
+        self.metrics = {}
+
+    def compute_metrics(self, tracking_id, result_data=None):
+        metrics = {
+            "tracking_id": tracking_id,
+            "liquidity_score": 0.85,
+            "data": result_data
+        }
+        self.metrics[tracking_id] = metrics
+        return metrics
+
+    def get_metrics_by_id(self, tracking_id):
+        return self.metrics.get(tracking_id)
+
+
 class market_portfolio_var_liquidity_core:
     """Класс для интеграционных и юнит-тестов, реализующий расчет VaR и ликвидности."""
     

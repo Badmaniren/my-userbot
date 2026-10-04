@@ -11,3 +11,6 @@
 - market_portfolio_liquidity_scenario_analyzer: Проводим финальный стабильный рефакторинг market_portfolio_liquidity_scenario_analyzer без падений тестов для продвижения контура макро-ликвидности.
 - market_portfolio_liquidity_scenario_analyzer: market_portfolio_liquidity_scenario_analyzer: Укрепление и стабилизация анализатора сценариев ликвидности для предотвращения эскалаций и продвижения автономного контура макро-ликвидности портфеля.
 - market_portfolio_monitor: Проведение финальной стабилизации и рефакторинга базового монитора макро-ликвидности для завершения автономного контура ликвидности.
+- market_portfolio_liquidity_scenario_analyzer: market_portfolio_liquidity_scenario_analyzer: Успешно завершаем эпик автономного контура макро-ликвидности портфеля финальным рефакторингом и стабилизацией тестов.  ✅ ЭПИК ЗАВЕРШЁН
+
+Нет активного эпика — можно предложить новый.

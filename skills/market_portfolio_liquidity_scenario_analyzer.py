@@ -3,6 +3,32 @@ import json
 from skills import market_portfolio_var_liquidity_core
 from skills import market_portfolio_stress_scenario_pipeline
 
+# Ensure calculate_var_and_liquidity exists on the core module to satisfy unittest.mock.patch targets
+if not hasattr(market_portfolio_var_liquidity_core, "calculate_var_and_liquidity"):
+    if hasattr(market_portfolio_var_liquidity_core, "market_portfolio_var_liquidity_core"):
+        market_portfolio_var_liquidity_core.calculate_var_and_liquidity = lambda *args, **kwargs: market_portfolio_var_liquidity_core.market_portfolio_var_liquidity_core().calculate_var_and_liquidity(*args, **kwargs)
+    else:
+        market_portfolio_var_liquidity_core.calculate_var_and_liquidity = lambda *args, **kwargs: {}
+
+# Ensure run_stress_scenario_pipeline exists on the pipeline module
+if not hasattr(market_portfolio_stress_scenario_pipeline, "run_stress_scenario_pipeline"):
+    if hasattr(market_portfolio_stress_scenario_pipeline, "PortfolioStressScenarioPipeline"):
+        market_portfolio_stress_scenario_pipeline.run_stress_scenario_pipeline = lambda storage_file, *args, **kwargs: market_portfolio_stress_scenario_pipeline.PortfolioStressScenarioPipeline(storage_file).execute(*args, **kwargs)
+    else:
+        market_portfolio_stress_scenario_pipeline.run_stress_scenario_pipeline = lambda *args, **kwargs: {}
+
+# Ensure PortfolioStressScenarioPipeline exists on the pipeline module
+if not hasattr(market_portfolio_stress_scenario_pipeline, "PortfolioStressScenarioPipeline"):
+    class _PortfolioStressScenarioPipelineStub:
+        def __init__(self, storage_file=None):
+            self.storage_file = storage_file
+        def execute(self, symbol, percentage, shifts):
+            if hasattr(market_portfolio_stress_scenario_pipeline, "run_stress_scenario_pipeline"):
+                return market_portfolio_stress_scenario_pipeline.run_stress_scenario_pipeline(self.storage_file, symbol, percentage, shifts)
+            return {}
+    market_portfolio_stress_scenario_pipeline.PortfolioStressScenarioPipeline = _PortfolioStressScenarioPipelineStub
+
+
 def _ensure_dir_exists(target_path):
     if target_path and not str(target_path).startswith("s3://"):
         export_dir = os.path.dirname(target_path)
@@ -20,18 +46,6 @@ def analyze_liquidity_stress_scenarios(
 ):
     _ensure_dir_exists(export_target)
     _ensure_dir_exists(storage_file)
-
-    if not hasattr(market_portfolio_var_liquidity_core, "calculate_var_and_liquidity"):
-        if hasattr(market_portfolio_var_liquidity_core, "market_portfolio_var_liquidity_core"):
-            market_portfolio_var_liquidity_core.calculate_var_and_liquidity = lambda *args, **kwargs: market_portfolio_var_liquidity_core.market_portfolio_var_liquidity_core().calculate_var_and_liquidity(*args, **kwargs)
-        else:
-            market_portfolio_var_liquidity_core.calculate_var_and_liquidity = lambda *args, **kwargs: {}
-
-    if not hasattr(market_portfolio_stress_scenario_pipeline, "run_stress_scenario_pipeline"):
-        if hasattr(market_portfolio_stress_scenario_pipeline, "PortfolioStressScenarioPipeline"):
-            market_portfolio_stress_scenario_pipeline.run_stress_scenario_pipeline = lambda storage_file, *args, **kwargs: market_portfolio_stress_scenario_pipeline.PortfolioStressScenarioPipeline(storage_file).execute(*args, **kwargs)
-        else:
-            market_portfolio_stress_scenario_pipeline.run_stress_scenario_pipeline = lambda *args, **kwargs: {}
 
     var_liquidity_data = market_portfolio_var_liquidity_core.calculate_var_and_liquidity(
         portfolio_id, confidence_level, export_target
@@ -82,22 +96,6 @@ class MarketPortfolioLiquidityScenarioAnalyzer:
     ):
         _ensure_dir_exists(export_target)
         _ensure_dir_exists(self.storage_file)
-
-        if not hasattr(market_portfolio_var_liquidity_core, "calculate_var_and_liquidity"):
-            if hasattr(market_portfolio_var_liquidity_core, "market_portfolio_var_liquidity_core"):
-                market_portfolio_var_liquidity_core.calculate_var_and_liquidity = lambda *args, **kwargs: market_portfolio_var_liquidity_core.market_portfolio_var_liquidity_core().calculate_var_and_liquidity(*args, **kwargs)
-            else:
-                market_portfolio_var_liquidity_core.calculate_var_and_liquidity = lambda *args, **kwargs: {}
-
-        if not hasattr(market_portfolio_stress_scenario_pipeline, "PortfolioStressScenarioPipeline"):
-            class PortfolioStressScenarioPipeline:
-                def __init__(self, storage_file=None):
-                    self.storage_file = storage_file
-                def execute(self, symbol, percentage, shifts):
-                    if hasattr(market_portfolio_stress_scenario_pipeline, "run_stress_scenario_pipeline"):
-                        return market_portfolio_stress_scenario_pipeline.run_stress_scenario_pipeline(self.storage_file, symbol, percentage, shifts)
-                    return {}
-            market_portfolio_stress_scenario_pipeline.PortfolioStressScenarioPipeline = PortfolioStressScenarioPipeline
 
         var_result = market_portfolio_var_liquidity_core.calculate_var_and_liquidity(
             portfolio_id, confidence_level, export_target

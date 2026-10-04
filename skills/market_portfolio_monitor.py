@@ -49,7 +49,7 @@ class MarketParser:
 
     def fetch_and_store(self, symbol, price):
         data = {}
-        if os.path.exists(self.storage_file):
+        if self.storage_file and os.path.exists(self.storage_file):
             with open(self.storage_file, "r", encoding="utf-8") as f:
                 content = f.read()
                 if content.strip():
@@ -59,13 +59,16 @@ class MarketParser:
                         data = json.loads(content)
                     except (json.JSONDecodeError, TypeError):
                         data = {}
+        if data is None:
+            data = {}
         
         data[symbol] = price
-        with open(self.storage_file, "w", encoding="utf-8") as f:
-            json.dump(data, f)
+        if self.storage_file:
+            with open(self.storage_file, "w", encoding="utf-8") as f:
+                json.dump(data, f)
 
     def load_data(self, storage_file):
-        if not os.path.exists(storage_file):
+        if not storage_file or not os.path.exists(storage_file):
             return None
         with open(storage_file, "r", encoding="utf-8") as f:
             content = f.read()
@@ -92,8 +95,7 @@ class MarketReportGenerator:
         if self.storage_file and os.path.exists(self.storage_file):
             with open(self.storage_file, "r", encoding="utf-8") as f:
                 return f.read()
-        with open(self.storage_file, "r", encoding="utf-8") as f:
-            return f.read()
+        return "{}"
 
 
 def generate_market_report(storage_file, symbol):

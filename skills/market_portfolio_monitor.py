@@ -68,7 +68,9 @@ class MarketParser:
                 json.dump(data, f)
 
     def load_data(self, storage_file):
-        if not storage_file or not os.path.exists(storage_file):
+        if not storage_file:
+            return None
+        if not os.path.exists(storage_file):
             return None
         with open(storage_file, "r", encoding="utf-8") as f:
             content = f.read()
@@ -78,7 +80,10 @@ class MarketParser:
             if content.strip().startswith("{") and not content.strip().endswith("}"):
                 raise json.JSONDecodeError("Unterminated object", content, 0)
             
-            return json.loads(content)
+            try:
+                return json.loads(content)
+            except (json.JSONDecodeError, TypeError):
+                return {}
 
 
 class MarketReportGenerator:

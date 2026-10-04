@@ -98,17 +98,14 @@ class MarketReportGenerator:
         return f"Report for {symbol}: No data"
 
     def get_raw_stream_dump(self):
-        if self.storage_file and os.path.exists(self.storage_file):
-            try:
-                with open(self.storage_file, "r", encoding="utf-8") as f:
-                    return f.read()
-            except Exception:
-                return "{}"
-        try:
-            with open(self.storage_file, "r", encoding="utf-8") as f:
-                return f.read()
-        except Exception:
+        path = self.storage_file
+        if path is None:
             return "{}"
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                return f.read()
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
 
 
 def generate_market_report(storage_file, symbol):
@@ -133,20 +130,17 @@ def run_market_telegram_pipeline(storage_file, symbol, chat_id, url, telegram_to
 def export_audit_logs(storage_file=None):
     """Экспорт аудиторских логов с явным возвратом результата."""
     if storage_file and os.path.exists(storage_file):
-        try:
-            with open(storage_file, "r", encoding="utf-8") as f:
-                content = f.read()
-                if not content.strip():
-                    return False
-                if content.strip().startswith("{") and not content.strip().endswith("}"):
+        with open(storage_file, "r", encoding="utf-8") as f:
+            content = f.read()
+            if not content.strip():
+                return False
+            if content.strip().startswith("{") and not content.strip().endswith("}"):
+                return True
+            try:
+                parsed = json.loads(content)
+                if isinstance(parsed, dict):
                     return True
-                try:
-                    parsed = json.loads(content)
-                    if isinstance(parsed, dict):
-                        return True
-                    return False
-                except (json.JSONDecodeError, TypeError):
-                    return True
-        except Exception:
-            return False
+                return False
+            except (json.JSONDecodeError, TypeError):
+                return True
     return False

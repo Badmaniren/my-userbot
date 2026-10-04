@@ -87,5 +87,10 @@ def process_stream_alert(alert_id):
             try:
                 return generator_instance.get_raw_stream_dump(alert_id)
             except TypeError:
-                return generator_instance.get_raw_stream_dump()
+                try:
+                    return generator_instance.get_raw_stream_dump()
+                except Exception:
+                    return io.BytesIO(b"")
+            except Exception:
+                return io.BytesIO(b"")
     return io.BytesIO(b"")

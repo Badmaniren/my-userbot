@@ -4,3 +4,4 @@
 
 - market_portfolio_stress_monte_carlo_engine: Запускаем новый стратегический эпик по углубленному стресс-тестированию портфельных рисков методами симуляций.
 - market_portfolio_stress_monte_carlo_engine: Рефакторинг и стабилизация ядра Монте-Карло для обеспечения надежности симуляций в контуре стресс-тестирования портфеля.
+- market_portfolio_stress_monte_carlo_engine: Проводим рефакторинг и расширяем функциональность market_portfolio_stress_monte_carlo_engine для поддержки продвинутых метрик риска (VaR, CVaR) и многофакторных симуляций.

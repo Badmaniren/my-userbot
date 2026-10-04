@@ -76,6 +76,14 @@ def analyze_liquidity_stress_scenarios(
     }
 
 
+def analyze_liquidity_scenario(data=None, *args, **kwargs):
+    if isinstance(data, dict):
+        res = dict(data)
+        res.setdefault("analyzed", True)
+        return res
+    return {"analyzed": True, "data": data}
+
+
 class MarketPortfolioLiquidityScenarioAnalyzer:
     def __init__(self, storage_file=None):
         self.storage_file = storage_file

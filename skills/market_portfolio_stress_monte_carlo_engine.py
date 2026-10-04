@@ -154,3 +154,14 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
         market_portfolio_stress_audit_visualizer.visualize_stress_test(result_dict)
 
     return result_dict
+
+
+def run_monte_carlo_simulation(portfolio_id=None, portfolio_value=100000.0, scenario_params=None, iterations=100, **kwargs):
+    if scenario_params is None:
+        scenario_params = {}
+    return run_monte_carlo_stress_test(
+        portfolio_id=portfolio_id or "default_portfolio",
+        portfolio_value=portfolio_value,
+        scenario_params=scenario_params,
+        iterations=iterations
+    )

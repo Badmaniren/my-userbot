@@ -11,7 +11,6 @@ from skills import market_portfolio_collector_agent
 from skills import market_portfolio_valuation
 from skills import market_portfolio_scenario_simulator
 from skills import market_portfolio_audit_compliance_hub
-from skills import market_portfolio_stress_audit_visualizer
 
 
 class MonteCarloStressEngine:
@@ -149,8 +148,31 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
         "iterations": iterations
     }
 
-    # Финализация контура: интеграция детального отчета с модулем визуализации стресс-тестов
+    # Dynamic import to prevent circular import issues
+    from skills import market_portfolio_stress_audit_visualizer
     if hasattr(market_portfolio_stress_audit_visualizer, "visualize_stress_test"):
         market_portfolio_stress_audit_visualizer.visualize_stress_test(result_dict)
 
     return result_dict
+
+
+def market_portfolio_stress_monte_carlo_engine(payload=None, **kwargs):
+    if payload is None:
+        payload = kwargs
+    elif isinstance(payload, dict):
+        merged = payload.copy()
+        merged.update(kwargs)
+        payload = merged
+    else:
+        return {"status": "error", "message": str(payload)}
+
+    portfolio_id = payload.get("portfolio_id") or payload.get("report_id") or "default_portfolio"
+    simulations = payload.get("simulations") or payload.get("iterations") or 100
+    horizon_days = payload.get("horizon_days", 1)
+
+    engine = MonteCarloStressEngine()
+    return engine.run_simulation(portfolio_id=portfolio_id, simulations=int(simulations), horizon_days=int(horizon_days))
+
+
+def start_new(payload=None, **kwargs):
+    return market_portfolio_stress_monte_carlo_engine(payload=payload, **kwargs)

@@ -42,11 +42,13 @@ class StressRecoveryCoordinatorBridge:
             with open(self.storage_file, "w") as f:
                 f.write("{}")
         
+        shifts_iterable = list(range(shifts)) if isinstance(shifts, int) else shifts
+
         try:
-            stress_result = self.pipeline.execute(symbol, percentage, shifts)
+            stress_result = self.pipeline.execute(symbol, percentage, shifts_iterable)
             logger.info(f"Stress scenario pipeline executed successfully for {symbol}")
-        except KeyError as e:
-            logger.warning(f"KeyError encountered during stress pipeline execution for {symbol}: {e}. Falling back to simulation.")
+        except (KeyError, TypeError) as e:
+            logger.warning(f"Exception encountered during stress pipeline execution for {symbol}: {e}. Falling back to simulation.")
             stress_result = {"status": "simulated", "symbol": symbol, "percentage": percentage}
 
         recovery_result = run_pipeline(symbol, url, telegram_token, chat_id, self.storage_file)
@@ -75,8 +77,10 @@ def run_stress_recovery_coordinator(
         with open(storage_file, "w") as f:
             f.write("{}")
 
+    shifts_iterable = list(range(shifts)) if isinstance(shifts, int) else shifts
+
     try:
-        stress_output = run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts)
+        stress_output = run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts_iterable)
         logger.info(f"Stress scenario run successfully for {symbol}")
     except (KeyError, TypeError) as e:
         logger.warning(f"Caught exception {type(e).__name__} during stress scenario execution for {symbol}: {e}. Falling back.")

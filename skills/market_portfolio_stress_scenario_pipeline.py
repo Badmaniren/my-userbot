@@ -65,6 +65,8 @@ class PortfolioStressScenarioPipeline:
             "stress_report": stress_report_result
         }
 
+MarketPortfolioStressScenarioPipeline = PortfolioStressScenarioPipeline
+
 def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
     try:
         with open(storage_file, "r", encoding="utf-8", errors="ignore") as f:
@@ -117,3 +119,30 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
         "stress_test": stress_test_result,
         "stress_report": stress_report_result
     }
+
+def market_portfolio_stress_scenario_pipeline(data_or_storage=None, symbol=None, percentage=0.0, shifts=None, **kwargs):
+    if isinstance(data_or_storage, dict):
+        payload = data_or_storage
+        storage_file = payload.get("storage_file", "default.json")
+        sym = payload.get("symbol") or payload.get("portfolio_id", "DEFAULT")
+        pct = payload.get("percentage", payload.get("shock_percentage", 0.0))
+        s_shifts = payload.get("shifts", [pct])
+        return run_stress_scenario_pipeline(storage_file, sym, pct, s_shifts)
+    elif isinstance(data_or_storage, str) and (symbol is not None or kwargs):
+        storage_file = data_or_storage
+        sym = symbol if symbol is not None else kwargs.get("symbol", "DEFAULT")
+        pct = percentage if percentage != 0.0 else kwargs.get("percentage", 0.0)
+        s_shifts = shifts if shifts is not None else kwargs.get("shifts", [pct])
+        return run_stress_scenario_pipeline(storage_file, sym, pct, s_shifts)
+    elif isinstance(data_or_storage, str):
+        storage_file = "default.json"
+        sym = data_or_storage
+        pct = percentage
+        s_shifts = shifts if shifts is not None else [pct]
+        return run_stress_scenario_pipeline(storage_file, sym, pct, s_shifts)
+    else:
+        storage_file = kwargs.get("storage_file", "default.json")
+        sym = kwargs.get("symbol", kwargs.get("portfolio_id", "DEFAULT"))
+        pct = kwargs.get("percentage", kwargs.get("shock_percentage", 0.0))
+        s_shifts = kwargs.get("shifts", [pct])
+        return run_stress_scenario_pipeline(storage_file, sym, pct, s_shifts)

@@ -1,7 +1,7 @@
 import unittest
 import os
 import uuid
-import random
+import tempfile
 import json
 from skills.market_portfolio_liquidity_scenario_analyzer import (
     analyze_liquidity_stress_scenarios,
@@ -10,29 +10,18 @@ from skills.market_portfolio_liquidity_scenario_analyzer import (
 
 class TestMarketPortfolioLiquidityScenarioAnalyzerIntegration(unittest.TestCase):
     def setUp(self):
-        self.portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
-        self.symbol = f"ASSET_{random.choice(['USD', 'EUR', 'RUB', 'BTC'])}"
-        self.confidence_level = round(random.uniform(0.90, 0.99), 4)
-        self.percentage = round(random.uniform(5.0, 25.0), 2)
-        self.shifts = [round(random.uniform(-0.1, 0.1), 4) for _ in range(3)]
+        self.portfolio_id = f"port-{uuid.uuid4()}"
+        self.symbol = f"SYM-{uuid.uuid4().hex[:6].upper()}"
+        self.confidence_level = round(0.90 + (uuid.uuid4().int % 9) / 100.0, 2)
+        self.percentage = float(uuid.uuid4().int % 15 + 1)
+        self.shifts = [float(uuid.uuid4().int % 5 - 2), float(uuid.uuid4().int % 10 + 1)]
         
-        self.export_target = f"test_outputs/export_{uuid.uuid4().hex[:6]}.json"
-        self.storage_file = f"test_outputs/storage_{uuid.uuid4().hex[:6]}.json"
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.export_target = os.path.join(self.temp_dir.name, f"export_{uuid.uuid4().hex}.json")
+        self.storage_file = os.path.join(self.temp_dir.name, f"storage_{uuid.uuid4().hex}.json")
 
     def tearDown(self):
-        for path in [self.export_target, self.storage_file]:
-            if os.path.exists(path):
-                try:
-                    os.remove(path)
-                except OSError:
-                    pass
-        
-        for dir_path in ["test_outputs"]:
-            if os.path.exists(dir_path) and not os.listdir(dir_path):
-                try:
-                    os.rmdir(dir_path)
-                except OSError:
-                    pass
+        self.temp_dir.cleanup()
 
     def test_analyze_liquidity_stress_scenarios_integration(self):
         result = analyze_liquidity_stress_scenarios(
@@ -50,18 +39,18 @@ class TestMarketPortfolioLiquidityScenarioAnalyzerIntegration(unittest.TestCase)
         self.assertIn("var_liquidity_data", result)
         self.assertIn("stress_pipeline_data", result)
         self.assertIn("reserve_capital_requirement", result)
-        
         self.assertGreaterEqual(result["reserve_capital_requirement"], 0.0)
 
-        self.assertTrue(os.path.exists(self.export_target), "Export target file must be created")
-        with open(self.export_target, 'r') as f:
-            export_content = json.load(f)
-        self.assertIsInstance(export_content, dict)
+        self.assertTrue(os.path.exists(self.export_target))
+        self.assertTrue(os.path.exists(self.storage_file))
 
-        self.assertTrue(os.path.exists(self.storage_file), "Storage file must be created")
+        with open(self.export_target, 'r') as f:
+            exported_data = json.load(f)
+            self.assertIsInstance(exported_data, dict)
+
         with open(self.storage_file, 'r') as f:
-            storage_content = json.load(f)
-        self.assertIsInstance(storage_content, dict)
+            stored_data = json.load(f)
+            self.assertIsInstance(stored_data, dict)
 
     def test_market_portfolio_liquidity_scenario_analyzer_class_integration(self):
         analyzer = MarketPortfolioLiquidityScenarioAnalyzer(storage_file=self.storage_file)
@@ -80,7 +69,8 @@ class TestMarketPortfolioLiquidityScenarioAnalyzerIntegration(unittest.TestCase)
         self.assertIn("var_result", eval_result)
         self.assertIn("stress_result", eval_result)
 
-        self.assertTrue(os.path.exists(self.export_target))
+        calculated_reserve = analyzer._calculate_required_reserve(100.0, 200.0)
+        self.assertEqual(calculated_reserve, 230.0)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

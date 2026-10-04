@@ -6,3 +6,4 @@
 - market_portfolio_monitor: Проводим рефакторинг базового монитора макро-ликвидности, устраняя технический долг перед выходом на следующие этапы контура.
 - market_portfolio_monitor: Завершаем стабилизацию market_portfolio_monitor перед масштабированием контура макро-ликвидности.
 - market_portfolio_liquidity_scenario_analyzer: Расширяем market_portfolio_liquidity_scenario_analyzer макро-сценарными шоками ликвидности и строгим расчетом горизонта ликвидации позиций.
+- market_portfolio_liquidity_scenario_analyzer: Укрепляем и стабилизируем market_portfolio_liquidity_scenario_analyzer после эскалации для продолжения сборки автономного контура макро-ликвидности портфеля.

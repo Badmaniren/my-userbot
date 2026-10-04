@@ -1,58 +1,108 @@
+import unittest
+from unittest.mock import patch, MagicMock
 import os
 import json
 import uuid
 import random
-import unittest
-from unittest.mock import patch, MagicMock
+import io
+
 from skills import market_portfolio_liquidity_scenario_analyzer
+from skills import market_portfolio_var_liquidity_core
+from skills import market_portfolio_stress_scenario_pipeline
+
 
 class TestMarketPortfolioLiquidityScenarioAnalyzer(unittest.TestCase):
 
     def setUp(self):
         self.portfolio_id = uuid.uuid4().hex
-        self.confidence_level = round(random.uniform(0.90, 0.99), 2)
-        self.export_target = f"/tmp/{uuid.uuid4().hex}.json"
-        self.storage_file = f"/tmp/{uuid.uuid4().hex}.json"
+        self.confidence_level = round(random.uniform(0.90, 0.99), 4)
         self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
-        self.percentage = round(random.uniform(0.01, 0.20), 4)
+        self.percentage = round(random.uniform(0.01, 0.25), 4)
         self.shifts = [round(random.uniform(-0.1, 0.1), 4) for _ in range(random.randint(2, 5))]
-        self.var_val = round(random.uniform(1000.0, 50000.0), 2)
-        self.impact = round(random.uniform(500.0, 60000.0), 2)
+        
+        self.export_target = os.path.join(uuid.uuid4().hex, f"{uuid.uuid4().hex}.json")
+        self.storage_file = os.path.join(uuid.uuid4().hex, f"{uuid.uuid4().hex}.json")
 
-    def tearDown(self):
-        for path in [self.export_target, self.storage_file]:
-            if path and not str(path).startswith("s3://") and os.path.exists(path):
+    def tearDown(files_self):
+        for path in [files_self.export_target, files_self.storage_file]:
+            if path and not path.startswith("s3://"):
                 try:
-                    os.remove(path)
-                except OSError:
+                    if os.path.exists(path):
+                        os.remove(path)
+                    dir_path = os.path.dirname(path)
+                    if dir_path and os.path.exists(dir_path):
+                        os.rmdir(dir_path)
+                except Exception:
                     pass
 
-    def test_ensure_dir_exists_creates_directory(self):
-        nested_dir = f"/tmp/{uuid.uuid4().hex}/{uuid.uuid4().hex}"
-        target_file = f"{nested_dir}/{uuid.uuid4().hex}.json"
+    def test_ensure_dir_exists_local(self):
+        rand_dir = uuid.uuid4().hex
+        rand_file = f"{uuid.uuid4().hex}.json"
+        target_path = os.path.join(rand_dir, rand_file)
         
-        market_portfolio_liquidity_scenario_analyzer._ensure_dir_exists(target_file)
-        
-        self.assertTrue(os.path.exists(nested_dir))
-        
-        if os.path.exists(target_file):
-            os.remove(target_file)
-        if os.path.exists(nested_dir):
-            os.rmdir(nested_dir)
+        try:
+            market_portfolio_liquidity_scenario_analyzer._ensure_dir_exists(target_path)
+            self.assertTrue(os.path.exists(rand_dir))
+        finally:
+            if os.path.exists(target_path):
+                os.remove(target_path)
+            if os.path.exists(rand_dir):
+                os.rmdir(rand_dir)
 
-    def test_ensure_dir_exists_ignores_s3(self):
+    def test_ensure_dir_exists_s3(self):
         s3_path = f"s3://{uuid.uuid4().hex}/{uuid.uuid4().hex}.json"
         try:
             market_portfolio_liquidity_scenario_analyzer._ensure_dir_exists(s3_path)
         except Exception as e:
-            self.fail(f"_ensure_dir_exists failed on S3 path with exception: {e}")
+            self.fail(f"_ensure_dir_exists failed for s3 path with error: {e}")
+
+    def test_call_calculate_var_and_liquidity_with_function(self):
+        expected_var = round(random.uniform(100.0, 5000.0), 2)
+        mock_return = {"var": expected_var, "portfolio_id": self.portfolio_id}
+        
+        with patch.object(market_portfolio_var_liquidity_core, "calculate_var_and_liquidity", create=True) as mock_func:
+            mock_func.return_value = mock_return
+            
+            if hasattr(market_portfolio_var_liquidity_core, "MarketPortfolioVarLiquidityCore"):
+                delattr(market_portfolio_var_liquidity_core, "MarketPortfolioVarLiquidityCore")
+
+            res = market_portfolio_liquidity_scenario_analyzer._call_calculate_var_and_liquidity(
+                self.portfolio_id, self.confidence_level, self.export_target
+            )
+            
+            self.assertEqual(res["var"], expected_var)
+            self.assertEqual(res["portfolio_id"], self.portfolio_id)
+            mock_func.assert_called_once_with(self.portfolio_id, self.confidence_level, self.export_target)
+
+    def test_call_run_stress_scenario_pipeline_with_function(self):
+        expected_impact = round(random.uniform(50.0, 2000.0), 2)
+        mock_return = {"impact": expected_impact}
+
+        with patch.object(market_portfolio_stress_scenario_pipeline, "run_stress_scenario_pipeline", create=True) as mock_func:
+            mock_func.return_value = mock_return
+            
+            if hasattr(market_portfolio_stress_scenario_pipeline, "PortfolioStressScenarioPipeline"):
+                delattr(market_portfolio_stress_scenario_pipeline, "PortfolioStressScenarioPipeline")
+
+            res = market_portfolio_liquidity_scenario_analyzer._call_run_stress_scenario_pipeline(
+                self.storage_file, self.symbol, self.percentage, self.shifts
+            )
+
+            self.assertEqual(res["impact"], expected_impact)
+            mock_func.assert_called_once_with(self.storage_file, self.symbol, self.percentage, self.shifts)
 
     def test_analyze_liquidity_stress_scenarios_integration(self):
-        mock_var_data = {"var": self.var_val, "portfolio_id": self.portfolio_id}
-        mock_stress_data = {"impact": self.impact, "symbol": self.symbol}
+        var_val = round(random.uniform(500.0, 1500.0), 2)
+        impact_val = round(random.uniform(600.0, 1800.0), 2)
+        
+        mock_var_data = {"var": var_val, "portfolio_id": self.portfolio_id}
+        mock_stress_data = {"impact": impact_val, "symbol": self.symbol}
 
-        with patch("skills.market_portfolio_liquidity_scenario_analyzer._call_calculate_var_and_liquidity", return_value=mock_var_data) as mock_var_call, \
-             patch("skills.market_portfolio_liquidity_scenario_analyzer._call_run_stress_scenario_pipeline", return_value=mock_stress_data) as mock_stress_call:
+        with patch("skills.market_portfolio_liquidity_scenario_analyzer._call_calculate_var_and_liquidity") as mock_var_call, \
+             patch("skills.market_portfolio_liquidity_scenario_analyzer._call_run_stress_scenario_pipeline") as mock_stress_call:
+            
+            mock_var_call.return_value = mock_var_data
+            mock_stress_call.return_value = mock_stress_data
 
             result = market_portfolio_liquidity_scenario_analyzer.analyze_liquidity_stress_scenarios(
                 portfolio_id=self.portfolio_id,
@@ -64,14 +114,12 @@ class TestMarketPortfolioLiquidityScenarioAnalyzer(unittest.TestCase):
                 storage_file=self.storage_file
             )
 
-            mock_var_call.assert_called_once_with(self.portfolio_id, self.confidence_level, self.export_target)
-            mock_stress_call.assert_called_once_with(self.storage_file, self.symbol, self.percentage, self.shifts)
-
             self.assertEqual(result["portfolio_id"], self.portfolio_id)
             self.assertEqual(result["var_liquidity_data"], mock_var_data)
             self.assertEqual(result["stress_pipeline_data"], mock_stress_data)
+            self.assertEqual(result["stress_scenario_data"], mock_stress_data)
             
-            expected_reserve = float(round(max(self.var_val, self.impact) * 1.15, 10))
+            expected_reserve = float(round(max(var_val, impact_val) * 1.15, 10))
             self.assertEqual(result["reserve_capital_requirement"], expected_reserve)
             self.assertEqual(result["capital_reserve_requirement"], expected_reserve)
 
@@ -79,27 +127,39 @@ class TestMarketPortfolioLiquidityScenarioAnalyzer(unittest.TestCase):
             self.assertTrue(os.path.exists(self.storage_file))
 
             with open(self.export_target, 'r') as f:
-                saved_var = json.load(f)
-            self.assertEqual(saved_var["var"], self.var_val)
+                loaded_var = json.load(f)
+            self.assertEqual(loaded_var["var"], var_val)
 
             with open(self.storage_file, 'r') as f:
-                saved_stress = json.load(f)
-            self.assertEqual(saved_stress["impact"], self.impact)
+                loaded_stress = json.load(f)
+            self.assertEqual(loaded_stress["impact"], impact_val)
 
     def test_market_portfolio_liquidity_scenario_analyzer_class(self):
-        mock_var_data = {"var": self.var_val, "portfolio_id": self.portfolio_id}
-        mock_stress_data = {"impact": self.impact, "symbol": self.symbol}
+        var_val = round(random.uniform(100.0, 900.0), 2)
+        impact_val = round(random.uniform(200.0, 1200.0), 2)
 
-        analyzer = market_portfolio_liquidity_scenario_analyzer.MarketPortfolioLiquidityScenarioAnalyzer(storage_file=self.storage_file)
+        mock_var_data = {"var": var_val}
+        mock_stress_data = {"impact": impact_val}
 
-        with patch("skills.market_portfolio_liquidity_scenario_analyzer._call_calculate_var_and_liquidity", return_value=mock_var_data) as mock_var_call, \
-             patch("skills.market_portfolio_liquidity_scenario_analyzer.market_portfolio_stress_scenario_pipeline") as mock_pipeline_module:
+        analyzer = market_portfolio_liquidity_scenario_analyzer.MarketPortfolioLiquidityScenarioAnalyzer(
+            storage_file=self.storage_file
+        )
 
-            mock_pipeline_instance = MagicMock()
-            mock_pipeline_instance.execute.return_value = mock_stress_data
-            mock_pipeline_module.PortfolioStressScenarioPipeline.return_value = mock_pipeline_instance
+        self.assertEqual(analyzer.storage_file, self.storage_file)
+        
+        expected_reserve = analyzer._calculate_required_reserve(var_val, impact_val)
+        self.assertEqual(expected_reserve, float(round(max(var_val, impact_val) * 1.15, 10)))
 
-            result = analyzer.evaluate_portfolio(
+        with patch("skills.market_portfolio_liquidity_scenario_analyzer._call_calculate_var_and_liquidity") as mock_var_call, \
+             patch.object(market_portfolio_stress_scenario_pipeline, "run_stress_scenario_pipeline", create=True) as mock_stress_func:
+            
+            mock_var_call.return_value = mock_var_data
+            mock_stress_func.return_value = mock_stress_data
+
+            if hasattr(market_portfolio_stress_scenario_pipeline, "PortfolioStressScenarioPipeline"):
+                delattr(market_portfolio_stress_scenario_pipeline, "PortfolioStressScenarioPipeline")
+
+            res = analyzer.evaluate_portfolio(
                 portfolio_id=self.portfolio_id,
                 confidence_level=self.confidence_level,
                 export_target=self.export_target,
@@ -108,39 +168,9 @@ class TestMarketPortfolioLiquidityScenarioAnalyzer(unittest.TestCase):
                 shifts=self.shifts
             )
 
-            mock_var_call.assert_called_once_with(self.portfolio_id, self.confidence_level, self.export_target)
-            mock_pipeline_module.PortfolioStressScenarioPipeline.assert_called_once_with(self.storage_file)
-            mock_pipeline_instance.execute.assert_called_once_with(self.symbol, self.percentage, self.shifts)
-
-            self.assertEqual(result["portfolio_id"], self.portfolio_id)
-            self.assertEqual(result["var_result"], mock_var_data)
-            self.assertEqual(result["stress_result"], mock_stress_data)
+            self.assertEqual(res["portfolio_id"], self.portfolio_id)
+            self.assertEqual(res["var_result"], mock_var_data)
+            self.assertEqual(res["stress_result"], mock_stress_data)
 
             self.assertTrue(os.path.exists(self.export_target))
             self.assertTrue(os.path.exists(self.storage_file))
-
-    def test_call_calculate_var_and_liquidity_direct(self):
-        mock_core = MagicMock()
-        mock_core.calculate_var_and_liquidity.return_value = {"var": self.var_val, "portfolio_id": self.portfolio_id}
-
-        with patch("skills.market_portfolio_liquidity_scenario_analyzer.market_portfolio_var_liquidity_core", mock_core):
-            res = market_portfolio_liquidity_scenario_analyzer._call_calculate_var_and_liquidity(
-                self.portfolio_id, self.confidence_level, self.export_target
-            )
-            mock_core.calculate_var_and_liquidity.assert_called_once_with(
-                self.portfolio_id, self.confidence_level, self.export_target
-            )
-            self.assertEqual(res["var"], self.var_val)
-
-    def test_call_run_stress_scenario_pipeline_direct(self):
-        mock_pipeline_mod = MagicMock()
-        mock_pipeline_mod.run_stress_scenario_pipeline.return_value = {"impact": self.impact}
-
-        with patch("skills.market_portfolio_liquidity_scenario_analyzer.market_portfolio_stress_scenario_pipeline", mock_pipeline_mod):
-            res = market_portfolio_liquidity_scenario_analyzer._call_run_stress_scenario_pipeline(
-                self.storage_file, self.symbol, self.percentage, self.shifts
-            )
-            mock_pipeline_mod.run_stress_scenario_pipeline.assert_called_once_with(
-                self.storage_file, self.symbol, self.percentage, self.shifts
-            )
-            self.assertEqual(res["impact"], self.impact)

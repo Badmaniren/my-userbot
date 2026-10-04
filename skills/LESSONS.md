@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-в: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_audit_visualizer (refactor) — раундов: 1
+: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_macro_regime_shift_detector (create) — раундов: 4
@@ -270,6 +267,9 @@
 
 ## market_portfolio_stress_scenario_pipeline (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=2)
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_scenario_pipeline (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_scenario_pipeline (refactor) — раундов: 1

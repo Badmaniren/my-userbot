@@ -37,3 +37,10 @@ class MarketPortfolioIntegrationHub:
 
     def run_full_integration_pipeline(self, symbol, url, telegram_token, chat_id, shifts):
         return self.process_and_export(url, symbol, shifts, telegram_token, chat_id)
+
+
+def process_integration_payload(payload):
+    return {
+        "status": "processed",
+        "payload": payload
+    }

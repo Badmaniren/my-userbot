@@ -25,13 +25,13 @@ except ImportError:
         def __init__(self, storage_file: str):
             self.storage_file = storage_file
 
-        def export_audit_logs(self, export_path: str) -> bool:
+        def export_audit_logs(self, export_path: str) -> Any:
             return True
 
         def get_audit_stream_summary(self) -> Dict[str, Any]:
             return {"total_records": 0}
 
-        def verify_log_integrity(self) -> bool:
+        def verify_log_integrity(self) -> Any:
             return True
 
 
@@ -78,7 +78,7 @@ class MarketPortfolioAuditComplianceHub:
                 except OSError:
                     pass
 
-    def run_compliance_export(self, export_path: str) -> bool:
+    def run_compliance_export(self, export_path: str) -> Any:
         if not export_path or not isinstance(export_path, str):
             raise ValueError("export_path must be a non-empty string")
 
@@ -95,12 +95,12 @@ class MarketPortfolioAuditComplianceHub:
                 with open(export_path, "w", encoding="utf-8") as f:
                     f.write("{}")
             return True
-        return bool(res)
+        return res
 
-    def export_audit_logs(self, export_path: str) -> bool:
+    def export_audit_logs(self, export_path: str) -> Any:
         return self.run_compliance_export(export_path)
 
-    def check_compliance_integrity(self) -> bool:
+    def check_compliance_integrity(self) -> Any:
         if self.storage_file and isinstance(self.storage_file, str) and not os.path.exists(self.storage_file):
             try:
                 with open(self.storage_file, "w", encoding="utf-8") as f:
@@ -111,9 +111,9 @@ class MarketPortfolioAuditComplianceHub:
         res = self.audit_exporter.verify_log_integrity()
         if res is None:
             return True
-        return bool(res)
+        return res
 
-    def verify_log_integrity(self) -> bool:
+    def verify_log_integrity(self) -> Any:
         return self.check_compliance_integrity()
 
     def fetch_compliance_summary(self) -> Dict[str, Any]:
@@ -122,13 +122,13 @@ class MarketPortfolioAuditComplianceHub:
     def get_audit_stream_summary(self) -> Dict[str, Any]:
         return self.fetch_compliance_summary()
 
-    def process_audit_stream_data(self, export_path: str, stream: Any) -> bool:
+    def process_audit_stream_data(self, export_path: str, stream: Any) -> Any:
         res = self.audit_exporter.process_audit_stream(export_path, stream)
-        return True if res is None else bool(res)
+        return True if res is None else res
 
-    def generate_compliance_log(self, export_path: str) -> bool:
+    def generate_compliance_log(self, export_path: str) -> Any:
         res = self.audit_exporter.generate_audit_log(export_path)
-        return True if res is None else bool(res)
+        return True if res is None else res
 
     def audit_fetch_market_price(self, url: str) -> float:
         if not url or not isinstance(url, str):

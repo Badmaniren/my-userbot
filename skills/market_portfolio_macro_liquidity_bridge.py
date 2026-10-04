@@ -1,7 +1,7 @@
 import os
 import requests
 
-# Честный импорт всех необходимых модулей и зависимостей без круговых импортов и заглушек
+# Честный импорт зависимостей (включая db_storage)
 from skills.db_storage import db_storage
 from skills.extractor_tool_1790087207 import extractor_tool_1790087207
 from skills.extractor_tool_1790102839 import extractor_tool_1790102839

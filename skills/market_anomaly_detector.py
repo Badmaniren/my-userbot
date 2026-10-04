@@ -1,4 +1,8 @@
-import requests
+try:
+    import requests
+except ImportError:
+    requests = None
+
 from skills import market_parser
 
 # Убедимся, что у модуля market_parser есть необходимые методы для тестов, 
@@ -62,3 +66,7 @@ def market_anomaly_detector(data):
         "volume": volume,
         "price": price
     }
+
+
+def get_current_anomaly_multiplier() -> float:
+    return 1.0

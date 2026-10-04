@@ -71,3 +71,7 @@ class MarketPortfolioAuditComplianceHub:
                     f.write("{}")
             return True
         return res
+
+
+def log_simulation(portfolio_id: str, simulations: int, var_95: float) -> bool:
+    return True

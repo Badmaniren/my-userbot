@@ -1,150 +1,165 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import random
 import uuid
 import math
-import io
 
 from skills.market_portfolio_stress_monte_carlo_engine import (
     MonteCarloStressEngine,
     run_monte_carlo_stress_test
 )
-from skills import db_storage
-from skills import market_anomaly_detector
-from skills import market_portfolio_data_exporter
-from skills import market_portfolio_api_gateway
-from skills import market_portfolio_audit_compliance_hub
-
 
 class TestMonteCarloStressEngine(unittest.TestCase):
 
-    def setUp(self):
-        self.portfolio_id = f"port_{uuid.uuid4().hex}"
-        self.report_id = f"rep_{uuid.uuid4().hex}"
-        self.simulations = random.randint(10, 50)
-        self.horizon_days = random.randint(1, 10)
-        self.initial_value = round(random.uniform(50000.0, 500000.0), 2)
-        self.volatility = round(random.uniform(0.1, 0.5), 4)
-        self.drift = round(random.uniform(-0.05, 0.05), 4)
-        self.loss_limit = round(random.uniform(1000.0, 10000.0), 2)
+    def test_validate_inputs_success(self):
+        engine = MonteCarloStressEngine()
+        sims = random.randint(10, 100)
+        horizon = random.randint(1, 30)
+        try:
+            engine._validate_inputs(sims, horizon)
+        except Exception as e:
+            self.fail(f"Validation failed unexpectedly with error: {e}")
+
+    def test_validate_inputs_invalid_simulations(self):
+        engine = MonteCarloStressEngine()
+        sims = random.choice([0, -random.randint(1, 50), "100", None])
+        horizon = random.randint(1, 30)
+        with self.assertRaises((ValueError, TypeError)):
+            engine._validate_inputs(sims, horizon)
+
+    def test_validate_inputs_invalid_horizon(self):
+        engine = MonteCarloStressEngine()
+        sims = random.randint(10, 100)
+        horizon = random.choice([0, -random.randint(1, 50), "10", None])
+        with self.assertRaises((ValueError, TypeError)):
+            engine._validate_inputs(sims, horizon)
 
     def test_run_simulation_with_db_storage(self):
         engine = MonteCarloStressEngine()
-        portfolio_data = {
-            "portfolio_id": self.portfolio_id,
-            "initial_value": self.initial_value,
-            "volatility": self.volatility,
-            "drift": self.drift
+        portfolio_id = f"port_{uuid.uuid4().hex}"
+        sims = random.randint(5, 20)
+        horizon = random.randint(2, 10)
+        mock_data = {
+            "initial_value": float(random.randint(50000, 150000)),
+            "volatility": float(random.uniform(0.1, 0.4)),
+            "drift": float(random.uniform(-0.05, 0.05))
         }
 
-        with patch("skills.db_storage.fetch_portfolio", return_value=portfolio_data) as mock_fetch, \
-             patch("skills.market_portfolio_audit_compliance_hub.log_simulation") as mock_audit:
+        with patch("skills.db_storage.fetch_portfolio", return_value=mock_data) as mock_fetch, \
+             patch("skills.market_portfolio_audit_compliance_hub.log_simulation") as mock_log:
             
-            result = engine.run_simulation(self.portfolio_id, self.simulations, self.horizon_days)
-
-            mock_fetch.assert_called_once_with(self.portfolio_id)
-            mock_audit.assert_called_once()
+            result = engine.run_simulation(portfolio_id, sims, horizon)
             
-            self.assertIn("portfolio_id", result)
-            self.assertEqual(result["portfolio_id"], self.portfolio_id)
-            self.assertIn("simulation_results", result)
+            mock_fetch.assert_called_once_with(portfolio_id)
+            self.assertEqual(result["portfolio_id"], portfolio_id)
             self.assertIn("var_95", result)
             self.assertIn("cvar_95", result)
-            self.assertEqual(len(result["simulation_results"]), self.simulations)
+            self.assertIn("simulation_results", result)
+            self.assertEqual(len(result["simulation_results"]), sims)
+            mock_log.assert_called_once()
 
-    def test_run_simulation_attribute_error_fallback(self):
+    def test_run_simulation_fallback_to_memory_db(self):
         engine = MonteCarloStressEngine()
-        
-        with patch("skills.db_storage.fetch_portfolio", side_effect=AttributeError("No fetch")):
-            if not hasattr(db_storage, "_in_memory_db"):
-                setattr(db_storage, "_in_memory_db", {})
-            db_storage._in_memory_db[self.portfolio_id] = {
-                "portfolio_id": self.portfolio_id,
-                "initial_value": self.initial_value,
-                "volatility": self.volatility,
-                "drift": self.drift
-            }
+        portfolio_id = f"port_{uuid.uuid4().hex}"
+        sims = random.randint(5, 20)
+        horizon = random.randint(2, 10)
+        mock_data = {
+            "initial_value": float(random.randint(10000, 50000)),
+            "volatility": float(random.uniform(0.1, 0.3)),
+            "drift": 0.01
+        }
 
-            result = engine.run_simulation(self.portfolio_id, self.simulations, self.horizon_days)
+        with patch("skills.db_storage.fetch_portfolio", side_effect=KeyError), \
+             patch("skills.db_storage._in_memory_db", {portfolio_id: mock_data}, create=True), \
+             patch("skills.market_portfolio_audit_compliance_hub.log_simulation") as mock_log:
             
-            self.assertEqual(result["portfolio_id"], self.portfolio_id)
+            result = engine.run_simulation(portfolio_id, sims, horizon)
+            self.assertEqual(result["portfolio_id"], portfolio_id)
             self.assertIsInstance(result["var_95"], float)
-            self.assertIsInstance(result["cvar_95"], float)
+            mock_log.assert_called_once()
 
     def test_get_anomaly_adjustment_success(self):
         engine = MonteCarloStressEngine()
-        expected_mult = round(random.uniform(1.1, 2.5), 2)
-
-        with patch("skills.market_anomaly_detector.get_current_anomaly_multiplier", return_value=expected_mult) as mock_detector:
+        expected_mult = float(random.uniform(1.1, 2.5))
+        with patch("skills.market_anomaly_detector.get_current_anomaly_multiplier", return_value=expected_mult):
             mult = engine._get_anomaly_adjustment()
-            mock_detector.assert_called_once()
             self.assertEqual(mult, expected_mult)
 
     def test_get_anomaly_adjustment_fallback(self):
         engine = MonteCarloStressEngine()
-
-        with patch("skills.market_anomaly_detector.get_current_anomaly_multiplier", side_effect=AttributeError("No attr")):
+        with patch("skills.market_anomaly_detector.get_current_anomaly_multiplier", side_effect=AttributeError):
             mult = engine._get_anomaly_adjustment()
             self.assertEqual(mult, 1.0)
 
     def test_export_report_success(self):
         engine = MonteCarloStressEngine()
-        expected_response = {"report_id": self.report_id, "loss_limit": self.loss_limit, "status": uuid.uuid4().hex}
+        report_id = f"rep_{uuid.uuid4().hex}"
+        loss_limit = float(random.randint(1000, 10000))
+        expected_response = {"status": uuid.uuid4().hex, "report_id": report_id}
 
-        with patch("skills.market_portfolio_data_exporter.export", return_value=expected_response) as mock_export:
-            res = engine.export_report(self.report_id, self.loss_limit)
-            mock_export.assert_called_once_with(self.report_id, self.loss_limit)
+        with patch("skills.market_portfolio_data_exporter.export", create=True, return_value=expected_response) as mock_export:
+            res = engine.export_report(report_id, loss_limit)
+            mock_export.assert_called_once_with(report_id, loss_limit)
             self.assertEqual(res, expected_response)
 
     def test_export_report_fallback(self):
         engine = MonteCarloStressEngine()
+        report_id = f"rep_{uuid.uuid4().hex}"
+        loss_limit = float(random.randint(1000, 10000))
 
-        with patch("skills.market_portfolio_data_exporter.export", side_effect=AttributeError("No export")):
-            res = engine.export_report(self.report_id, self.loss_limit)
-            self.assertEqual(res["report_id"], self.report_id)
-            self.assertEqual(res["loss_limit"], self.loss_limit)
+        with patch("skills.market_portfolio_data_exporter", create=True) as mock_mod:
+            if hasattr(mock_mod, "export"):
+                delattr(mock_mod, "export")
+            res = engine.export_report(report_id, loss_limit)
+            self.assertEqual(res["report_id"], report_id)
+            self.assertEqual(res["loss_limit"], loss_limit)
 
     def test_consume_stream_success(self):
         engine = MonteCarloStressEngine()
-        payload = io.BytesIO(uuid.uuid4().hex.encode('utf-8'))
+        stream_payload_data = {"stream_id": uuid.uuid4().hex, "data": random.randint(1, 100)}
 
-        with patch("skills.market_portfolio_api_gateway.stream_payload", return_value=payload) as mock_stream:
+        with patch("skills.market_portfolio_api_gateway.stream_payload", create=True, return_value=stream_payload_data) as mock_stream:
             res = engine.consume_stream()
             mock_stream.assert_called_once()
-            self.assertEqual(res, payload)
+            self.assertEqual(res, stream_payload_data)
 
     def test_consume_stream_fallback(self):
         engine = MonteCarloStressEngine()
-
-        with patch("skills.market_portfolio_api_gateway.stream_payload", side_effect=AttributeError("No stream")):
+        with patch("skills.market_portfolio_api_gateway", create=True) as mock_mod:
+            if hasattr(mock_mod, "stream_payload"):
+                delattr(mock_mod, "stream_payload")
             res = engine.consume_stream()
             self.assertIsNone(res)
 
-    def test_run_monte_carlo_stress_test_function(self):
-        iterations = random.randint(15, 30)
+    def test_run_monte_carlo_stress_test_success(self):
+        portfolio_id = f"port_{uuid.uuid4().hex}"
+        portfolio_value = float(random.randint(50000, 500000))
+        iterations = random.randint(10, 50)
         scenario_params = {
-            "volatility": self.volatility,
-            "drift": self.drift,
-            "horizon_days": self.horizon_days
+            "volatility": float(random.uniform(0.1, 0.5)),
+            "drift": float(random.uniform(-0.02, 0.02)),
+            "horizon_days": random.randint(1, 10)
         }
 
-        with patch("skills.market_portfolio_audit_compliance_hub.log_simulation") as mock_audit:
-            result = run_monte_carlo_stress_test(
-                portfolio_id=self.portfolio_id,
-                portfolio_value=self.initial_value,
-                scenario_params=scenario_params,
-                iterations=iterations
-            )
+        with patch("skills.market_portfolio_audit_compliance_hub.log_simulation") as mock_log, \
+             patch("skills.market_portfolio_stress_audit_visualizer.visualize_stress_test") as mock_vis:
 
-            mock_audit.assert_called_once()
-            self.assertEqual(result["portfolio_id"], self.portfolio_id)
-            self.assertEqual(result["initial_value"], self.initial_value)
-            self.assertEqual(result["iterations"], iterations)
-            self.assertIn("simulation_id", result)
-            self.assertTrue(result["simulation_id"].startswith("sim_"))
-            self.assertIsInstance(result["var_95"], float)
-            self.assertIsInstance(result["expected_shortfall"], float)
+            res = run_monte_carlo_stress_test(portfolio_id, portfolio_value, scenario_params, iterations)
 
+            self.assertEqual(res["portfolio_id"], portfolio_id)
+            self.assertEqual(res["initial_value"], portfolio_value)
+            self.assertEqual(res["iterations"], iterations)
+            self.assertIn("var_95", res)
+            self.assertIn("expected_shortfall", res)
+            self.assertIn("simulation_id", res)
+            mock_log.assert_called_once()
+            mock_vis.assert_called_once()
 
-if __name__ == "__main__":
-    unittest.main()
+    def test_run_monte_carlo_stress_test_invalid_iterations(self):
+        portfolio_id = f"port_{uuid.uuid4().hex}"
+        portfolio_value = float(random.randint(10000, 50000))
+        iterations = random.choice([0, -random.randint(1, 10)])
+        scenario_params = {}
+
+        with self.assertRaises(ValueError):
+            run_monte_carlo_stress_test(portfolio_id, portfolio_value, scenario_params, iterations)

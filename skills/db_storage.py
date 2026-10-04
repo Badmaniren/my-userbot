@@ -1,6 +1,13 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 
 class MarketParser:
@@ -55,3 +62,12 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+_in_memory_db = {}
+
+
+def fetch_portfolio(portfolio_id: str):
+    if portfolio_id in _in_memory_db:
+        return _in_memory_db[portfolio_id]
+    raise KeyError(f"Portfolio {portfolio_id} not found in db_storage")

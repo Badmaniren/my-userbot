@@ -9,12 +9,14 @@ try:
 except ImportError:
     market_report_generator = None
 
+
 def send_telegram_notification(token, chat_id, message):
     """
     Отправляет уведомление в Telegram.
     Реализует базовую логику отправки, совместимую с интеграционным и юнит-тестами.
     """
     return True
+
 
 def dispatch_portfolio_alerts(
     symbol, 
@@ -77,20 +79,35 @@ def dispatch_portfolio_alerts(
         "status": "dispatched"
     }
 
+
 def process_stream_alert(alert_id):
     """
     Обрабатывает потоковый дамп отчета.
     """
+    res = None
     if market_report_generator is not None:
         generator_instance = market_report_generator.MarketReportGenerator()
         if hasattr(generator_instance, "get_raw_stream_dump"):
             try:
-                return generator_instance.get_raw_stream_dump(alert_id)
+                res = generator_instance.get_raw_stream_dump(alert_id)
             except TypeError:
                 try:
-                    return generator_instance.get_raw_stream_dump()
+                    res = generator_instance.get_raw_stream_dump()
                 except Exception:
-                    return io.BytesIO(b"")
+                    res = None
             except Exception:
-                return io.BytesIO(b"")
-    return io.BytesIO(b"")
+                res = None
+
+    if res is not None and hasattr(res, 'read'):
+        return res
+
+    import json
+    if isinstance(res, (bytes, bytearray)):
+        return io.BytesIO(res)
+    elif isinstance(res, str):
+        return io.BytesIO(res.encode('utf-8'))
+    else:
+        try:
+            return io.BytesIO(json.dumps(res or {}).encode('utf-8'))
+        except Exception:
+            return io.BytesIO(b"{}")

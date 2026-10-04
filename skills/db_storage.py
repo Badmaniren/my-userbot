@@ -185,30 +185,26 @@ class MarketParser:
     def __init__(self, storage_file: str = "market_data.db"):
         self.storage_file = storage_file
 
-    def fetch_price(self, url: str):
+    def fetch_price(self, url: str, symbol: Optional[str] = None):
         if requests is None:
-            return None
-        try:
-            response = requests.get(url, timeout=10)
-            data = response.json()
+            raise RuntimeError("requests library is not available")
+        response = requests.get(url, timeout=10)
+        data = response.json()
+        if isinstance(data, dict):
             return data.get("price")
-        except Exception:
-            return None
+        return data
 
     def parse_html_prices(self, url: str):
         if requests is None or BeautifulSoup is None:
             return None
-        try:
-            response = requests.get(url, timeout=10)
-            soup = BeautifulSoup(response.text, 'html.parser')
-            element = soup.find()
-            if element and element.text:
-                try:
-                    return float(element.text)
-                except (ValueError, TypeError):
-                    return None
-        except Exception:
-            return None
+        response = requests.get(url, timeout=10)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        element = soup.find()
+        if element and element.text:
+            try:
+                return float(element.text)
+            except (ValueError, TypeError):
+                return None
         return None
 
     def fetch_and_store(self, symbol: str, price: float):
@@ -243,9 +239,6 @@ class MarketParser:
                 conn.close()
             return data
         else:
-            import os
-            if os.path.exists(filename):
-                with open(filename, 'rb') as f:
-                    lines = f.readlines()
-                    return [line.decode('utf-8') for line in lines]
-            return []
+            with open(filename, 'rb') as f:
+                lines = f.readlines()
+                return [line.decode('utf-8') for line in lines]

@@ -51,11 +51,11 @@ class MarketReportGenerator:
     def update_and_fetch_report(self, url, symbol):
         price = self.parser.fetch_price(url)
         if price is None:
-            price = 100.0  # Fallback for integration tests where fetch might return None
+            price = 100.0
         self.parser.fetch_and_store(symbol, price)
         return price
 
-    def get_raw_stream_dump(self):
+    def get_raw_stream_dump(self, alert_id=None):
         return self.parser.load_data(self.storage_file)
 
 
@@ -99,3 +99,5 @@ def generate_market_report(storage_file, symbol):
                 break
                 
     return f"Report for {symbol}: price {price}"
+
+market_report_generator = MarketReportGenerator

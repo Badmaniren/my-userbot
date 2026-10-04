@@ -28,18 +28,30 @@ class MarketParser:
                 return {"raw": data}
         return {"data": data}
 
-    def fetch_price(self, url):
+    def fetch_price(self, url, symbol=None):
         if requests is None:
-            return None
+            raise RuntimeError("requests library is not available")
         try:
             response = requests.get(url, timeout=10)
-            try:
-                data = response.json()
-                return data
-            except ValueError as e:
-                return {"error": str(e)}
-        except requests.exceptions.RequestException:
+        except Exception:
             return None
+
+        try:
+            data = response.json()
+        except ValueError as e:
+            return {"error": str(e)}
+        except Exception:
+            return None
+
+        if isinstance(data, dict):
+            if symbol and symbol in data:
+                symbol_val = data[symbol]
+                if isinstance(symbol_val, dict):
+                    return symbol_val.get("price", 0.0)
+                return symbol_val
+            if "price" in data and len(data) == 1:
+                return data.get("price")
+        return data
 
     def parse_html_prices(self, url):
         if requests is None or BeautifulSoup is None:
@@ -69,8 +81,10 @@ class MarketParser:
         if self.storage_file and os.path.exists(self.storage_file):
             try:
                 with open(self.storage_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-            except (json.JSONDecodeError, OSError):
+                    loaded = json.load(f)
+                    if isinstance(loaded, dict):
+                        data = loaded
+            except Exception:
                 data = {}
 
         data[symbol] = {
@@ -85,10 +99,33 @@ class MarketParser:
         return record_id
 
     def load_data(self, filename):
-        if os.path.exists(filename):
-            with open(filename, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        return {}
+        if not filename or not os.path.exists(filename):
+            return {}
+        if filename.endswith('.db'):
+            try:
+                import sqlite3
+                conn = sqlite3.connect(filename)
+                cursor = conn.cursor()
+                try:
+                    cursor.execute('SELECT symbol, price FROM market_data')
+                    rows = cursor.fetchall()
+                    data = [f"{row[0]},{row[1]}\n" for row in rows]
+                finally:
+                    conn.close()
+                return data
+            except Exception:
+                return {}
+        else:
+            with open(filename, 'rb') as f:
+                content = f.read()
+                try:
+                    decoded = content.decode('utf-8')
+                    try:
+                        return json.loads(decoded)
+                    except Exception:
+                        return [line + '\n' for line in decoded.splitlines()]
+                except Exception:
+                    raise UnicodeDecodeError("utf-8", content, 0, 1, "invalid utf-8")
 
 
 market_parser = MarketParser

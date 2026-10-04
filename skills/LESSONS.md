@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-folio_stress_reporter (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_reporter (refactor) — раундов: 1
+_reporter (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_autonomous_sentinel (refactor) — раундов: 4
@@ -264,3 +261,6 @@ folio_stress_reporter (refactor) — раундов: 1
 ## market_portfolio_liquidity_scenario_analyzer (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/skills/market_portfolio_liquidity_scenario_analyzer.py", line 107, in evaluate_portfolio
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_liquidity_scenario_analyzer (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

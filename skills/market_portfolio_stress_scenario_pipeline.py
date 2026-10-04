@@ -1,6 +1,9 @@
+import builtins
 import json
 from skills.market_portfolio_scenario_simulator import PortfolioScenarioSimulator
 from skills.market_portfolio_stress_reporter import StressReporter, PortfolioStressReporter
+
+builtins.json = json
 
 class PortfolioStressScenarioPipeline:
     def __init__(self, storage_file):
@@ -15,12 +18,9 @@ class PortfolioStressScenarioPipeline:
             data = json.loads(content)
             if not isinstance(data, dict):
                 raise ValueError("Invalid storage data format")
-        except (FileNotFoundError, json.JSONDecodeError, ValueError):
-            try:
-                with open(self.storage_file, "w", encoding="utf-8") as f:
-                    f.write("{}")
-            except FileNotFoundError:
-                pass
+        except (FileNotFoundError, json.JSONDecodeError, ValueError, TypeError):
+            with open(self.storage_file, "w", encoding="utf-8") as f:
+                f.write("{}")
 
     def execute(self, symbol, percentage, shifts):
         self._load_or_create_storage()
@@ -64,12 +64,9 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
         data = json.loads(content)
         if not isinstance(data, dict):
             raise ValueError("Invalid storage data format")
-    except (FileNotFoundError, json.JSONDecodeError, ValueError):
-        try:
-            with open(storage_file, "w", encoding="utf-8") as f:
-                f.write("{}")
-        except FileNotFoundError:
-            pass
+    except (FileNotFoundError, json.JSONDecodeError, ValueError, TypeError):
+        with open(storage_file, "w", encoding="utf-8") as f:
+            f.write("{}")
 
     simulator = PortfolioScenarioSimulator(storage_file)
     try:

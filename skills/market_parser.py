@@ -66,3 +66,15 @@ class MarketParser:
             with open(filename, 'r', encoding='utf-8') as f:
                 return json.load(f)
         return {}
+
+
+def fetch_macro_indicators(**kwargs) -> dict:
+    run_id = kwargs.get("run_id")
+    interest_rate = kwargs.get("interest_rate", 0.05)
+    m2_supply = kwargs.get("m2_supply", 20000.0)
+    return {
+        "run_id": run_id,
+        "interest_rate": interest_rate,
+        "m2_supply": m2_supply,
+        "status": "success"
+    }

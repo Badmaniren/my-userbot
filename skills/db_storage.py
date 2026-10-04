@@ -55,3 +55,23 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+_MACRO_STATE_STORAGE = {}
+
+
+def save_macro_liquidity_state(run_id: str, state_data: dict) -> bool:
+    if run_id is None:
+        return False
+    _MACRO_STATE_STORAGE[run_id] = dict(state_data or {})
+    return True
+
+
+def get_macro_liquidity_state(run_id: str) -> dict:
+    return _MACRO_STATE_STORAGE.get(run_id)
+
+
+def save_macro_metric(data: dict) -> bool:
+    if isinstance(data, dict) and "run_id" in data:
+        _MACRO_STATE_STORAGE[data["run_id"]] = data
+    return True

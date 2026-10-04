@@ -50,3 +50,12 @@ class market_portfolio_var_liquidity_core:
             confidence_level=confidence_level,
             export_target=export_target
         )
+
+
+def calculate_var_liquidity(portfolio_size: float = 100000.0, liquidity_multiplier: float = 1.0, **kwargs) -> dict:
+    var_value = round((portfolio_size * 0.05) * liquidity_multiplier, 2)
+    return {
+        "portfolio_size": portfolio_size,
+        "liquidity_multiplier": liquidity_multiplier,
+        "var_value": var_value
+    }

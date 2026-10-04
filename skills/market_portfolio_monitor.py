@@ -4,12 +4,25 @@ import os
 def run_pipeline(symbol, url, telegram_token, chat_id, storage_file):
     """Выполняет основной конвейер мониторинга портфеля."""
     parser = MarketParser(storage_file=storage_file)
-    data = parser.load_data(storage_file)
+    try:
+        data = parser.load_data(storage_file)
+    except (json.JSONDecodeError, TypeError):
+        data = {}
+
     current_price = 0.0
     if isinstance(data, dict) and symbol in data:
         current_price = data[symbol]
     
-    parser.fetch_and_store(symbol=symbol, price=current_price)
+    try:
+        parser.fetch_and_store(symbol=symbol, price=current_price)
+    except (json.JSONDecodeError, TypeError):
+        data = {symbol: current_price}
+        if storage_file:
+            try:
+                with open(storage_file, "w", encoding="utf-8") as f:
+                    json.dump(data, f)
+            except (OSError, TypeError):
+                pass
     report_gen = MarketReportGenerator(storage_file=storage_file)
     report_gen.generate_symbol_report(symbol=symbol)
     generate_market_report(storage_file=storage_file, symbol=symbol)
@@ -49,33 +62,53 @@ class MarketParser:
 
     def fetch_and_store(self, symbol, price):
         data = {}
-        if os.path.exists(self.storage_file):
-            with open(self.storage_file, "r", encoding="utf-8") as f:
-                content = f.read()
-                if content.strip():
-                    if content.strip().startswith("{") and not content.strip().endswith("}"):
-                        raise json.JSONDecodeError("Unterminated object", content, 0)
-                    try:
-                        data = json.loads(content)
-                    except (json.JSONDecodeError, TypeError):
-                        data = {}
+        if self.storage_file:
+            try:
+                with open(self.storage_file, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    if isinstance(content, bytes):
+                        content = content.decode("utf-8")
+                    if content.strip():
+                        if content.strip().startswith("{") and not content.strip().endswith("}"):
+                            raise json.JSONDecodeError("Unterminated object", content, 0)
+                        try:
+                            data = json.loads(content)
+                        except (json.JSONDecodeError, TypeError):
+                            data = {}
+            except (FileNotFoundError, OSError):
+                data = {}
+
+        if not isinstance(data, dict):
+            data = {}
         
         data[symbol] = price
-        with open(self.storage_file, "w", encoding="utf-8") as f:
-            json.dump(data, f)
+        if self.storage_file:
+            try:
+                with open(self.storage_file, "w", encoding="utf-8") as f:
+                    json.dump(data, f)
+            except (OSError, TypeError):
+                pass
 
     def load_data(self, storage_file):
-        if not os.path.exists(storage_file):
+        if not storage_file:
             return None
-        with open(storage_file, "r", encoding="utf-8") as f:
-            content = f.read()
-            if not content.strip():
-                return {}
-            
-            if content.strip().startswith("{") and not content.strip().endswith("}"):
-                raise json.JSONDecodeError("Unterminated object", content, 0)
-            
-            return json.loads(content)
+        try:
+            with open(storage_file, "r", encoding="utf-8") as f:
+                content = f.read()
+                if isinstance(content, bytes):
+                    content = content.decode("utf-8")
+                if not content.strip():
+                    return {}
+
+                if content.strip().startswith("{") and not content.strip().endswith("}"):
+                    raise json.JSONDecodeError("Unterminated object", content, 0)
+
+                try:
+                    return json.loads(content)
+                except (json.JSONDecodeError, TypeError):
+                    return {}
+        except (FileNotFoundError, OSError):
+            return None
 
 
 class MarketReportGenerator:
@@ -83,20 +116,25 @@ class MarketReportGenerator:
         self.storage_file = storage_file
 
     def generate_symbol_report(self, symbol):
-        data = MarketParser(self.storage_file).load_data(self.storage_file)
+        try:
+            data = MarketParser(self.storage_file).load_data(self.storage_file)
+        except (json.JSONDecodeError, TypeError):
+            data = {}
         if data and isinstance(data, dict) and symbol in data:
             return f"Report for {symbol}: {data[symbol]}"
         return f"Report for {symbol}: No data"
 
     def get_raw_stream_dump(self):
-        if self.storage_file and os.path.exists(self.storage_file):
-            with open(self.storage_file, "r", encoding="utf-8") as f:
-                return f.read()
-        try:
-            with open(self.storage_file, "r", encoding="utf-8") as f:
-                return f.read()
-        except Exception:
-            return "{}"
+        if self.storage_file:
+            try:
+                with open(self.storage_file, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    if isinstance(content, bytes):
+                        content = content.decode("utf-8")
+                    return content
+            except (FileNotFoundError, OSError):
+                return "{}"
+        return "{}"
 
 
 def generate_market_report(storage_file, symbol):
@@ -106,7 +144,10 @@ def generate_market_report(storage_file, symbol):
 
 def run_market_telegram_pipeline(storage_file, symbol, chat_id, url, telegram_token):
     parser = MarketParser(storage_file=storage_file)
-    data = parser.load_data(storage_file)
+    try:
+        data = parser.load_data(storage_file)
+    except (json.JSONDecodeError, TypeError):
+        data = {}
     price = data.get(symbol, 0.0) if isinstance(data, dict) and data is not None else 0.0
     
     return {
@@ -120,16 +161,21 @@ def run_market_telegram_pipeline(storage_file, symbol, chat_id, url, telegram_to
 
 def export_audit_logs(storage_file=None):
     """Экспорт аудиторских логов с явным возвратом результата."""
-    if storage_file and os.path.exists(storage_file):
-        with open(storage_file, "r", encoding="utf-8") as f:
-            content = f.read()
-            if not content.strip():
-                return False
-            if content.strip().startswith("{") and not content.strip().endswith("}"):
-                return False
-            try:
-                json.loads(content)
-            except (json.JSONDecodeError, TypeError):
-                return False
-            return True
+    if storage_file:
+        try:
+            with open(storage_file, "r", encoding="utf-8") as f:
+                content = f.read()
+                if isinstance(content, bytes):
+                    content = content.decode("utf-8")
+                if not content.strip():
+                    return False
+                if content.strip().startswith("{") and not content.strip().endswith("}"):
+                    return False
+                try:
+                    json.loads(content)
+                except (json.JSONDecodeError, TypeError):
+                    return False
+                return True
+        except (FileNotFoundError, OSError):
+            return False
     return False

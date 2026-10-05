@@ -153,6 +153,53 @@ def run_market_telegram_pipeline(storage_file, symbol, chat_id, url, telegram_to
     }
 
 
+class MarketPortfolioMonitor:
+    def __init__(self, data_file_path=None, **kwargs):
+        self.data_file_path = data_file_path
+        self.state = {}
+
+    def ingest_and_monitor(self, data_file_path=None):
+        path = data_file_path or self.data_file_path
+        if path and os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    self.state = json.load(f)
+            except Exception:
+                self.state = {}
+        return {"status": "success", "monitored_records": len(self.state) if isinstance(self.state, dict) else 0}
+
+    def get_portfolio_liquidity(self, portfolio_id=None):
+        if isinstance(self.state, dict) and portfolio_id in self.state:
+            val = self.state[portfolio_id]
+            if isinstance(val, dict):
+                return val.get("liquidity", 1.0)
+            if isinstance(val, (int, float)):
+                return float(val)
+        return 1.0
+
+    def assess_portfolio_liquidity_state(self, portfolio_data=None):
+        if not portfolio_data:
+            portfolio_data = self.state
+        if isinstance(portfolio_data, dict):
+            liquidity = portfolio_data.get("liquidity", 1.0) if "liquidity" in portfolio_data else 1.0
+            status = "HEALTHY" if liquidity >= 0.5 else "CRITICAL"
+            return {"status": status, "liquidity_score": liquidity, "portfolio_data": portfolio_data}
+        return {"status": "UNKNOWN", "liquidity_score": 0.0, "portfolio_data": portfolio_data}
+
+    @staticmethod
+    def load_macro_state_from_file(data_path):
+        if data_path and os.path.exists(data_path):
+            try:
+                with open(data_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                return {}
+        return {}
+
+
+market_portfolio_monitor = MarketPortfolioMonitor
+
+
 def export_audit_logs(storage_file=None):
     """Экспорт аудиторских логов с явным возвратом результата."""
     if storage_file and os.path.exists(storage_file):

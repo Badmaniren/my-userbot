@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ridge (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+Унгой, передан на эскалацию
 
 ## market_portfolio_liquidity_scenario_analyzer (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/skills/market_portfolio_liquidity_scenario_analyzer.py", line 107, in evaluate_portfolio
@@ -285,3 +283,6 @@ ridge (create) — раундов: 4
 ## market_macro_liquidity_monitor (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_monitor (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

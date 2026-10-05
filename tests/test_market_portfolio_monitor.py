@@ -119,6 +119,44 @@ class TestMarketPortfolioMonitor(unittest.TestCase):
             self.assertIn(self.random_symbol, res)
             self.assertIn(str(self.random_price), res)
 
+    def test_generate_market_report_proxy(self):
+        with patch("skills.market_portfolio_monitor.MarketReportGenerator") as mock_class:
+            mock_gen = mock_class.return_value
+            mock_gen.generate_symbol_report.return_value = "Mocked Report"
+
+            res = generate_market_report(storage_file=self.random_file, symbol=self.random_symbol)
+
+            mock_class.assert_called_once_with(storage_file=self.random_file)
+            mock_gen.generate_symbol_report.assert_called_once_with(symbol=self.random_symbol)
+            self.assertEqual(res, "Mocked Report")
+
+    def test_run_pipeline_integration_flow(self):
+        payload = {self.random_symbol: self.random_price}
+
+        with patch.object(MarketParser, "load_data", return_value=payload), \
+             patch.object(MarketParser, "fetch_and_store") as mock_fetch, \
+             patch.object(MarketReportGenerator, "generate_symbol_report") as mock_sym_rep, \
+             patch("skills.market_portfolio_monitor.run_market_telegram_pipeline") as mock_tg:
+
+            success = run_pipeline(
+                symbol=self.random_symbol,
+                url=self.random_url,
+                telegram_token=self.random_token,
+                chat_id=self.random_chat_id,
+                storage_file=self.random_file
+            )
+
+            self.assertTrue(success)
+            mock_fetch.assert_called_once_with(symbol=self.random_symbol, price=self.random_price)
+            mock_sym_rep.assert_called_once_with(symbol=self.random_symbol)
+            mock_tg.assert_called_once_with(
+                storage_file=self.random_file,
+                symbol=self.random_symbol,
+                chat_id=self.random_chat_id,
+                url=self.random_url,
+                telegram_token=self.random_token
+            )
+
     def test_run_market_telegram_pipeline(self):
         payload = {self.random_symbol: self.random_price}
         with patch.object(MarketParser, "load_data", return_value=payload):

@@ -110,7 +110,7 @@ class MarketReportGenerator:
 
 def generate_market_report(storage_file, symbol):
     gen = MarketReportGenerator(storage_file=storage_file)
-    return gen.generate_symbol_report(symbol)
+    return gen.generate_symbol_report(symbol=symbol)
 
 
 def run_market_telegram_pipeline(storage_file, symbol, chat_id, url, telegram_token):

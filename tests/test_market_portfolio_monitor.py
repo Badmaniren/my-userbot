@@ -10,6 +10,8 @@ import string
 from skills.market_portfolio_monitor import (
     MarketParser,
     MarketReportGenerator,
+    MarketPortfolioMonitor,
+    market_portfolio_monitor,
     run_pipeline,
     start_new,
     start_ened,
@@ -169,6 +171,46 @@ class TestMarketPortfolioMonitor(unittest.TestCase):
             storage_file=self.random_storage
         )
         self.assertTrue(res)
+
+    def test_market_portfolio_monitor_class_methods(self):
+        monitor = MarketPortfolioMonitor(storage_file=self.random_storage)
+        self.assertEqual(monitor.storage_file, self.random_storage)
+
+        # Test ingest_and_monitor
+        with open(self.random_storage, "w", encoding="utf-8") as f:
+            json.dump({self.random_symbol: self.random_price}, f)
+        res = monitor.ingest_and_monitor()
+        self.assertEqual(res.get("status"), "success")
+        self.assertEqual(res.get("data", {}).get(self.random_symbol), self.random_price)
+
+        # Test get_portfolio_liquidity
+        liq = monitor.get_portfolio_liquidity(self.random_symbol)
+        self.assertEqual(liq, 100.0)
+        self.assertEqual(monitor.get_portfolio_liquidity(""), 0.0)
+
+        # Test assess_portfolio_liquidity_state
+        self.assertEqual(monitor.assess_portfolio_liquidity_state(None), "liquid")
+        self.assertEqual(monitor.assess_portfolio_liquidity_state({"risk_level": "high"}), "illiquid")
+        self.assertEqual(monitor.assess_portfolio_liquidity_state({"risk_level": "low"}), "liquid")
+
+        # Test load_macro_state_from_file
+        macro_file = f"/tmp/{uuid.uuid4().hex}_macro.json"
+        try:
+            with open(macro_file, "w", encoding="utf-8") as f:
+                json.dump({"macro_index": 0.85}, f)
+            macro_data = MarketPortfolioMonitor.load_macro_state_from_file(macro_file)
+            self.assertEqual(macro_data, {"macro_index": 0.85})
+        finally:
+            if os.path.exists(macro_file):
+                os.remove(macro_file)
+
+        # Test load_macro_state_from_file nonexistent
+        self.assertEqual(MarketPortfolioMonitor.load_macro_state_from_file("nonexistent.json"), {})
+
+    def test_market_portfolio_monitor_alias(self):
+        self.assertEqual(market_portfolio_monitor, MarketPortfolioMonitor)
+        inst = market_portfolio_monitor()
+        self.assertIsInstance(inst, MarketPortfolioMonitor)
 
 if __name__ == "__main__":
     unittest.main()

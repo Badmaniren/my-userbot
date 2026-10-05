@@ -3,7 +3,7 @@ import os
 import json
 import uuid
 import random
-from skills.market_portfolio_monitor import start_new, export_audit_logs, MarketParser
+from skills.market_portfolio_monitor import start_new, export_audit_logs, MarketParser, MarketPortfolioMonitor
 
 class TestMarketPortfolioMonitorIntegration(unittest.TestCase):
     def setUp(self):
@@ -50,6 +50,15 @@ class TestMarketPortfolioMonitorIntegration(unittest.TestCase):
 
         audit_status = export_audit_logs(storage_file=self.storage_file)
         self.assertTrue(audit_status)
+
+        # Monitor integration test
+        monitor = MarketPortfolioMonitor(storage_file=self.storage_file)
+        monitored_res = monitor.ingest_and_monitor()
+        self.assertEqual(monitored_res["status"], "success")
+        self.assertEqual(monitored_res["data"][self.symbol], initial_data[self.symbol])
+
+        liquidity_state = monitor.assess_portfolio_liquidity_state(monitored_res["data"])
+        self.assertEqual(liquidity_state, "liquid")
 
 if __name__ == "__main__":
     unittest.main()

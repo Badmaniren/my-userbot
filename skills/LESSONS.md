@@ -3,13 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-а эскалацию
-
-## market_portfolio_audit_compliance_hub (refactor) — раундов: 3
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_audit_visualizer (refactor) — раундов: 1
+arket_portfolio_stress_audit_visualizer (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_monte_carlo_engine (refactor) — раундов: 4
@@ -276,4 +270,8 @@
 
 ## market_portfolio_monitor (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_liquidity_risk_evaluator (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

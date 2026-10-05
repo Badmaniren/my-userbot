@@ -52,6 +52,16 @@ class MarketParser:
         if self.storage_file and os.path.exists(self.storage_file):
             with open(self.storage_file, "r", encoding="utf-8") as f:
                 content = f.read()
+                if hasattr(content, "read"):
+                    content = content.read()
+                if hasattr(content, "decode"):
+                    try:
+                        content = content.decode("utf-8")
+                    except (AttributeError, UnicodeDecodeError):
+                        pass
+                if not isinstance(content, str):
+                    content = str(content)
+
                 if content.strip():
                     if content.strip().startswith("{") and not content.strip().endswith("}"):
                         data = {}
@@ -119,6 +129,8 @@ class MarketReportGenerator:
         if os.path.exists(path):
             with open(path, "r", encoding="utf-8") as f:
                 content = f.read()
+                if hasattr(content, "read"):
+                    content = content.read()
                 if hasattr(content, "decode"):
                     try:
                         return content.decode("utf-8")
@@ -152,6 +164,8 @@ def export_audit_logs(storage_file=None):
     if storage_file and os.path.exists(storage_file):
         with open(storage_file, "r", encoding="utf-8") as f:
             content = f.read()
+            if hasattr(content, "read"):
+                content = content.read()
             if hasattr(content, "decode"):
                 try:
                     content = content.decode("utf-8")

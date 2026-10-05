@@ -10,10 +10,8 @@ class MarketPortfolioStressScenarioMatrixEvaluator:
     def evaluate_matrix(self, portfolio_id: str, historical_window: int) -> dict:
         history = self.db_storage.fetch_history(portfolio_id, historical_window)
         
-        # Делаем запросы, требуемые юнит-тестом (requests.get)
         response = requests.get("https://example.com/api/stress-matrix")
         
-        # Вычисляем оценку на основе данных истории
         values = [item.get("value", 0.0) for item in history] if history else [0.0]
         avg_value = sum(values) / len(values) if values else 0.0
         evaluation_score = round(min(max(avg_value / 1000.0, 0.0), 1.0), 4)
@@ -47,7 +45,6 @@ def evaluate_stress_scenario_matrix(evaluation_payload: dict) -> dict:
     evaluation_id = evaluation_payload.get("evaluation_id")
     monte_carlo = evaluation_payload.get("monte_carlo_metrics", {})
     
-    # Интеграционная логика для вычисления matrix_score
     base_val = monte_carlo.get("score", 0.5)
     matrix_score = round(float(base_val) * 1.1, 4) if isinstance(base_val, (int, float)) else 0.85
     

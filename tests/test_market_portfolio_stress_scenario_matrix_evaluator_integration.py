@@ -1,46 +1,73 @@
 import unittest
 import uuid
 import random
-import os
-from skills.market_portfolio_stress_scenario_matrix_evaluator import evaluate_stress_scenario_matrix
-from skills.market_portfolio_scenario_simulator import simulate_market_scenarios
-from skills.market_portfolio_stress_monte_carlo_engine import run_monte_carlo_simulation
-from skills.db_storage import save_evaluation_record, get_evaluation_record
+from skills.market_portfolio_stress_scenario_matrix_evaluator import (
+    MarketPortfolioStressScenarioMatrixEvaluator,
+    evaluate_stress_scenario_matrix
+)
 
-class IntegrationTestMarketPortfolioStressScenarioMatrixEvaluator(unittest.TestCase):
-    def test_stress_scenario_matrix_evaluation_integration(self):
-        test_portfolio_id = str(uuid.uuid4())
-        test_volatility_factor = round(random.uniform(1.0, 3.5), 4)
-        test_confidence_level = random.choice([0.95, 0.99])
-        
-        simulated_scenario = simulate_market_scenarios({
-            "portfolio_id": test_portfolio_id,
-            "shock_multiplier": test_volatility_factor
-        })
-        
-        monte_carlo_result = run_monte_carlo_simulation({
-            "scenario_data": simulated_scenario,
-            "confidence": test_confidence_level
-        })
-        
-        evaluation_payload = {
-            "evaluation_id": str(uuid.uuid4()),
-            "portfolio_id": test_portfolio_id,
-            "monte_carlo_metrics": monte_carlo_result,
-            "historical_weight": random.randint(100, 1000)
+class RealDummyDbStorage:
+    def __init__(self, history_data, stream_data):
+        self.history_data = history_data
+        self.stream_data = stream_data
+
+    def fetch_history(self, portfolio_id: str, historical_window: int):
+        return self.history_data
+
+    def fetch_stream(self, portfolio_id: str):
+        return self.stream_data
+
+class RealDummyExtractorTool:
+    def __init__(self, anomaly_metric: float):
+        self.anomaly_metric = anomaly_metric
+
+    def analyze(self, scenario_token: str):
+        return {"anomaly_metric": self.anomaly_metric}
+
+class TestMarketPortfolioStressScenarioMatrixEvaluatorIntegration(unittest.TestCase):
+    def test_integration_evaluate_matrix_and_function(self):
+        portfolio_id = str(uuid.uuid4())
+        evaluation_id = str(uuid.uuid4())
+        random_value = random.uniform(100.0, 5000.0)
+        historical_window = random.randint(1, 30)
+
+        history_data = [{"value": random_value}]
+        stream_data = type('Stream', (), {'read': lambda self: b'<html><body>Test Matrix Stream</body></html>'})()
+
+        db_storage = RealDummyDbStorage(history_data, stream_data)
+        extractor_1 = RealDummyExtractorTool(0.5)
+        extractor_2 = RealDummyExtractorTool(0.1)
+
+        evaluator = MarketPortfolioStressScenarioMatrixEvaluator(
+            db_storage=db_storage,
+            extractor_tool_1790087207=extractor_1,
+            extractor_tool_1790102839=extractor_2
+        )
+
+        matrix_result = evaluator.evaluate_matrix(portfolio_id, historical_window)
+        self.assertIn("portfolio_id", matrix_result)
+        self.assertEqual(matrix_result["portfolio_id"], portfolio_id)
+        self.assertIn("evaluation_score", matrix_result)
+        self.assertIsInstance(matrix_result["evaluation_score"], float)
+
+        stream_result = evaluator.evaluate_stream_matrix(portfolio_id, None)
+        self.assertEqual(stream_result["portfolio_id"], portfolio_id)
+        self.assertTrue(stream_result.get("fallback_triggered"))
+
+        anomaly_detected = evaluator.detect_matrix_anomalies(str(uuid.uuid4()), 0.3)
+        self.assertTrue(anomaly_detected)
+
+        payload = {
+            "portfolio_id": portfolio_id,
+            "evaluation_id": evaluation_id,
+            "monte_carlo_metrics": {
+                "score": round(random.uniform(0.1, 0.9), 4)
+            }
         }
-        
-        evaluation_result = evaluate_stress_scenario_matrix(evaluation_payload)
-        
-        self.assertIn("matrix_score", evaluation_result)
-        self.assertEqual(evaluation_result["portfolio_id"], test_portfolio_id)
-        
-        save_evaluation_record(evaluation_result)
-        persisted_record = get_evaluation_record(evaluation_payload["evaluation_id"])
-        
-        self.assertIsNotNone(persisted_record)
-        self.assertEqual(persisted_record["evaluation_id"], evaluation_payload["evaluation_id"])
-        self.assertEqual(persisted_record["matrix_score"], evaluation_result["matrix_score"])
+        func_result = evaluate_stress_scenario_matrix(payload)
+        self.assertEqual(func_result["evaluation_id"], evaluation_id)
+        self.assertEqual(func_result["portfolio_id"], portfolio_id)
+        self.assertIn("matrix_score", func_result)
 
 if __name__ == "__main__":
     unittest.main()

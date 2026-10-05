@@ -45,8 +45,11 @@ def evaluate_stress_scenario_matrix(evaluation_payload: dict) -> dict:
     evaluation_id = evaluation_payload.get("evaluation_id")
     monte_carlo = evaluation_payload.get("monte_carlo_metrics", {})
     
-    base_val = monte_carlo.get("score", 0.5)
-    matrix_score = round(float(base_val) * 1.1, 4) if isinstance(base_val, (int, float)) else 0.85
+    if "score" in monte_carlo:
+        base_val = monte_carlo.get("score", 0.5)
+        matrix_score = round(float(base_val) * 1.1, 4) if isinstance(base_val, (int, float)) else 0.85
+    else:
+        matrix_score = 0.85
     
     return {
         "evaluation_id": evaluation_id,

@@ -51,75 +51,66 @@ class MarketParser:
         data = {}
         if self.storage_file:
             if os.path.exists(self.storage_file):
-                try:
-                    with open(self.storage_file, "r", encoding="utf-8") as f:
-                        content = f.read()
-                        if hasattr(content, "read"):
-                            content = content.read()
-                        if hasattr(content, "decode"):
-                            try:
-                                content = content.decode("utf-8")
-                            except (AttributeError, UnicodeDecodeError):
-                                pass
-                        if not isinstance(content, str):
-                            content = str(content)
+                with open(self.storage_file, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    if hasattr(content, "read"):
+                        content = content.read()
+                    if hasattr(content, "decode"):
+                        try:
+                            content = content.decode("utf-8")
+                        except (AttributeError, UnicodeDecodeError):
+                            pass
+                    if not isinstance(content, str):
+                        content = str(content)
 
-                        if content.strip():
-                            if content.strip().startswith("{") and not content.strip().endswith("}"):
+                    if content.strip():
+                        if content.strip().startswith("{") and not content.strip().endswith("}"):
+                            data = {}
+                        else:
+                            try:
+                                data = json.loads(content)
+                            except (json.JSONDecodeError, TypeError):
                                 data = {}
-                            else:
-                                try:
-                                    data = json.loads(content)
-                                except (json.JSONDecodeError, TypeError):
-                                    data = {}
-                except (OSError, IOError, PermissionError):
-                    data = {}
         
         if not isinstance(data, dict):
             data = {}
 
         data[symbol] = price
         if self.storage_file:
-            try:
-                with open(self.storage_file, "w", encoding="utf-8") as f:
-                    json.dump(data, f)
-            except (OSError, IOError, PermissionError, TypeError):
-                pass
+            with open(self.storage_file, "w", encoding="utf-8") as f:
+                json.dump(data, f)
 
     def load_data(self, storage_file):
         if storage_file is None:
             return None
         if not os.path.exists(storage_file):
             return {}
-        try:
-            with open(storage_file, "r", encoding="utf-8") as f:
-                content = f.read()
-                if hasattr(content, "read"):
-                    content = content.read()
-                if hasattr(content, "decode"):
-                    try:
-                        content = content.decode("utf-8")
-                    except (AttributeError, UnicodeDecodeError):
-                        pass
-                
-                if not isinstance(content, str):
-                    content = str(content)
-
-                if not content.strip():
-                    return {}
-                
-                if content.strip().startswith("{") and not content.strip().endswith("}"):
-                    return {}
-                
+        with open(storage_file, "r", encoding="utf-8") as f:
+            content = f.read()
+            if hasattr(content, "read"):
+                content = content.read()
+            if hasattr(content, "decode"):
                 try:
-                    res = json.loads(content)
-                    if not isinstance(res, dict):
-                        return {}
-                    return res
-                except (json.JSONDecodeError, TypeError, AttributeError):
+                    content = content.decode("utf-8")
+                except (AttributeError, UnicodeDecodeError):
+                    pass
+            
+            if not isinstance(content, str):
+                content = str(content)
+
+            if not content.strip():
+                return {}
+            
+            if content.strip().startswith("{") and not content.strip().endswith("}"):
+                return {}
+            
+            try:
+                res = json.loads(content)
+                if not isinstance(res, dict):
                     return {}
-        except (OSError, IOError, PermissionError):
-            return {}
+                return res
+            except (json.JSONDecodeError, TypeError, AttributeError):
+                return {}
 
 
 class MarketReportGenerator:
@@ -137,19 +128,16 @@ class MarketReportGenerator:
         if path is None:
             return "{}"
         if os.path.exists(path):
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    content = f.read()
-                    if hasattr(content, "read"):
-                        content = content.read()
-                    if hasattr(content, "decode"):
-                        try:
-                            return content.decode("utf-8")
-                        except (AttributeError, UnicodeDecodeError):
-                            pass
-                    return str(content)
-            except (OSError, IOError, PermissionError):
-                return "{}"
+            with open(path, "r", encoding="utf-8") as f:
+                content = f.read()
+                if hasattr(content, "read"):
+                    content = content.read()
+                if hasattr(content, "decode"):
+                    try:
+                        return content.decode("utf-8")
+                    except (AttributeError, UnicodeDecodeError):
+                        pass
+                return str(content)
         return "{}"
 
 
@@ -175,29 +163,26 @@ def run_market_telegram_pipeline(storage_file, symbol, chat_id, url, telegram_to
 def export_audit_logs(storage_file=None):
     """Экспорт аудиторских логов с явным возвратом результата."""
     if storage_file and os.path.exists(storage_file):
-        try:
-            with open(storage_file, "r", encoding="utf-8") as f:
-                content = f.read()
-                if hasattr(content, "read"):
-                    content = content.read()
-                if hasattr(content, "decode"):
-                    try:
-                        content = content.decode("utf-8")
-                    except (AttributeError, UnicodeDecodeError):
-                        pass
-                if not isinstance(content, str):
-                    content = str(content)
-                if not content.strip():
-                    return False
-                if content.strip().startswith("{") and not content.strip().endswith("}"):
-                    return True
+        with open(storage_file, "r", encoding="utf-8") as f:
+            content = f.read()
+            if hasattr(content, "read"):
+                content = content.read()
+            if hasattr(content, "decode"):
                 try:
-                    parsed = json.loads(content)
-                    if isinstance(parsed, dict):
-                        return True
-                    return False
-                except (json.JSONDecodeError, TypeError):
+                    content = content.decode("utf-8")
+                except (AttributeError, UnicodeDecodeError):
+                    pass
+            if not isinstance(content, str):
+                content = str(content)
+            if not content.strip():
+                return False
+            if content.strip().startswith("{") and not content.strip().endswith("}"):
+                return True
+            try:
+                parsed = json.loads(content)
+                if isinstance(parsed, dict):
                     return True
-        except (OSError, IOError, PermissionError):
-            return False
+                return False
+            except (json.JSONDecodeError, TypeError):
+                return True
     return False

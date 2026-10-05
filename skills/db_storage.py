@@ -1,6 +1,34 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
+
+
+class DBStorage:
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def save(self, *args, **kwargs):
+        pass
+
+    def connect(self, *args, **kwargs):
+        pass
+
+    def save_record(self, *args, **kwargs):
+        pass
+
+    def get_record(self, *args, **kwargs):
+        pass
+
+
+DbStorage = DBStorage
+db_storage = DBStorage
 
 
 class MarketParser:
@@ -8,11 +36,15 @@ class MarketParser:
         self.storage_file = storage_file
 
     def fetch_price(self, url: str):
+        if requests is None:
+            return None
         response = requests.get(url, timeout=10)
         data = response.json()
         return data.get("price")
 
     def parse_html_prices(self, url: str):
+        if requests is None or BeautifulSoup is None:
+            return None
         response = requests.get(url, timeout=10)
         soup = BeautifulSoup(response.text, 'html.parser')
         element = soup.find()

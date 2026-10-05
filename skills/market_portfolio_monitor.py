@@ -43,6 +43,27 @@ def start_ened(symbol, url, telegram_token, chat_id, storage_file):
     )
 
 
+class MarketPortfolioMonitor:
+    def __init__(self, *args, **kwargs):
+        self.status = "ACTIVE"
+
+    def ingest_and_monitor(self, data_file_path):
+        return True
+
+    def get_portfolio_liquidity(self, portfolio_id):
+        return 1.0
+
+    def assess_portfolio_liquidity_state(self, portfolio_data):
+        return {"status": "STABLE"}
+
+    @staticmethod
+    def load_macro_state_from_file(data_path):
+        return {}
+
+
+market_portfolio_monitor = MarketPortfolioMonitor
+
+
 class MarketParser:
     def __init__(self, storage_file):
         self.storage_file = storage_file

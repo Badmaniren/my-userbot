@@ -49,27 +49,28 @@ class MarketParser:
 
     def fetch_and_store(self, symbol, price):
         data = {}
-        if self.storage_file and os.path.exists(self.storage_file):
-            with open(self.storage_file, "r", encoding="utf-8") as f:
-                content = f.read()
-                if hasattr(content, "read"):
-                    content = content.read()
-                if hasattr(content, "decode"):
-                    try:
-                        content = content.decode("utf-8")
-                    except (AttributeError, UnicodeDecodeError):
-                        pass
-                if not isinstance(content, str):
-                    content = str(content)
-
-                if content.strip():
-                    if content.strip().startswith("{") and not content.strip().endswith("}"):
-                        data = {}
-                    else:
+        if self.storage_file:
+            if os.path.exists(self.storage_file):
+                with open(self.storage_file, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    if hasattr(content, "read"):
+                        content = content.read()
+                    if hasattr(content, "decode"):
                         try:
-                            data = json.loads(content)
-                        except (json.JSONDecodeError, TypeError):
+                            content = content.decode("utf-8")
+                        except (AttributeError, UnicodeDecodeError):
+                            pass
+                    if not isinstance(content, str):
+                        content = str(content)
+
+                    if content.strip():
+                        if content.strip().startswith("{") and not content.strip().endswith("}"):
                             data = {}
+                        else:
+                            try:
+                                data = json.loads(content)
+                            except (json.JSONDecodeError, TypeError):
+                                data = {}
         
         if not isinstance(data, dict):
             data = {}

@@ -3,14 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-arket_portfolio_stress_audit_visualizer (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_monte_carlo_engine (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=3)
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_scenario_pipeline (refactor) — раундов: 2
+ market_portfolio_stress_scenario_pipeline (refactor) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main
 
@@ -274,4 +267,8 @@ arket_portfolio_stress_audit_visualizer (refactor) — раундов: 1
 
 ## market_portfolio_liquidity_risk_evaluator (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_monitor (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/tests/test_market_portfolio_monitor.py", line 166, in test_market_parser_malformed_bracket_handling
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

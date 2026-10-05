@@ -76,6 +76,17 @@ class MarketParser:
             return {}
         with open(storage_file, "r", encoding="utf-8") as f:
             content = f.read()
+            if hasattr(content, "read"):
+                content = content.read()
+            if hasattr(content, "decode"):
+                try:
+                    content = content.decode("utf-8")
+                except (AttributeError, UnicodeDecodeError):
+                    pass
+            
+            if not isinstance(content, str):
+                content = str(content)
+
             if not content.strip():
                 return {}
             
@@ -87,7 +98,7 @@ class MarketParser:
                 if not isinstance(res, dict):
                     return {}
                 return res
-            except (json.JSONDecodeError, TypeError):
+            except (json.JSONDecodeError, TypeError, AttributeError):
                 return {}
 
 
@@ -107,7 +118,13 @@ class MarketReportGenerator:
             return "{}"
         if os.path.exists(path):
             with open(path, "r", encoding="utf-8") as f:
-                return f.read()
+                content = f.read()
+                if hasattr(content, "decode"):
+                    try:
+                        return content.decode("utf-8")
+                    except (AttributeError, UnicodeDecodeError):
+                        pass
+                return str(content)
         return "{}"
 
 
@@ -135,6 +152,13 @@ def export_audit_logs(storage_file=None):
     if storage_file and os.path.exists(storage_file):
         with open(storage_file, "r", encoding="utf-8") as f:
             content = f.read()
+            if hasattr(content, "decode"):
+                try:
+                    content = content.decode("utf-8")
+                except (AttributeError, UnicodeDecodeError):
+                    pass
+            if not isinstance(content, str):
+                content = str(content)
             if not content.strip():
                 return False
             if content.strip().startswith("{") and not content.strip().endswith("}"):

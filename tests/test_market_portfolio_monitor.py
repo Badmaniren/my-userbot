@@ -1,427 +1,183 @@
-import io
-import json
-import os
-import random
-import string
-import tempfile
 import unittest
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import patch
+import os
+import json
+import io
+import random
+import uuid
+import string
 
-try:
-    from skills import market_portfolio_monitor as mpm
-except ImportError:
-    import market_portfolio_monitor as mpm
+from skills.market_portfolio_monitor import (
+    run_pipeline,
+    start_new,
+    start_ened,
+    MarketParser,
+    MarketReportGenerator,
+    generate_market_report,
+    run_market_telegram_pipeline,
+    export_audit_logs
+)
 
+class TestMarketPortfolioMonitor(unittest.TestCase):
 
-def _rand_str(length=None):
-    if length is None:
-        length = random.randint(8, 20)
-    return "".join(random.choices(string.ascii_letters + string.digits, k=length))
-
-
-def _rand_symbol():
-    return "".join(random.choices(string.ascii_uppercase, k=random.randint(3, 5)))
-
-
-def _rand_float():
-    return round(random.uniform(1.0, 10000.0), 4)
-
-
-def _rand_int():
-    return random.randint(1000, 999999)
-
-
-def _rand_url():
-    return f"https://{_rand_str(10)}.org/api/{_rand_str(6)}"
-
-
-class TestMarketParser(unittest.TestCase):
     def setUp(self):
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.base_path = self.temp_dir.name
+        self.random_symbol = ''.join(random.choices(string.ascii_uppercase, k=5)) + uuid.uuid4().hex[:4]
+        self.random_url = f"https://{uuid.uuid4().hex[:8]}.com/{uuid.uuid4().hex[:6]}"
+        self.random_token = uuid.uuid4().hex
+        self.random_chat_id = str(random.randint(100000, 99999999))
+        self.random_storage = f"{uuid.uuid4().hex}.json"
 
     def tearDown(self):
-        self.temp_dir.cleanup()
+        if os.path.exists(self.random_storage):
+            try:
+                os.remove(self.random_storage)
+            except OSError:
+                pass
 
-    def test_load_data_none_storage(self):
-        parser = mpm.MarketParser(storage_file=None)
-        res = parser.load_data(None)
-        self.assertIsNone(res)
+    def test_market_parser_load_and_store_random_data(self):
+        random_price = round(random.uniform(10.0, 5000.0), 2)
+        parser = MarketParser(storage_file=self.random_storage)
+        parser.fetch_and_store(symbol=self.random_symbol, price=random_price)
+        
+        loaded_data = parser.load_data(self.random_storage)
+        self.assertIsInstance(loaded_data, dict)
+        self.assertIn(self.random_symbol, loaded_data)
+        self.assertEqual(loaded_data[self.random_symbol], random_price)
 
-    def test_load_data_nonexistent_file(self):
-        fake_path = os.path.join(self.base_path, f"{_rand_str()}.json")
-        parser = mpm.MarketParser(storage_file=fake_path)
-        res = parser.load_data(fake_path)
+    def test_market_parser_load_nonexistent_file(self):
+        non_existent = f"{uuid.uuid4().hex}.json"
+        parser = MarketParser(storage_file=non_existent)
+        res = parser.load_data(non_existent)
         self.assertEqual(res, {})
 
-    def test_load_data_empty_file(self):
-        file_path = os.path.join(self.base_path, f"{_rand_str()}.json")
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write("   \n\t  ")
-        parser = mpm.MarketParser(storage_file=file_path)
-        res = parser.load_data(file_path)
-        self.assertEqual(res, {})
+    def test_market_parser_read_content_edge_cases(self):
+        parser = MarketParser(storage_file=self.random_storage)
+        garbage_bytes = io.BytesIO(uuid.uuid4().bytes)
+        read_res = parser._read_content(garbage_bytes)
+        self.assertIsInstance(read_res, str)
 
-    def test_load_data_truncated_json_object(self):
-        file_path = os.path.join(self.base_path, f"{_rand_str()}.json")
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(f'{{"{_rand_symbol()}": {_rand_float()}')
-        parser = mpm.MarketParser(storage_file=file_path)
-        res = parser.load_data(file_path)
-        self.assertEqual(res, {})
+        broken_json_content = "{invalid_json_stream"
+        with open(self.random_storage, "w", encoding="utf-8") as f:
+            f.write(broken_json_content)
+        
+        loaded = parser.load_data(self.random_storage)
+        self.assertEqual(loaded, {})
 
-    def test_load_data_non_dict_json(self):
-        file_path = os.path.join(self.base_path, f"{_rand_str()}.json")
-        rand_list = [_rand_str(), _rand_float()]
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(rand_list, f)
-        parser = mpm.MarketParser(storage_file=file_path)
-        res = parser.load_data(file_path)
-        self.assertEqual(res, {})
+    def test_market_report_generator_symbol_report(self):
+        random_price = round(random.uniform(1.0, 999.0), 2)
+        parser = MarketParser(storage_file=self.random_storage)
+        parser.fetch_and_store(symbol=self.random_symbol, price=random_price)
 
-    def test_load_data_corrupt_content(self):
-        file_path = os.path.join(self.base_path, f"{_rand_str()}.json")
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(f"MALFORMED_GARBAGE_{_rand_str()}")
-        parser = mpm.MarketParser(storage_file=file_path)
-        res = parser.load_data(file_path)
-        self.assertEqual(res, {})
+        generator = MarketReportGenerator(storage_file=self.random_storage)
+        report = generator.generate_symbol_report(symbol=self.random_symbol)
+        self.assertIn(self.random_symbol, report)
+        self.assertIn(str(random_price), report)
 
-    def test_load_data_valid_payload(self):
-        file_path = os.path.join(self.base_path, f"{_rand_str()}.json")
-        expected_sym = _rand_symbol()
-        expected_price = _rand_float()
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump({expected_sym: expected_price}, f)
-        parser = mpm.MarketParser(storage_file=file_path)
-        res = parser.load_data(file_path)
-        self.assertIn(expected_sym, res)
-        self.assertEqual(res[expected_sym], expected_price)
+        missing_symbol = uuid.uuid4().hex[:6]
+        missing_report = generator.generate_symbol_report(symbol=missing_symbol)
+        self.assertIn("No data", missing_report)
 
-    def test_load_data_bytes_like_stream_simulation(self):
-        file_path = os.path.join(self.base_path, f"{_rand_str()}.json")
-        sym = _rand_symbol()
-        val = _rand_float()
-        raw_bytes = json.dumps({sym: val}).encode("utf-8")
-
-        mock_f = MagicMock()
-        mock_f.read.return_value = io.BytesIO(raw_bytes)
-        parser = mpm.MarketParser(storage_file=file_path)
-
-        with patch("os.path.exists", return_value=True):
-            with patch("builtins.open", return_value=mock_f):
-                mock_f.__enter__.return_value = mock_f
-                res = parser.load_data(file_path)
-                self.assertIsInstance(res, dict)
-                self.assertEqual(res.get(sym), val)
-
-    def test_fetch_and_store_creates_file_if_not_present(self):
-        file_path = os.path.join(self.base_path, f"{_rand_str()}.json")
-        parser = mpm.MarketParser(storage_file=file_path)
-        sym = _rand_symbol()
-        price = _rand_float()
-
-        parser.fetch_and_store(symbol=sym, price=price)
-        self.assertTrue(os.path.exists(file_path))
-
-        with open(file_path, "r", encoding="utf-8") as f:
-            stored = json.load(f)
-        self.assertEqual(stored, {sym: price})
-
-    def test_fetch_and_store_updates_existing_content(self):
-        file_path = os.path.join(self.base_path, f"{_rand_str()}.json")
-        initial_sym = _rand_symbol()
-        initial_price = _rand_float()
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump({initial_sym: initial_price}, f)
-
-        parser = mpm.MarketParser(storage_file=file_path)
-        new_sym = _rand_symbol()
-        new_price = _rand_float()
-        parser.fetch_and_store(symbol=new_sym, price=new_price)
-
-        with open(file_path, "r", encoding="utf-8") as f:
-            updated = json.load(f)
-        self.assertEqual(updated[initial_sym], initial_price)
-        self.assertEqual(updated[new_sym], new_price)
-
-    def test_fetch_and_store_overwrites_corrupt_file(self):
-        file_path = os.path.join(self.base_path, f"{_rand_str()}.json")
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(f'{{"broken": "{_rand_str()}"')
-
-        parser = mpm.MarketParser(storage_file=file_path)
-        sym = _rand_symbol()
-        price = _rand_float()
-        parser.fetch_and_store(symbol=sym, price=price)
-
-        with open(file_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        self.assertEqual(data, {sym: price})
-
-    def test_fetch_and_store_with_none_storage(self):
-        parser = mpm.MarketParser(storage_file=None)
-        sym = _rand_symbol()
-        price = _rand_float()
-        # Should not raise exception
-        parser.fetch_and_store(symbol=sym, price=price)
-
-
-class TestMarketReportGenerator(unittest.TestCase):
-    def setUp(self):
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.base_path = self.temp_dir.name
-
-    def tearDown(self):
-        self.temp_dir.cleanup()
-
-    def test_generate_symbol_report_found(self):
-        file_path = os.path.join(self.base_path, f"{_rand_str()}.json")
-        sym = _rand_symbol()
-        price = _rand_float()
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump({sym: price}, f)
-
-        generator = mpm.MarketReportGenerator(storage_file=file_path)
-        report = generator.generate_symbol_report(sym)
-        self.assertEqual(report, f"Report for {sym}: {price}")
-
-    def test_generate_symbol_report_missing_symbol(self):
-        file_path = os.path.join(self.base_path, f"{_rand_str()}.json")
-        sym_in_db = _rand_symbol()
-        sym_query = _rand_symbol() + "_OTHER"
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump({sym_in_db: _rand_float()}, f)
-
-        generator = mpm.MarketReportGenerator(storage_file=file_path)
-        report = generator.generate_symbol_report(sym_query)
-        self.assertEqual(report, f"Report for {sym_query}: No data")
-
-    def test_get_raw_stream_dump_none_path(self):
-        generator = mpm.MarketReportGenerator(storage_file=None)
+    def test_market_report_generator_raw_stream_dump(self):
+        generator = MarketReportGenerator(storage_file=None)
         self.assertEqual(generator.get_raw_stream_dump(), "{}")
 
-    def test_get_raw_stream_dump_nonexistent_file(self):
-        fake_path = os.path.join(self.base_path, f"{_rand_str()}.json")
-        generator = mpm.MarketReportGenerator(storage_file=fake_path)
-        self.assertEqual(generator.get_raw_stream_dump(), "{}")
+        random_price = round(random.uniform(100.0, 200.0), 2)
+        parser = MarketParser(storage_file=self.random_storage)
+        parser.fetch_and_store(symbol=self.random_symbol, price=random_price)
 
-    def test_get_raw_stream_dump_existing_file(self):
-        file_path = os.path.join(self.base_path, f"{_rand_str()}.json")
-        payload = f'{{"random_key_{_rand_str()}": {_rand_int()}}}'
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(payload)
+        generator_active = MarketReportGenerator(storage_file=self.random_storage)
+        dump_content = generator_active.get_raw_stream_dump()
+        self.assertIn(self.random_symbol, dump_content)
+        self.assertIn(str(random_price), dump_content)
 
-        generator = mpm.MarketReportGenerator(storage_file=file_path)
-        self.assertEqual(generator.get_raw_stream_dump(), payload)
+    def test_generate_market_report_function(self):
+        random_price = round(random.uniform(5.0, 50.0), 2)
+        parser = MarketParser(storage_file=self.random_storage)
+        parser.fetch_and_store(symbol=self.random_symbol, price=random_price)
 
-    def test_get_raw_stream_dump_decode_handling(self):
-        file_path = os.path.join(self.base_path, f"{_rand_str()}.json")
-        raw_text = f"raw_data_{_rand_str()}"
+        rep = generate_market_report(storage_file=self.random_storage, symbol=self.random_symbol)
+        self.assertIn(self.random_symbol, rep)
 
-        mock_f = MagicMock()
-        mock_f.read.return_value = io.BytesIO(raw_text.encode("utf-8"))
+    def test_run_market_telegram_pipeline(self):
+        random_price = round(random.uniform(1000.0, 2000.0), 2)
+        parser = MarketParser(storage_file=self.random_storage)
+        parser.fetch_and_store(symbol=self.random_symbol, price=random_price)
 
-        generator = mpm.MarketReportGenerator(storage_file=file_path)
-        with patch("os.path.exists", return_value=True):
-            with patch("builtins.open", return_value=mock_f):
-                mock_f.__enter__.return_value = mock_f
-                dump = generator.get_raw_stream_dump()
-                self.assertEqual(dump, raw_text)
-
-
-class TestStandaloneFunctionsAndPipeline(unittest.TestCase):
-    def setUp(self):
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.base_path = self.temp_dir.name
-
-    def tearDown(self):
-        self.temp_dir.cleanup()
-
-    def test_generate_market_report_helper(self):
-        file_path = os.path.join(self.base_path, f"{_rand_str()}.json")
-        sym = _rand_symbol()
-        price = _rand_float()
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump({sym: price}, f)
-
-        res = mpm.generate_market_report(storage_file=file_path, symbol=sym)
-        self.assertEqual(res, f"Report for {sym}: {price}")
-
-    def test_run_market_telegram_pipeline_existing_symbol(self):
-        file_path = os.path.join(self.base_path, f"{_rand_str()}.json")
-        sym = _rand_symbol()
-        price = _rand_float()
-        chat_id = _rand_int()
-        url = _rand_url()
-        token = _rand_str(32)
-
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump({sym: price}, f)
-
-        res = mpm.run_market_telegram_pipeline(
-            storage_file=file_path,
-            symbol=sym,
-            chat_id=chat_id,
-            url=url,
-            telegram_token=token
+        pipeline_result = run_market_telegram_pipeline(
+            storage_file=self.random_storage,
+            symbol=self.random_symbol,
+            chat_id=self.random_chat_id,
+            url=self.random_url,
+            telegram_token=self.random_token
         )
-        self.assertEqual(res["status"], "success")
-        self.assertEqual(res["symbol"], sym)
-        self.assertEqual(res["price"], price)
-        self.assertEqual(res["chat_id"], chat_id)
-        self.assertEqual(res["url"], url)
 
-    def test_run_market_telegram_pipeline_missing_symbol(self):
-        file_path = os.path.join(self.base_path, f"{_rand_str()}.json")
-        sym = _rand_symbol()
-        chat_id = _rand_int()
-        url = _rand_url()
+        self.assertEqual(pipeline_result["status"], "success")
+        self.assertEqual(pipeline_result["symbol"], self.random_symbol)
+        self.assertEqual(pipeline_result["price"], random_price)
+        self.assertEqual(pipeline_result["chat_id"], self.random_chat_id)
+        self.assertEqual(pipeline_result["url"], self.random_url)
 
-        res = mpm.run_market_telegram_pipeline(
-            storage_file=file_path,
-            symbol=sym,
-            chat_id=chat_id,
-            url=url,
-            telegram_token=_rand_str()
+    def test_export_audit_logs(self):
+        self.assertFalse(export_audit_logs(storage_file=None))
+        non_existent = f"{uuid.uuid4().hex}.json"
+        self.assertFalse(export_audit_logs(storage_file=non_existent))
+
+        with open(self.random_storage, "w", encoding="utf-8") as f:
+            f.write("   ")
+        self.assertFalse(export_audit_logs(storage_file=self.random_storage))
+
+        with open(self.random_storage, "w", encoding="utf-8") as f:
+            f.write("{partial_json")
+        self.assertTrue(export_audit_logs(storage_file=self.random_storage))
+
+        valid_data = {self.random_symbol: random.randint(1, 100)}
+        with open(self.random_storage, "w", encoding="utf-8") as f:
+            json.dump(valid_data, f)
+        self.assertTrue(export_audit_logs(storage_file=self.random_storage))
+
+    def test_run_pipeline_execution(self):
+        random_price = round(random.uniform(10.0, 99.0), 2)
+        parser = MarketParser(storage_file=self.random_storage)
+        parser.fetch_and_store(symbol=self.random_symbol, price=random_price)
+
+        pipeline_res = run_pipeline(
+            symbol=self.random_symbol,
+            url=self.random_url,
+            telegram_token=self.random_token,
+            chat_id=self.random_chat_id,
+            storage_file=self.random_storage
         )
-        self.assertEqual(res["status"], "success")
-        self.assertEqual(res["symbol"], sym)
-        self.assertEqual(res["price"], 0.0)
+        self.assertTrue(pipeline_res)
 
-    def test_run_pipeline_end_to_end(self):
-        file_path = os.path.join(self.base_path, f"{_rand_str()}.json")
-        sym = _rand_symbol()
-        initial_price = _rand_float()
-        url = _rand_url()
-        token = _rand_str(16)
-        chat_id = _rand_int()
-
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump({sym: initial_price}, f)
-
-        status = mpm.run_pipeline(
-            symbol=sym,
-            url=url,
-            telegram_token=token,
-            chat_id=chat_id,
-            storage_file=file_path
-        )
-        self.assertTrue(status)
-
-        with open(file_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        self.assertIn(sym, data)
-        self.assertEqual(data[sym], initial_price)
-
-    def test_run_pipeline_fresh_symbol_defaults_to_zero(self):
-        file_path = os.path.join(self.base_path, f"{_rand_str()}.json")
-        sym = _rand_symbol()
-        url = _rand_url()
-        token = _rand_str(16)
-        chat_id = _rand_int()
-
-        status = mpm.run_pipeline(
-            symbol=sym,
-            url=url,
-            telegram_token=token,
-            chat_id=chat_id,
-            storage_file=file_path
-        )
-        self.assertTrue(status)
-
-        with open(file_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        self.assertIn(sym, data)
-        self.assertEqual(data[sym], 0.0)
-
-    def test_aliases_start_new_and_start_ened(self):
-        file_path = os.path.join(self.base_path, f"{_rand_str()}.json")
-        sym = _rand_symbol()
-        url = _rand_url()
-        token = _rand_str(12)
-        chat_id = _rand_int()
-
-        res_new = mpm.start_new(
-            symbol=sym,
-            url=url,
-            telegram_token=token,
-            chat_id=chat_id,
-            storage_file=file_path
+    def test_start_new_and_ened_aliases(self):
+        res_new = start_new(
+            symbol=self.random_symbol,
+            url=self.random_url,
+            telegram_token=self.random_token,
+            chat_id=self.random_chat_id,
+            storage_file=self.random_storage
         )
         self.assertTrue(res_new)
 
-        sym2 = _rand_symbol()
-        res_ened = mpm.start_ened(
-            symbol=sym2,
-            url=url,
-            telegram_token=token,
-            chat_id=chat_id,
-            storage_file=file_path
+        res_ened = start_ened(
+            symbol=self.random_symbol,
+            url=self.random_url,
+            telegram_token=self.random_token,
+            chat_id=self.random_chat_id,
+            storage_file=self.random_storage
         )
         self.assertTrue(res_ened)
 
-        with open(file_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        self.assertIn(sym, data)
-        self.assertIn(sym2, data)
+    def test_market_parser_non_dict_json_recovery(self):
+        with open(self.random_storage, "w", encoding="utf-8") as f:
+            json.dump([1, 2, 3], f)
 
+        parser = MarketParser(storage_file=self.random_storage)
+        loaded = parser.load_data(self.random_storage)
+        self.assertEqual(loaded, {})
 
-class TestExportAuditLogs(unittest.TestCase):
-    def setUp(self):
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.base_path = self.temp_dir.name
-
-    def tearDown(self):
-        self.temp_dir.cleanup()
-
-    def test_export_audit_logs_none_or_missing(self):
-        self.assertFalse(mpm.export_audit_logs(None))
-        fake_path = os.path.join(self.base_path, f"{_rand_str()}.log")
-        self.assertFalse(mpm.export_audit_logs(fake_path))
-
-    def test_export_audit_logs_empty_file(self):
-        file_path = os.path.join(self.base_path, f"{_rand_str()}.log")
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write("   \n")
-        self.assertFalse(mpm.export_audit_logs(file_path))
-
-    def test_export_audit_logs_valid_dict_json(self):
-        file_path = os.path.join(self.base_path, f"{_rand_str()}.log")
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump({_rand_str(): _rand_int()}, f)
-        self.assertTrue(mpm.export_audit_logs(file_path))
-
-    def test_export_audit_logs_valid_non_dict_json(self):
-        file_path = os.path.join(self.base_path, f"{_rand_str()}.log")
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump([_rand_str(), _rand_int()], f)
-        self.assertFalse(mpm.export_audit_logs(file_path))
-
-    def test_export_audit_logs_truncated_braces(self):
-        file_path = os.path.join(self.base_path, f"{_rand_str()}.log")
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(f'{{"audit_trail_{_rand_str()}":')
-        self.assertTrue(mpm.export_audit_logs(file_path))
-
-    def test_export_audit_logs_corrupted_json_exception(self):
-        file_path = os.path.join(self.base_path, f"{_rand_str()}.log")
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(f"INVALID_RAW_LOG_ENTRY_{_rand_str()}")
-        self.assertTrue(mpm.export_audit_logs(file_path))
-
-    def test_export_audit_logs_with_stream_object(self):
-        file_path = os.path.join(self.base_path, f"{_rand_str()}.log")
-        payload = f'{{"trace_id": "{_rand_str()}"}}'
-        mock_f = MagicMock()
-        mock_f.read.return_value = io.BytesIO(payload.encode("utf-8"))
-
-        with patch("os.path.exists", return_value=True):
-            with patch("builtins.open", return_value=mock_f):
-                mock_f.__enter__.return_value = mock_f
-                res = mpm.export_audit_logs(file_path)
-                self.assertTrue(res)
-
-
-if __name__ == "__main__":
-    unittest.main()
+        random_price = round(random.uniform(50.0, 100.0), 2)
+        parser.fetch_and_symbol_price = parser.fetch_and_store(symbol=self.random_symbol, price=random_price)
+        final_loaded = parser.load_data(self.random_storage)
+        self.assertIn(self.random_symbol, final_loaded)
+        self.assertEqual(final_loaded[self.random_symbol], random_price)

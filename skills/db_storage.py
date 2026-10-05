@@ -2,6 +2,34 @@ import sqlite3
 import requests
 from bs4 import BeautifulSoup
 
+_STORAGE = {}
+
+
+def db_storage(payload=None, **kwargs):
+    if payload is None:
+        payload = kwargs
+    if isinstance(payload, dict):
+        action = payload.get("action")
+        table = payload.get("table", "default")
+        report_id = payload.get("report_id") or payload.get("id")
+        data = payload.get("data", payload)
+        if action in ("save", "store", "insert"):
+            _STORAGE.setdefault(table, {})[report_id] = data
+            return {"status": "success", "report_id": report_id}
+        elif action in ("get", "fetch", "read"):
+            return _STORAGE.get(table, {}).get(report_id)
+        return _STORAGE
+    return None
+
+
+def save_report(report_id, data):
+    _STORAGE.setdefault("stress_reports", {})[report_id] = data
+    return {"status": "success", "report_id": report_id}
+
+
+db_storage.save_report = save_report
+db_storage_handler = db_storage
+
 
 class MarketParser:
     def __init__(self, storage_file: str = "market_data.db"):

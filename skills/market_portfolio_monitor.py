@@ -1,5 +1,6 @@
 import json
 import os
+import io
 
 def run_pipeline(symbol, url, telegram_token, chat_id, storage_file):
     """Выполняет основной конвейер мониторинга портфеля."""
@@ -47,22 +48,25 @@ class MarketParser:
     def __init__(self, storage_file):
         self.storage_file = storage_file
 
+    def _read_content(self, f):
+        content = f.read()
+        if hasattr(content, "read"):
+            content = content.read()
+        if hasattr(content, "decode"):
+            try:
+                content = content.decode("utf-8")
+            except (AttributeError, UnicodeDecodeError):
+                pass
+        if not isinstance(content, str):
+            content = str(content)
+        return content
+
     def fetch_and_store(self, symbol, price):
         data = {}
         if self.storage_file:
             if os.path.exists(self.storage_file):
                 with open(self.storage_file, "r", encoding="utf-8") as f:
-                    content = f.read()
-                    if hasattr(content, "read"):
-                        content = content.read()
-                    if hasattr(content, "decode"):
-                        try:
-                            content = content.decode("utf-8")
-                        except (AttributeError, UnicodeDecodeError):
-                            pass
-                    if not isinstance(content, str):
-                        content = str(content)
-
+                    content = self._read_content(f)
                     if content.strip():
                         if content.strip().startswith("{") and not content.strip().endswith("}"):
                             data = {}
@@ -86,18 +90,7 @@ class MarketParser:
         if not os.path.exists(storage_file):
             return {}
         with open(storage_file, "r", encoding="utf-8") as f:
-            content = f.read()
-            if hasattr(content, "read"):
-                content = content.read()
-            if hasattr(content, "decode"):
-                try:
-                    content = content.decode("utf-8")
-                except (AttributeError, UnicodeDecodeError):
-                    pass
-            
-            if not isinstance(content, str):
-                content = str(content)
-
+            content = self._read_content(f)
             if not content.strip():
                 return {}
             

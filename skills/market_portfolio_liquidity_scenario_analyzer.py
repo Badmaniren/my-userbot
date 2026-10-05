@@ -80,6 +80,23 @@ class MarketPortfolioLiquidityScenarioAnalyzer:
     def __init__(self, storage_file=None):
         self.storage_file = storage_file
 
+    def evaluate_scenarios(self, raw_market_data, shock_multiplier=2.5):
+        asset_metrics = []
+        if isinstance(raw_market_data, list):
+            for item in raw_market_data:
+                if isinstance(item, dict):
+                    spread = item.get("bid_ask_spread_bps", 0.0) * shock_multiplier
+                    depth = item.get("depth_usd", 0.0) / shock_multiplier
+                    asset_metrics.append({
+                        "asset": item.get("asset"),
+                        "stressed_spread": round(spread, 2),
+                        "stressed_depth": round(depth, 2)
+                    })
+        return {
+            "shock_multiplier": shock_multiplier,
+            "asset_metrics": asset_metrics
+        }
+
     def _calculate_required_reserve(self, var_val, stress_impact):
         return float(round(max(var_val, stress_impact) * 1.15, 10))
 

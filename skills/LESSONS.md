@@ -3,7 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-чит поймал: ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'market_portfolio_liquidity_scenario_analyzer'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.market_portfolio_liquidity_scenario_analyz
+авать заглушки. Используй честный импорт: 'from skills.market_portfolio_liquidity_scenario_analyz
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -284,4 +284,7 @@
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_monitor (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_scenario_pipeline (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

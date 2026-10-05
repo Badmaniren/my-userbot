@@ -112,7 +112,8 @@ class TestMarketPortfolioMonitorUnit(unittest.TestCase):
 
     def test_market_parser_stream_and_decode(self):
         parser = MarketParser(self.storage_file)
-        self.assertEqual(parser.load_data(None), None)
+        # load_data() without args defaults to self.storage_file (which does not exist yet -> returns {})
+        self.assertEqual(parser.load_data(), {})
         self.assertEqual(parser.load_data(os.path.join(self.test_dir.name, "missing.json")), {})
 
         # Parse stream as string

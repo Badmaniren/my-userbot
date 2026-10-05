@@ -1,6 +1,8 @@
 import json
 import os
 
+_DEFAULT = object()
+
 
 class MarketParser:
     def __init__(self, storage_file=None):
@@ -45,8 +47,8 @@ class MarketParser:
             except Exception:
                 pass
 
-    def load_data(self, storage_file=None):
-        target_file = storage_file if storage_file is not None else self.storage_file
+    def load_data(self, storage_file=_DEFAULT):
+        target_file = self.storage_file if storage_file is _DEFAULT else storage_file
         if target_file is None:
             return None
         if not os.path.exists(target_file):

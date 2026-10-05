@@ -70,7 +70,9 @@ class MarketParser:
                 json.dump(data, f)
 
     def load_data(self, storage_file):
-        if not storage_file or not os.path.exists(storage_file):
+        if not storage_file:
+            return None
+        if not os.path.exists(storage_file):
             return None
         with open(storage_file, "r", encoding="utf-8") as f:
             content = f.read()

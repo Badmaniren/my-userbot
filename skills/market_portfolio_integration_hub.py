@@ -13,6 +13,13 @@ class MarketPortfolioIntegrationHub:
         self.api_gateway = self.gateway
         self.data_exporter = self.exporter
 
+    def prepare_context(self, portfolio_id=None, db_uri=None, **kwargs):
+        return {
+            "portfolio_id": portfolio_id,
+            "db_uri": db_uri,
+            "status": "ready"
+        }
+
     def run_integrated_pipeline(self, url, symbol, shifts, telegram_token, chat_id):
         try:
             self.gateway.export_portfolio_summary(url)
@@ -37,3 +44,6 @@ class MarketPortfolioIntegrationHub:
 
     def run_full_integration_pipeline(self, symbol, url, telegram_token, chat_id, shifts):
         return self.process_and_export(url, symbol, shifts, telegram_token, chat_id)
+
+
+market_portfolio_integration_hub = MarketPortfolioIntegrationHub()

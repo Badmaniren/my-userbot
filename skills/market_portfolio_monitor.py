@@ -76,6 +76,17 @@ class MarketParser:
             return {}
         with open(storage_file, "r", encoding="utf-8") as f:
             content = f.read()
+            if hasattr(content, "read"):
+                content = content.read()
+            if hasattr(content, "decode"):
+                try:
+                    content = content.decode("utf-8")
+                except (AttributeError, UnicodeDecodeError):
+                    pass
+            
+            if not isinstance(content, str):
+                content = str(content)
+
             if not content.strip():
                 return {}
             
@@ -83,9 +94,6 @@ class MarketParser:
                 return {}
             
             try:
-                # Поддержка чтения из моков io.BytesIO или текстовых потоков
-                if hasattr(content, "decode"):
-                    content = content.decode("utf-8")
                 res = json.loads(content)
                 if not isinstance(res, dict):
                     return {}
@@ -112,8 +120,11 @@ class MarketReportGenerator:
             with open(path, "r", encoding="utf-8") as f:
                 content = f.read()
                 if hasattr(content, "decode"):
-                    return content.decode("utf-8")
-                return content
+                    try:
+                        return content.decode("utf-8")
+                    except (AttributeError, UnicodeDecodeError):
+                        pass
+                return str(content)
         return "{}"
 
 
@@ -142,7 +153,12 @@ def export_audit_logs(storage_file=None):
         with open(storage_file, "r", encoding="utf-8") as f:
             content = f.read()
             if hasattr(content, "decode"):
-                content = content.decode("utf-8")
+                try:
+                    content = content.decode("utf-8")
+                except (AttributeError, UnicodeDecodeError):
+                    pass
+            if not isinstance(content, str):
+                content = str(content)
             if not content.strip():
                 return False
             if content.strip().startswith("{") and not content.strip().endswith("}"):

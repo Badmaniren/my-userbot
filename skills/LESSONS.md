@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-: FAILED (errors=1)
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_macro_liquidity_bridge (create) — раундов: 4
-- Античит поймал: ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'db_storage'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.db_storage import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'extractor_tool_1790087207'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.extractor_tool_1790087207 import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'market_portfolio_liquidity_scenario_analyzer'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.market_portfolio_liquidity_scenario_analyz
+ТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'db_storage'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.db_storage import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'extractor_tool_1790087207'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.extractor_tool_1790087207 import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'market_portfolio_liquidity_scenario_analyzer'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.market_portfolio_liquidity_scenario_analyz
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -273,4 +269,8 @@
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_monitor (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_monitor (refactor) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main

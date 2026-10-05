@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-авать заглушки. Используй честный импорт: 'from skills.market_portfolio_liquidity_scenario_analyz
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+Н Унгой, передан на эскалацию
 
 ## market_portfolio_liquidity_scenario_analyzer (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
@@ -287,4 +285,8 @@
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_scenario_pipeline (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_scenario_pipeline (refactor) — раундов: 2
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main

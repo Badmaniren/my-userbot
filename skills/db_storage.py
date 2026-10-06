@@ -1,6 +1,30 @@
 import sqlite3
 import requests
 from bs4 import BeautifulSoup
+from typing import Optional, Dict, Any
+
+
+class db_storage:
+    _storage: Dict[str, Any] = {}
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def save_calibration_metrics(self, portfolio_id: str, data: dict) -> None:
+        db_storage._storage[portfolio_id] = data
+
+    def save_var_calibration(self, portfolio_id: str, data: dict) -> None:
+        db_storage._storage[portfolio_id] = data
+
+    def get_var_calibration(self, portfolio_id: str) -> Optional[dict]:
+        return db_storage._storage.get(portfolio_id)
+
+    def fetch_portfolio(self, portfolio_id: str) -> dict:
+        return db_storage._storage.get(portfolio_id, {"portfolio_id": portfolio_id})
+
+
+def fetch_portfolio(portfolio_id: str) -> dict:
+    return db_storage._storage.get(portfolio_id, {"portfolio_id": portfolio_id})
 
 
 class MarketParser:

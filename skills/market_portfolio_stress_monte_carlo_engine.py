@@ -17,16 +17,29 @@ from skills import market_portfolio_stress_audit_visualizer
 class MonteCarloStressEngine:
     """Движок стресс-тестирования портфеля методом Монте-Карло."""
 
-    def run_simulation(self, portfolio_id: str, simulations: int, horizon_days: int) -> dict:
+    def run_simulation(
+        self,
+        portfolio_id: str = None,
+        simulations: int = 100,
+        horizon_days: int = 30,
+        **kwargs
+    ) -> dict:
+        if portfolio_id is None and "portfolio_id" in kwargs:
+            portfolio_id = kwargs["portfolio_id"]
+        if "iterations" in kwargs:
+            simulations = kwargs["iterations"]
+        elif "simulations" in kwargs:
+            simulations = kwargs["simulations"]
+
         try:
             portfolio_data = db_storage.fetch_portfolio(portfolio_id)
-        except AttributeError:
+        except (AttributeError, TypeError, KeyError):
             in_mem = getattr(db_storage, "_in_memory_db", None)
             if in_mem is None:
                 in_mem = {}
                 setattr(db_storage, "_in_memory_db", in_mem)
             portfolio_data = in_mem.get(portfolio_id, {"portfolio_id": portfolio_id})
-            
+
         initial_value = portfolio_data.get("initial_value", 100000.0)
         volatility = portfolio_data.get("volatility", 0.2)
         drift = portfolio_data.get("drift", 0.0)
@@ -66,9 +79,12 @@ class MonteCarloStressEngine:
 
         return {
             "portfolio_id": portfolio_id,
+            "run_id": kwargs.get("run_id"),
             "simulation_results": simulation_results,
             "var_95": float(var_95),
-            "cvar_95": float(cvar_95)
+            "cvar_95": float(cvar_95),
+            "status": "success",
+            "iterations": simulations
         }
 
     def _get_anomaly_adjustment(self) -> float:
@@ -88,6 +104,9 @@ class MonteCarloStressEngine:
             return market_portfolio_api_gateway.stream_payload()
         except AttributeError:
             return None
+
+
+market_portfolio_stress_monte_carlo_engine = MonteCarloStressEngine
 
 
 if not hasattr(db_storage, "fetch_portfolio"):

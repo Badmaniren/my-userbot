@@ -3,23 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-татус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_scenario_pipeline (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_scenario_pipeline (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_stress_reporter (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_reporter (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_alert_dispatcher (refactor) — раундов: 2
-- Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/skills/market_portfolio_alert_dispatcher.py", line 90, in process_stream_alert
+File "/home/runner/work/my-userbot/my-userbot/skills/market_portfolio_alert_dispatcher.py", line 90, in process_stream_alert
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_audit_visualizer (refactor) — раундов: 1
@@ -283,4 +267,8 @@
 
 ## market_portfolio_stress_hedge_executor (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_auto_rebalance_trigger (refactor) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 84); АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'market_portfolio_stress_auto_rebalance_trigger' глобальной переменной!; АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'market_portfolio_stress_auto_rebalance_trigger' глобальной переменной!; АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'market_portfolio_stress_auto_rebalance_trigger' глобальной переменной!
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

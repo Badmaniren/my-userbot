@@ -66,3 +66,21 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+_REPORTS = {}
+
+
+def save(data: dict):
+    if isinstance(data, dict):
+        report_id = data.get("report_id") or data.get("id")
+        if report_id:
+            _REPORTS[report_id] = data
+
+
+def store_report(data: dict):
+    save(data)
+
+
+def fetch_stored_report(report_id: str):
+    return _REPORTS.get(report_id)

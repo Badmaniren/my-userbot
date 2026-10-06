@@ -59,7 +59,21 @@ class MarketReportGenerator:
         return self.parser.load_data(self.storage_file)
 
 
-def generate_market_report(storage_file, symbol):
+def generate_market_report(storage_file=None, symbol=None, report_id=None, portfolio_value=None, asset_count=None, **kwargs):
+    if report_id is not None or portfolio_value is not None or asset_count is not None:
+        report = {}
+        if report_id is not None:
+            report["report_id"] = report_id
+        if portfolio_value is not None:
+            report["portfolio_value"] = portfolio_value
+        if asset_count is not None:
+            report["asset_count"] = asset_count
+        if symbol is not None:
+            report["symbol"] = symbol
+        for k, v in kwargs.items():
+            report[k] = v
+        return report
+
     data = {}
     load_func = getattr(db_storage, "load_data", None)
     if load_func is None:

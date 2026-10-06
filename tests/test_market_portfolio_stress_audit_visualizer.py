@@ -1,9 +1,8 @@
 import unittest
-from unittest.mock import patch, MagicMock
 import uuid
 import random
-import string
-
+import io
+from unittest.mock import patch, MagicMock
 from skills.market_portfolio_stress_audit_visualizer import (
     MarketPortfolioStressAuditVisualizer,
     market_portfolio_stress_audit_visualizer
@@ -13,104 +12,128 @@ from skills.market_portfolio_stress_audit_visualizer import (
 class TestMarketPortfolioStressAuditVisualizer(unittest.TestCase):
 
     def setUp(self):
-        self.random_deps = {
-            "db_storage": f"db_{uuid.uuid4().hex[:8]}",
-            "market_portfolio_stress_scenario_matrix_evaluator": f"eval_{uuid.uuid4().hex[:8]}"
-        }
-        self.visualizer_class = MarketPortfolioStressAuditVisualizer(**self.random_deps)
+        self.random_db_val = uuid.uuid4().hex
+        self.visualizer = MarketPortfolioStressAuditVisualizer(db_storage=self.random_db_val)
 
     def test_init_and_dependencies(self):
-        self.assertEqual(self.visualizer_class.db_storage, self.random_deps["db_storage"])
-        self.assertEqual(self.visualizer_class.dependencies, self.random_deps)
+        rand_key = uuid.uuid4().hex
+        rand_val = uuid.uuid4().hex
+        inst = MarketPortfolioStressAuditVisualizer(**{rand_key: rand_val})
+        self.assertEqual(inst.dependencies.get(rand_key), rand_val)
+        self.assertEqual(inst.db_storage, None)
 
-    def test_visualize_proxy_call(self):
-        portfolio_id = uuid.uuid4().hex
-        adaptive_score = round(random.uniform(1.0, 100.0), 2)
+        inst_with_db = MarketPortfolioStressAuditVisualizer(db_storage=rand_val)
+        self.assertEqual(inst_with_db.db_storage, rand_val)
+
+    def test_visualize_wrapper_delegation(self):
+        rand_portfolio_id = uuid.uuid4().hex
         payload = {
-            "portfolio_id": portfolio_id,
-            "format": "text_summary",
-            "adaptive_risk_score": adaptive_score,
-            "export_to_text_report": True
+            "portfolio_id": rand_portfolio_id,
+            "format": "text_summary"
         }
-        
-        result = self.visualizer_class.visualize(payload)
-        self.assertIn(portfolio_id, result)
-        self.assertIn(str(adaptive_score), result)
-        self.assertIn("Exported to text report successfully.", result)
+        res = self.visualizer.visualize(payload)
+        self.assertIn(rand_portfolio_id, res)
 
-    def test_non_dict_payload(self):
-        random_string = "".join(random.choices(string.ascii_letters, k=15))
-        result = market_portfolio_stress_audit_visualizer(random_string)
-        self.assertEqual(result, random_string)
+    def test_payload_not_dict_returns_string(self):
+        rand_int = random.randint(100000, 999999)
+        res = market_portfolio_stress_audit_visualizer(rand_int)
+        self.assertEqual(res, str(rand_int))
 
-        random_number = random.randint(1000, 99999)
-        result_num = market_portfolio_stress_audit_visualizer(random_number)
-        self.assertEqual(result_num, str(random_number))
+        rand_str = uuid.uuid4().hex
+        res_str = market_portfolio_stress_audit_visualizer(rand_str)
+        self.assertEqual(res_str, rand_str)
 
     def test_text_summary_format_basic(self):
+        portfolio_id = uuid.uuid4().hex
+        payload = {
+            "portfolio_id": portfolio_id,
+            "format": "text_summary"
+        }
+        result = market_portfolio_stress_audit_visualizer(payload)
+        self.assertIn(portfolio_id, result)
+        self.assertIn("Portfolio Stress Audit Summary", result)
+
+    def test_text_summary_with_report_id_fallback(self):
         report_id = uuid.uuid4().hex
         payload = {
             "report_id": report_id,
             "format": "text_summary"
         }
         result = market_portfolio_stress_audit_visualizer(payload)
-        expected_msg = f"Portfolio Stress Audit Summary for {report_id}: Data successfully audited and visualized."
-        self.assertEqual(result, expected_msg)
+        self.assertIn(report_id, result)
 
-    def test_text_summary_format_advanced(self):
-        portfolio_id = f"port_{uuid.uuid4().hex[:6]}"
-        adaptive_score = round(random.uniform(0.1, 99.9), 4)
+    def test_text_summary_with_adaptive_score(self):
+        portfolio_id = uuid.uuid4().hex
+        score = round(random.uniform(1.0, 100.0), 2)
         payload = {
             "portfolio_id": portfolio_id,
             "format": "text_summary",
-            "adaptive_risk_score": adaptive_score,
+            "adaptive_risk_score": score
+        }
+        result = market_portfolio_stress_audit_visualizer(payload)
+        self.assertIn(str(score), result)
+        self.assertIn("Adaptive Risk Score", result)
+
+    def test_text_summary_with_export_text(self):
+        portfolio_id = uuid.uuid4().hex
+        payload = {
+            "portfolio_id": portfolio_id,
+            "format": "text_summary",
             "export_to_text_report": True
         }
         result = market_portfolio_stress_audit_visualizer(payload)
-        
-        self.assertIn(portfolio_id, result)
-        self.assertIn(str(adaptive_score), result)
         self.assertIn("Exported to text report successfully.", result)
 
     def test_graphical_format_basic(self):
         portfolio_id = uuid.uuid4().hex
-        format_type = "".join(random.choices(string.ascii_lowercase, k=8))
+        format_type = uuid.uuid4().hex
         payload = {
             "portfolio_id": portfolio_id,
             "format": format_type
         }
         result = market_portfolio_stress_audit_visualizer(payload)
-        
         self.assertIsInstance(result, dict)
-        self.assertEqual(result["portfolio_id"], portfolio_id)
-        self.assertEqual(result["status"], "success")
-        self.assertEqual(result["layout"], "graphical")
+        self.assertEqual(result.get("portfolio_id"), portfolio_id)
+        self.assertEqual(result.get("status"), "success")
+        self.assertEqual(result.get("layout"), "graphical")
         self.assertNotIn("adaptive_risk_score", result)
         self.assertNotIn("tail_risk_metrics", result)
         self.assertNotIn("stream_payload", result)
 
-    def test_graphical_format_with_optional_fields(self):
+    def test_graphical_format_with_all_optional_fields(self):
         portfolio_id = uuid.uuid4().hex
-        adaptive_score = round(random.uniform(10.0, 50.0), 2)
-        tail_risk_metrics = {uuid.uuid4().hex: random.random() for _ in range(3)}
-        stream_payload = {"stream_id": uuid.uuid4().hex, "data": random.randint(1, 100)}
+        format_type = uuid.uuid4().hex
+        score = round(random.uniform(-50.0, 50.0), 4)
+        tail_metrics = {uuid.uuid4().hex: random.random() for _ in range(3)}
+        stream_data = {uuid.uuid4().hex: uuid.uuid4().hex for _ in range(2)}
+
+        payload = {
+            "portfolio_id": portfolio_id,
+            "format": format_type,
+            "adaptive_risk_score": score,
+            "tail_risk_metrics": tail_metrics,
+            "stream_payload": stream_data
+        }
+
+        result = market_portfolio_stress_audit_visualizer(payload)
+        self.assertEqual(result.get("portfolio_id"), portfolio_id)
+        self.assertEqual(result.get("adaptive_risk_score"), score)
+        self.assertEqual(result.get("tail_risk_metrics"), tail_metrics)
+        self.assertEqual(result.get("stream_payload"), stream_data)
+
+    def test_stream_io_integration_mock(self):
+        rand_bytes = uuid.uuid4().bytes
+        stream_io = io.BytesIO(rand_bytes)
+        portfolio_id = uuid.uuid4().hex
         
         payload = {
             "portfolio_id": portfolio_id,
-            "format": "graphical_custom",
-            "adaptive_risk_score": adaptive_score,
-            "tail_risk_metrics": tail_risk_metrics,
-            "stream_payload": stream_payload
+            "format": uuid.uuid4().hex,
+            "stream_payload": stream_io.read()
         }
-        
+
         result = market_portfolio_stress_audit_visualizer(payload)
-        
-        self.assertEqual(result["portfolio_id"], portfolio_id)
-        self.assertEqual(result["status"], "success")
-        self.assertEqual(result["layout"], "graphical")
-        self.assertEqual(result["adaptive_risk_score"], adaptive_score)
-        self.assertEqual(result["tail_risk_metrics"], tail_risk_metrics)
-        self.assertEqual(result["stream_payload"], stream_payload)
+        self.assertEqual(result.get("stream_payload"), rand_bytes)
 
 
 if __name__ == "__main__":

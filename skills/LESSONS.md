@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-skills.market_portfolio_stress_scenario_pipeline imp
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_stress_diagnostic_logger (create) — раундов: 4
 - Античит поймал: ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'market_portfolio_scenario_simulator'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.market_portfolio_scenario_simulator import ...'; Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
@@ -261,4 +259,7 @@ skills.market_portfolio_stress_scenario_pipeline imp
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_reporter (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_audit_visualizer (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

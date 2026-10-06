@@ -136,7 +136,8 @@ class TestMarketPortfolioStressExecutionGateway(unittest.TestCase):
             "auto_hedge_enabled": random.choice([True, False])
         }
 
-        with patch("builtins.open", new_callable=unittest.mock.mock_open()) as mock_file:
+        m = unittest.mock.mock_open()
+        with patch("builtins.open", m):
             res = market_portfolio_stress_execution_gateway(payload)
             self.assertEqual(res["execution_status"], "SUCCESS")
             self.assertEqual(res["portfolio_id"], self.portfolio_id)
@@ -145,8 +146,8 @@ class TestMarketPortfolioStressExecutionGateway(unittest.TestCase):
             self.assertEqual(res["confidence_level"], payload["confidence_level"])
             self.assertEqual(res["auto_hedge_enabled"], payload["auto_hedge_enabled"])
             self.assertTrue(res["execution_id"].startswith("exec_"))
-            mock_file.assert_called_once()
-            mock_file.return_value.write.assert_called_once()
+            m.assert_called_once()
+            m().write.assert_called_once()
 
     def test_stress_execution_gateway_integration_flow(self):
         payload = {

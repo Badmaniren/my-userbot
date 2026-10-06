@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-дняя ошибка перед фиксом: FAILED (failures=2)
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_scenario_pipeline (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
+татус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_scenario_pipeline (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
@@ -284,3 +280,7 @@
 
 ## market_portfolio_stress_scenario_pipeline (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_hedge_executor (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

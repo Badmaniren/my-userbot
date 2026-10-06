@@ -50,3 +50,6 @@ class market_portfolio_var_liquidity_core:
             confidence_level=confidence_level,
             export_target=export_target
         )
+
+
+MarketPortfolioVarLiquidityCore = market_portfolio_var_liquidity_core

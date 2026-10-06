@@ -33,7 +33,7 @@ class MarketPortfolioDeepStressAnalyzer:
             monte_carlo_results = self.monte_carlo.run_simulation(
                 portfolio_id=portfolio_id,
                 simulations=simulations,
-                horizon_days=30
+                confidence=confidence
             )
 
             if hasattr(self.var_core, "calculate_var"):

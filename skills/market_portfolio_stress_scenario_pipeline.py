@@ -6,7 +6,7 @@ from skills.market_portfolio_stress_reporter import StressReporter, PortfolioStr
 builtins.json = json
 
 class PortfolioStressScenarioPipeline:
-    def __init__(self, storage_file):
+    def __init__(self, storage_file="storage.json"):
         self.storage_file = storage_file
         self.simulator = PortfolioScenarioSimulator(storage_file)
         self.reporter = PortfolioStressReporter(storage_file)
@@ -67,6 +67,10 @@ class PortfolioStressScenarioPipeline:
             "stress_test": stress_test_result,
             "stress_report": stress_report_result
         }
+
+
+MarketPortfolioStressScenarioPipeline = PortfolioStressScenarioPipeline
+
 
 def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
     try:

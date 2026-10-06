@@ -154,3 +154,32 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
         market_portfolio_stress_audit_visualizer.visualize_stress_test(result_dict)
 
     return result_dict
+
+
+def market_portfolio_stress_monte_carlo_engine(payload=None, **kwargs):
+    if payload is None:
+        payload = kwargs
+    elif not isinstance(payload, dict):
+        payload = {"portfolio_id": str(payload)}
+
+    portfolio_id = payload.get("portfolio_id") or kwargs.get("portfolio_id", "default_portfolio")
+    simulations = payload.get("simulations_count") or payload.get("simulations") or kwargs.get("simulations", 100)
+    horizon_days = payload.get("horizon_days") or kwargs.get("horizon_days", 1)
+
+    engine = MonteCarloStressEngine()
+    res = engine.run_simulation(portfolio_id, int(simulations), int(horizon_days))
+
+    res["var_value"] = res.get("var_95", 0.0)
+    return res
+
+
+market_portfolio_stress_monte_carlo_engine.simulate = lambda portfolio_id: MonteCarloStressEngine().run_simulation(portfolio_id, 100, 30)
+
+
+class MarketPortfolioStressMonteCarloEngine:
+    def simulate(self, portfolio_id):
+        return MonteCarloStressEngine().run_simulation(portfolio_id, 100, 30)
+
+    def run_simulations(self, raw_market_data, simulations=100):
+        portfolio_id = raw_market_data.get("portfolio_id", "default") if isinstance(raw_market_data, dict) else "default"
+        return MonteCarloStressEngine().run_simulation(portfolio_id, simulations, 30)

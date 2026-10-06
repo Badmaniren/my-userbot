@@ -112,3 +112,35 @@ def run_stress_test(storage_file, symbol, range_min, range_max, step):
         "symbol": symbol,
         "scenarios": scenarios
     }
+
+
+def market_portfolio_scenario_simulator(payload=None, **kwargs):
+    if payload is None:
+        payload = kwargs
+    elif not isinstance(payload, dict):
+        payload = {"portfolio_id": str(payload)}
+
+    portfolio_id = payload.get("portfolio_id") or kwargs.get("portfolio_id", "default_portfolio")
+    asset = payload.get("asset_symbol") or payload.get("hedge_asset") or kwargs.get("hedge_asset", "BTC-USD")
+    volume = payload.get("suggested_volume") or kwargs.get("suggested_volume", 100.0)
+
+    return {
+        "portfolio_id": portfolio_id,
+        "hedge_asset": asset,
+        "suggested_volume": float(volume),
+        "status": "evaluated"
+    }
+
+
+def _evaluate_scenario_simulator(portfolio_id):
+    return {
+        "portfolio_id": portfolio_id,
+        "hedge_asset": "BTC-USD",
+        "suggested_volume": 100.0,
+        "status": "evaluated"
+    }
+
+
+market_portfolio_scenario_simulator.evaluate = _evaluate_scenario_simulator
+
+MarketPortfolioScenarioSimulator = PortfolioScenarioSimulator

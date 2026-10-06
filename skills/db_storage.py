@@ -2,6 +2,18 @@ import sqlite3
 import requests
 from bs4 import BeautifulSoup
 
+_AUDIT_LOGS = {}
+
+
+def save_audit_log_batch(portfolio_id: str, batch: list) -> None:
+    if portfolio_id not in _AUDIT_LOGS:
+        _AUDIT_LOGS[portfolio_id] = []
+    _AUDIT_LOGS[portfolio_id].extend(batch)
+
+
+def get_audit_logs_by_portfolio(portfolio_id: str) -> list:
+    return _AUDIT_LOGS.get(portfolio_id, [])
+
 
 class MarketParser:
     def __init__(self, storage_file: str = "market_data.db"):

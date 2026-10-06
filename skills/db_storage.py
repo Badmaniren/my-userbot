@@ -9,18 +9,29 @@ class MarketParser:
 
     def fetch_price(self, url: str):
         response = requests.get(url, timeout=10)
-        data = response.json()
-        return data.get("price")
+        try:
+            data = response.json()
+        except Exception:
+            return None
+        if isinstance(data, dict):
+            return data.get("price")
+        return None
 
     def parse_html_prices(self, url: str):
         response = requests.get(url, timeout=10)
         soup = BeautifulSoup(response.text, 'html.parser')
         element = soup.find()
         if element and element.text:
-            return float(element.text)
+            try:
+                return float(element.text)
+            except (ValueError, TypeError):
+                return None
         return None
 
     def fetch_and_store(self, symbol: str, price: float):
+        if not isinstance(symbol, str) or not isinstance(price, (int, float)) or isinstance(price, bool):
+            raise TypeError("Строгая типизация нарушена: symbol должен быть str, а price — числом.")
+        
         conn = sqlite3.connect(self.storage_file)
         cursor = conn.cursor()
         
@@ -34,7 +45,7 @@ class MarketParser:
         
         cursor.execute(
             'INSERT INTO market_data (symbol, price) VALUES (?, ?)',
-            (symbol, price)
+            (symbol, float(price))
         )
         
         conn.commit()

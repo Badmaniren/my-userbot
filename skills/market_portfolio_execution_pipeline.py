@@ -17,7 +17,11 @@ class MarketPortfolioExecutionPipeline:
             scenario_result = self.scenario_simulator.simulate_scenario(ticker, percentage)
             
             execution_result = self.slippage_model.simulate_order_execution(order_data, market_context)
-            self.slippage_model.persist_execution_logs(self.storage_file)
+            if hasattr(self.slippage_model, "persist_execution_logs"):
+                try:
+                    self.slippage_model.persist_execution_logs(ticker, [execution_result], self.storage_file)
+                except TypeError:
+                    self.slippage_model.persist_execution_logs(self.storage_file)
 
             return {
                 "scenario_result": scenario_result,

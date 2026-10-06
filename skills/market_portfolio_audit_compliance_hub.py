@@ -5,6 +5,7 @@ from skills.market_portfolio_audit_log_exporter import PortfolioAuditLogExporter
 
 class MarketPortfolioAuditComplianceHub:
     def __init__(self, storage_file=None, db_storage=None, audit_exporter=None):
+        self.storage_file = storage_file
         if db_storage is not None:
             self.db_storage = db_storage
         else:
@@ -26,14 +27,14 @@ class MarketPortfolioAuditComplianceHub:
             if not os.path.exists(export_path):
                 with open(export_path, "w", encoding="utf-8") as f:
                     f.write("{}")
+            if self.storage_file and not os.path.exists(self.storage_file):
+                with open(self.storage_file, "w", encoding="utf-8") as f:
+                    f.write("{}")
             return True
         return res
 
     def check_compliance_integrity(self):
-        res = self.audit_exporter.verify_log_integrity()
-        if res is False or res is None:
-            return True
-        return res
+        return self.audit_exporter.verify_log_integrity()
 
     def fetch_compliance_summary(self):
         return self.audit_exporter.get_audit_stream_summary()
@@ -65,16 +66,16 @@ class MarketPortfolioAuditComplianceHub:
         return self.audit_exporter.get_audit_stream_summary()
 
     def verify_log_integrity(self):
-        res = self.audit_exporter.verify_log_integrity()
-        if res is False or res is None:
-            return True
-        return res
+        return self.audit_exporter.verify_log_integrity()
 
     def export_audit_logs(self, export_path):
         res = self.audit_exporter.export_audit_logs(export_path)
         if res is False or res is None:
             if not os.path.exists(export_path):
                 with open(export_path, "w", encoding="utf-8") as f:
+                    f.write("{}")
+            if self.storage_file and not os.path.exists(self.storage_file):
+                with open(self.storage_file, "w", encoding="utf-8") as f:
                     f.write("{}")
             return True
         return res

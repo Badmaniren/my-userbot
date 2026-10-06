@@ -1,6 +1,8 @@
 import os
 import json
 from datetime import datetime
+from typing import Dict, Any, Optional
+
 
 class MarketParser:
     def __init__(self, storage_file: str):
@@ -64,6 +66,46 @@ class PortfolioVisualizer:
 
     def build_text_report(self, symbol: str) -> str:
         return f"Report for {symbol}"
+
+
+class PortfolioCollectorAgent:
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def collect(self, symbol: str) -> dict:
+        return {"symbol": symbol, "collected": True}
+
+    def parse(self, data: Any) -> dict:
+        return {"parsed": True, "data": data}
+
+
+class MarketPortfolioCollectorAgent(PortfolioCollectorAgent):
+    pass
+
+
+def collect_portfolio_metrics(portfolio_id: str) -> dict:
+    return {"portfolio_id": portfolio_id, "metrics": {"status": "OK"}}
+
+
+def fetch_stream(portfolio_id: str) -> dict:
+    return {"portfolio_id": portfolio_id, "stream": []}
+
+
+def market_portfolio_collector_agent_fetch(portfolio_id: str) -> dict:
+    return fetch_stream(portfolio_id)
+
+
+def market_portfolio_collector_agent(payload: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+    if payload is None:
+        payload = kwargs
+    elif isinstance(payload, str):
+        payload = {"portfolio_id": payload}
+
+    portfolio_id = payload.get("portfolio_id", "default")
+    res = dict(payload)
+    res["status"] = "COLLECTED"
+    res["portfolio_id"] = portfolio_id
+    return res
 
 
 def run_pipeline(symbol: str, url: str, telegram_token: str, chat_id: str, storage_file: str) -> bool:

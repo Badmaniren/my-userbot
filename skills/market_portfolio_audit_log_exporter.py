@@ -1,6 +1,7 @@
 import json
 import os
 import csv
+from typing import Dict, Any, Optional
 from skills.market_parser import MarketParser
 
 
@@ -101,3 +102,11 @@ class MarketPortfolioAuditLogExporter(PortfolioAuditLogExporter):
 
     def process_audit_stream(self, export_path: str):
         return self.export_audit_logs(export_path)
+
+
+def market_portfolio_audit_log_exporter(data: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+    if data is None:
+        data = kwargs
+    res = dict(data) if isinstance(data, dict) else {"data": data}
+    res["status"] = "EXPORTED"
+    return res

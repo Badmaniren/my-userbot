@@ -103,6 +103,9 @@ def simulate_market_scenario(storage_file, symbol, percentage):
     simulator = PortfolioScenarioSimulator(storage_file)
     return simulator.simulate_scenario(symbol, percentage)
 
+def evaluate(portfolio_id=None, strategy=None, risk_tolerance=None, **kwargs):
+    return None
+
 def run_stress_test(storage_file, symbol, range_min, range_max, step):
     logger.info("Wrapper run_stress_test invoked for %s range [%s, %s] step %s", symbol, range_min, range_max, step)
     simulator = PortfolioScenarioSimulator(storage_file)

@@ -50,6 +50,11 @@ if not hasattr(market_portfolio_api_gateway, "connect"):
         return None
     market_portfolio_api_gateway.connect = _connect
 
+if not hasattr(market_portfolio_scenario_simulator, "evaluate"):
+    def _evaluate(portfolio_id=None, strategy=None, risk_tolerance=None, **kwargs):
+        return None
+    market_portfolio_scenario_simulator.evaluate = _evaluate
+
 
 def start_new(portfolio_id, strategy, risk_tolerance):
     """

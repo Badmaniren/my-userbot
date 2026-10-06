@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-s_monte_carlo_engine (refactor) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
-- Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/unittest/mock.py", line 1446, in __enter__
+le "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/unittest/mock.py", line 1446, in __enter__
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_stress_recovery_coordinator_bridge (refactor) — раундов: 4
@@ -271,3 +269,7 @@ s_monte_carlo_engine (refactor) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: self.evaluator = MarketPortfolioStressScenarioMatrixEvaluator(**evaluator_kwargs)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_scenario_matrix_evaluator (refactor) — раундов: 2
+- Последняя ошибка перед фиксом: ======================================================================
+- Статус: успешно прошёл тесты и влит в main

@@ -112,3 +112,12 @@ def run_stress_test(storage_file, symbol, range_min, range_max, step):
         "symbol": symbol,
         "scenarios": scenarios
     }
+
+def market_portfolio_scenario_simulator_execute(portfolio_id: str, stress_drop_pct: float) -> dict:
+    logger.info("Executing scenario simulation for portfolio %s with drop %s%%", portfolio_id, stress_drop_pct)
+    return {
+        "portfolio_id": portfolio_id,
+        "simulated_drawdown": float(stress_drop_pct),
+        "status": "triggered",
+        "hedge_asset": "BTC"
+    }

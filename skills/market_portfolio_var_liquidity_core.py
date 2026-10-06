@@ -50,3 +50,10 @@ class market_portfolio_var_liquidity_core:
             confidence_level=confidence_level,
             export_target=export_target
         )
+
+
+def market_portfolio_var_liquidity_core_calculate(portfolio_id: str, confidence_level: float = 0.95) -> dict:
+    return start_new(
+        portfolio_id=portfolio_id,
+        confidence_level=confidence_level
+    )

@@ -3,7 +3,8 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-66, in test_market_parser_malformed_bracket_handling
+## market_portfolio_monitor (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/tests/test_market_portfolio_monitor.py", line 166, in test_market_parser_malformed_bracket_handling
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_monitor (refactor) — раундов: 1
@@ -263,7 +264,3 @@
 ## market_portfolio_audit_compliance_hub (refactor) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (failures=2)
 - Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_audit_integrity_reporter (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

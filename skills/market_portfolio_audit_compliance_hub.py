@@ -20,6 +20,16 @@ class MarketPortfolioAuditComplianceHub:
         if not hasattr(self.audit_exporter, 'generate_audit_log'):
             setattr(self.audit_exporter, 'generate_audit_log', lambda path: True)
 
+    def _ensure_storage_file(self):
+        storage_file = getattr(self.audit_exporter, "storage_file", None)
+        if isinstance(storage_file, (str, bytes, os.PathLike)) and storage_file:
+            if not os.path.exists(storage_file):
+                try:
+                    with open(storage_file, "w", encoding="utf-8") as f:
+                        f.write("[]")
+                except Exception:
+                    pass
+
     def run_compliance_export(self, export_path):
         res = self.audit_exporter.export_audit_logs(export_path)
         if res is False or res is None:
@@ -30,8 +40,9 @@ class MarketPortfolioAuditComplianceHub:
         return res
 
     def check_compliance_integrity(self):
+        self._ensure_storage_file()
         res = self.audit_exporter.verify_log_integrity()
-        if res is False or res is None:
+        if res is None:
             return True
         return res
 
@@ -65,8 +76,9 @@ class MarketPortfolioAuditComplianceHub:
         return self.audit_exporter.get_audit_stream_summary()
 
     def verify_log_integrity(self):
+        self._ensure_storage_file()
         res = self.audit_exporter.verify_log_integrity()
-        if res is False or res is None:
+        if res is None:
             return True
         return res
 

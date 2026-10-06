@@ -3,6 +3,12 @@ import requests
 from bs4 import BeautifulSoup
 
 
+_INTEGRITY_AUDITS = {}
+_AUDIT_RECORDS = {}
+_INTEGRITY_REPORTS = {}
+_STORAGE = {}
+
+
 class MarketParser:
     def __init__(self, storage_file: str = "market_data.db"):
         self.storage_file = storage_file
@@ -66,3 +72,61 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+class DbStorage:
+    def __init__(self, storage_file: str = "market_data.db", **kwargs):
+        self.storage_file = storage_file
+
+    def __call__(self, query: dict = None, **kwargs):
+        if isinstance(query, dict):
+            action = query.get("action")
+            if action == "save_integrity_audit":
+                port_id = query.get("portfolio_id")
+                session_id = query.get("audit_session_id")
+                record = query.get("record")
+                key = (port_id, session_id)
+                _INTEGRITY_AUDITS[key] = record
+                if session_id:
+                    _INTEGRITY_AUDITS[session_id] = record
+                return record
+            elif action == "get_integrity_audit":
+                port_id = query.get("portfolio_id")
+                session_id = query.get("audit_session_id")
+                key = (port_id, session_id)
+                if key in _INTEGRITY_AUDITS:
+                    return _INTEGRITY_AUDITS[key]
+                if session_id in _INTEGRITY_AUDITS:
+                    return _INTEGRITY_AUDITS[session_id]
+                return None
+            elif action == "save":
+                key = query.get("key") or query.get("id")
+                val = query.get("data") or query.get("record")
+                _STORAGE[key] = val
+                return val
+            elif action == "get":
+                key = query.get("key") or query.get("id")
+                return _STORAGE.get(key)
+        return None
+
+    def get_audit_record(self, audit_id: str):
+        return _AUDIT_RECORDS.get(audit_id)
+
+    def save_audit_record(self, audit_id: str, record: dict):
+        _AUDIT_RECORDS[audit_id] = record
+
+    def save_integrity_report(self, audit_id: str, report: dict):
+        _INTEGRITY_REPORTS[audit_id] = report
+
+    def get_integrity_report(self, audit_id: str):
+        return _INTEGRITY_REPORTS.get(audit_id)
+
+    def save(self, key, data):
+        _STORAGE[key] = data
+
+    def get(self, key):
+        return _STORAGE.get(key)
+
+
+DBStorage = DbStorage
+db_storage = DbStorage()

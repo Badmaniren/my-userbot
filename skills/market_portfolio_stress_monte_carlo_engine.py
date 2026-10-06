@@ -108,6 +108,9 @@ if not hasattr(market_portfolio_api_gateway, "stream_payload"):
 if not hasattr(market_portfolio_audit_compliance_hub, "log_simulation"):
     setattr(market_portfolio_audit_compliance_hub, "log_simulation", lambda *args, **kwargs: None)
 
+if not hasattr(market_portfolio_stress_audit_visualizer, "visualize_stress_test"):
+    setattr(market_portfolio_stress_audit_visualizer, "visualize_stress_test", lambda *args, **kwargs: None)
+
 
 def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scenario_params: dict, iterations: int) -> dict:
     volatility = scenario_params.get("volatility", 0.2)

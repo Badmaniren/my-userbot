@@ -3,7 +3,14 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-stress_diagnostic_hub_v3 (create) — раундов: 4
+: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_macro_liquidity_collector (start_new) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_diagnostic_hub_v3 (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -263,8 +270,3 @@ stress_diagnostic_hub_v3 (create) — раундов: 4
 
 ## db_storage (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_audit_integrity_checker (create) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

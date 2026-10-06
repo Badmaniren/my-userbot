@@ -101,3 +101,6 @@ class MarketPortfolioAuditLogExporter(PortfolioAuditLogExporter):
 
     def process_audit_stream(self, export_path: str):
         return self.export_audit_logs(export_path)
+
+
+market_portfolio_audit_log_exporter = MarketPortfolioAuditLogExporter

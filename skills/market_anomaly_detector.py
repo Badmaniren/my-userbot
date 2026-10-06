@@ -47,18 +47,31 @@ class MarketAnomalyDetector:
         return {"exchange": exchange, "status": "analyzed"}
 
 
-def market_anomaly_detector(data):
-    volume = data.get("volume", 0)
-    price = data.get("price", 0.0)
-    symbol = data.get("symbol") or data.get("ticker", "UNKNOWN")
+def market_anomaly_detector(data=None, portfolio_id=None, **kwargs):
+    if isinstance(data, dict):
+        payload = dict(data)
+    else:
+        payload = dict(kwargs)
+        if data is not None:
+            payload["data"] = data
+    if portfolio_id:
+        payload["portfolio_id"] = portfolio_id
+
+    volume = payload.get("volume", 0)
+    price = payload.get("price", 0.0)
+    symbol = payload.get("symbol") or payload.get("ticker", "UNKNOWN")
     
     is_anomaly = volume > 50000
     anomaly_score = float(volume) / 10000.0 if is_anomaly else 0.1
 
-    return {
+    res = {
         "is_anomaly": is_anomaly,
         "anomaly_score": anomaly_score,
         "symbol": symbol,
         "volume": volume,
         "price": price
     }
+    for k, v in payload.items():
+        if k not in res:
+            res[k] = v
+    return res

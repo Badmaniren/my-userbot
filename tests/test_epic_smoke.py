@@ -2,9 +2,9 @@ import unittest
 import os
 import json
 import tempfile
-from skills.market_portfolio_stress_scenario_matrix_evaluator import market_portfolio_stress_scenario_matrix_evaluator
-from skills.market_portfolio_stress_audit_visualizer import market_portfolio_stress_audit_visualizer
-from skills.db_storage import db_storage
+from market_portfolio_stress_scenario_matrix_evaluator import market_portfolio_stress_scenario_matrix_evaluator
+from market_portfolio_stress_audit_visualizer import market_portfolio_stress_audit_visualizer
+from db_storage import db_storage
 
 class TestPortfolioStressTestingEpicPractical(unittest.TestCase):
 

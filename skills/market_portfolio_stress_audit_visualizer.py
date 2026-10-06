@@ -11,8 +11,27 @@ class MarketPortfolioStressAuditVisualizer:
     def visualize(self, payload):
         return market_portfolio_stress_audit_visualizer(payload)
 
+    def generate_audit_summary(self, evaluation_results: list) -> dict:
+        total_scenarios = len(evaluation_results) if isinstance(evaluation_results, list) else 0
+        passed = sum(1 for item in evaluation_results if isinstance(item, dict) and item.get("status") == "PASSED") if total_scenarios else 0
+        warnings = sum(1 for item in evaluation_results if isinstance(item, dict) and item.get("status") == "WARNING") if total_scenarios else 0
+        critical = sum(1 for item in evaluation_results if isinstance(item, dict) and item.get("status") == "CRITICAL") if total_scenarios else 0
 
-def market_portfolio_stress_audit_visualizer(payload):
+        return {
+            "summary_metrics": {
+                "total_scenarios": total_scenarios,
+                "passed_count": passed,
+                "warning_count": warnings,
+                "critical_count": critical
+            },
+            "audit_status": "COMPLETED",
+            "results": evaluation_results
+        }
+
+
+def market_portfolio_stress_audit_visualizer(payload=None, **kwargs):
+    if payload is None:
+        return MarketPortfolioStressAuditVisualizer(**kwargs)
     if not isinstance(payload, dict):
         return str(payload)
 

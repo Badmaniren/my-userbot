@@ -27,8 +27,8 @@ class StressAutoHedgeEngine:
     """
     Движок для выполнения стресс-хеджирования.
     """
-    def __init__(self, db_storage):
-        self.db = db_storage
+    def __init__(self, db_storage_module):
+        self.db = db_storage_module
 
     def execute_hedge_sequence(self, portfolio_id, scenario_id):
         """

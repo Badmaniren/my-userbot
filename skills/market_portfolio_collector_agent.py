@@ -97,3 +97,11 @@ def start_new(symbol: str, url: str, telegram_token: str, chat_id: str, storage_
         chat_id,
         storage_file
     )
+
+
+def market_portfolio_collector_agent_fetch(portfolio_id: str) -> dict:
+    return {
+        "portfolio_id": portfolio_id,
+        "collected_at": datetime.utcnow().isoformat(),
+        "status": "active"
+    }

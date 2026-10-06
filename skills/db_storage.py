@@ -55,3 +55,7 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+def db_storage_connect(db_path: str = "market_data.db"):
+    return sqlite3.connect(db_path)

@@ -154,3 +154,14 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
         market_portfolio_stress_audit_visualizer.visualize_stress_test(result_dict)
 
     return result_dict
+
+
+def market_portfolio_stress_monte_carlo_engine_calculate(portfolio_id: str, balance: float) -> dict:
+    engine = MonteCarloStressEngine()
+    sim_res = engine.run_simulation(portfolio_id, simulations=50, horizon_days=30)
+    return {
+        "portfolio_id": portfolio_id,
+        "balance": balance,
+        "var_95": sim_res.get("var_95", 0.0),
+        "cvar_95": sim_res.get("cvar_95", 0.0)
+    }

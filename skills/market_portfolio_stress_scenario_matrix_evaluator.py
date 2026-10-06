@@ -2,10 +2,10 @@ import requests
 import bs4
 
 class MarketPortfolioStressScenarioMatrixEvaluator:
-    def __init__(self, db_storage, extractor_tool_1790087207, extractor_tool_1790102839):
+    def __init__(self, db_storage, extractor_tool_1790087207, extractor_tool_1790102839=None, extractor_tool_102839=None):
         self.db_storage = db_storage
         self.extractor_tool_1790087207 = extractor_tool_1790087207
-        self.extractor_tool_1790102839 = extractor_tool_1790102839
+        self.extractor_tool_1790102839 = extractor_tool_1790102839 if extractor_tool_1790102839 is not None else extractor_tool_102839
 
     def evaluate_matrix(self, portfolio_id: str, historical_window: int) -> dict:
         history = self.db_storage.fetch_history(portfolio_id, historical_window)

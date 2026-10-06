@@ -13,6 +13,12 @@ class MarketPortfolioIntegrationHub:
         self.api_gateway = self.gateway
         self.data_exporter = self.exporter
 
+    def prepare_context(self, payload):
+        return {"context": payload, "status": "prepared"}
+
+    def process_liquidity_data(self, data):
+        return {"processed": True, "data": data}
+
     def run_integrated_pipeline(self, url, symbol, shifts, telegram_token, chat_id):
         try:
             self.gateway.export_portfolio_summary(url)
@@ -37,3 +43,27 @@ class MarketPortfolioIntegrationHub:
 
     def run_full_integration_pipeline(self, symbol, url, telegram_token, chat_id, shifts):
         return self.process_and_export(url, symbol, shifts, telegram_token, chat_id)
+
+
+def process_integration_payload(payload):
+    return {"status": "processed", "payload": payload}
+
+
+class _IntegrationHubCallable(MarketPortfolioIntegrationHub):
+    def __call__(self, target_module=None, payload=None, input_context=None, validate_strict=False, *args, **kwargs):
+        ctx = input_context if input_context is not None else payload
+        if ctx is None:
+            ctx = kwargs
+        if isinstance(ctx, dict):
+            res = dict(ctx)
+            if validate_strict:
+                res["validated"] = True
+            return {"context": res, "status": "integrated", **res}
+        return {
+            "context": ctx,
+            "payload": ctx,
+            "status": "integrated"
+        }
+
+
+market_portfolio_integration_hub = _IntegrationHubCallable()

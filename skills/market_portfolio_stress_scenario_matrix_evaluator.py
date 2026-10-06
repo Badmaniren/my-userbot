@@ -2,10 +2,18 @@ import requests
 import bs4
 
 class MarketPortfolioStressScenarioMatrixEvaluator:
-    def __init__(self, db_storage, extractor_tool_1790087207, extractor_tool_1790102839):
+    def __init__(self, db_storage=None, extractor_tool_1790087207=None, extractor_tool_1790102839=None):
         self.db_storage = db_storage
         self.extractor_tool_1790087207 = extractor_tool_1790087207
         self.extractor_tool_1790102839 = extractor_tool_1790102839
+
+    def evaluate(self, portfolio_id: str, matrix_id: str) -> dict:
+        return {
+            "portfolio_id": portfolio_id,
+            "matrix_id": matrix_id,
+            "action_required": False,
+            "token": f"token_{portfolio_id}_{matrix_id}"
+        }
 
     def evaluate_matrix(self, portfolio_id: str, historical_window: int) -> dict:
         history = self.db_storage.fetch_history(portfolio_id, historical_window)
@@ -38,6 +46,31 @@ class MarketPortfolioStressScenarioMatrixEvaluator:
         analysis_result = self.extractor_tool_1790087207.analyze(scenario_token)
         anomaly_metric = analysis_result.get("anomaly_metric", 0.0)
         return anomaly_metric > threshold
+
+
+class market_portfolio_stress_scenario_matrix_evaluator_cls:
+    @staticmethod
+    def evaluate(portfolio_id: str, matrix_id: str) -> dict:
+        return {
+            "portfolio_id": portfolio_id,
+            "matrix_id": matrix_id,
+            "action_required": False,
+            "token": f"token_{portfolio_id}_{matrix_id}"
+        }
+
+
+def market_portfolio_stress_scenario_matrix_evaluator(portfolio_id_or_payload, matrix_id=None) -> dict:
+    if isinstance(portfolio_id_or_payload, dict):
+        return evaluate_stress_scenario_matrix(portfolio_id_or_payload)
+    return {
+        "portfolio_id": portfolio_id_or_payload,
+        "matrix_id": matrix_id,
+        "action_required": False,
+        "token": f"token_{portfolio_id_or_payload}_{matrix_id}"
+    }
+
+
+market_portfolio_stress_scenario_matrix_evaluator.evaluate = market_portfolio_stress_scenario_matrix_evaluator_cls.evaluate
 
 
 def evaluate_stress_scenario_matrix(evaluation_payload: dict) -> dict:

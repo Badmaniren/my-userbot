@@ -3,3 +3,4 @@
 ## Расширенная симуляция рыночных рисков и стресс-тестирования v3
 
 - market_portfolio_stress_monte_carlo_engine: Запуск нового эпика по симуляции рыночных рисков через создание движка Монте-Карло без заглушек.
+- market_portfolio_stress_monte_carlo_engine: Доработка и стабилизация market_portfolio_stress_monte_carlo_engine для надежного функционирования в конвейере стресс-тестирования v3.

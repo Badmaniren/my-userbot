@@ -2,7 +2,7 @@ import math
 import random
 import uuid
 
-# Честные импорты зависимостей без заглушек через try-except
+# Честные импорты зависимостей без заглушек и try-except
 from skills import db_storage
 from skills import market_anomaly_detector
 from skills import market_portfolio_data_exporter
@@ -152,7 +152,6 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
         "iterations": iterations
     }
 
-    # Финализация контура: интеграция детального отчета с модулем визуализации стресс-тестов
     if hasattr(market_portfolio_stress_audit_visualizer, "visualize_stress_test"):
         market_portfolio_stress_audit_visualizer.visualize_stress_test(result_dict)
 

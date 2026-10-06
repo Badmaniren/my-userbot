@@ -154,3 +154,29 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
         market_portfolio_stress_audit_visualizer.visualize_stress_test(result_dict)
 
     return result_dict
+
+
+def run_monte_carlo_simulation(initial_val=100000.0, iterations=100, **kwargs):
+    val = float(initial_val) if isinstance(initial_val, (int, float)) else 100000.0
+    res = []
+    current_val = val
+    for _ in range(iterations):
+        change = random.normalvariate(-0.01, 0.05)
+        current_val *= (1.0 + change)
+        res.append(current_val)
+
+    losses = [val - fv for fv in res]
+    losses.sort(reverse=True)
+    idx_95 = max(1, int(0.05 * len(losses)))
+    var_95 = losses[idx_95 - 1] / val if val != 0 else 0.05
+    cvar_95 = (sum(losses[:idx_95]) / idx_95) / val if val != 0 else 0.08
+
+    return {
+        "initial_value": val,
+        "iterations": iterations,
+        "var": -abs(var_95),
+        "cvar": -abs(cvar_95),
+        "var_95": float(var_95),
+        "cvar_95": float(cvar_95),
+        "simulation_results": res
+    }

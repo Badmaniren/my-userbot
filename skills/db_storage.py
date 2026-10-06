@@ -55,3 +55,15 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+_HEDGE_OPTIMIZATION_STORAGE = {}
+
+
+def save_hedge_optimization_result(portfolio_id: str, result: dict):
+    _HEDGE_OPTIMIZATION_STORAGE[portfolio_id] = result
+    return True
+
+
+def get_hedge_optimization_result(portfolio_id: str):
+    return _HEDGE_OPTIMIZATION_STORAGE.get(portfolio_id)

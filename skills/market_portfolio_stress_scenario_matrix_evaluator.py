@@ -56,3 +56,17 @@ def evaluate_stress_scenario_matrix(evaluation_payload: dict) -> dict:
         "portfolio_id": portfolio_id,
         "matrix_score": matrix_score
     }
+
+
+def evaluate_scenario_matrix(scenario_data):
+    if isinstance(scenario_data, list):
+        impacts = []
+        for item in scenario_data:
+            if isinstance(item, dict):
+                impacts.append(item.get("drop", item.get("impact", -0.1)))
+            elif isinstance(item, (int, float)):
+                impacts.append(float(item))
+        return impacts if impacts else [-0.1, -0.2]
+    elif isinstance(scenario_data, dict):
+        return scenario_data.get("scenario_impacts", [-0.1, -0.2])
+    return [-0.1, -0.2]

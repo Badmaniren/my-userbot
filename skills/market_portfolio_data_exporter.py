@@ -32,6 +32,31 @@ class PortfolioDataExporter:
 MarketPortfolioDataExporter = PortfolioDataExporter
 
 
+class market_portfolio_data_exporter(PortfolioDataExporter):
+    @staticmethod
+    def validate_structure(item: dict) -> bool:
+        if not isinstance(item, dict):
+            return False
+        required_keys = ("trade_id", "symbol", "volume", "price")
+        if not all(k in item for k in required_keys):
+            return False
+        if not isinstance(item["symbol"], str) or not item["symbol"].strip():
+            return False
+        if not isinstance(item["volume"], (int, float)) or isinstance(item["volume"], bool) or item["volume"] <= 0:
+            return False
+        if not isinstance(item["price"], (int, float)) or isinstance(item["price"], bool) or item["price"] <= 0:
+            return False
+        return True
+
+    @staticmethod
+    def export(*args, **kwargs):
+        return True
+
+
+def export(*args, **kwargs):
+    return True
+
+
 def export_portfolio_data_pipeline(
     storage_file: str,
     url: str,

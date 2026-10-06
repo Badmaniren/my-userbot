@@ -30,11 +30,6 @@ class MarketPortfolioAuditComplianceHub:
         else:
             self.audit_exporter = PortfolioAuditLogExporter(storage_file)
 
-        if not hasattr(self.audit_exporter, 'process_audit_stream'):
-            setattr(self.audit_exporter, 'process_audit_stream', lambda path, stream: True)
-        if not hasattr(self.audit_exporter, 'generate_audit_log'):
-            setattr(self.audit_exporter, 'generate_audit_log', lambda path: True)
-
     def run_compliance_export(self, export_path: str) -> bool:
         logger.info(f"Запуск экспорта соответствия в путь: {export_path}")
         res = self.audit_exporter.export_audit_logs(export_path)

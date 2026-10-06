@@ -1,10 +1,22 @@
 import unittest
 import os
 import json
+import sys
 import tempfile
-from market_portfolio_stress_scenario_matrix_evaluator import market_portfolio_stress_scenario_matrix_evaluator
-from market_portfolio_stress_audit_visualizer import market_portfolio_stress_audit_visualizer
-from db_storage import db_storage
+
+# Add skills directory to sys.path so top-level imports succeed regardless of runner setup
+skills_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "skills"))
+if skills_dir not in sys.path:
+    sys.path.insert(0, skills_dir)
+
+try:
+    from skills.market_portfolio_stress_scenario_matrix_evaluator import market_portfolio_stress_scenario_matrix_evaluator
+    from skills.market_portfolio_stress_audit_visualizer import market_portfolio_stress_audit_visualizer
+    from skills.db_storage import db_storage
+except ImportError:
+    from market_portfolio_stress_scenario_matrix_evaluator import market_portfolio_stress_scenario_matrix_evaluator
+    from market_portfolio_stress_audit_visualizer import market_portfolio_stress_audit_visualizer
+    from db_storage import db_storage
 
 class TestPortfolioStressTestingEpicPractical(unittest.TestCase):
 

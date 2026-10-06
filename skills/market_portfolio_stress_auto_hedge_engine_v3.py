@@ -1,8 +1,8 @@
 import io
-import db_storage
 import uuid
 import datetime
 import os
+import db_storage
 
 def start_new(portfolio_id, scenario_name):
     """

@@ -1,5 +1,6 @@
 import os
 import json
+import io
 from datetime import datetime
 
 class MarketParser:
@@ -64,6 +65,10 @@ class PortfolioVisualizer:
 
     def build_text_report(self, symbol: str) -> str:
         return f"Report for {symbol}"
+
+
+def fetch_stream(portfolio_id=None):
+    return io.BytesIO(f"stream_data_for_{portfolio_id}".encode('utf-8'))
 
 
 def run_pipeline(symbol: str, url: str, telegram_token: str, chat_id: str, storage_file: str) -> bool:

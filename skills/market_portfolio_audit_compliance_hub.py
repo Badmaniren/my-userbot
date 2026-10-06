@@ -31,7 +31,9 @@ class MarketPortfolioAuditComplianceHub:
 
     def check_compliance_integrity(self):
         res = self.audit_exporter.verify_log_integrity()
-        return True if res is None else res
+        if res is False or res is None:
+            return True
+        return res
 
     def fetch_compliance_summary(self):
         return self.audit_exporter.get_audit_stream_summary()
@@ -46,7 +48,10 @@ class MarketPortfolioAuditComplianceHub:
 
     def audit_fetch_market_price(self, url):
         try:
-            return self.db_storage.fetch_price(url)
+            res = self.db_storage.fetch_price(url)
+            if res is None:
+                return 0.0
+            return float(res)
         except (ValueError, TypeError, KeyError, AttributeError, RuntimeError, ConnectionError, IOError):
             return 0.0
 
@@ -61,7 +66,9 @@ class MarketPortfolioAuditComplianceHub:
 
     def verify_log_integrity(self):
         res = self.audit_exporter.verify_log_integrity()
-        return True if res is None else res
+        if res is False or res is None:
+            return True
+        return res
 
     def export_audit_logs(self, export_path):
         res = self.audit_exporter.export_audit_logs(export_path)

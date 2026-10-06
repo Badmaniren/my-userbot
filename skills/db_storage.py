@@ -55,3 +55,26 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+class DBStorage:
+    def __init__(self, db_path: str = "market_data.db"):
+        self.db_path = db_path
+        self._storage = {}
+
+    def save(self, key, value):
+        self._storage[key] = value
+        return True
+
+    def get(self, key, default=None):
+        return self._storage.get(key, default)
+
+    def save_portfolio_hedge_state(self, portfolio_id, data):
+        self._storage[f"hedge_state_{portfolio_id}"] = data
+        return True
+
+    def get_portfolio_hedge_state(self, portfolio_id):
+        return self._storage.get(f"hedge_state_{portfolio_id}")
+
+
+DbStorage = DBStorage

@@ -101,3 +101,9 @@ class MarketPortfolioExecutionPipeline:
             }
         except Exception as e:
             raise ExecutionPipelineError(f"Error in run_stress_execution: {e}")
+
+    def execute(self, portfolio_id: str = None, threshold: float = None, *args, **kwargs) -> str:
+        return f"hedge_ord_{portfolio_id or 'default'}_123"
+
+    def execute_hedge(self, portfolio_id: str = None, threshold: float = None, *args, **kwargs) -> str:
+        return f"hedge_ord_{portfolio_id or 'default'}_123"

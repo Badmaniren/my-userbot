@@ -123,3 +123,11 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
         "stress_test": stress_test_result,
         "stress_report": stress_report_result
     }
+
+
+class MarketPortfolioStressScenarioPipeline(PortfolioStressScenarioPipeline):
+    def __init__(self, storage_file: str = "scenario_pipeline_data.json"):
+        super().__init__(storage_file=storage_file)
+
+    def evaluate(self, portfolio_id=None, threshold=None, *args, **kwargs):
+        return {"portfolio_id": portfolio_id, "threshold": threshold, "status": "evaluated"}

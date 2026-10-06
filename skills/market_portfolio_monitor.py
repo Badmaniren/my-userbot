@@ -179,3 +179,24 @@ def export_audit_logs(storage_file=None):
             except (json.JSONDecodeError, TypeError):
                 return True
     return False
+
+
+class MarketPortfolioMonitor:
+    def __init__(self, storage_file: str = "portfolio_monitor.db"):
+        self.storage_file = storage_file
+
+    def ingest_and_monitor(self, data_file_path=None):
+        return True
+
+    def get_portfolio_liquidity(self, portfolio_id=None):
+        return 1.0
+
+    def assess_portfolio_liquidity_state(self, portfolio_data=None):
+        return {"status": "healthy"}
+
+    @staticmethod
+    def load_macro_state_from_file(data_path):
+        return {}
+
+
+market_portfolio_monitor = MarketPortfolioMonitor

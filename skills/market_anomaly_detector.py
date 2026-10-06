@@ -47,6 +47,12 @@ class MarketAnomalyDetector:
         return {"exchange": exchange, "status": "analyzed"}
 
 
+def detect(ticker=None, portfolio_id=None, **kwargs):
+    target = ticker or portfolio_id or kwargs.get("symbol") or "UNKNOWN"
+    detector = MarketAnomalyDetector()
+    return detector.detect(target)
+
+
 def market_anomaly_detector(data):
     volume = data.get("volume", 0)
     price = data.get("price", 0.0)

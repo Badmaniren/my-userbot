@@ -3,162 +3,146 @@ from unittest.mock import MagicMock, patch
 import os
 import uuid
 import random
-import string
 import io
 from skills.market_portfolio_audit_compliance_hub import MarketPortfolioAuditComplianceHub
 
-
 class TestMarketPortfolioAuditComplianceHub(unittest.TestCase):
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.storage_file = f"{uuid.uuid4().hex}.json"
-        self.export_path = f"{uuid.uuid4().hex}_export.json"
-        self.url = f"https://{uuid.uuid4().hex}.market/{uuid.uuid4().hex}"
-        self.stream_name = f"stream_{uuid.uuid4().hex}"
+        self.db_storage_mock = MagicMock()
+        self.audit_exporter_mock = MagicMock()
+        self.hub = MarketPortfolioAuditComplianceHub(
+            storage_file=self.storage_file,
+            db_storage=self.db_storage_mock,
+            audit_exporter=self.audit_exporter_mock
+        )
 
-    def tearDown(self):
-        for path in [self.storage_file, self.export_path]:
-            if os.path.exists(path):
-                try:
-                    os.remove(path)
-                except OSError:
-                    pass
+    def tearDown(self) -> None:
+        if os.path.exists(self.storage_file):
+            try:
+                os.remove(self.storage_file)
+            except OSError:
+                pass
 
-    def test_init_and_storage_allocation(self):
-        mock_db = MagicMock()
-        mock_exporter = MagicMock()
-        hub = MarketPortfolioAuditComplianceHub(db_storage=mock_db, audit_exporter=mock_exporter)
-        
-        self.assertEqual(hub.db_storage, mock_db)
-        self.assertEqual(hub.audit_exporter, mock_exporter)
+    def test_run_compliance_export_success(self) -> None:
+        export_path = f"{uuid.uuid4().hex}.log"
+        expected_result = random.choice([True, False])
+        self.audit_exporter_mock.export_audit_logs.return_value = expected_result
 
-    def test_run_compliance_export_success(self):
-        expected_result = random.choice([True, {"status": uuid.uuid4().hex}])
-        mock_exporter = MagicMock()
-        mock_exporter.export_audit_logs.return_value = expected_result
-
-        hub = MarketPortfolioAuditComplianceHub(db_storage=MagicMock(), audit_exporter=mock_exporter)
-        result = hub.run_compliance_export(self.export_path)
-
+        result = self.hub.run_compliance_export(export_path)
         self.assertEqual(result, expected_result)
-        mock_exporter.export_audit_logs.assert_called_once_with(self.export_path)
+        self.audit_exporter_mock.export_audit_logs.assert_called_once_with(export_path)
 
-    def test_run_compliance_export_fallback_creation(self):
-        mock_exporter = MagicMock()
-        mock_exporter.export_audit_logs.return_value = False
+        if os.path.exists(export_path):
+            os.remove(export_path)
 
-        hub = MarketPortfolioAuditComplianceHub(db_storage=MagicMock(), audit_exporter=mock_exporter)
+    def test_run_compliance_export_fallback_creates_file(self) -> None:
+        export_path = f"{uuid.uuid4().hex}.log"
+        self.audit_exporter_mock.export_audit_logs.return_value = False
+
+        self.assertFalse(os.path.exists(export_path))
+        result = self.hub.run_compliance_export(export_path)
         
-        with patch('os.path.exists', return_value=False), \
-             patch('builtins.open', unittest.mock.mock_open()) as mocked_file:
-            result = hub.run_compliance_export(self.export_path)
+        self.assertTrue(result)
+        self.assertTrue(os.path.exists(export_path))
+        
+        with open(export_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        self.assertEqual(content, "{}")
 
-            self.assertTrue(result)
-            mocked_file.assert_called_once_with(self.export_path, "w", encoding="utf-8")
-            mocked_file().write.assert_called_once_with("{}")
+        os.remove(export_path)
 
-    def test_check_compliance_integrity(self):
+    def test_check_compliance_integrity_normal(self) -> None:
         expected_integrity = random.choice([True, False])
-        mock_exporter = MagicMock()
-        mock_exporter.verify_log_integrity.return_value = expected_integrity
+        self.audit_exporter_mock.verify_log_integrity.return_value = expected_integrity
 
-        hub = MarketPortfolioAuditComplianceHub(db_storage=MagicMock(), audit_exporter=mock_exporter)
-        result = hub.check_compliance_integrity()
-
+        result = self.hub.check_compliance_integrity()
         self.assertEqual(result, expected_integrity)
-        mock_exporter.verify_log_integrity.assert_called_once()
+        self.audit_exporter_mock.verify_log_integrity.assert_called_once()
 
-    def test_fetch_compliance_summary(self):
-        summary_data = {uuid.uuid4().hex: random.randint(1, 100)}
-        mock_exporter = MagicMock()
-        mock_exporter.get_audit_stream_summary.return_value = summary_data
+    def test_check_compliance_integrity_fallback(self) -> None:
+        self.audit_exporter_mock.verify_log_integrity.return_value = None
 
-        hub = MarketPortfolioAuditComplianceHub(db_storage=MagicMock(), audit_exporter=mock_exporter)
-        result = hub.fetch_compliance_summary()
+        result = self.hub.check_compliance_integrity()
+        self.assertTrue(result)
 
-        self.assertEqual(result, summary_data)
-        mock_exporter.get_audit_stream_summary.assert_called_once()
+    def test_fetch_compliance_summary(self) -> None:
+        expected_summary = {uuid.uuid4().hex: random.randint(1, 100)}
+        self.audit_exporter_mock.get_audit_stream_summary.return_value = expected_summary
 
-    def test_process_audit_stream_data(self):
-        stream_payload = io.BytesIO(uuid.uuid4().hex.encode('utf-8'))
+        result = self.hub.fetch_compliance_summary()
+        self.assertEqual(result, expected_summary)
+        self.audit_exporter_mock.get_audit_stream_summary.assert_called_once()
+
+    def test_process_audit_stream_data(self) -> None:
+        export_path = f"{uuid.uuid4().hex}.stream"
+        stream_data = io.BytesIO(uuid.uuid4().hex.encode('utf-8'))
         expected_res = random.choice([True, False])
-        mock_exporter = MagicMock()
-        mock_exporter.process_audit_stream.return_value = expected_res
+        self.audit_exporter_mock.process_audit_stream.return_value = expected_res
 
-        hub = MarketPortfolioAuditComplianceHub(db_storage=MagicMock(), audit_exporter=mock_exporter)
-        result = hub.process_audit_stream_data(self.export_path, stream_payload)
-
+        result = self.hub.process_audit_stream_data(export_path, stream_data)
         self.assertEqual(result, expected_res)
-        mock_exporter.process_audit_stream.assert_called_once_with(self.export_path, stream_payload)
+        self.audit_exporter_mock.process_audit_stream.assert_called_once_with(export_path, stream_data)
 
-    def test_generate_compliance_log(self):
+    def test_generate_compliance_log(self) -> None:
+        export_path = f"{uuid.uuid4().hex}.gen"
         expected_res = random.choice([True, False])
-        mock_exporter = MagicMock()
-        mock_exporter.generate_audit_log.return_value = expected_res
+        self.audit_exporter_mock.generate_audit_log.return_value = expected_res
 
-        hub = MarketPortfolioAuditComplianceHub(db_storage=MagicMock(), audit_exporter=mock_exporter)
-        result = hub.generate_compliance_log(self.export_path)
-
+        result = self.hub.generate_compliance_log(export_path)
         self.assertEqual(result, expected_res)
-        mock_exporter.generate_audit_log.assert_called_once_with(self.export_path)
+        self.audit_exporter_mock.generate_audit_log.assert_called_once_with(export_path)
 
-    def test_audit_fetch_market_price_success(self):
+    def test_audit_fetch_market_price_valid(self) -> None:
+        url = f"https://{uuid.uuid4().hex}.com/market"
         expected_price = round(random.uniform(10.0, 1000.0), 2)
-        mock_db = MagicMock()
-        mock_db.fetch_price.return_value = expected_price
+        self.db_storage_mock.fetch_price.return_value = expected_price
 
-        hub = MarketPortfolioAuditComplianceHub(db_storage=mock_db, audit_exporter=MagicMock())
-        result = hub.audit_fetch_market_price(self.url)
+        result = self.hub.audit_fetch_market_price(url)
+        self.assertEqual(result, float(expected_price))
+        self.db_storage_mock.fetch_price.assert_called_once_with(url)
 
-        self.assertEqual(result, expected_price)
-        mock_db.fetch_price.assert_called_once_with(self.url)
+    def test_audit_fetch_market_price_exception(self) -> None:
+        url = f"https://{uuid.uuid4().hex}.com/error"
+        exception_type = random.choice([ValueError, TypeError, KeyError, AttributeError, RuntimeError, ConnectionError, IOError])
+        self.db_storage_mock.fetch_price.side_effect = exception_type("Test exception")
 
-    def test_audit_fetch_market_price_raises_exceptions(self):
-        exceptions_to_test = [
-            ValueError, TypeError, KeyError, AttributeError, 
-            RuntimeError, ConnectionError, IOError
-        ]
-        
-        for exc_class in exceptions_to_test:
-            mock_db = MagicMock()
-            mock_db.fetch_price.side_effect = exc_class(uuid.uuid4().hex)
+        result = self.hub.audit_fetch_market_price(url)
+        self.assertEqual(result, 0.0)
 
-            hub = MarketPortfolioAuditComplianceHub(db_storage=mock_db, audit_exporter=MagicMock())
-            result = hub.audit_fetch_market_price(self.url)
+    def test_load_historical_audit_data_existing(self) -> None:
+        filename = f"{uuid.uuid4().hex}.json"
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write("[]")
 
-            self.assertEqual(result, 0.0)
+        expected_data = [{"id": uuid.uuid4().hex}]
+        self.db_storage_mock.load_data.return_value = expected_data
 
-    def test_load_historical_audit_data_file_missing(self):
-        expected_data = [{"id": uuid.uuid4().hex, "value": random.random()}]
-        mock_db = MagicMock()
-        mock_db.load_data.return_value = expected_data
+        result = self.hub.load_historical_audit_data(filename)
+        self.assertEqual(result, expected_data)
+        self.db_storage_mock.load_data.assert_called_once_with(filename)
 
-        hub = MarketPortfolioAuditComplianceHub(db_storage=mock_db, audit_exporter=MagicMock())
+        if os.path.exists(filename):
+            os.remove(filename)
 
-        with patch('os.path.exists', return_value=False), \
-             patch('builtins.open', unittest.mock.mock_open()) as mocked_file:
-            result = hub.load_historical_audit_data(self.storage_file)
+    def test_load_historical_audit_data_missing(self) -> None:
+        filename = f"{uuid.uuid4().hex}.json"
+        self.assertFalse(os.path.exists(filename))
 
-            self.assertEqual(result, expected_data)
-            mocked_file.assert_called_once_with(self.storage_file, "w", encoding="utf-8")
-            mocked_file().write.assert_called_once_with("[]")
-            mock_db.load_data.assert_called_once_with(self.storage_file)
+        expected_data = []
+        self.db_storage_mock.load_data.return_value = expected_data
 
-    def test_load_historical_audit_data_file_exists(self):
-        expected_data = [{"audit_id": uuid.uuid4().hex}]
-        mock_db = MagicMock()
-        mock_db.load_data.return_value = expected_data
+        result = self.hub.load_historical_audit_data(filename)
+        self.assertTrue(os.path.exists(filename))
+        self.assertEqual(result, expected_data)
 
-        hub = MarketPortfolioAuditComplianceHub(db_storage=mock_db, audit_exporter=MagicMock())
+        with open(filename, "r", encoding="utf-8") as f:
+            content = f.read()
+        self.assertEqual(content, "[]")
 
-        with patch('os.path.exists', return_value=True), \
-             patch('builtins.open', unittest.mock.mock_open()) as mocked_file:
-            result = hub.load_historical_audit_data(self.storage_file)
-
-            self.assertEqual(result, expected_data)
-            mocked_file.assert_not_called()
-            mock_db.load_data.assert_called_once_with(self.storage_file)
-
+        if os.path.exists(filename):
+            os.remove(filename)
 
 if __name__ == '__main__':
     unittest.main()

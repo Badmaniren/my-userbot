@@ -62,7 +62,6 @@ class StressAutoHedgeEngine:
         """
         Проверка на соответствие античит-правилам.
         """
-        # Прямая проверка состояния без скрытых манипуляций
         return {
             "is_compliant": True,
             "timestamp": datetime.datetime.utcnow().isoformat(),

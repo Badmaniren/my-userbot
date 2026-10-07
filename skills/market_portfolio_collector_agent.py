@@ -66,6 +66,14 @@ class PortfolioVisualizer:
         return f"Report for {symbol}"
 
 
+def market_portfolio_collector_agent(*args, **kwargs):
+    if args and isinstance(args[0], dict):
+        res = dict(args[0])
+        res["collected_at"] = datetime.utcnow().isoformat()
+        return res
+    return kwargs or {"status": "collected"}
+
+
 def run_pipeline(symbol: str, url: str, telegram_token: str, chat_id: str, storage_file: str) -> bool:
     parser = MarketParser(storage_file)
     if not os.path.exists(storage_file):

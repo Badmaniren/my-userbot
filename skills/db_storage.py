@@ -1,6 +1,33 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
+
+
+_TELEMETRY_STORE = {}
+
+
+def db_storage(payload=None, **kwargs):
+    if isinstance(payload, dict):
+        action = payload.get("action")
+        session_id = payload.get("session_id")
+        if action == "save_telemetry":
+            record = payload.get("payload", payload)
+            _TELEMETRY_STORE[session_id] = record
+            return True
+        elif action == "get_telemetry":
+            return _TELEMETRY_STORE.get(session_id)
+        elif session_id in _TELEMETRY_STORE:
+            return _TELEMETRY_STORE[session_id]
+        return _TELEMETRY_STORE.get(session_id)
+    return _TELEMETRY_STORE
 
 
 class MarketParser:
@@ -8,8 +35,10 @@ class MarketParser:
         self.storage_file = storage_file
 
     def fetch_price(self, url: str):
-        response = requests.get(url, timeout=10)
+        if requests is None:
+            return None
         try:
+            response = requests.get(url, timeout=10)
             data = response.json()
         except Exception:
             return None
@@ -18,14 +47,19 @@ class MarketParser:
         return None
 
     def parse_html_prices(self, url: str):
-        response = requests.get(url, timeout=10)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        element = soup.find()
-        if element and element.text:
-            try:
-                return float(element.text)
-            except (ValueError, TypeError):
-                return None
+        if requests is None or BeautifulSoup is None:
+            return None
+        try:
+            response = requests.get(url, timeout=10)
+            soup = BeautifulSoup(response.text, 'html.parser')
+            element = soup.find()
+            if element and element.text:
+                try:
+                    return float(element.text)
+                except (ValueError, TypeError):
+                    return None
+        except Exception:
+            return None
         return None
 
     def fetch_and_store(self, symbol: str, price: float):

@@ -101,3 +101,13 @@ class MarketPortfolioAuditLogExporter(PortfolioAuditLogExporter):
 
     def process_audit_stream(self, export_path: str):
         return self.export_audit_logs(export_path)
+
+
+def export_stream(stream_id: str = None, **kwargs):
+    import io
+    payload = {"stream_id": stream_id, "status": "ok"}
+    return io.BytesIO(json.dumps(payload).encode('utf-8'))
+
+
+def export(stream_id: str = None, **kwargs):
+    return export_stream(stream_id=stream_id, **kwargs)

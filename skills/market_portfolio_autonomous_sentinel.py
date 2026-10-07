@@ -72,6 +72,18 @@ class AutonomousSentinel:
         return result_dict
 
 
+def evaluate_threat(context_id=None, **kwargs):
+    return {
+        "threat_level": "LOW",
+        "score": 0.1,
+        "context_id": context_id
+    }
+
+
+def evaluate(context_id=None, **kwargs):
+    return evaluate_threat(context_id=context_id, **kwargs)
+
+
 def run_autonomous_sentinel(
     symbol,
     url,

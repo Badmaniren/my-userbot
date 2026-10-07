@@ -112,6 +112,19 @@ if not hasattr(market_portfolio_stress_audit_visualizer, "visualize_stress_test"
     setattr(market_portfolio_stress_audit_visualizer, "visualize_stress_test", lambda *args, **kwargs: None)
 
 
+def run_simulation(portfolio_id: str = "default", session_id: str = None, **kwargs) -> dict:
+    engine = MonteCarloStressEngine()
+    sim_count = kwargs.get("simulations", 100)
+    horizon = kwargs.get("horizon_days", 30)
+    res = engine.run_simulation(portfolio_id, sim_count, horizon)
+    res["stress_score"] = res.get("cvar_95", 0.0)
+    return res
+
+
+def run(portfolio_id: str = "default", session_id: str = None, **kwargs) -> dict:
+    return run_simulation(portfolio_id=portfolio_id, session_id=session_id, **kwargs)
+
+
 def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scenario_params: dict, iterations: int) -> dict:
     volatility = scenario_params.get("volatility", 0.2)
     drift = scenario_params.get("drift", 0.0)

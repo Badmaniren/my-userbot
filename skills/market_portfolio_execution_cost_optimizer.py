@@ -81,6 +81,17 @@ class MarketPortfolioExecutionCostOptimizer:
 # Синглтон / экземпляр модуля для интеграционных тестов
 _optimizer_instance = MarketPortfolioExecutionCostOptimizer()
 
+
+def optimize(portfolio_id=None, **kwargs):
+    res = _optimizer_instance.optimize_execution_cost(portfolio_id=portfolio_id, **kwargs)
+    res["optimal_cost"] = res.get("optimized_cost", 10.0)
+    return res
+
+
+def opt(portfolio_id=None, **kwargs):
+    return optimize(portfolio_id=portfolio_id, **kwargs)
+
+
 def market_portfolio_execution_cost_optimizer(portfolio_id=None, ticker=None, volume=None, slippage_model_output=None, **kwargs):
     return _optimizer_instance.optimize_execution_cost(
         portfolio_id=portfolio_id,

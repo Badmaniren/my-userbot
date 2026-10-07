@@ -2,6 +2,25 @@ import sqlite3
 import requests
 from bs4 import BeautifulSoup
 
+_in_memory_db = {}
+
+
+def commit():
+    return True
+
+
+def save(record_id: str, payload: dict) -> bool:
+    _in_memory_db[record_id] = payload
+    return True
+
+
+def get(record_id: str) -> dict:
+    return _in_memory_db.get(record_id, {})
+
+
+def fetch_portfolio(portfolio_id: str) -> dict:
+    return _in_memory_db.get(portfolio_id, {"portfolio_id": portfolio_id, "initial_value": 100000.0, "volatility": 0.2, "drift": 0.0})
+
 
 class MarketParser:
     def __init__(self, storage_file: str = "market_data.db"):

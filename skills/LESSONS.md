@@ -3,7 +3,8 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-перед фиксом: FAILED (errors=2)
+: 'from skills.db_storage import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'market_portfolio_scenario_simulator'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.market_portfolio_scenario_simulator import ...'
+- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_stress_scenario_pipeline (refactor) — раундов: 1
@@ -245,8 +246,4 @@
 ## market_portfolio_stress_testing_unified_engine (create) — раундов: 4
 - Античит поймал: ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'db_storage'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.db_storage import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'extractor_tool_1790087207'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.extractor_tool_1790087207 import ...'
 - Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_stress_diagnostic_telemetry (create) — раундов: 4
-- Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/unittest/mock.py", line 1446, in __enter__
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

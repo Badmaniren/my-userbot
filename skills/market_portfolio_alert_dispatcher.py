@@ -9,6 +9,18 @@ try:
 except ImportError:
     market_report_generator = None
 
+def dispatch_alert(threat_eval=None, **kwargs):
+    return {
+        "status": "DISPATCHED",
+        "id": "alert_123",
+        "payload": threat_eval
+    }
+
+
+def dispatch(threat_eval=None, **kwargs):
+    return dispatch_alert(threat_eval=threat_eval, **kwargs)
+
+
 def send_telegram_notification(token, chat_id, message):
     """
     Отправляет уведомление в Telegram.

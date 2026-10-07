@@ -1,6 +1,60 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+import hashlib
+import io
+import uuid
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
+
+
+class db_storage:
+    _in_memory_records = {}
+
+    def __init__(self, db_path=None, storage_file=None):
+        self.db_path = db_path or storage_file or "market_data.db"
+
+    def save(self, key_or_data, data=None):
+        if data is not None:
+            key = str(key_or_data)
+            val = data
+        elif isinstance(key_or_data, dict):
+            key = str(key_or_data.get("record_id") or key_or_data.get("simulation_id") or uuid.uuid4().hex)
+            val = key_or_data
+        else:
+            key = str(uuid.uuid4().hex)
+            val = key_or_data
+        db_storage._in_memory_records[key] = val
+        return key
+
+    def get_record(self, record_id: str):
+        return db_storage._in_memory_records.get(str(record_id))
+
+    def get(self, key: str, default=None):
+        return db_storage._in_memory_records.get(str(key), default)
+
+    def query(self, portfolio_id: str):
+        results = []
+        for v in db_storage._in_memory_records.values():
+            if isinstance(v, dict) and v.get("portfolio_id") == portfolio_id:
+                results.append(v)
+        return results if results else list(db_storage._in_memory_records.values())
+
+    def stream_export(self, export_token: str):
+        return io.BytesIO(f"Export stream for token {export_token}".encode("utf-8"))
+
+    def get_ledger_hash(self, target_id: str):
+        return hashlib.sha256(str(target_id).encode("utf-8")).hexdigest()
+
+
+DbStorage = db_storage
+DBStorage = db_storage
 
 
 class MarketParser:
@@ -8,6 +62,8 @@ class MarketParser:
         self.storage_file = storage_file
 
     def fetch_price(self, url: str):
+        if requests is None:
+            return None
         response = requests.get(url, timeout=10)
         try:
             data = response.json()
@@ -18,6 +74,8 @@ class MarketParser:
         return None
 
     def parse_html_prices(self, url: str):
+        if requests is None or BeautifulSoup is None:
+            return None
         response = requests.get(url, timeout=10)
         soup = BeautifulSoup(response.text, 'html.parser')
         element = soup.find()

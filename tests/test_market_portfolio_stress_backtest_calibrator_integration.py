@@ -11,7 +11,8 @@ except ImportError:
         db_storage = None
 import skills.market_portfolio_stress_monte_carlo_engine as mc_engine_mod
 market_portfolio_stress_monte_carlo_engine = getattr(mc_engine_mod, "market_portfolio_stress_monte_carlo_engine", getattr(mc_engine_mod, "MonteCarloStressEngine", None))
-from skills.market_portfolio_scenario_simulator import market_portfolio_scenario_simulator
+import skills.market_portfolio_scenario_simulator as scenario_sim_mod
+market_portfolio_scenario_simulator = getattr(scenario_sim_mod, "market_portfolio_scenario_simulator", getattr(scenario_sim_mod, "PortfolioScenarioSimulator", None))
 from skills.market_portfolio_stress_backtest_calibrator import (
     MarketPortfolioStressBacktestCalibrator,
     market_portfolio_stress_backtest_calibrator

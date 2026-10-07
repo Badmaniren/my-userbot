@@ -15,8 +15,11 @@ market_portfolio_backtester = getattr(market_portfolio_backtester_mod, "market_p
 import skills.market_portfolio_stress_monte_carlo_engine as market_portfolio_stress_monte_carlo_engine_mod
 market_portfolio_stress_monte_carlo_engine = getattr(market_portfolio_stress_monte_carlo_engine_mod, "market_portfolio_stress_monte_carlo_engine", getattr(market_portfolio_stress_monte_carlo_engine_mod, "MonteCarloStressEngine", None))
 
-from skills.market_portfolio_valuation import market_portfolio_valuation
-from skills.market_portfolio_scenario_simulator import market_portfolio_scenario_simulator
+import skills.market_portfolio_valuation as valuation_mod
+market_portfolio_valuation = getattr(valuation_mod, "market_portfolio_valuation", getattr(valuation_mod, "PortfolioValuation", None))
+
+import skills.market_portfolio_scenario_simulator as scenario_sim_mod
+market_portfolio_scenario_simulator = getattr(scenario_sim_mod, "market_portfolio_scenario_simulator", getattr(scenario_sim_mod, "PortfolioScenarioSimulator", None))
 
 
 class MarketPortfolioStressBacktestCalibrator:

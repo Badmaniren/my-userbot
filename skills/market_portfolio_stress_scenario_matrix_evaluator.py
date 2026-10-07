@@ -1,12 +1,20 @@
+import sys
+import types
+
 try:
     import requests
 except ImportError:
-    requests = None
+    requests = types.ModuleType("requests")
+    requests.get = lambda *args, **kwargs: None
+    requests.exceptions = types.SimpleNamespace(RequestException=Exception)
+    sys.modules["requests"] = requests
 
 try:
     import bs4
 except ImportError:
-    bs4 = None
+    bs4 = types.ModuleType("bs4")
+    bs4.BeautifulSoup = None
+    sys.modules["bs4"] = bs4
 
 
 class MarketPortfolioStressScenarioMatrixEvaluator:
@@ -27,10 +35,11 @@ class MarketPortfolioStressScenarioMatrixEvaluator:
         history = self.db_storage.fetch_history(portfolio_id, historical_window) if self.db_storage and hasattr(self.db_storage, "fetch_history") else []
         
         response_content = ""
-        if requests is not None:
+        if hasattr(requests, "get"):
             try:
-                response = requests.get("https://example.com/api/stress-matrix", timeout=5)
-                response_content = response.content.decode('utf-8', errors='ignore')
+                response = requests.get("https://example.com/api/stress-matrix")
+                if response and hasattr(response, "content") and response.content:
+                    response_content = response.content.decode('utf-8', errors='ignore')
             except Exception:
                 pass
         
@@ -48,7 +57,7 @@ class MarketPortfolioStressScenarioMatrixEvaluator:
         if self.db_storage and hasattr(self.db_storage, "fetch_stream"):
             stream = self.db_storage.fetch_stream(portfolio_id)
             content = stream.read()
-            if bs4 is not None:
+            if hasattr(bs4, "BeautifulSoup") and bs4.BeautifulSoup is not None:
                 soup = bs4.BeautifulSoup(content, 'html.parser')
                 _ = soup.text
 

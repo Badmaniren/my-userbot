@@ -97,3 +97,15 @@ def start_new(symbol: str, url: str, telegram_token: str, chat_id: str, storage_
         chat_id,
         storage_file
     )
+
+
+def market_portfolio_collector_agent(market_data=None, *args, **kwargs):
+    if isinstance(market_data, dict):
+        return {"status": "collected", **market_data}
+    elif isinstance(market_data, str):
+        return {"status": "collected", "portfolio_id": market_data}
+    return {"status": "collected", "data": market_data}
+
+
+MarketPortfolioCollectorAgent = market_portfolio_collector_agent
+PortfolioCollectorAgent = market_portfolio_collector_agent

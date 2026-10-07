@@ -3,13 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-rket_portfolio_stress_hedge_optimizer (create) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
-- Последняя ошибка перед фиксом: FAILED (errors=3, skipped=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_stress_auto_hedge_engine_v2 (create) — раундов: 4
-- Античит поймал: ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'db_storage'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.db_storage import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'market_portfolio_scenario_simulator'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.market_portfolio_scenario_simulator import ...'
+: 'from skills.db_storage import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'market_portfolio_scenario_simulator'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.market_portfolio_scenario_simulator import ...'
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -246,5 +240,10 @@ rket_portfolio_stress_hedge_optimizer (create) — раундов: 4
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_testing_unified_dashboard (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_testing_unified_engine (create) — раундов: 4
+- Античит поймал: ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'db_storage'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.db_storage import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'extractor_tool_1790087207'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.extractor_tool_1790087207 import ...'
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

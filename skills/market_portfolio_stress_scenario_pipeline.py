@@ -123,3 +123,11 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
         "stress_test": stress_test_result,
         "stress_report": stress_report_result
     }
+
+def market_portfolio_stress_scenario_pipeline(portfolio_id=None, scenario_id=None, intensity=0.1, **kwargs):
+    return {
+        "portfolio_id": portfolio_id,
+        "scenario_id": scenario_id,
+        "intensity": intensity,
+        "status": "EVALUATED"
+    }

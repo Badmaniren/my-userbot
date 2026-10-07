@@ -56,3 +56,6 @@ def evaluate_stress_scenario_matrix(evaluation_payload: dict) -> dict:
         "portfolio_id": portfolio_id,
         "matrix_score": matrix_score
     }
+
+
+market_portfolio_stress_scenario_matrix_evaluator = MarketPortfolioStressScenarioMatrixEvaluator

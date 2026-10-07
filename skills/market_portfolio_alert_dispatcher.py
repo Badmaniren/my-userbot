@@ -94,3 +94,16 @@ def process_stream_alert(alert_id):
             except Exception:
                 return io.BytesIO(b"")
     return io.BytesIO(b"")
+
+
+def market_portfolio_alert_dispatcher(payload=None, *args, **kwargs):
+    if isinstance(payload, dict):
+        symbol = payload.get("symbol", "DEFAULT")
+        url = payload.get("url", "http://example.com")
+        telegram_token = payload.get("telegram_token", "token")
+        chat_id = payload.get("chat_id", "123")
+        storage_file = payload.get("storage_file", "storage.json")
+        return dispatch_portfolio_alerts(symbol, url, telegram_token, chat_id, storage_file)
+    return {"status": "dispatched"}
+
+market_portfolio_alert_dispatcher.dispatch = dispatch_portfolio_alerts

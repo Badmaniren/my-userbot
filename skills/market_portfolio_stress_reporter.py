@@ -25,7 +25,10 @@ class StressReporter:
         }
 
     def simulate_single(self, symbol, percentage):
-        return self.simulator.simulate_scenario(symbol, percentage)
+        try:
+            return self.simulator.simulate_scenario(symbol, percentage)
+        except KeyError:
+            return {}
 
     def get_stream_data(self):
         return self.generator.get_raw_stream_dump()

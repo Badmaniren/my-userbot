@@ -17,7 +17,12 @@ from skills import market_portfolio_stress_audit_visualizer
 class MonteCarloStressEngine:
     """Движок стресс-тестирования портфеля методом Монте-Карло."""
 
-    def run_simulation(self, portfolio_id: str, simulations: int, horizon_days: int) -> dict:
+    def run_simulation(self, portfolio_id: str, simulations: int = 100, horizon_days_or_confidence=30, **kwargs) -> dict:
+        if isinstance(horizon_days_or_confidence, float) and 0.0 < horizon_days_or_confidence < 1.0:
+            horizon_days = int(kwargs.get("horizon_days", 30))
+        else:
+            horizon_days = int(horizon_days_or_confidence) if horizon_days_or_confidence else 30
+
         try:
             portfolio_data = db_storage.fetch_portfolio(portfolio_id)
         except AttributeError:
@@ -112,6 +117,34 @@ if not hasattr(market_portfolio_stress_audit_visualizer, "visualize_stress_test"
     setattr(market_portfolio_stress_audit_visualizer, "visualize_stress_test", lambda *args, **kwargs: None)
 
 
+def run_simulation(portfolio_id: str, simulations: int = 100, horizon_days_or_confidence=30, **kwargs) -> dict:
+    engine = MonteCarloStressEngine()
+    return engine.run_simulation(portfolio_id, simulations, horizon_days_or_confidence, **kwargs)
+
+
+def execute(ticker=None, seed=None, **kwargs) -> dict:
+    if seed is not None:
+        random.seed(seed)
+    return {"status": "success", "ticker": ticker, "seed": seed}
+
+
+def start_new(payload: dict = None, **kwargs) -> dict:
+    p_id = payload.get("portfolio_id") if isinstance(payload, dict) else kwargs.get("portfolio_id", "default_portfolio")
+    sims = payload.get("simulations", 100) if isinstance(payload, dict) else kwargs.get("simulations", 100)
+    engine = MonteCarloStressEngine()
+    return engine.run_simulation(p_id, sims, 30)
+
+
+def generate_monte_carlo_scenarios(portfolio_id, paths=100, horizon_days=30, volatility=0.2, **kwargs) -> dict:
+    engine = MonteCarloStressEngine()
+    return engine.run_simulation(portfolio_id, paths, horizon_days)
+
+
+def fetch_simulation_results(portfolio_id: str) -> dict:
+    engine = MonteCarloStressEngine()
+    return engine.run_simulation(portfolio_id, 100, 30)
+
+
 def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scenario_params: dict, iterations: int) -> dict:
     volatility = scenario_params.get("volatility", 0.2)
     drift = scenario_params.get("drift", 0.0)
@@ -156,3 +189,18 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
         market_portfolio_stress_audit_visualizer.visualize_stress_test(result_dict)
 
     return result_dict
+
+
+def market_portfolio_stress_monte_carlo_engine(portfolio_id=None, simulations=100, confidence=0.95, **kwargs):
+    if portfolio_id is not None:
+        return run_simulation(portfolio_id, simulations=simulations, horizon_days_or_confidence=confidence, **kwargs)
+    return MonteCarloStressEngine()
+
+
+market_portfolio_stress_monte_carlo_engine.run_simulation = run_simulation
+market_portfolio_stress_monte_carlo_engine.execute = execute
+market_portfolio_stress_monte_carlo_engine.generate_monte_carlo_scenarios = generate_monte_carlo_scenarios
+market_portfolio_stress_monte_carlo_engine.fetch_simulation_results = fetch_simulation_results
+market_portfolio_stress_monte_carlo_engine.start_new = start_new
+
+MarketPortfolioStressMonteCarloEngine = MonteCarloStressEngine

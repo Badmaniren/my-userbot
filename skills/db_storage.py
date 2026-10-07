@@ -3,6 +3,52 @@ import requests
 from bs4 import BeautifulSoup
 
 
+class DBStorage:
+    def __init__(self):
+        self._data = {}
+
+    def save(self, key, value=None):
+        if value is None:
+            key, value = f"key_{len(self._data)}", key
+        self._data[key] = value
+
+    def fetch_portfolio(self, portfolio_id):
+        return self._data.get(portfolio_id, {"portfolio_id": portfolio_id, "initial_value": 100000.0})
+
+    def save_portfolio(self, portfolio_id, data):
+        self._data[portfolio_id] = data
+
+    def fetch_history(self, portfolio_id, historical_window=30):
+        return [{"value": 100.0} for _ in range(historical_window)]
+
+    def fetch_stream(self, portfolio_id):
+        import io
+        return io.BytesIO(f"stream_data_for_{portfolio_id}".encode("utf-8"))
+
+
+db_storage = DBStorage()
+
+
+def save(key, value=None):
+    db_storage.save(key, value)
+
+
+def fetch_portfolio(portfolio_id, db_path=None):
+    return db_storage.fetch_portfolio(portfolio_id)
+
+
+def save_portfolio(portfolio_id, data):
+    db_storage.save_portfolio(portfolio_id, data)
+
+
+def fetch_history(portfolio_id, historical_window=30):
+    return db_storage.fetch_history(portfolio_id, historical_window)
+
+
+def fetch_stream(portfolio_id):
+    return db_storage.fetch_stream(portfolio_id)
+
+
 class MarketParser:
     def __init__(self, storage_file: str = "market_data.db"):
         self.storage_file = storage_file

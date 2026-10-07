@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-r_tool_1791311878 (create) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## extractor_tool_1791313028 (create) — раундов: 1
+91313028 (create) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_audit_compliance_hub (refactor) — раундов: 2
@@ -259,6 +256,9 @@ r_tool_1791311878 (create) — раундов: 1
 
 ## market_portfolio_stress_reporter (refactor) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_reporter (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_reporter (refactor) — раундов: 1

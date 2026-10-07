@@ -1,6 +1,7 @@
 import os
 import io
 import json
+from skills.db_storage import db_storage
 
 def start_new(deps):
     """
@@ -49,7 +50,6 @@ def market_portfolio_stress_deep_impact_analyzer(data):
     }
 
     # Сохранение в базу данных (через реальный db_storage)
-    from skills.db_storage import db_storage
     db_storage({
         "action": "save",
         "portfolio_id": portfolio_id,

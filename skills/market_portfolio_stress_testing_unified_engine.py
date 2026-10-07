@@ -2,6 +2,9 @@ import uuid
 import random
 import io
 
+from skills.market_portfolio_collector_agent import market_portfolio_collector_agent
+from skills.db_storage import db_storage as save_to_db
+
 def start_new(
     db_storage,
     extractor_tool_1790087207,
@@ -62,13 +65,14 @@ def start_new(
     market_sentiment_telegram_publisher,
     market_telegram_pipeline
 ):
-    # Вызовы в соответствии с ожиданиями юнит-тестов
     mc_result = market_portfolio_stress_monte_carlo_engine.run()
     sc_result = market_portfolio_scenario_simulator.evaluate()
     parsed_stream = market_parser.parse()
     
     if hasattr(parsed_stream, "read"):
-        parsed_stream.read()
+        content = parsed_stream.read()
+        if hasattr(parsed_stream, "seek"):
+            parsed_stream.seek(0)
 
     return {
         "status": "success",
@@ -97,7 +101,6 @@ def market_portfolio_stress_testing_unified_engine(payload):
         "audit_summary": audit_data
     }
 
-    from skills.db_storage import db_storage as save_to_db
     save_to_db({
         "action": "set",
         "portfolio_id": portfolio_id,

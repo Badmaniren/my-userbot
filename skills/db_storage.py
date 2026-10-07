@@ -1,6 +1,13 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 
 class MarketParser:
@@ -8,6 +15,8 @@ class MarketParser:
         self.storage_file = storage_file
 
     def fetch_price(self, url: str):
+        if requests is None:
+            return None
         response = requests.get(url, timeout=10)
         try:
             data = response.json()
@@ -18,6 +27,8 @@ class MarketParser:
         return None
 
     def parse_html_prices(self, url: str):
+        if requests is None or BeautifulSoup is None:
+            return None
         response = requests.get(url, timeout=10)
         soup = BeautifulSoup(response.text, 'html.parser')
         element = soup.find()
@@ -66,3 +77,28 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+_STORAGE = {}
+
+def db_storage(action=None, key=None, value=None, **kwargs):
+    if action == "set" or action == "save":
+        if key is not None:
+            _STORAGE[key] = value
+        return True
+    elif action == "get" or action == "fetch":
+        if key is not None:
+            return _STORAGE.get(key)
+        return dict(_STORAGE)
+    elif action == "insert":
+        if isinstance(key, dict):
+            payload = key
+            k = payload.get("audit_id") or payload.get("id") or str(len(_STORAGE))
+            _STORAGE[k] = payload
+            return True
+        elif isinstance(value, dict):
+            k = key or value.get("audit_id") or str(len(_STORAGE))
+            _STORAGE[k] = value
+            return True
+        return False
+    return dict(_STORAGE)

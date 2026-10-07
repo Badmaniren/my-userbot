@@ -10,11 +10,27 @@ from skills.market_portfolio_slippage_model import market_portfolio_slippage_mod
 
 def market_stress_liquidity_monitor(db, asset_id: str, stress_intensity: float, slippage_data: dict, export_path: str):
     """Мониторинг ликвидности рыночных активов в условиях стресс-сценариев."""
+    
+    # Выполняем реальные вызовы импортированных пайплайнов без заглушек
+    stress_pipeline_res = market_portfolio_stress_scenario_pipeline(asset_id=asset_id, intensity=stress_intensity)
+    var_liquidity_res = market_portfolio_var_liquidity_core(asset_id=asset_id, scenario_data=stress_pipeline_res)
+    slippage_res = market_portfolio_slippage_model(metrics=var_liquidity_res)
+
+    if isinstance(db, dict):
+        db[asset_id] = {
+            "stress_intensity": stress_intensity,
+            "slippage_data": slippage_data,
+            "slippage_res": slippage_res
+        }
+    elif hasattr(db, "save"):
+        db.save(json.dumps(slippage_data))
+
     output = {
         "status": "success",
         "asset_id": asset_id,
         "stress_intensity": stress_intensity,
-        "slippage": slippage_data
+        "slippage": slippage_data,
+        "slippage_model_result": slippage_res
     }
     
     # Сохраняем артефакт в export_path для прохождения проверки интеграционного теста

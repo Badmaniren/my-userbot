@@ -156,3 +156,6 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
         market_portfolio_stress_audit_visualizer.visualize_stress_test(result_dict)
 
     return result_dict
+
+
+market_portfolio_stress_monte_carlo_engine = MonteCarloStressEngine

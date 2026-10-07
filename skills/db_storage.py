@@ -66,3 +66,24 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+_STORAGE = {}
+
+def db_storage(payload=None, **kwargs):
+    if isinstance(payload, dict):
+        action = payload.get("action")
+        key = payload.get("key")
+        if action in ("set", "save", "store"):
+            val = payload.get("value") if "value" in payload else payload.get("data")
+            _STORAGE[key] = val
+            return val
+        elif action in ("get", "fetch"):
+            return _STORAGE.get(key)
+        elif "key" in payload and "value" in payload:
+            _STORAGE[payload["key"]] = payload["value"]
+            return payload["value"]
+    return None
+
+db_storage.save = lambda key, value: _STORAGE.update({key: value}) or value
+db_storage.get = lambda key: _STORAGE.get(key)

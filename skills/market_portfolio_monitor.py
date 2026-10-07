@@ -2,6 +2,9 @@ import json
 import os
 import io
 
+from skills.db_storage import MarketParser as DBMarketParser
+from skills.market_portfolio_collector_agent import MarketParser as CollectorMarketParser, PortfolioValuation
+
 def run_pipeline(symbol, url, telegram_token, chat_id, storage_file):
     """Выполняет основной конвейер мониторинга портфеля."""
     parser = MarketParser(storage_file=storage_file)

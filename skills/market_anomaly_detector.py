@@ -1,4 +1,8 @@
-import requests
+try:
+    import requests
+except ImportError:
+    requests = None
+
 from skills import market_parser
 
 # Убедимся, что у модуля market_parser есть необходимые методы для тестов, 

@@ -1,49 +1,65 @@
 import unittest
 import uuid
 import random
-import os
-from skills.market_portfolio_stress_resilience_guard import market_portfolio_stress_resilience_guard
-from skills.market_portfolio_scenario_simulator import market_portfolio_scenario_simulator
-from skills.market_portfolio_stress_monte_carlo_engine import market_portfolio_stress_monte_carlo_engine
+
+from skills.market_portfolio_stress_resilience_guard import market_portfolio_stress_resilience_guard, start_new
 from skills.db_storage import db_storage
 
+
 class TestMarketPortfolioStressResilienceGuardIntegration(unittest.TestCase):
-    def test_stress_resilience_guard_pipeline_real_execution(self):
-        portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
-        simulation_seed = random.randint(1000, 99999)
-        shock_factor = round(random.uniform(0.05, 0.45), 4)
 
-        simulator_result = market_portfolio_scenario_simulator(
-            portfolio_id=portfolio_id,
-            shock_factor=shock_factor,
-            seed=simulation_seed
-        )
+    def test_resilience_guard_integration_secure(self):
+        portfolio_id = str(uuid.uuid4())
+        random_val = random.randint(1, 1000)
+        
+        simulation_metrics = [
+            {"name": "alpha", "value": random_val},
+            {"name": "beta", "value": random_val + 50}
+        ]
 
-        self.assertIsInstance(simulator_result, dict)
-        self.assertIn("scenario_id", simulator_result)
+        result = market_portfolio_stress_resilience_guard(portfolio_id, simulation_metrics)
 
-        mc_result = market_portfolio_stress_monte_carlo_engine(
-            scenario_id=simulator_result["scenario_id"],
-            iterations=100
-        )
+        self.assertEqual(result["portfolio_id"], portfolio_id)
+        self.assertEqual(result["resilience_status"], "SECURE")
+        self.assertEqual(result["metrics_count"], 2)
 
-        self.assertIsInstance(mc_result, dict)
-        self.assertIn("metrics", mc_result)
+        stored_data = db_storage(action="get", key=f"resilience_{portfolio_id}")
+        self.assertEqual(stored_data, result)
 
-        guard_result = market_portfolio_stress_resilience_guard(
-            portfolio_id=portfolio_id,
-            simulation_metrics=mc_result["metrics"]
-        )
+    def test_resilience_guard_integration_vulnerable(self):
+        portfolio_id = str(uuid.uuid4())
+        negative_val = -random.randint(1, 100)
+        
+        simulation_metrics = [
+            {"name": "drawdown", "value": negative_val},
+            {"name": "stability", "value": 10}
+        ]
 
-        self.assertIsInstance(guard_result, dict)
-        self.assertIn("resilience_status", guard_result)
-        self.assertEqual(guard_result.get("portfolio_id"), portfolio_id)
+        result = market_portfolio_stress_resilience_guard(portfolio_id, simulation_metrics)
 
-        stored_data = db_storage(
-            action="get",
-            key=f"resilience_{portfolio_id}"
-        )
-        self.assertIsNotNone(stored_data)
+        self.assertEqual(result["portfolio_id"], portfolio_id)
+        self.assertEqual(result["resilience_status"], "VULNERABLE")
+        self.assertEqual(result["metrics_count"], 2)
+
+        stored_data = db_storage(action="get", key=f"resilience_{portfolio_id}")
+        self.assertEqual(stored_data["resilience_status"], "VULNERABLE")
+
+    def test_start_new_integration_pipeline_failure(self):
+        reason_msg = f"failed_test_{uuid.uuid4()}"
+
+        class DummyPipeline:
+            def evaluate(self):
+                return {"status": "FAILED", "reason": reason_msg}
+
+        dependencies = {
+            "market_portfolio_stress_scenario_pipeline": DummyPipeline()
+        }
+
+        with self.assertRaises(ValueError) as ctx:
+            start_new(dependencies, seed=random.randint(0, 100))
+        
+        self.assertIn(reason_msg, str(ctx.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

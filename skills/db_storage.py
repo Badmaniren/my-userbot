@@ -1,6 +1,39 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+import datetime
+from typing import Dict, Any, Optional
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
+
+
+_DATABASE_STORE: Dict[str, Dict[str, Any]] = {}
+_EXPORT_LOGS = []
+
+
+def save_to_database(table: str, key: str, value: Any) -> None:
+    if table not in _DATABASE_STORE:
+        _DATABASE_STORE[table] = {}
+    _DATABASE_STORE[table][key] = value
+
+
+def get_from_database(table: str, key: str) -> Optional[Any]:
+    return _DATABASE_STORE.get(table, {}).get(key)
+
+
+def log_export_event(portfolio_id: str, format_type: str, destination_path: str) -> None:
+    _EXPORT_LOGS.append({
+        "portfolio_id": portfolio_id,
+        "format_type": format_type,
+        "destination_path": destination_path,
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    })
 
 
 class MarketParser:
@@ -8,6 +41,8 @@ class MarketParser:
         self.storage_file = storage_file
 
     def fetch_price(self, url: str):
+        if requests is None:
+            return None
         response = requests.get(url, timeout=10)
         try:
             data = response.json()
@@ -18,6 +53,8 @@ class MarketParser:
         return None
 
     def parse_html_prices(self, url: str):
+        if requests is None or BeautifulSoup is None:
+            return None
         response = requests.get(url, timeout=10)
         soup = BeautifulSoup(response.text, 'html.parser')
         element = soup.find()

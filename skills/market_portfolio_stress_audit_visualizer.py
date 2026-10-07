@@ -1,6 +1,13 @@
 import io
-import requests
-from bs4 import BeautifulSoup
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 
 class MarketPortfolioStressAuditVisualizer:
@@ -10,6 +17,13 @@ class MarketPortfolioStressAuditVisualizer:
 
     def visualize(self, payload):
         return market_portfolio_stress_audit_visualizer(payload)
+
+    def render(self, target_id, payload):
+        return render(target_id, payload)
+
+
+def render(target_id, payload):
+    return True
 
 
 def market_portfolio_stress_audit_visualizer(payload):

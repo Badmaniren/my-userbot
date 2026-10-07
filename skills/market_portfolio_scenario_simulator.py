@@ -112,3 +112,6 @@ def run_stress_test(storage_file, symbol, range_min, range_max, step):
         "symbol": symbol,
         "scenarios": scenarios
     }
+
+
+market_portfolio_scenario_simulator = PortfolioScenarioSimulator

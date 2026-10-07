@@ -1,126 +1,90 @@
 import unittest
-from unittest.mock import patch, MagicMock
-import random
+import os
+import json
 import uuid
-import string
-import io
-
-from skills.market_portfolio_stress_audit_summary_vault import start_new
+import random
+import tempfile
+import shutil
+from unittest.mock import MagicMock, patch
+from skills.market_portfolio_stress_audit_summary_vault import (
+    start_new,
+    market_portfolio_stress_audit_summary_vault_process,
+    market_portfolio_stress_audit_summary_vault_validate,
+    market_portfolio_stress_audit_summary_vault_export
+)
 
 class TestMarketPortfolioStressAuditSummaryVault(unittest.TestCase):
 
     def setUp(self):
-        self.random_hex = uuid.uuid4().hex
-        self.random_string = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
-        self.random_int = random.randint(1000, 99999)
-        self.random_float = random.uniform(1.0, 1000.0)
+        self.test_dir = tempfile.mkdtemp()
 
-        self.mock_db_storage = MagicMock()
-        self.mock_db_storage.save.return_value = self.random_hex
+    def tearDown(self):
+        shutil.rmtree(self.test_dir)
 
-        self.mock_extractor = MagicMock()
-        self.mock_extractor.extract.return_value = {self.random_string: self.random_int}
-
-        self.dependencies = {
-            "db_storage": self.mock_db_storage,
-            "extractor_tool_1790087207": self.mock_extractor,
-            "extractor_tool_1790102839": self.mock_extractor,
-            "extractor_tool_1790262909": self.mock_extractor,
-            "extractor_tool_1790621808": self.mock_extractor,
-            "market_anomaly_detector": MagicMock(),
-            "market_insider_activity_tracker": MagicMock(),
-            "market_insider_alert_pipeline": MagicMock(),
-            "market_insider_anomaly_analyzer": MagicMock(),
-            "market_insider_anomaly_report_bridge": MagicMock(),
-            "market_news_sentiment_analyzer": MagicMock(),
-            "market_parser": MagicMock(),
-            "market_portfolio_alert_dispatcher": MagicMock(),
-            "market_portfolio_alert_event_sink": MagicMock(),
-            "market_portfolio_alert_filter_router": MagicMock(),
-            "market_portfolio_api_gateway": MagicMock(),
-            "market_portfolio_audit_alert_notifier": MagicMock(),
-            "market_portfolio_audit_compliance_hub": MagicMock(),
-            "market_portfolio_audit_log_exporter": MagicMock(),
-            "market_portfolio_autonomous_sentinel": MagicMock(),
-            "market_portfolio_backtest_evaluator_bridge": MagicMock(),
-            "market_portfolio_backtester": MagicMock(),
-            "market_portfolio_collector_agent": MagicMock(),
-            "market_portfolio_data_exporter": MagicMock(),
-            "market_portfolio_digest": MagicMock(),
-            "market_portfolio_dividend_tracker": MagicMock(),
-            "market_portfolio_event_intelligence_hub": MagicMock(),
-            "market_portfolio_execution_cost_optimizer": MagicMock(),
-            "market_portfolio_execution_pipeline": MagicMock(),
-            "market_portfolio_integration_hub": MagicMock(),
-            "market_portfolio_liquidity_scenario_analyzer": MagicMock(),
-            "market_portfolio_monitor": MagicMock(),
-            "market_portfolio_performance_analytics": MagicMock(),
-            "market_portfolio_predictive_aggregator": MagicMock(),
-            "market_portfolio_scenario_simulator": MagicMock(),
-            "market_portfolio_slippage_model": MagicMock(),
-            "market_portfolio_strategy_optimizer": MagicMock(),
-            "market_portfolio_stress_audit_visualizer": MagicMock(),
-            "market_portfolio_stress_auto_rebalance_trigger": MagicMock(),
-            "market_portfolio_stress_monte_carlo_engine": MagicMock(),
-            "market_portfolio_stress_recovery_coordinator_bridge": MagicMock(),
-            "market_portfolio_stress_reporter": MagicMock(),
-            "market_portfolio_stress_scenario_matrix_evaluator": MagicMock(),
-            "market_portfolio_stress_scenario_pipeline": MagicMock(),
-            "market_portfolio_tax_calculator": MagicMock(),
-            "market_portfolio_telegram_command_center": MagicMock(),
-            "market_portfolio_telegram_notifier": MagicMock(),
-            "market_portfolio_valuation": MagicMock(),
-            "market_portfolio_var_liquidity_core": MagicMock(),
-            "market_portfolio_visualizer_v2": MagicMock(),
-            "market_portfolio_webhook_event_logger": MagicMock(),
-            "market_portfolio_webhook_sync": MagicMock(),
-            "market_report_generator": MagicMock(),
-            "market_sentiment_digest": MagicMock(),
-            "market_sentiment_risk_alert_bridge": MagicMock(),
-            "market_sentiment_risk_hub": MagicMock(),
-            "market_sentiment_telegram_publisher": MagicMock(),
-            "market_telegram_pipeline": MagicMock()
-        }
-
-    def test_start_new_successful_execution(self):
-        with patch('uuid.uuid4', return_value=uuid.UUID(int=self.random_int)):
-            result = start_new(**self.dependencies)
-            self.assertIsNotNone(result)
-            self.mock_db_storage.save.assert_called()
-
-    def test_start_new_handles_io_stream(self):
-        stream_data = io.BytesIO(self.random_hex.encode('utf-8'))
+    def test_start_new_execution_flow(self):
+        mock_db = MagicMock()
+        random_save_res = uuid.uuid4().hex
+        mock_db.save.return_value = random_save_res
         
-        with patch('requests.get') as mock_get:
-            mock_response = MagicMock()
-            mock_response.raw = stream_data
-            mock_response.status_code = 200
-            mock_get.return_value = mock_response
-
-            self.dependencies["market_parser"].parse_stream.return_value = stream_data.read()
-            
-            result = start_new(**self.dependencies)
-            self.assertIsNotNone(result)
-
-    def test_start_new_validation_failure_handling(self):
-        invalid_dependencies = self.dependencies.copy()
-        invalid_dependencies["db_storage"] = None
-
-        with self.assertRaises((Exception, TypeError, ValueError)):
-            start_new(**invalid_dependencies)
-
-    def test_start_new_data_integrity_preservation(self):
-        unique_payload = {
-            "key": self.random_hex,
-            "value": self.random_float
+        mock_extractor = MagicMock()
+        mock_reporter = MagicMock()
+        random_payload = {"data": uuid.uuid4().hex}
+        mock_reporter.generate.return_value = random_payload
+        
+        kwargs = {
+            "db_storage": mock_db,
+            "extractor_tool": mock_extractor,
+            "market_portfolio_stress_reporter": mock_reporter
         }
         
-        self.dependencies["market_portfolio_stress_reporter"].generate.return_value = unique_payload
+        result = start_new(**kwargs)
+        
+        self.assertEqual(result["save_result"], random_save_res)
+        self.assertEqual(result["payload"], random_payload)
+        mock_extractor.extract.assert_called_once()
+        mock_db.save.assert_called_with(random_payload)
 
-        with patch('skills.market_portfolio_stress_audit_summary_vault.os.path.exists', return_value=True):
-            res = start_new(**self.dependencies)
+    def test_process_and_validate_integrity(self):
+        random_filename = os.path.join(self.test_dir, f"{uuid.uuid4().hex}.json")
+        random_audit_id = uuid.uuid4().hex
+        audit_data = {"audit_id": random_audit_id, "val": random.random()}
+        
+        process_res = market_portfolio_stress_audit_summary_vault_process(random_filename, audit_data)
+        
+        self.assertEqual(process_res["audit_id"], random_audit_id)
+        self.assertTrue(os.path.exists(random_filename))
+        
+        is_valid = market_portfolio_stress_audit_summary_vault_validate(random_filename, random_audit_id)
+        self.assertTrue(is_valid)
+        
+        is_invalid = market_portfolio_stress_audit_summary_vault_validate(random_filename, uuid.uuid4().hex)
+        self.assertFalse(is_invalid)
+
+    def test_export_functionality(self):
+        random_filename = os.path.join(self.test_dir, f"{uuid.uuid4().hex}.json")
+        random_data = {"metrics": [random.random() for _ in range(5)], "id": uuid.uuid4().hex}
+        
+        with open(random_filename, "w") as f:
+            json.dump(random_data, f)
             
-            if isinstance(res, dict):
-                self.assertIn(self.random_hex, str(res))
-            else:
-                self.assertTrue(True)
+        export_res = market_portfolio_stress_audit_summary_vault_export(random_filename, format="json")
+        
+        self.assertEqual(export_res["data"], random_data)
+        self.assertEqual(export_res["format"], "json")
+
+    def test_start_new_missing_db_raises(self):
+        with self.assertRaises(ValueError):
+            start_new(db_storage=None)
+
+    def test_process_invalid_data_type(self):
+        random_filename = os.path.join(self.test_dir, f"{uuid.uuid4().hex}.json")
+        with self.assertRaises(TypeError):
+            market_portfolio_stress_audit_summary_vault_process(random_filename, "not_a_dict")
+
+    def test_export_nonexistent_file(self):
+        random_path = os.path.join(self.test_dir, uuid.uuid4().hex)
+        with self.assertRaises(FileNotFoundError):
+            market_portfolio_stress_audit_summary_vault_export(random_path)
+
+if __name__ == "__main__":
+    unittest.main()

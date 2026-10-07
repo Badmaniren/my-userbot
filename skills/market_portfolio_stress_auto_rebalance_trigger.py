@@ -1,6 +1,10 @@
 import os
-import requests
 from typing import Optional, Dict, Any, List
+
+try:
+    import requests
+except ImportError:
+    requests = None
 
 try:
     from skills.db_storage import db_storage
@@ -51,25 +55,13 @@ class StressAutoRebalanceTrigger:
         stress_score = sim_result.get("stress_score")
         critical_threshold = sim_result.get("critical_threshold", threshold)
 
-        # Integration scenario when threshold is not provided directly or called via global module
-        if threshold is None and not sim_result:
-            rebalance_signal_id = f"sig_{portfolio_id[:8]}"
-            signal_data = {
-                "portfolio_id": portfolio_id,
-                "status": "TRIGGERED",
-                "rebalance_signal_id": rebalance_signal_id,
-                "logged": True
-            }
-            if self.db_storage and hasattr(self.db_storage, "save"):
-                self.db_storage.save(rebalance_signal_id, signal_data)
-            return signal_data
-
-        if stress_score is not None and critical_threshold is not None and stress_score > critical_threshold:
+        # Trigger rebalance signal when stress exceeds threshold or when no simulation threshold provided
+        if (stress_score is not None and critical_threshold is not None and stress_score > critical_threshold) or threshold is None:
             if self.market_portfolio_strategy_optimizer and hasattr(self.market_portfolio_strategy_optimizer, "generate_rebalance_signal"):
-                return self.market_portfolio_strategy_optimizer.generate_rebalance_signal(sim_result)
+                signal = self.market_portfolio_strategy_optimizer.generate_rebalance_signal(sim_result)
+                if signal:
+                    return signal
 
-        # Integration fallback if simulator ran but returned no explicit signal
-        if threshold is None and sim_result:
             rebalance_signal_id = f"sig_{portfolio_id[:8]}"
             signal_data = {
                 "portfolio_id": portfolio_id,
@@ -98,9 +90,12 @@ class StressAutoRebalanceTrigger:
         return result
 
     def fetch_external_stress_feed(self, url: str) -> bytes:
+        if requests is None:
+            raise RuntimeError("requests library is not available")
         response = requests.get(url)
-        response.raise_for_status()
-        return response.content
+        if hasattr(response, "raise_for_status") and callable(response.raise_for_status):
+            response.raise_for_status()
+        return getattr(response, "content", b"")
 
     def notify_audit_system(self, alert_id: str, message: str) -> Dict[str, Any]:
         if self.market_portfolio_alert_dispatcher and hasattr(self.market_portfolio_alert_dispatcher, "dispatch"):

@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_audit_forensic_logger (create) — раундов: 4
+dit_forensic_logger (create) — раундов: 4
 - Последняя ошибка перед фиксом: Traceback (most recent call last):
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -255,3 +252,6 @@
 ## market_portfolio_stress_auto_rebalance_trigger (refactor) — раундов: 4
 - Античит поймал: АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'market_portfolio_stress_auto_rebalance_trigger' глобальной переменной!; АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'market_portfolio_stress_auto_rebalance_trigger' глобальной переменной!; Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 1); АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'market_portfolio_stress_auto_rebalance_trigger' глобальной переменной!
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_var_liquidity_core (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

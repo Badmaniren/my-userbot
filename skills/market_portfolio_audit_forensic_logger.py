@@ -135,13 +135,18 @@ class ForensicLogger:
         self._init_db()
         conn = self._get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT id, chain_previous_hash, integrity_hash, payload FROM forensic_audit_logs")
+        cursor.execute("SELECT id, chain_previous_hash, integrity_hash, payload, event_id, discrepancy_code FROM forensic_audit_logs")
         rows = cursor.fetchall()
         conn.close()
 
         dump_data = []
         for r in rows:
-            dump_data.append({"id": r[0], "prev_hash": r[1], "hash": r[2], "payload": r[3]})
+            record = {"id": r[0], "prev_hash": r[1], "hash": r[2], "payload": r[3]}
+            if r[4] is not None:
+                record["event_id"] = r[4]
+            if r[5] is not None:
+                record["discrepancy_code"] = r[5]
+            dump_data.append(record)
 
         content = json.dumps(dump_data, indent=2)
         with open(target_path, 'w', encoding='utf-8') as f:

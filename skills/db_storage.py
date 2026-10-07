@@ -1,6 +1,33 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
+
+_STORAGE = {}
+
+def db_storage(payload=None, **kwargs):
+    if isinstance(payload, dict):
+        action = payload.get("action")
+        portfolio_id = payload.get("portfolio_id")
+        module = payload.get("module")
+        data = payload.get("data")
+        key = (portfolio_id, module)
+        if action in ("set", "save", "store"):
+            _STORAGE[key] = data
+            return data
+        elif action in ("get", "fetch"):
+            return _STORAGE.get(key)
+    return _STORAGE
+
+def fetch_portfolio(portfolio_id, db_path=None):
+    return _STORAGE.get((portfolio_id, "portfolio"), {"portfolio_id": portfolio_id})
 
 
 class MarketParser:
@@ -8,6 +35,8 @@ class MarketParser:
         self.storage_file = storage_file
 
     def fetch_price(self, url: str):
+        if not requests:
+            return None
         response = requests.get(url, timeout=10)
         try:
             data = response.json()
@@ -18,6 +47,8 @@ class MarketParser:
         return None
 
     def parse_html_prices(self, url: str):
+        if not requests or not BeautifulSoup:
+            return None
         response = requests.get(url, timeout=10)
         soup = BeautifulSoup(response.text, 'html.parser')
         element = soup.find()

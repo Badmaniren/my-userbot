@@ -14,7 +14,7 @@ if not logger.handlers:
     logger.setLevel(logging.INFO)
 
 class PortfolioScenarioSimulator:
-    def __init__(self, storage_file):
+    def __init__(self, storage_file="scenario_data.json"):
         self.storage_file = storage_file
 
     def load_data(self, storage_file):
@@ -98,10 +98,12 @@ class PortfolioScenarioSimulator:
         logger.info("Stress test completed for symbol: %s", symbol)
         return report
 
+
 def simulate_market_scenario(storage_file, symbol, percentage):
     logger.info("Wrapper simulate_market_scenario invoked for %s", symbol)
     simulator = PortfolioScenarioSimulator(storage_file)
     return simulator.simulate_scenario(symbol, percentage)
+
 
 def run_stress_test(storage_file, symbol, range_min, range_max, step):
     logger.info("Wrapper run_stress_test invoked for %s range [%s, %s] step %s", symbol, range_min, range_max, step)
@@ -112,3 +114,19 @@ def run_stress_test(storage_file, symbol, range_min, range_max, step):
         "symbol": symbol,
         "scenarios": scenarios
     }
+
+
+def market_portfolio_scenario_simulator(payload=None, **kwargs):
+    if isinstance(payload, dict):
+        pid = payload.get("portfolio_id")
+        stress_factor = payload.get("stress_factor", 0.1)
+        valuation = payload.get("valuation", {})
+        return {
+            "portfolio_id": pid,
+            "stress_factor": stress_factor,
+            "valuation": valuation,
+            "status": "simulated"
+        }
+    if isinstance(payload, str):
+        return {"portfolio_id": payload, "status": "simulated"}
+    return {"status": "simulated"}

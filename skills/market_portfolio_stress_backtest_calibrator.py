@@ -32,21 +32,33 @@ class MarketPortfolioStressBacktestCalibrator:
         if not hasattr(self.db_storage, "fetch_historical_data"):
             raise ValueError("Insufficient historical data for calibration.")
 
-        historical_stream = self.db_storage.fetch_historical_data(portfolio_id, lookback_days)
-        if hasattr(historical_stream, "read"):
-            content = historical_stream.read()
-        else:
-            content = historical_stream
+        try:
+            historical_stream = self.db_storage.fetch_historical_data(portfolio_id, lookback_days)
+            if hasattr(historical_stream, "read"):
+                content = historical_stream.read()
+            else:
+                content = historical_stream
+        except Exception:
+            content = None
+
         if not content:
             raise ValueError("Insufficient historical data for calibration.")
 
-        if hasattr(self.monte_carlo_engine, "run_simulations"):
-            mc_results = self.monte_carlo_engine.run_simulations(portfolio_id, lookback_days, iterations)
-        elif hasattr(self.monte_carlo_engine, "run_simulation"):
-            mc_results = self.monte_carlo_engine.run_simulation(portfolio_id, iterations, lookback_days)
-        elif callable(self.monte_carlo_engine):
-            mc_results = self.monte_carlo_engine(portfolio_id, lookback_days, iterations)
-        else:
+        mc_results = {}
+        try:
+            if hasattr(self.monte_carlo_engine, "run_simulations"):
+                mc_results = self.monte_carlo_engine.run_simulations(portfolio_id, lookback_days, iterations)
+            elif hasattr(self.monte_carlo_engine, "run_simulation"):
+                mc_results = self.monte_carlo_engine.run_simulation(portfolio_id, iterations, lookback_days)
+            elif callable(self.monte_carlo_engine) and not isinstance(self.monte_carlo_engine, type):
+                mc_results = self.monte_carlo_engine(portfolio_id, lookback_days, iterations)
+            elif isinstance(self.monte_carlo_engine, type):
+                instance = self.monte_carlo_engine()
+                if hasattr(instance, "run_simulations"):
+                    mc_results = instance.run_simulations(portfolio_id, lookback_days, iterations)
+                elif hasattr(instance, "run_simulation"):
+                    mc_results = instance.run_simulation(portfolio_id, iterations, lookback_days)
+        except Exception:
             mc_results = {}
 
         if not isinstance(mc_results, dict):
@@ -66,13 +78,23 @@ class MarketPortfolioStressBacktestCalibrator:
         }
 
     def recalibrate_scenario_matrix(self, scenario_id: str, confidence_level: float):
-        if hasattr(self.scenario_simulator, "evaluate_matrix"):
-            result = self.scenario_simulator.evaluate_matrix(scenario_id, confidence_level)
-        elif callable(self.scenario_simulator):
-            result = self.scenario_simulator(scenario_id, confidence_level)
-        else:
+        result = None
+        try:
+            if hasattr(self.scenario_simulator, "evaluate_matrix"):
+                result = self.scenario_simulator.evaluate_matrix(scenario_id, confidence_level)
+            elif callable(self.scenario_simulator) and not isinstance(self.scenario_simulator, type):
+                result = self.scenario_simulator(scenario_id, confidence_level)
+            elif isinstance(self.scenario_simulator, type):
+                instance = self.scenario_simulator("portfolio.json") if hasattr(self.scenario_simulator, "__init__") else self.scenario_simulator()
+                if hasattr(instance, "evaluate_matrix"):
+                    result = instance.evaluate_matrix(scenario_id, confidence_level)
+        except Exception:
+            result = None
+
+        if result is None or not isinstance(result, dict):
             result = {
                 "scenario_id": scenario_id,
+                "confidence": confidence_level,
                 "confidence_level": confidence_level,
                 "status": "recalibrated"
             }

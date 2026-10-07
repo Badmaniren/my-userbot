@@ -1,6 +1,6 @@
 import unittest
-import os
 import json
+import os
 import uuid
 import random
 from skills.market_portfolio_stress_scenario_pipeline import PortfolioStressScenarioPipeline, run_stress_scenario_pipeline
@@ -8,9 +8,9 @@ from skills.market_portfolio_stress_scenario_pipeline import PortfolioStressScen
 class TestPortfolioStressScenarioPipelineIntegration(unittest.TestCase):
     def setUp(self):
         self.storage_file = f"test_storage_{uuid.uuid4().hex}.json"
-        self.symbol = f"SYM_{random.randint(100, 999)}"
+        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
         self.percentage = round(random.uniform(-50.0, 50.0), 2)
-        self.shifts = [round(random.uniform(-10.0, 10.0), 2) for _ in range(random.randint(1, 3))]
+        self.shifts = [round(random.uniform(-20.0, 20.0), 2) for _ in range(random.randint(2, 5))]
 
     def tearDown(self):
         if os.path.exists(self.storage_file):
@@ -27,11 +27,11 @@ class TestPortfolioStressScenarioPipelineIntegration(unittest.TestCase):
         self.assertIn("simulation", result)
         self.assertIn("stress_test", result)
         self.assertIn("stress_report", result)
-        
+
         self.assertEqual(result["simulation"].get("symbol"), self.symbol)
         self.assertEqual(result["stress_test"].get("symbol"), self.symbol)
         self.assertEqual(result["stress_report"].get("symbol"), self.symbol)
-        
+
         self.assertTrue(os.path.exists(self.storage_file))
         with open(self.storage_file, "r", encoding="utf-8") as f:
             content = f.read()
@@ -45,11 +45,11 @@ class TestPortfolioStressScenarioPipelineIntegration(unittest.TestCase):
         self.assertIn("simulation", result)
         self.assertIn("stress_test", result)
         self.assertIn("stress_report", result)
-        
+
         self.assertEqual(result["simulation"].get("symbol"), self.symbol)
         self.assertEqual(result["stress_test"].get("symbol"), self.symbol)
         self.assertEqual(result["stress_report"].get("symbol"), self.symbol)
-        
+
         self.assertTrue(os.path.exists(self.storage_file))
 
 if __name__ == "__main__":

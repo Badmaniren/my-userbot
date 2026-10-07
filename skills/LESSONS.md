@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-: Не удалось скачать архив логов рана (HTTP 404).
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_monitor (refactor) — раундов: 1
+or (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_monitor (refactor) — раундов: 1
@@ -254,3 +251,6 @@
 ## market_portfolio_stress_backtest_calibrator (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_scenario_matrix_evaluator (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

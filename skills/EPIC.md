@@ -10,3 +10,6 @@
 - market_portfolio_stress_reporter: market_portfolio_stress_reporter: продолжаем укрепление и чистку ядра стресс-тестирования без создания дубликатов и нарушения античита.
 - market_portfolio_stress_reporter: Продолжаем укрепление и чистку market_portfolio_stress_reporter в рамках текущего эпика отказоустойчивого ядра стресс-тестирования.
 - market_portfolio_stress_reporter: Продолжаем укрепление и чистку market_portfolio_stress_reporter в рамках текущего эпика отказоустойчивого ядра стресс-тестирования.
+- market_portfolio_stress_reporter: market_portfolio_stress_reporter: успешно завершаем эпик по очистки и укреплению ядра стресс-тестирования портфеля без дубликатов и нарушений античита.  ✅ ЭПИК ЗАВЕРШЁН
+
+Нет активного эпика — можно предложить новый.

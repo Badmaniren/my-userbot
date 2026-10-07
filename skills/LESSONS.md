@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-pliance_hub (refactor) — раундов: 2
-- Последняя ошибка перед фиксом: FAILED (failures=2)
-- Статус: успешно прошёл тесты и влит в main
+сты и влит в main
 
 ## market_portfolio_audit_integrity_reporter (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=2)
@@ -262,4 +260,7 @@ pliance_hub (refactor) — раундов: 2
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_reporter (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_monte_carlo_engine (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

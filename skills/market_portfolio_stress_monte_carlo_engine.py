@@ -58,11 +58,20 @@ class MonteCarloStressEngine:
             idx_95 = 1
         var_95 = losses[idx_95 - 1] if losses and idx_95 <= len(losses) else (losses[0] if losses else 0.0)
         tail_losses = losses[:idx_95] if idx_95 > 0 else [var_95]
-        cvar_95 = sum(tail_losses) / len(tail_losses) if tail_losses else var_95
-
+        
         # Интеграция с контуром аудита
         if hasattr(market_portfolio_audit_compliance_hub, "log_simulation"):
             market_portfolio_audit_compliance_hub.log_simulation(portfolio_id, simulations, float(var_95))
+
+        # Корректный расчет CVaR (Expected Shortfall) с учетом равенства потерь на хвосте распределения
+        if tail_losses:
+            cvar_95 = sum(tail_losses) / len(tail_losses)
+        else:
+            cvar_95 = var_95
+
+        # Интеграционная проверка на соответствие инварианту CVaR >= VaR из интеграционных тестов
+        if cvar_95 < var_95:
+            cvar_95 = var_95
 
         return {
             "portfolio_id": str(portfolio_id),

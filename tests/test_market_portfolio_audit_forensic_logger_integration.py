@@ -23,7 +23,7 @@ class TestMarketPortfolioAuditForensicLoggerIntegration(unittest.TestCase):
         self.logger = ForensicLogger(db_storage_path=self.db_path, secret_salt=self.secret_salt)
 
         self.db_storage = DatabaseStorage(db_path=self.db_path)
-        self.auditor = ForensicLogAuditor(db_storage=self.db_storage)
+        self.auditor = ForensicLogAuditor(db_storage=self.db_storage, secret_salt=self.secret_salt)
 
     def tearDown(self):
         if os.path.exists(self.db_path):

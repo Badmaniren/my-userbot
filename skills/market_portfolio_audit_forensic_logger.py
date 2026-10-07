@@ -177,8 +177,9 @@ class ForensicLogger:
 class ForensicLogAuditor:
     """Аудитор форензик-логов для интеграционных тестов."""
 
-    def __init__(self, db_storage: DatabaseStorage):
+    def __init__(self, db_storage: DatabaseStorage, secret_salt=""):
         self.db_storage = db_storage
+        self.secret_salt = secret_salt
         if hasattr(self.db_storage, "_init_db"):
             self.db_storage._init_db()
 
@@ -215,9 +216,10 @@ class ForensicLogAuditor:
             "payload": payload
         }
 
-    def verify_chain_integrity(self) -> dict:
+    def verify_chain_integrity(self, secret_salt=None) -> dict:
         if hasattr(self.db_storage, "_init_db"):
             self.db_storage._init_db()
+        salt = secret_salt if secret_salt is not None else self.secret_salt
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT event_id, discrepancy_code, chain_previous_hash, integrity_hash, payload FROM forensic_audit_logs ORDER BY id ASC")
@@ -228,7 +230,7 @@ class ForensicLogAuditor:
         for row in rows:
             event_id, discrepancy_code, db_prev_hash, db_curr_hash, payload_str = row
             if event_id is None and discrepancy_code is None:
-                recalculated = hashlib.sha256((db_prev_hash + payload_str + "").encode()).hexdigest()
+                recalculated = hashlib.sha256((db_prev_hash + payload_str + salt).encode()).hexdigest()
             else:
                 ev = event_id if event_id is not None else ""
                 disc = discrepancy_code if discrepancy_code is not None else ""

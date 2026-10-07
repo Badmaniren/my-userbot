@@ -56,3 +56,7 @@ def evaluate_stress_scenario_matrix(evaluation_payload: dict) -> dict:
         "portfolio_id": portfolio_id,
         "matrix_score": matrix_score
     }
+
+
+def evaluate(portfolio_id: str, monte_carlo_data: dict = None) -> dict:
+    return evaluate_stress_scenario_matrix({"portfolio_id": portfolio_id, "monte_carlo_metrics": monte_carlo_data or {}})

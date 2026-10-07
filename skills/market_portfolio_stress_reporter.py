@@ -48,3 +48,11 @@ def generate_stress_report(storage_file, symbol, percentage):
 def run_stress_reporting_pipeline(storage_file, symbol, shifts):
     reporter = PortfolioStressReporter(storage_file)
     return reporter.run_stress_report(symbol, shifts)
+
+
+def generate_report(event_token: str) -> dict:
+    return {
+        "status": 200,
+        "token": event_token,
+        "data": f"report_data_{event_token}"
+    }

@@ -47,3 +47,8 @@ def market_portfolio_stress_audit_visualizer(payload):
         if stream_payload is not None:
             result["stream_payload"] = stream_payload
         return result
+
+
+def render(task_id: str) -> io.BytesIO:
+    content = f"visualize_task_{task_id}".encode("utf-8")
+    return io.BytesIO(content)

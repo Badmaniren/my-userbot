@@ -115,3 +115,8 @@ class MarketPortfolioAuditComplianceHub:
                     f.write("{}")
             return True
         return bool(res)
+
+
+def log_event(event_token: str) -> bool:
+    logger.info(f"Logged event token: {event_token}")
+    return True

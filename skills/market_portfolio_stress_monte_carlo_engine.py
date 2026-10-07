@@ -17,7 +17,10 @@ from skills import market_portfolio_stress_audit_visualizer
 class MonteCarloStressEngine:
     """Движок стресс-тестирования портфеля методом Монте-Карло."""
 
-    def run_simulation(self, portfolio_id: str, simulations: int, horizon_days: int) -> dict:
+    def run_simulation(self, portfolio_id: str, simulations: int = 100, horizon_days: int = 30, iterations: int = None, **kwargs) -> dict:
+        if iterations is not None:
+            simulations = iterations
+
         try:
             portfolio_data = db_storage.fetch_portfolio(portfolio_id)
         except AttributeError:
@@ -68,7 +71,8 @@ class MonteCarloStressEngine:
             "portfolio_id": portfolio_id,
             "simulation_results": simulation_results,
             "var_95": float(var_95),
-            "cvar_95": float(cvar_95)
+            "cvar_95": float(cvar_95),
+            "var_result": float(var_95)
         }
 
     def _get_anomaly_adjustment(self) -> float:
@@ -88,6 +92,9 @@ class MonteCarloStressEngine:
             return market_portfolio_api_gateway.stream_payload()
         except AttributeError:
             return None
+
+
+MarketPortfolioStressMonteCarloEngine = MonteCarloStressEngine
 
 
 if not hasattr(db_storage, "fetch_portfolio"):

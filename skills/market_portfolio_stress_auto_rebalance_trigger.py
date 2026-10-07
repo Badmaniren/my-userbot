@@ -98,10 +98,21 @@ class StressAutoRebalanceTrigger:
                 return res
         return {"alert_id": alert_id, "dispatched": False}
 
+    def execute_rebalance(self, portfolio_id: str, hedges=None, weights=None) -> Dict[str, Any]:
+        return {
+            "status": "EXECUTED",
+            "portfolio_id": portfolio_id,
+            "hedges": hedges or [],
+            "weights": weights or []
+        }
+
 
 class _GlobalModuleProxy:
     def __init__(self):
         self._instance = None
+
+    def __call__(self, *args, **kwargs):
+        return self._get_instance()
 
     def _get_instance(self):
         if self._instance is None:
@@ -121,6 +132,9 @@ class _GlobalModuleProxy:
 
     def notify_audit_system(self, alert_id: str, message: str) -> Dict[str, Any]:
         return self._get_instance().notify_audit_system(alert_id, message)
+
+    def execute_rebalance(self, portfolio_id: str, hedges=None, weights=None) -> Dict[str, Any]:
+        return self._get_instance().execute_rebalance(portfolio_id, hedges, weights)
 
 
 market_portfolio_stress_auto_rebalance_trigger = _GlobalModuleProxy()

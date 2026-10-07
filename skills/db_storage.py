@@ -66,3 +66,26 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+class DBStorageCallable:
+    def __init__(self):
+        self._in_memory_db = {}
+        self._hedge_events = []
+
+    def __call__(self, query=None, params=None, *args, **kwargs):
+        return True
+
+    def save_hedge_event(self, event_record):
+        self._hedge_events.append(event_record)
+        return True
+
+    def save(self, record_id, data):
+        self._in_memory_db[record_id] = data
+        return True
+
+    def fetch_portfolio(self, portfolio_id):
+        return self._in_memory_db.get(portfolio_id, {"portfolio_id": portfolio_id, "initial_value": 100000.0, "volatility": 0.2, "drift": 0.0})
+
+
+db_storage = DBStorageCallable()

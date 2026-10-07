@@ -7,3 +7,4 @@
 - market_portfolio_stress_reporter: Продолжаем эпик по очистке и укреплению ядра стресс-тестирования, исправляя логику отчетов и устраняя любые нарушения античита.
 - market_portfolio_stress_reporter: Продолжаем эпик по очистке и укреплению ядра стресс-тестирования, совершенствуя market_portfolio_stress_reporter строго в рамках существующих стандартов античита.
 - market_portfolio_stress_reporter: Продолжаем эпик по очистке и укреплению ядра стресс-тестирования, совершенствуя market_portfolio_stress_reporter без нарушений античита.
+- market_portfolio_stress_reporter: market_portfolio_stress_reporter: продолжаем укрепление и чистку ядра стресс-тестирования без создания дубликатов и нарушения античита.

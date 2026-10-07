@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.db
+collector_*.json
+pipeline.json
+report.json
+mc.json

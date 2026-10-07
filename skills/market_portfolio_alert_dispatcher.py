@@ -98,12 +98,25 @@ def process_stream_alert(alert_id):
 
 def market_portfolio_alert_dispatcher(payload=None, *args, **kwargs):
     if isinstance(payload, dict):
-        symbol = payload.get("symbol", "DEFAULT")
+        symbol = payload.get("symbol") or payload.get("alert_id") or "DEFAULT"
         url = payload.get("url", "http://example.com")
         telegram_token = payload.get("telegram_token", "token")
         chat_id = payload.get("chat_id", "123")
         storage_file = payload.get("storage_file", "storage.json")
-        return dispatch_portfolio_alerts(symbol, url, telegram_token, chat_id, storage_file)
+        severity_level = payload.get("severity_level", "MEDIUM")
+        min_threshold = payload.get("min_threshold")
+        channels = payload.get("channels")
+        res = dispatch_portfolio_alerts(symbol, url, telegram_token, chat_id, storage_file, severity_level, min_threshold, channels)
+        if "alert_id" in payload:
+            res["alert_id"] = payload["alert_id"]
+            res["dispatched"] = True
+        return res
     return {"status": "dispatched"}
 
-market_portfolio_alert_dispatcher.dispatch = dispatch_portfolio_alerts
+
+def dispatch(symbol_or_payload=None, url=None, telegram_token=None, chat_id=None, storage_file=None, **kwargs):
+    if isinstance(symbol_or_payload, dict):
+        return market_portfolio_alert_dispatcher(symbol_or_payload)
+    return dispatch_portfolio_alerts(symbol_or_payload, url, telegram_token, chat_id, storage_file, **kwargs)
+
+market_portfolio_alert_dispatcher.dispatch = dispatch

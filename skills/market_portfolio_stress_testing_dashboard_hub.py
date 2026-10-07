@@ -24,40 +24,49 @@ def start_new(**kwargs):
     elif db_storage is not None and hasattr(db_storage, "read_blob") and data_stream is None:
         db_storage.read_blob()
 
-    monte_carlo_result = None
-    if monte_carlo_engine and hasattr(monte_carlo_engine, "run"):
-        monte_carlo_result = monte_carlo_engine.run(
-            portfolio_id=portfolio_id,
-            simulations=simulations,
-            confidence=confidence
-        )
-
-    scenario_result = None
-    if scenario_simulator and hasattr(scenario_simulator, "evaluate"):
-        scenario_result = scenario_simulator.evaluate(
-            portfolio_id=portfolio_id
-        )
-
-    aggregated_metrics = None
-    if stress_reporter and hasattr(stress_reporter, "aggregate"):
-        aggregated_metrics = stress_reporter.aggregate()
-
     dashboard_id = uuid.uuid4().hex
 
-    response = {
-        "dashboard_id": dashboard_id,
-        "portfolio_id": portfolio_id,
-        "status": "completed"
-    }
+    try:
+        monte_carlo_result = None
+        if monte_carlo_engine and hasattr(monte_carlo_engine, "run"):
+            monte_carlo_result = monte_carlo_engine.run(
+                portfolio_id=portfolio_id,
+                simulations=simulations,
+                confidence=confidence
+            )
 
-    if monte_carlo_result is not None:
-        response["monte_carlo"] = monte_carlo_result
-    if scenario_result is not None:
-        response["scenario"] = scenario_result
-    if aggregated_metrics is not None:
-        response["aggregated_metrics"] = aggregated_metrics
+        scenario_result = None
+        if scenario_simulator and hasattr(scenario_simulator, "evaluate"):
+            scenario_result = scenario_simulator.evaluate(
+                portfolio_id=portfolio_id
+            )
 
-    return response
+        aggregated_metrics = None
+        if stress_reporter and hasattr(stress_reporter, "aggregate"):
+            aggregated_metrics = stress_reporter.aggregate()
+
+        response = {
+            "dashboard_id": dashboard_id,
+            "portfolio_id": portfolio_id,
+            "status": "completed"
+        }
+
+        if monte_carlo_result is not None:
+            response["monte_carlo"] = monte_carlo_result
+        if scenario_result is not None:
+            response["scenario"] = scenario_result
+        if aggregated_metrics is not None:
+            response["aggregated_metrics"] = aggregated_metrics
+
+        return response
+
+    except Exception as e:
+        return {
+            "dashboard_id": dashboard_id,
+            "portfolio_id": portfolio_id,
+            "status": "failed",
+            "error": str(e)
+        }
 
 
 def market_portfolio_stress_testing_dashboard_hub(**kwargs):

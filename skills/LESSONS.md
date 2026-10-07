@@ -3,8 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ическая ошибка в коде: invalid character '—' (U+2014) (<unknown>, line 86)
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
+(failures=1, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_audit_compliance_hub (refactor) — раундов: 2
@@ -264,3 +263,6 @@
 ## market_portfolio_stress_scenario_matrix_evaluator (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_scenario_pipeline (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

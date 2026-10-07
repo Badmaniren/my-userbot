@@ -17,6 +17,9 @@ from skills import market_portfolio_stress_audit_visualizer
 class MonteCarloStressEngine:
     """Движок стресс-тестирования портфеля методом Монте-Карло."""
 
+    def generate_scenarios(self, portfolio_id: str, paths: int = 100) -> list:
+        return generate_monte_carlo_scenarios(portfolio_id=portfolio_id, paths=paths)
+
     def run_simulation(self, portfolio_id: str, simulations: int, horizon_days: int) -> dict:
         try:
             portfolio_data = db_storage.fetch_portfolio(portfolio_id)
@@ -157,3 +160,14 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
         market_portfolio_stress_audit_visualizer.visualize_stress_test(result_dict)
 
     return result_dict
+
+
+def generate_monte_carlo_scenarios(portfolio_id: str = "default", paths: int = 100, horizon_days: int = 1, volatility: float = 0.2, **kwargs) -> list:
+    """Генерирует сэмплы сценариев доходностей/потерь методом Монте-Карло."""
+    engine = MonteCarloStressEngine()
+    res = engine.run_simulation(portfolio_id=portfolio_id, simulations=paths, horizon_days=horizon_days)
+    sim_results = res.get("simulation_results", [])
+    if sim_results and isinstance(sim_results[0], list):
+        initial_val = sim_results[0][0] if sim_results[0] else 1.0
+        return [(path[-1] - initial_val) / initial_val for path in sim_results]
+    return [random.gauss(0, volatility) for _ in range(paths)]

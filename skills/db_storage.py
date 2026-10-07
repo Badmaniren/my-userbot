@@ -66,3 +66,25 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+_TAIL_RISK_METRICS = {}
+
+
+def save_tail_risk_metrics(portfolio_id_or_data, metrics=None) -> bool:
+    if isinstance(portfolio_id_or_data, dict):
+        pid = portfolio_id_or_data.get("portfolio_id", "default")
+        _TAIL_RISK_METRICS[pid] = portfolio_id_or_data
+        return True
+    elif portfolio_id_or_data and metrics is not None:
+        _TAIL_RISK_METRICS[portfolio_id_or_data] = metrics
+        return True
+    return False
+
+
+def get_tail_risk_metrics(portfolio_id: str):
+    return _TAIL_RISK_METRICS.get(portfolio_id, {})
+
+
+def save_risk_report(report_data: dict) -> bool:
+    return save_tail_risk_metrics(report_data)

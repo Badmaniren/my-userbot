@@ -1,7 +1,9 @@
 import unittest
 import os
 import uuid
+import random
 import tempfile
+import json
 from skills.market_portfolio_audit_forensic_logger import (
     DatabaseStorage,
     ForensicLogger,
@@ -39,7 +41,7 @@ class TestMarketPortfolioAuditForensicLoggerIntegration(unittest.TestCase):
 
         event_id_2 = str(uuid.uuid4())
         discrepancy_code_2 = f"DISC_{uuid.uuid4().hex[:6].upper()}"
-        payload_2 = {"metric": uuid.random.randint(100, 999), "status": "investigation_required"}
+        payload_2 = {"metric": random.randint(100, 999), "status": "investigation_required"}
 
         audit_res = self.auditor.log_audit_event(
             event_id=event_id_2,

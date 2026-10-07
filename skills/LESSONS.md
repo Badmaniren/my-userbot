@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-dit_forensic_logger (create) — раундов: 4
-- Последняя ошибка перед фиксом: Traceback (most recent call last):
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_audit_forensic_ledger (create) — раундов: 4
+tfolio_audit_forensic_ledger (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -255,3 +251,7 @@ dit_forensic_logger (create) — раундов: 4
 
 ## market_portfolio_var_liquidity_core (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_liquidity_scenario_analyzer (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

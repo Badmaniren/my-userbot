@@ -9,20 +9,27 @@ class MarketSentimentRiskHub:
         self.sentiment_analyzer = MarketNewsSentimentAnalyzer()
         self.anomaly_detector = MarketAnomalyDetector()
 
-    def evaluate_risk(self, ticker=None, exchange=None, news_snippet=None):
+    def evaluate_risk(self, ticker=None, exchange=None, news_snippet=None, **kwargs):
         sentiment_score = 0.0
         anomaly_score = 0.0
+
+        target_exchange = exchange or kwargs.get("exchange")
+        target_ticker = ticker or kwargs.get("ticker")
 
         if news_snippet:
             sentiment_res = self.sentiment_analyzer.analyze(news_snippet)
             if isinstance(sentiment_res, dict):
                 sentiment_score = sentiment_res.get("sentiment_score", 0.0)
-        elif ticker:
-            sentiment_res = self.sentiment_analyzer.analyze(ticker)
+            elif isinstance(sentiment_res, (int, float)):
+                sentiment_score = float(sentiment_res)
+        elif target_ticker:
+            sentiment_res = self.sentiment_analyzer.analyze(target_ticker)
             if isinstance(sentiment_res, dict):
                 sentiment_score = sentiment_res.get("sentiment_score", 0.0)
+            elif isinstance(sentiment_res, (int, float)):
+                sentiment_score = float(sentiment_res)
 
-        target_anomaly_query = exchange if exchange else (ticker if ticker else "DEFAULT")
+        target_anomaly_query = target_exchange if target_exchange else (target_ticker if target_ticker else "DEFAULT")
         anomaly_res = self.anomaly_detector.detect(target_anomaly_query)
         if isinstance(anomaly_res, dict):
             anomaly_score = anomaly_res.get("anomaly_score", 0.0)
@@ -59,9 +66,9 @@ class MarketSentimentRiskHub:
             f.write(f"Risk Audit Report for {ticker}\n")
         return True
 
-def compute_market_risk_index(ticker=None, exchange=None):
+def compute_market_risk_index(ticker=None, exchange=None, **kwargs):
     hub = MarketSentimentRiskHub()
-    return hub.evaluate_risk(ticker=ticker, exchange=exchange)
+    return hub.evaluate_risk(ticker=ticker, exchange=exchange, **kwargs)
 
 def process_risk_stream(stream_source):
     hub = MarketSentimentRiskHub()

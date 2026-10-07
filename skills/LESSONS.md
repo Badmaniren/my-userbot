@@ -3,12 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-с: успешно прошёл тесты и влит в main
-
-## market_portfolio_data_exporter (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## db_storage (refactor) — раундов: 1
+раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_audit_integrity_checker (create) — раундов: 4
@@ -256,5 +251,9 @@
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_stress_audit_summary_ledger (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_audit_summary_logbook (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

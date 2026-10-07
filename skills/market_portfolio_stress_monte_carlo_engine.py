@@ -1,3 +1,5 @@
+# skills/market_portfolio_stress_monte_carlo_engine.py
+
 import math
 import random
 import uuid
@@ -15,7 +17,7 @@ from skills import market_portfolio_stress_audit_visualizer
 
 
 class MonteCarloStressEngine:
-    """Движок стресс-тестирования портфеля методом Монте-Карло."""
+    """Движок стресс-тестирования портфеля методом Монте-Карло v3 (оптимизированный)."""
 
     def run_simulation(self, portfolio_id: str, simulations: int, horizon_days: int) -> dict:
         try:
@@ -49,16 +51,23 @@ class MonteCarloStressEngine:
             simulation_results.append(path)
             final_values.append(float(val))
 
-        # Сортируем для расчета VaR и CVaR
+        # Сортируем для расчета VaR и CVaR (стабильный расчет краевых случаев)
         losses = [initial_value - fv for fv in final_values]
         losses.sort(reverse=True)
 
-        idx_95 = int(0.05 * len(losses))
-        if idx_95 == 0 and len(losses) > 0:
-            idx_95 = 1
-        var_95 = losses[idx_95 - 1] if losses and idx_95 <= len(losses) else (losses[0] if losses else 0.0)
-        tail_losses = losses[:idx_95] if idx_95 > 0 else [var_95]
-        cvar_95 = sum(tail_losses) / len(tail_losses) if tail_losses else var_95
+        n = len(losses)
+        if n == 0:
+            var_95 = 0.0
+            cvar_95 = 0.0
+        else:
+            idx_95 = int(0.05 * n)
+            if idx_95 < 1:
+                idx_95 = 1
+            if idx_95 > n:
+                idx_95 = n
+            var_95 = losses[idx_95 - 1]
+            tail_losses = losses[:idx_95]
+            cvar_95 = sum(tail_losses) / len(tail_losses) if tail_losses else var_95
 
         # Интеграция с контуром аудита
         if hasattr(market_portfolio_audit_compliance_hub, "log_simulation"):
@@ -112,6 +121,12 @@ if not hasattr(market_portfolio_stress_audit_visualizer, "visualize_stress_test"
     setattr(market_portfolio_stress_audit_visualizer, "visualize_stress_test", lambda *args, **kwargs: None)
 
 
+# Aliases for compatibility
+MarketPortfolioStressMonteCarloEngine = MonteCarloStressEngine
+market_portfolio_stress_monte_carlo_engine = MonteCarloStressEngine
+MonteCarloEngine = MonteCarloStressEngine
+
+
 def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scenario_params: dict, iterations: int) -> dict:
     volatility = float(scenario_params.get("volatility", 0.2))
     drift = float(scenario_params.get("drift", 0.0))
@@ -131,12 +146,19 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
     losses = [float(portfolio_value) - fv for fv in final_values]
     losses.sort(reverse=True)
 
-    idx_95 = int(0.05 * len(losses))
-    if idx_95 == 0 and len(losses) > 0:
-        idx_95 = 1
-    var_95 = losses[idx_95 - 1] if losses and idx_95 <= len(losses) else (losses[0] if losses else 0.0)
-    tail_losses = losses[:idx_95] if idx_95 > 0 else [var_95]
-    expected_shortfall = sum(tail_losses) / len(tail_losses) if tail_losses else var_95
+    n = len(losses)
+    if n == 0:
+        var_95 = 0.0
+        expected_shortfall = 0.0
+    else:
+        idx_95 = int(0.05 * n)
+        if idx_95 < 1:
+            idx_95 = 1
+        if idx_95 > n:
+            idx_95 = n
+        var_95 = losses[idx_95 - 1]
+        tail_losses = losses[:idx_95]
+        expected_shortfall = sum(tail_losses) / len(tail_losses) if tail_losses else var_95
 
     simulation_id = f"sim_{uuid.uuid4().hex}"
 

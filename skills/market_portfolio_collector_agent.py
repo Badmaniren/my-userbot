@@ -2,6 +2,21 @@ import os
 import json
 from datetime import datetime
 
+
+def market_portfolio_collector_agent(data=None, **kwargs):
+    if isinstance(data, dict):
+        pid = data.get("portfolio_id")
+        ticker = data.get("ticker", "AAPL")
+        allocation = data.get("allocation", 100000.0)
+        return {
+            "portfolio_id": pid,
+            "ticker": ticker,
+            "allocation": allocation,
+            "status": "collected"
+        }
+    return {"status": "collected"}
+
+
 class MarketParser:
     def __init__(self, storage_file: str):
         self.storage_file = storage_file

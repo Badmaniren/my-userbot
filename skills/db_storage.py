@@ -1,6 +1,42 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
+
+
+class DBStorage:
+    _profiles = {}
+
+    def __init__(self, db_path=None):
+        self.db_path = db_path
+
+    def save_risk_profile(self, profile_id: str, data: dict) -> bool:
+        portfolio_id = data.get("portfolio_id", profile_id)
+        if portfolio_id not in DBStorage._profiles:
+            DBStorage._profiles[portfolio_id] = []
+        DBStorage._profiles[portfolio_id].append(data)
+        return True
+
+    def get_latest_profile(self, portfolio_id: str) -> dict:
+        profiles = DBStorage._profiles.get(portfolio_id, [])
+        if profiles:
+            return profiles[-1]
+        return {}
+
+    def delete_portfolio_records(self, portfolio_id: str) -> bool:
+        if portfolio_id in DBStorage._profiles:
+            del DBStorage._profiles[portfolio_id]
+        return True
+
+
+DbStorage = DBStorage
 
 
 class MarketParser:
@@ -8,6 +44,8 @@ class MarketParser:
         self.storage_file = storage_file
 
     def fetch_price(self, url: str):
+        if requests is None:
+            return None
         response = requests.get(url, timeout=10)
         try:
             data = response.json()
@@ -18,6 +56,8 @@ class MarketParser:
         return None
 
     def parse_html_prices(self, url: str):
+        if requests is None or BeautifulSoup is None:
+            return None
         response = requests.get(url, timeout=10)
         soup = BeautifulSoup(response.text, 'html.parser')
         element = soup.find()

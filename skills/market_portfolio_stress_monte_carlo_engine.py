@@ -27,9 +27,9 @@ class MonteCarloStressEngine:
                 setattr(db_storage, "_in_memory_db", in_mem)
             portfolio_data = in_mem.get(portfolio_id, {"portfolio_id": portfolio_id})
             
-        initial_value = portfolio_data.get("initial_value", 100000.0)
-        volatility = portfolio_data.get("volatility", 0.2)
-        drift = portfolio_data.get("drift", 0.0)
+        initial_value = float(portfolio_data.get("initial_value", 100000.0))
+        volatility = float(portfolio_data.get("volatility", 0.2))
+        drift = float(portfolio_data.get("drift", 0.0))
 
         anomaly_mult = self._get_anomaly_adjustment()
         effective_vol = volatility * anomaly_mult
@@ -45,9 +45,9 @@ class MonteCarloStressEngine:
                 rand_norm = random.gauss(0, 1)
                 shock = (drift - 0.5 * (effective_vol ** 2)) * dt + effective_vol * math.sqrt(dt) * rand_norm
                 val *= math.exp(shock)
-                path.append(val)
+                path.append(float(val))
             simulation_results.append(path)
-            final_values.append(val)
+            final_values.append(float(val))
 
         # Сортируем для расчета VaR и CVaR
         losses = [initial_value - fv for fv in final_values]
@@ -65,7 +65,7 @@ class MonteCarloStressEngine:
             market_portfolio_audit_compliance_hub.log_simulation(portfolio_id, simulations, float(var_95))
 
         return {
-            "portfolio_id": portfolio_id,
+            "portfolio_id": str(portfolio_id),
             "simulation_results": simulation_results,
             "var_95": float(var_95),
             "cvar_95": float(cvar_95)
@@ -73,7 +73,7 @@ class MonteCarloStressEngine:
 
     def _get_anomaly_adjustment(self) -> float:
         try:
-            return market_anomaly_detector.get_current_anomaly_multiplier()
+            return float(market_anomaly_detector.get_current_anomaly_multiplier())
         except AttributeError:
             return 1.0
 
@@ -81,7 +81,7 @@ class MonteCarloStressEngine:
         try:
             return market_portfolio_data_exporter.export(report_id, loss_limit)
         except AttributeError:
-            return {"report_id": report_id, "loss_limit": loss_limit}
+            return {"report_id": report_id, "loss_limit": float(loss_limit)}
 
     def consume_stream(self):
         try:
@@ -113,22 +113,22 @@ if not hasattr(market_portfolio_stress_audit_visualizer, "visualize_stress_test"
 
 
 def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scenario_params: dict, iterations: int) -> dict:
-    volatility = scenario_params.get("volatility", 0.2)
-    drift = scenario_params.get("drift", 0.0)
-    horizon_days = scenario_params.get("horizon_days", 1)
+    volatility = float(scenario_params.get("volatility", 0.2))
+    drift = float(scenario_params.get("drift", 0.0))
+    horizon_days = int(scenario_params.get("horizon_days", 1))
 
     dt = 1.0 / 365.0
     final_values = []
     
     for _ in range(iterations):
-        val = portfolio_value
+        val = float(portfolio_value)
         for _ in range(horizon_days):
             rand_norm = random.gauss(0, 1)
             shock = (drift - 0.5 * (volatility ** 2)) * dt + volatility * math.sqrt(dt) * rand_norm
             val *= math.exp(shock)
-        final_values.append(val)
+        final_values.append(float(val))
 
-    losses = [portfolio_value - fv for fv in final_values]
+    losses = [float(portfolio_value) - fv for fv in final_values]
     losses.sort(reverse=True)
 
     idx_95 = int(0.05 * len(losses))
@@ -141,15 +141,15 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
     simulation_id = f"sim_{uuid.uuid4().hex}"
 
     if hasattr(market_portfolio_audit_compliance_hub, "log_simulation"):
-        market_portfolio_audit_compliance_hub.log_simulation(portfolio_id, iterations, float(var_95))
+        market_portfolio_audit_compliance_hub.log_simulation(str(portfolio_id), int(iterations), float(var_95))
 
     result_dict = {
-        "simulation_id": simulation_id,
-        "portfolio_id": portfolio_id,
-        "initial_value": portfolio_value,
+        "simulation_id": str(simulation_id),
+        "portfolio_id": str(portfolio_id),
+        "initial_value": float(portfolio_value),
         "var_95": float(var_95),
         "expected_shortfall": float(expected_shortfall),
-        "iterations": iterations
+        "iterations": int(iterations)
     }
 
     if hasattr(market_portfolio_stress_audit_visualizer, "visualize_stress_test"):

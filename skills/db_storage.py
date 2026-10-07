@@ -66,3 +66,7 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+def db_storage(*args, **kwargs):
+    return True

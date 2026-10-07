@@ -112,3 +112,12 @@ def run_stress_test(storage_file, symbol, range_min, range_max, step):
         "symbol": symbol,
         "scenarios": scenarios
     }
+
+
+def market_portfolio_scenario_simulator(payload=None, **kwargs):
+    if payload is not None:
+        return payload
+    return kwargs
+
+
+MarketPortfolioScenarioSimulator = PortfolioScenarioSimulator

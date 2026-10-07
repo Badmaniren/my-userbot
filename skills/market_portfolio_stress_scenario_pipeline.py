@@ -123,3 +123,13 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
         "stress_test": stress_test_result,
         "stress_report": stress_report_result
     }
+
+
+def market_portfolio_stress_scenario_pipeline(payload=None, **kwargs):
+    if payload is not None:
+        return payload
+    return kwargs
+
+
+MarketPortfolioStressScenarioPipeline = PortfolioStressScenarioPipeline
+StressScenarioPipeline = PortfolioStressScenarioPipeline

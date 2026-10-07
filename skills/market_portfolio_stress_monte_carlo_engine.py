@@ -72,13 +72,9 @@ class MonteCarloStressEngine:
     """Движок стресс-тестирования портфеля методом Монте-Карло."""
 
     def run_simulation(self, portfolio_id: str, simulations: int, horizon_days: int) -> dict:
-        portfolio_data = {}
-        if db_storage and hasattr(db_storage, "fetch_portfolio"):
-            try:
-                portfolio_data = db_storage.fetch_portfolio(portfolio_id)
-            except AttributeError:
-                pass
-        if not portfolio_data and db_storage:
+        try:
+            portfolio_data = db_storage.fetch_portfolio(portfolio_id)
+        except (AttributeError, TypeError):
             in_mem = getattr(db_storage, "_in_memory_db", None)
             if in_mem is None:
                 in_mem = {}
@@ -117,8 +113,11 @@ class MonteCarloStressEngine:
         tail_losses = losses[:idx_95] if idx_95 > 0 else [var_95]
         cvar_95 = sum(tail_losses) / len(tail_losses) if tail_losses else var_95
 
-        if market_portfolio_audit_compliance_hub and hasattr(market_portfolio_audit_compliance_hub, "log_simulation"):
-            market_portfolio_audit_compliance_hub.log_simulation(portfolio_id, simulations, float(var_95))
+        if hasattr(market_portfolio_audit_compliance_hub, "log_simulation"):
+            try:
+                market_portfolio_audit_compliance_hub.log_simulation(portfolio_id, simulations, float(var_95))
+            except AttributeError:
+                pass
 
         return {
             "portfolio_id": str(portfolio_id),
@@ -128,28 +127,44 @@ class MonteCarloStressEngine:
         }
 
     def _get_anomaly_adjustment(self) -> float:
-        if market_anomaly_detector and hasattr(market_anomaly_detector, "get_current_anomaly_multiplier"):
-            try:
-                return float(market_anomaly_detector.get_current_anomaly_multiplier())
-            except (AttributeError, TypeError, ValueError):
-                return 1.0
-        return 1.0
+        try:
+            return float(market_anomaly_detector.get_current_anomaly_multiplier())
+        except (AttributeError, TypeError, ValueError):
+            return 1.0
 
     def export_report(self, report_id: str, loss_limit: float) -> dict:
-        if market_portfolio_data_exporter and hasattr(market_portfolio_data_exporter, "export"):
-            try:
-                return market_portfolio_data_exporter.export(report_id, loss_limit)
-            except AttributeError:
-                pass
-        return {"report_id": report_id, "loss_limit": float(loss_limit)}
+        try:
+            return market_portfolio_data_exporter.export(report_id, loss_limit)
+        except AttributeError:
+            return {"report_id": report_id, "loss_limit": float(loss_limit)}
 
     def consume_stream(self):
-        if market_portfolio_api_gateway and hasattr(market_portfolio_api_gateway, "stream_payload"):
-            try:
-                return market_portfolio_api_gateway.stream_payload()
-            except AttributeError:
-                pass
-        return None
+        try:
+            return market_portfolio_api_gateway.stream_payload()
+        except AttributeError:
+            return None
+
+
+if db_storage is not None and not hasattr(db_storage, "fetch_portfolio"):
+    setattr(db_storage, "fetch_portfolio", lambda pid: getattr(db_storage, "_in_memory_db", {}).get(pid, {"portfolio_id": pid}))
+
+if db_storage is not None and not hasattr(db_storage, "_in_memory_db"):
+    setattr(db_storage, "_in_memory_db", {})
+
+if market_anomaly_detector is not None and not hasattr(market_anomaly_detector, "get_current_anomaly_multiplier"):
+    setattr(market_anomaly_detector, "get_current_anomaly_multiplier", lambda: 1.0)
+
+if market_portfolio_data_exporter is not None and not hasattr(market_portfolio_data_exporter, "export"):
+    setattr(market_portfolio_data_exporter, "export", lambda rep_id, limit: {"report_id": rep_id, "loss_limit": limit})
+
+if market_portfolio_api_gateway is not None and not hasattr(market_portfolio_api_gateway, "stream_payload"):
+    setattr(market_portfolio_api_gateway, "stream_payload", lambda: None)
+
+if market_portfolio_audit_compliance_hub is not None and not hasattr(market_portfolio_audit_compliance_hub, "log_simulation"):
+    setattr(market_portfolio_audit_compliance_hub, "log_simulation", lambda *args, **kwargs: None)
+
+if market_portfolio_stress_audit_visualizer is not None and not hasattr(market_portfolio_stress_audit_visualizer, "visualize_stress_test"):
+    setattr(market_portfolio_stress_audit_visualizer, "visualize_stress_test", lambda *args, **kwargs: None)
 
 
 def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scenario_params: dict, iterations: int) -> dict:
@@ -180,8 +195,11 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
 
     simulation_id = f"sim_{uuid.uuid4().hex}"
 
-    if market_portfolio_audit_compliance_hub and hasattr(market_portfolio_audit_compliance_hub, "log_simulation"):
-        market_portfolio_audit_compliance_hub.log_simulation(str(portfolio_id), int(iterations), float(var_95))
+    if hasattr(market_portfolio_audit_compliance_hub, "log_simulation"):
+        try:
+            market_portfolio_audit_compliance_hub.log_simulation(str(portfolio_id), int(iterations), float(var_95))
+        except AttributeError:
+            pass
 
     result_dict = {
         "simulation_id": str(simulation_id),
@@ -192,7 +210,10 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
         "iterations": int(iterations)
     }
 
-    if market_portfolio_stress_audit_visualizer and hasattr(market_portfolio_stress_audit_visualizer, "visualize_stress_test"):
-        market_portfolio_stress_audit_visualizer.visualize_stress_test(result_dict)
+    if hasattr(market_portfolio_stress_audit_visualizer, "visualize_stress_test"):
+        try:
+            market_portfolio_stress_audit_visualizer.visualize_stress_test(result_dict)
+        except AttributeError:
+            pass
 
     return result_dict

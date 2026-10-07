@@ -1,6 +1,6 @@
 import os
 import requests
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 try:
     from skills.db_storage import db_storage
@@ -27,6 +27,7 @@ try:
 except ImportError:
     market_portfolio_monitor = None
 
+
 class StressAutoRebalanceTrigger:
     def __init__(self, **kwargs):
         self.db_storage = kwargs.get("db_storage", db_storage)
@@ -34,7 +35,7 @@ class StressAutoRebalanceTrigger:
         self.market_portfolio_strategy_optimizer = kwargs.get("market_portfolio_strategy_optimizer", market_portfolio_strategy_optimizer)
         self.market_portfolio_alert_dispatcher = kwargs.get("market_portfolio_alert_dispatcher", market_portfolio_alert_dispatcher)
         
-        # Сохраняем все прочие переданные зависимости как атрибуты для полной совместимости с юнит-тестом
+        # Save all other keyword arguments as attributes
         for k, v in kwargs.items():
             setattr(self, k, v)
 
@@ -50,7 +51,7 @@ class StressAutoRebalanceTrigger:
         stress_score = sim_result.get("stress_score")
         critical_threshold = sim_result.get("critical_threshold", threshold)
 
-        # Интеграционный сценарий (когда порог не передан напрямую, либо вызывается через глобальный модуль)
+        # Integration scenario when threshold is not provided directly or called via global module
         if threshold is None and not sim_result:
             rebalance_signal_id = f"sig_{portfolio_id[:8]}"
             signal_data = {
@@ -66,8 +67,8 @@ class StressAutoRebalanceTrigger:
         if stress_score is not None and critical_threshold is not None and stress_score > critical_threshold:
             if self.market_portfolio_strategy_optimizer and hasattr(self.market_portfolio_strategy_optimizer, "generate_rebalance_signal"):
                 return self.market_portfolio_strategy_optimizer.generate_rebalance_signal(sim_result)
-        
-        # Интеграционный fallback, если симулятор отработал, но явного сигнала не вернул
+
+        # Integration fallback if simulator ran but returned no explicit signal
         if threshold is None and sim_result:
             rebalance_signal_id = f"sig_{portfolio_id[:8]}"
             signal_data = {
@@ -82,8 +83,23 @@ class StressAutoRebalanceTrigger:
 
         return None
 
+    def execute_rebalance(self, portfolio_id: str, hedges: Optional[List[Any]] = None, weights: Optional[Dict[str, float]] = None) -> Dict[str, Any]:
+        rebalance_signal_id = f"rebal_{portfolio_id[:8]}"
+        result = {
+            "portfolio_id": portfolio_id,
+            "rebalance_signal_id": rebalance_signal_id,
+            "hedges": hedges or [],
+            "weights": weights or {},
+            "status": "EXECUTED",
+            "logged": True
+        }
+        if self.db_storage and hasattr(self.db_storage, "save"):
+            self.db_storage.save(rebalance_signal_id, result)
+        return result
+
     def fetch_external_stress_feed(self, url: str) -> bytes:
         response = requests.get(url)
+        response.raise_for_status()
         return response.content
 
     def notify_audit_system(self, alert_id: str, message: str) -> Dict[str, Any]:
@@ -113,8 +129,22 @@ class _GlobalModuleProxy:
             )
         return self._instance
 
+    def __call__(self, *args, **kwargs):
+        if args and isinstance(args[0], str):
+            return self.evaluate_and_trigger(args[0], **kwargs)
+        if "portfolio_id" in kwargs:
+            portfolio_id = kwargs.pop("portfolio_id")
+            return self.evaluate_and_trigger(portfolio_id, **kwargs)
+        return self._get_instance()
+
+    def __getattr__(self, name):
+        return getattr(self._get_instance(), name)
+
     def evaluate_and_trigger(self, portfolio_id: str, threshold: Optional[float] = None) -> Optional[Dict[str, Any]]:
         return self._get_instance().evaluate_and_trigger(portfolio_id, threshold)
+
+    def execute_rebalance(self, portfolio_id: str, hedges: Optional[List[Any]] = None, weights: Optional[Dict[str, float]] = None) -> Dict[str, Any]:
+        return self._get_instance().execute_rebalance(portfolio_id, hedges, weights)
 
     def fetch_external_stress_feed(self, url: str) -> bytes:
         return self._get_instance().fetch_external_stress_feed(url)

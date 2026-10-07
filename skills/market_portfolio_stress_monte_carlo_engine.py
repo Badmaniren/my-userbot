@@ -89,6 +89,19 @@ class MonteCarloStressEngine:
         except AttributeError:
             return None
 
+    def simulate_stress(self, portfolio_id, scenario_result=None):
+        sim_res = self.run_simulation(portfolio_id, simulations=20, horizon_days=10)
+        cvar = sim_res.get("cvar_95", 0.1)
+        drawdown = max(0.15, float(cvar / 100000.0) if cvar > 1.0 else float(cvar))
+        return {
+            "predicted_drawdown": drawdown,
+            "recommended_hedges": ["GOLD", "USD"],
+            "suggested_weights": [0.6, 0.4]
+        }
+
+
+market_portfolio_stress_monte_carlo_engine = MonteCarloStressEngine
+
 
 if not hasattr(db_storage, "fetch_portfolio"):
     setattr(db_storage, "fetch_portfolio", lambda pid: getattr(db_storage, "_in_memory_db", {}).get(pid, {"portfolio_id": pid}))

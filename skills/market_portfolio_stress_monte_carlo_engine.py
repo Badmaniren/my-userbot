@@ -147,6 +147,10 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
     tail_losses = losses[:idx_95] if idx_95 > 0 else [var_95]
     expected_shortfall = sum(tail_losses) / len(tail_losses) if tail_losses else var_95
 
+    # Защитный инвариант: ES (CVaR) никогда не может быть меньше VaR
+    if expected_shortfall < var_95:
+        expected_shortfall = var_95
+
     simulation_id = f"sim_{uuid.uuid4().hex}"
 
     if hasattr(market_portfolio_audit_compliance_hub, "log_simulation"):

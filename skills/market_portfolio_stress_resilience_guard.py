@@ -11,6 +11,8 @@ def start_new(dependencies, seed=None):
     if seed is not None:
         random.seed(seed)
 
+    _ = io.BytesIO()
+
     mc_engine = dependencies.get("market_portfolio_stress_monte_carlo_engine")
     pipeline = dependencies.get("market_portfolio_stress_scenario_pipeline")
 

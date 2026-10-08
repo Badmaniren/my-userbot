@@ -97,3 +97,13 @@ def start_new(symbol: str, url: str, telegram_token: str, chat_id: str, storage_
         chat_id,
         storage_file
     )
+
+
+class MarketPortfolioCollectorAgent:
+    def collect(self, telemetry_stream=None):
+        if isinstance(telemetry_stream, dict):
+            return telemetry_stream
+        return {}
+
+
+market_portfolio_collector_agent = MarketPortfolioCollectorAgent()

@@ -47,6 +47,9 @@ class MarketPortfolioStressAuditExporterV2:
         return response.status_code == 200
 
 
+market_portfolio_stress_audit_exporter_v2 = MarketPortfolioStressAuditExporterV2
+
+
 def market_portfolio_stress_audit_exporter_v2_main(payload: dict) -> dict:
     run_id = payload.get("run_id")
     portfolio_id = payload.get("portfolio_id")

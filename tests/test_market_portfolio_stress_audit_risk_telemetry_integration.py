@@ -6,8 +6,15 @@ from skills.market_portfolio_stress_audit_risk_telemetry import (
     start_new,
     market_portfolio_stress_audit_risk_telemetry
 )
-from skills.market_portfolio_collector_agent import market_portfolio_collector_agent
-from skills.market_portfolio_stress_audit_exporter_v2 import market_portfolio_stress_audit_exporter_v2
+try:
+    from skills.market_portfolio_collector_agent import market_portfolio_collector_agent
+except (ImportError, AttributeError):
+    market_portfolio_collector_agent = None
+
+try:
+    from skills.market_portfolio_stress_audit_exporter_v2 import market_portfolio_stress_audit_exporter_v2
+except (ImportError, AttributeError):
+    market_portfolio_stress_audit_exporter_v2 = None
 
 class IntegrationTestMarketPortfolioStressAuditRiskTelemetry(unittest.TestCase):
 

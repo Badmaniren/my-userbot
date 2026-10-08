@@ -48,6 +48,8 @@ class StressAlertEmitter:
         
         triggered = False
         for res in pipeline_results:
+            if isinstance(res, str):
+                continue
             drawdown = res.get("drawdown", 0.0)
             if drawdown >= min_threshold:
                 triggered = True
@@ -83,6 +85,8 @@ def emit_stress_alerts_from_report(
     
     dispatched = []
     for res in pipeline_results:
+        if isinstance(res, str):
+            continue
         drawdown = res.get("drawdown", 0.0)
         if abs(drawdown) >= abs(min_threshold):
             dispatch_res = market_portfolio_alert_dispatcher.dispatch_portfolio_alerts(

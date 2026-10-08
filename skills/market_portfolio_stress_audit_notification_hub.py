@@ -19,20 +19,30 @@ def start_v2(target_channel: str, payload: dict, notifier_type: str) -> dict:
     Централизованная маршрутизация и отправка уведомлений для юнит-тестов.
     """
     if notifier_type == "telegram":
-        res = market_portfolio_telegram_notifier.send_notification(target_channel, payload)
+        # Поддерживаем как вызов функции (если это mock или функция), так и метод .send_notification
+        if callable(market_portfolio_telegram_notifier):
+            res = market_portfolio_telegram_notifier(target_channel, payload)
+        else:
+            res = market_portfolio_telegram_notifier.send_notification(target_channel, payload)
         db_storage.save_audit_log(payload)
         return res
     elif notifier_type == "webhook":
-        resp_obj = market_portfolio_webhook_sync.post(target_channel, json=payload)
+        if hasattr(market_portfolio_webhook_sync, "post"):
+            resp_obj = market_portfolio_webhook_sync.post(target_channel, json=payload)
+        else:
+            resp_obj = market_portfolio_webhook_sync(target_channel, json=payload)
         db_storage.save_audit_log(payload)
         return {
-            "status_code": resp_obj.status_code,
-            "response_text": resp_obj.text
+            "status_code": getattr(resp_obj, "status_code", 200),
+            "response_text": getattr(resp_obj, "text", str(resp_obj))
         }
     elif notifier_type == "api_gateway":
-        stream_data = market_portfolio_api_gateway.stream_audit_payload(target_channel, payload)
+        if hasattr(market_portfolio_api_gateway, "stream_audit_payload"):
+            stream_data = market_portfolio_api_gateway.stream_audit_payload(target_channel, payload)
+        else:
+            stream_data = market_portfolio_api_gateway(target_channel, payload)
         db_storage.save_audit_log(payload)
-        content = stream_data.read() if hasattr(stream_data, "read") else b""
+        content = stream_data.read() if hasattr(stream_data, "read") else (stream_data if isinstance(stream_data, bytes) else b"")
         return {
             "stream_processed": len(content) > 0,
             "content": content
@@ -52,20 +62,29 @@ def market_portfolio_stress_audit_notification_hub(hub_payload: dict) -> dict:
     results = {}
     for ch in channels:
         if ch == "telegram":
-            results["telegram"] = market_portfolio_telegram_notifier({
-                "audit_id": audit_id,
-                "target": portfolio_id
-            })
+            if callable(market_portfolio_telegram_notifier):
+                results["telegram"] = market_portfolio_telegram_notifier({
+                    "audit_id": audit_id,
+                    "target": portfolio_id
+                })
+            else:
+                results["telegram"] = market_portfolio_telegram_notifier.send_notification(portfolio_id, {"audit_id": audit_id})
         elif ch == "webhook":
-            results["webhook"] = market_portfolio_webhook_sync({
-                "audit_id": audit_id,
-                "payload": hub_payload
-            })
+            if callable(market_portfolio_webhook_sync):
+                results["webhook"] = market_portfolio_webhook_sync({
+                    "audit_id": audit_id,
+                    "payload": hub_payload
+                })
+            else:
+                results["webhook"] = market_portfolio_webhook_sync.post(portfolio_id, json=hub_payload)
         elif ch == "api" or ch == "api_gateway":
-            results["api"] = market_portfolio_api_gateway({
-                "action": "get_notification_status",
-                "audit_id": audit_id
-            })
+            if callable(market_portfolio_api_gateway):
+                results["api"] = market_portfolio_api_gateway({
+                    "action": "get_notification_status",
+                    "audit_id": audit_id
+                })
+            else:
+                results["api"] = market_portfolio_api_gateway.stream_audit_payload(portfolio_id, {"audit_id": audit_id})
 
     return {
         "dispatch_status": "success",

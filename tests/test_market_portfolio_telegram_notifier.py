@@ -2,7 +2,12 @@ import unittest
 from unittest.mock import patch, MagicMock
 import uuid
 import random
-import requests
+
+try:
+    import requests
+except ImportError:
+    requests = MagicMock()
+
 from skills.market_portfolio_telegram_notifier import start_new, send_telegram_notification
 
 class TestMarketPortfolioTelegramNotifier(unittest.TestCase):
@@ -12,17 +17,17 @@ class TestMarketPortfolioTelegramNotifier(unittest.TestCase):
         rand_chat_id = str(random.randint(100000, 999999))
         rand_message = f"TEST_MSG_{uuid.uuid4().hex}"
 
-        with patch('skills.market_portfolio_telegram_notifier.requests.post') as mock_post:
+        with patch('skills.market_portfolio_telegram_notifier.requests') as mock_requests_mod:
             mock_response = MagicMock()
             mock_response.raise_for_status.return_value = None
             mock_response.json.return_value = {"ok": True, "result": {}}
-            mock_post.return_value = mock_response
+            mock_requests_mod.post.return_value = mock_response
 
             result = start_new(rand_token, rand_chat_id, rand_message)
 
             self.assertTrue(result)
-            mock_post.assert_called_once()
-            args, kwargs = mock_post.call_args
+            mock_requests_mod.post.assert_called_once()
+            args, kwargs = mock_requests_mod.post.call_args
             self.assertIn(rand_token, args[0])
             self.assertEqual(kwargs['json']['chat_id'], rand_chat_id)
             self.assertEqual(kwargs['json']['text'], rand_message)
@@ -33,29 +38,30 @@ class TestMarketPortfolioTelegramNotifier(unittest.TestCase):
         rand_chat_id = uuid.uuid4().hex[:8]
         rand_message = uuid.uuid4().hex
 
-        with patch('skills.market_portfolio_telegram_notifier.requests.post') as mock_post:
+        with patch('skills.market_portfolio_telegram_notifier.requests') as mock_requests_mod:
             mock_response = MagicMock()
             mock_response.raise_for_status.return_value = None
             mock_response.json.return_value = {"ok": False, "description": "Unauthorized"}
-            mock_post.return_value = mock_response
+            mock_requests_mod.post.return_value = mock_response
 
             result = start_new(rand_token, rand_chat_id, rand_message)
 
             self.assertFalse(result)
-            mock_post.assert_called_once()
+            mock_requests_mod.post.assert_called_once()
 
     def test_start_new_requests_exception_handling(self):
         rand_token = uuid.uuid4().hex
         rand_chat_id = uuid.uuid4().hex[:8]
         rand_message = uuid.uuid4().hex
 
-        with patch('skills.market_portfolio_telegram_notifier.requests.post') as mock_post:
-            mock_post.side_effect = requests.exceptions.RequestException(uuid.uuid4().hex)
+        with patch('skills.market_portfolio_telegram_notifier.requests') as mock_requests_mod:
+            mock_requests_mod.exceptions.RequestException = Exception
+            mock_requests_mod.post.side_effect = mock_requests_mod.exceptions.RequestException(uuid.uuid4().hex)
 
             result = start_new(rand_token, rand_chat_id, rand_message)
 
             self.assertFalse(result)
-            mock_post.assert_called_once()
+            mock_requests_mod.post.assert_called_once()
 
     def test_start_new_invalid_input_validation(self):
         invalid_inputs = [
@@ -65,10 +71,10 @@ class TestMarketPortfolioTelegramNotifier(unittest.TestCase):
         ]
         
         for token, chat_id, message in invalid_inputs:
-            with patch('skills.market_portfolio_telegram_notifier.requests.post') as mock_post:
+            with patch('skills.market_portfolio_telegram_notifier.requests') as mock_requests_mod:
                 mock_response = MagicMock()
                 mock_response.raise_for_status.side_effect = ValueError(uuid.uuid4().hex)
-                mock_post.return_value = mock_response
+                mock_requests_mod.post.return_value = mock_response
 
                 result = start_new(token, chat_id, message)
                 self.assertFalse(result)

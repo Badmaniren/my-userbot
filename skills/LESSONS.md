@@ -3,7 +3,11 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-редан на эскалацию
+ЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_stress_dashboard_exporter (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_stress_monte_carlo_engine (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
@@ -251,7 +255,3 @@
 
 ## market_portfolio_stress_audit_summary_vault (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_audit_notification_hub (start_new) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

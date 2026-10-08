@@ -11,9 +11,27 @@ if not logger.handlers:
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
 
-def start_new(**kwargs):
+def start_new(*args, **kwargs):
     logger.info("Starting new stress audit summary vault process.")
     db_storage = kwargs.get("db_storage")
+    if db_storage is None and args:
+        if hasattr(args[0], "save"):
+            db_storage = args[0]
+        elif isinstance(args[0], str):
+            # Positional argument might be storage_file path
+            try:
+                from skills import db_storage as default_db_storage
+                db_storage = default_db_storage
+            except ImportError:
+                db_storage = None
+
+    if db_storage is None:
+        try:
+            from skills import db_storage as default_db_storage
+            db_storage = default_db_storage
+        except ImportError:
+            db_storage = None
+
     if db_storage is None:
         logger.error("db_storage is required and cannot be None.")
         raise ValueError("db_storage is required and cannot be None.")

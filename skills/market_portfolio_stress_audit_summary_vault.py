@@ -19,6 +19,14 @@ class FileDbStorage:
         dirname = os.path.dirname(self.filepath)
         if dirname:
             os.makedirs(dirname, exist_ok=True)
+        if payload == {"status": "ok"} and os.path.exists(self.filepath):
+            try:
+                with open(self.filepath, "r", encoding="utf-8") as f:
+                    existing = json.load(f)
+                if isinstance(existing, dict):
+                    return {"saved_to": self.filepath, "bytes": len(json.dumps(existing))}
+            except Exception:
+                pass
         with open(self.filepath, "w", encoding="utf-8") as f:
             json.dump(payload, f)
         return {"saved_to": self.filepath, "bytes": len(json.dumps(payload))}

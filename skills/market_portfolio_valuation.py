@@ -66,3 +66,14 @@ class PortfolioValuation:
 
     def calculate_portfolio_pnl(self, url):
         return self.get_total_summary(url)
+
+    def calculate_portfolio_value(self, portfolio_data):
+        positions = portfolio_data.get("positions", [])
+        total_value = sum(pos.get("quantity", 0.0) * pos.get("price", 0.0) for pos in positions)
+        return {
+            "portfolio_id": portfolio_data.get("portfolio_id"),
+            "total_value": round(total_value, 2),
+            "positions": positions
+        }
+
+MarketPortfolioValuation = PortfolioValuation

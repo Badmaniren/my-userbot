@@ -41,8 +41,11 @@ def start_new(dependencies=None):
             {"portfolio_id": "test_port"}
         )
 
-    # 2. HTTP запрос через requests.get
-    requests.get("http://localhost:8000/stream")
+    # 2. HTTP запрос через requests.get (с обработкой через явную проверку или точечный перехват)
+    try:
+        requests.get("http://localhost:8000/stream")
+    except requests.RequestException:
+        pass
 
     # 3. Сохранение в БД
     if "db_storage" in dependencies:

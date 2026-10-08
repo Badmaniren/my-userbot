@@ -66,3 +66,48 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+_DB_TABLES = {}
+
+
+def db_storage(*args, **kwargs):
+    if kwargs:
+        operation = kwargs.get("operation")
+        table = kwargs.get("table", "default")
+        data = kwargs.get("data")
+        filters = kwargs.get("filters", {})
+
+        if table not in _DB_TABLES:
+            _DB_TABLES[table] = []
+
+        if operation == "insert":
+            if data is not None:
+                _DB_TABLES[table].append(data.copy())
+            return {"status": "INSERTED"}
+        elif operation == "update":
+            updated_count = 0
+            for record in _DB_TABLES[table]:
+                match = True
+                for k, v in filters.items():
+                    if record.get(k) != v:
+                        match = False
+                        break
+                if match:
+                    if data:
+                        record.update(data)
+                    updated_count += 1
+            return {"status": "UPDATED", "count": updated_count}
+        elif operation == "select":
+            res = []
+            for record in _DB_TABLES[table]:
+                match = True
+                for k, v in filters.items():
+                    if record.get(k) != v:
+                        match = False
+                        break
+                if match:
+                    res.append(record)
+            return res
+
+    return {"status": "OK"}

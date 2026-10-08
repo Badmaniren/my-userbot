@@ -66,3 +66,14 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+_in_memory_db_storage = {}
+
+def db_storage(action="get", key=None, value=None):
+    if action == "set":
+        _in_memory_db_storage[key] = value
+        return value
+    elif action == "get":
+        return _in_memory_db_storage.get(key)
+    return None

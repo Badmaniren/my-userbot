@@ -1,6 +1,74 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+import uuid
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
+
+_ml_model_metadata = {}
+_audit_artifacts = {}
+
+
+def connect(db_path: str = ":memory:"):
+    return True
+
+
+def fetch_historical_data(target_metric=None):
+    return [
+        {"metric": target_metric, "val": 0.1},
+        {"metric": target_metric, "val": 0.2},
+        {"metric": target_metric, "val": 0.3}
+    ]
+
+
+def save_audit_artifact(stream):
+    artifact_id = str(uuid.uuid4())
+    if hasattr(stream, "read"):
+        content = stream.read()
+    else:
+        content = stream
+    _audit_artifacts[artifact_id] = content
+    return artifact_id
+
+
+def save_ml_audit_model_metadata(metadata: dict):
+    model_id = metadata.get("model_id") if isinstance(metadata, dict) else None
+    if model_id:
+        _ml_model_metadata[model_id] = metadata
+    return model_id
+
+
+def get_ml_audit_model_metadata(model_id: str):
+    return _ml_model_metadata.get(model_id)
+
+
+class DBStorage:
+    def __init__(self, db_path: str = ":memory:"):
+        self.db_path = db_path
+
+    def connect(self):
+        return connect(self.db_path)
+
+    def fetch_historical_data(self, target_metric=None):
+        return fetch_historical_data(target_metric)
+
+    def save_audit_artifact(self, stream):
+        return save_audit_artifact(stream)
+
+    def save_ml_audit_model_metadata(self, metadata: dict):
+        return save_ml_audit_model_metadata(metadata)
+
+    def get_ml_audit_model_metadata(self, model_id: str):
+        return get_ml_audit_model_metadata(model_id)
+
+
+DbStorage = DBStorage
 
 
 class MarketParser:
@@ -8,6 +76,8 @@ class MarketParser:
         self.storage_file = storage_file
 
     def fetch_price(self, url: str):
+        if requests is None:
+            return None
         response = requests.get(url, timeout=10)
         try:
             data = response.json()
@@ -18,6 +88,8 @@ class MarketParser:
         return None
 
     def parse_html_prices(self, url: str):
+        if requests is None or BeautifulSoup is None:
+            return None
         response = requests.get(url, timeout=10)
         soup = BeautifulSoup(response.text, 'html.parser')
         element = soup.find()

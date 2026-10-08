@@ -1,107 +1,104 @@
 import unittest
-import uuid
-import random
 import os
-import io
+import uuid
 import json
+import io
 from skills.market_portfolio_stress_audit_exporter_v2 import (
     MarketPortfolioStressAuditExporterV2,
     market_portfolio_stress_audit_exporter_v2_main
 )
 
-class RealDbStorage:
-    def __init__(self, data_store):
-        self.data_store = data_store
+class RealDatabaseStorageStub:
+    def __init__(self, data):
+        self.data = data
     def fetch_audit(self, audit_id):
-        return self.data_store.get(audit_id)
+        return self.data.get(audit_id)
 
-class RealExtractorTool:
-    def __init__(self, data_store):
-        self.data_store = data_store
+class RealExtractorToolStub:
+    def __init__(self, payload):
+        self.payload = payload
     def extract(self, audit_id):
-        return {"audit_id": audit_id, "payload_data": self.data_store.get(audit_id, {})}
+        return {"audit_id": audit_id, "data": self.payload}
 
-class RealMarketAnomalyDetector:
+class RealAnomalyDetectorStub:
     def evaluate(self, payload):
-        return {"status": "evaluated", "payload": payload, "risk_score": random.uniform(0.0, 1.0)}
+        return {"status": "analyzed", "payload": payload}
 
-class RealMarketPortfolioStressReporter:
+class RealStressReporterStub:
     def generate_report(self, audit_data, export_format):
-        return json.dumps({"format": export_format, "data": audit_data}).encode("utf-8")
+        return f"REPORT:{audit_data['name']}:{export_format}".encode("utf-8")
 
-class RealMarketPortfolioStressAuditSummaryVault:
+class RealSummaryVaultStub:
+    def __init__(self, content):
+        self.content = content
     def load_summary(self, audit_id):
-        content = json.dumps({"summary_for": audit_id}).encode("utf-8")
-        return io.BytesIO(content)
-
-class RealMarketReportGenerator:
-    def generate(self):
-        return "report"
+        return io.BytesIO(self.content)
 
 class TestMarketPortfolioStressAuditExporterV2Integration(unittest.TestCase):
 
-    def test_integration_flow_and_main(self):
-        audit_id = str(uuid.uuid4())
-        portfolio_id = str(uuid.uuid4())
-        stress_factor = round(random.uniform(1.0, 10.0), 2)
-        run_id = str(uuid.uuid4())
-        destination_path = f"/tmp/{uuid.uuid4()}.json"
-
-        stored_data = {"portfolio_id": portfolio_id, "metrics": [random.randint(1, 100)]}
-        db_storage = RealDbStorage({audit_id: stored_data})
-        extractor_1 = RealExtractorTool({audit_id: stored_data})
-        extractor_2 = RealExtractorTool({audit_id: stored_data})
-        anomaly_detector = RealMarketAnomalyDetector()
-        stress_reporter = RealMarketPortfolioStressReporter()
-        summary_vault = RealMarketPortfolioStressAuditSummaryVault()
-        report_generator = RealMarketReportGenerator()
-
-        exporter = MarketPortfolioStressAuditExporterV2(
-            db_storage=db_storage,
-            extractor_tool_1790087207=extractor_1,
-            extractor_tool_1790102839=extractor_2,
-            market_anomaly_detector=anomaly_detector,
-            market_portfolio_stress_reporter=stress_reporter,
-            market_portfolio_stress_audit_summary_vault=summary_vault,
-            market_report_generator=report_generator
-        )
-
-        export_result = exporter.export_report(audit_id, "json", destination_path)
-        self.assertTrue(export_result)
-        self.assertTrue(os.path.exists(destination_path))
-
-        with open(destination_path, "r", encoding="utf-8") as f:
-            file_content = json.load(f)
-        self.assertEqual(file_content["data"]["portfolio_id"], portfolio_id)
-
-        os.remove(destination_path)
-
-        summary_stream = exporter.stream_audit_summary(audit_id)
-        self.assertIsInstance(summary_stream, io.BytesIO)
-        summary_data = json.loads(summary_stream.getvalue().decode("utf-8"))
-        self.assertEqual(summary_data["summary_for"], audit_id)
-
-        main_payload = {
-            "run_id": run_id,
-            "portfolio_id": portfolio_id,
-            "stress_factor": stress_factor
-        }
-        main_result = market_portfolio_stress_audit_exporter_v2_main(main_payload)
-
-        self.assertEqual(main_result["status"], "success")
-        self.assertEqual(main_result["run_id"], run_id)
-        self.assertEqual(main_result["portfolio_id"], portfolio_id)
+    def test_export_report_and_main_flow(self):
+        unique_run_id = str(uuid.uuid4())
+        unique_portfolio_id = str(uuid.uuid4())
+        stress_val = round(float(uuid.uuid1().int & 0xFF) / 10.0, 2)
         
-        expected_path = main_result["export_path"]
-        self.assertTrue(os.path.exists(expected_path))
+        payload = {
+            "run_id": unique_run_id,
+            "portfolio_id": unique_portfolio_id,
+            "stress_factor": stress_val
+        }
 
-        with open(expected_path, "r", encoding="utf-8") as f:
-            main_file_content = json.load(f)
-        self.assertEqual(main_file_content["run_id"], run_id)
-        self.assertEqual(main_file_content["stress_factor"], stress_factor)
+        result = market_portfolio_stress_audit_exporter_v2_main(payload)
+        
+        self.assertEqual(result["run_id"], unique_run_id)
+        self.assertEqual(result["portfolio_id"], unique_portfolio_id)
+        self.assertEqual(result["status"], "success")
+        
+        export_path = result["export_path"]
+        self.assertTrue(os.path.exists(export_path))
+        
+        with open(export_path, "r", encoding="utf-8") as f:
+            file_data = json.load(f)
+            self.assertEqual(file_data["run_id"], unique_run_id)
+            self.assertEqual(file_data["stress_factor"], stress_val)
+            
+        if os.path.exists(export_path):
+            os.remove(export_path)
 
-        if os.path.exists(expected_path):
-            os.remove(expected_path)
+    def test_exporter_class_integration(self):
+        audit_id = str(uuid.uuid4())
+        audit_name = f"audit_{uuid.uuid4()}"
+        export_format = "CSV"
+        dest_path = f"/tmp/test_report_{uuid.uuid4()}.csv"
+        
+        db = RealDatabaseStorageStub({audit_id: {"name": audit_name}})
+        ext1 = RealExtractorToolStub("test_payload")
+        detector = RealAnomalyDetectorStub()
+        reporter = RealStressReporterStub()
+        vault = RealSummaryVaultStub(b"summary_bytes")
+        
+        exporter = MarketPortfolioStressAuditExporterV2(
+            db_storage=db,
+            extractor_tool_1790087207=ext1,
+            extractor_tool_1790102839=ext1,
+            market_anomaly_detector=detector,
+            market_portfolio_stress_reporter=reporter,
+            market_portfolio_stress_audit_summary_vault=vault,
+            market_report_generator=None
+        )
+        
+        success = exporter.export_report(audit_id, export_format, dest_path)
+        self.assertTrue(success)
+        self.assertTrue(os.path.exists(dest_path))
+        
+        with open(dest_path, "rb") as f:
+            content = f.read()
+            self.assertEqual(content, f"REPORT:{audit_name}:{export_format}".encode("utf-8"))
+            
+        summary_stream = exporter.stream_audit_summary(audit_id)
+        self.assertEqual(summary_stream.read(), b"summary_bytes")
+        
+        if os.path.exists(dest_path):
+            os.remove(dest_path)
 
 if __name__ == "__main__":
     unittest.main()

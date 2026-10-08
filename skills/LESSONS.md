@@ -3,8 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-arket_stress_liquidity_monitor (start_new) — раундов: 4
-- Античит поймал: ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'db_storage'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.db_storage import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'market_portfolio_stress_scenario_pipeline'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.market_portfolio_stress_scenario_pipeline imp
+стный импорт: 'from skills.db_storage import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'market_portfolio_stress_scenario_pipeline'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.market_portfolio_stress_scenario_pipeline imp
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -272,4 +271,8 @@ arket_stress_liquidity_monitor (start_new) — раундов: 4
 
 ## none (start_new) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_audit_telemetry_logger (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

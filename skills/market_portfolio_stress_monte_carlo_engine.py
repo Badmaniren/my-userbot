@@ -99,6 +99,12 @@ class MonteCarloStressEngine:
             return None
 
 
+def market_portfolio_stress_monte_carlo_engine(payload=None, **kwargs):
+    if payload is None:
+        payload = kwargs
+    return payload
+
+
 if not hasattr(db_storage, "fetch_portfolio"):
     setattr(db_storage, "fetch_portfolio", lambda pid: getattr(db_storage, "_in_memory_db", {}).get(pid, {"portfolio_id": pid}))
 

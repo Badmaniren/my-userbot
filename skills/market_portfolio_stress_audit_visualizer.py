@@ -1,6 +1,10 @@
 import io
-import requests
-from bs4 import BeautifulSoup
+try:
+    import requests
+    from bs4 import BeautifulSoup
+except ImportError:
+    requests = None
+    BeautifulSoup = None
 
 
 class MarketPortfolioStressAuditVisualizer:

@@ -1,6 +1,9 @@
+import io
+import json
 import sys
 import uuid
 from skills import db_storage as default_db_storage
+
 
 class MarketPortfolioStressAuditRealtimeStreamer:
     def __init__(self, db_storage=None):
@@ -8,16 +11,27 @@ class MarketPortfolioStressAuditRealtimeStreamer:
         self.market_anomaly_detector = None
         self.market_portfolio_alert_event_sink = None
 
+    def emit_telemetry(self, payload: dict):
+        if isinstance(payload, dict):
+            raw = json.dumps(payload).encode('utf-8')
+        elif isinstance(payload, str):
+            raw = payload.encode('utf-8')
+        elif isinstance(payload, bytes):
+            raw = payload
+        else:
+            raw = str(payload).encode('utf-8')
+        return io.BytesIO(raw)
+
     def stream_and_persist(self, portfolio_id: str) -> bool:
         line_data = sys.stdin.readline()
         if isinstance(line_data, bytes):
             line = line_data.decode('utf-8', errors='ignore').strip()
         else:
             line = str(line_data).strip()
-            
+
         if not line:
             return False
-        
+
         parts = line.split(":")
         if len(parts) >= 3:
             p_id, metric_name, metric_value = parts[0], parts[1], parts[2]
@@ -26,7 +40,7 @@ class MarketPortfolioStressAuditRealtimeStreamer:
                     val = float(metric_value)
                 except ValueError:
                     val = metric_value
-                
+
                 if hasattr(self.db_storage, 'save_metric'):
                     self.db_storage.save_metric(portfolio_id, metric_name, val)
                 elif hasattr(self.db_storage, 'save_portfolio_metric'):

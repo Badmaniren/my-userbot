@@ -1,6 +1,6 @@
 import sys
 import uuid
-from skills.db_storage import db_storage as default_db_storage
+from skills import db_storage as default_db_storage
 
 class MarketPortfolioStressAuditRealtimeStreamer:
     def __init__(self, db_storage=None):

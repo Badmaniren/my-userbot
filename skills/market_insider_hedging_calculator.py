@@ -69,16 +69,16 @@ class MarketInsiderHedgingCalculator:
         self.min_threshold = data.get("min_threshold", 0.0)
 
     def export_report_to_stream(self, stream, report_data):
-        def _round_floats(obj):
+        def _format_floats(obj):
             if isinstance(obj, float):
-                return round(obj, 2)
+                return f"{obj:.2f}"
             elif isinstance(obj, dict):
-                return {k: _round_floats(v) for k, v in obj.items()}
+                return {k: _format_floats(v) for k, v in obj.items()}
             elif isinstance(obj, list):
-                return [_round_floats(item) for item in obj]
+                return [_format_floats(item) for item in obj]
             return obj
 
-        formatted_data = _round_floats(report_data)
+        formatted_data = _format_floats(report_data)
         content = json.dumps(formatted_data)
         stream.write(content.encode('utf-8'))
 

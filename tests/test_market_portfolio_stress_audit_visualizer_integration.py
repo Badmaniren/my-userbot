@@ -1,13 +1,16 @@
 import unittest
 import uuid
 import random
-from skills.market_portfolio_stress_audit_visualizer import MarketPortfolioStressAuditVisualizer
+from skills.market_portfolio_stress_audit_visualizer import (
+    MarketPortfolioStressAuditVisualizer,
+    market_portfolio_stress_audit_visualizer,
+)
 
 
 class TestMarketPortfolioStressAuditVisualizerIntegration(unittest.TestCase):
-    def test_visualize_integration_text_summary_flow(self):
-        portfolio_id = f"port-{uuid.uuid4()}"
-        adaptive_risk_score = round(random.uniform(10.0, 99.9), 2)
+    def test_visualizer_integration_text_summary(self):
+        portfolio_id = str(uuid.uuid4())
+        adaptive_risk_score = round(random.uniform(1.0, 100.0), 2)
         
         payload = {
             "portfolio_id": portfolio_id,
@@ -16,38 +19,43 @@ class TestMarketPortfolioStressAuditVisualizerIntegration(unittest.TestCase):
             "export_to_text_report": True
         }
         
-        visualizer = MarketPortfolioStressAuditVisualizer()
-        result = visualizer.visualize(payload)
+        visualizer = MarketPortfolioStressAuditVisualizer(db_storage="dummy_db")
+        result_class = visualizer.visualize(payload)
+        result_func = market_portfolio_stress_audit_visualizer(payload)
         
-        self.assertIsInstance(result, str)
-        self.assertIn(portfolio_id, result)
-        self.assertIn(str(adaptive_risk_score), result)
-        self.assertIn("Exported to text report successfully.", result)
+        self.assertIn(portfolio_id, result_class)
+        self.assertIn(str(adaptive_risk_score), result_class)
+        self.assertIn("Exported to text report successfully.", result_class)
+        
+        self.assertEqual(result_class, result_func)
 
-    def test_visualize_integration_graphical_flow(self):
-        report_id = f"rep-{uuid.uuid4()}"
-        adaptive_risk_score = round(random.uniform(1.0, 50.0), 2)
-        tail_risk_metric = round(random.uniform(0.01, 0.99), 4)
-        stream_token = f"stream-{uuid.uuid4()}"
+    def test_visualizer_integration_graphical_format(self):
+        report_id = str(uuid.uuid4())
+        adaptive_risk_score = round(random.uniform(1.0, 100.0), 2)
+        tail_risk_metrics = {"var_95": random.uniform(-0.5, -0.1), "cvar_95": random.uniform(-0.8, -0.3)}
+        stream_payload = {"channel": f"stream_{uuid.uuid4()}", "active": True}
         
         payload = {
             "report_id": report_id,
             "format": "graphical",
             "adaptive_risk_score": adaptive_risk_score,
-            "tail_risk_metrics": {"var_95": tail_risk_metric},
-            "stream_payload": stream_token
+            "tail_risk_metrics": tail_risk_metrics,
+            "stream_payload": stream_payload
         }
         
-        visualizer = MarketPortfolioStressAuditVisualizer(db_storage=object())
-        result = visualizer.visualize(payload)
+        visualizer = MarketPortfolioStressAuditVisualizer()
+        result_class = visualizer.visualize(payload)
+        result_func = market_portfolio_stress_audit_visualizer(payload)
         
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result.get("portfolio_id"), report_id)
-        self.assertEqual(result.get("status"), "success")
-        self.assertEqual(result.get("layout"), "graphical")
-        self.assertEqual(result.get("adaptive_risk_score"), adaptive_risk_score)
-        self.assertEqual(result.get("tail_risk_metrics"), {"var_95": tail_risk_metric})
-        self.assertEqual(result.get("stream_payload"), stream_token)
+        self.assertIsInstance(result_class, dict)
+        self.assertEqual(result_class.get("portfolio_id"), report_id)
+        self.assertEqual(result_class.get("status"), "success")
+        self.assertEqual(result_class.get("layout"), "graphical")
+        self.assertEqual(result_class.get("adaptive_risk_score"), adaptive_risk_score)
+        self.assertEqual(result_class.get("tail_risk_metrics"), tail_risk_metrics)
+        self.assertEqual(result_class.get("stream_payload"), stream_payload)
+        
+        self.assertEqual(result_class, result_func)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,10 @@
 import io
 import json
 import os
-import requests
+try:
+    import requests
+except ImportError:
+    requests = None
 
 
 class MarketPortfolioStressAuditExporterV2:
@@ -45,6 +48,13 @@ class MarketPortfolioStressAuditExporterV2:
         
         response = requests.post(webhook_url, json=evaluation)
         return response.status_code == 200
+
+
+def export(stream_data) -> str:
+    export_path = f"/tmp/export_{hash(str(stream_data)) & 0xffffffff}.json"
+    with open(export_path, "w", encoding="utf-8") as f:
+        json.dump({"stream": stream_data}, f)
+    return export_path
 
 
 def market_portfolio_stress_audit_exporter_v2_main(payload: dict) -> dict:

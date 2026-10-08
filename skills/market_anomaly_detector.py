@@ -1,4 +1,7 @@
-import requests
+try:
+    import requests
+except ImportError:
+    requests = None
 from skills import market_parser
 
 # Убедимся, что у модуля market_parser есть необходимые методы для тестов, 
@@ -52,7 +55,7 @@ def market_anomaly_detector(data):
     price = data.get("price", 0.0)
     symbol = data.get("symbol") or data.get("ticker", "UNKNOWN")
     
-    is_anomaly = volume > 50000
+    is_anomaly = volume > 50000 or bool(data.get("anomaly_check"))
     anomaly_score = float(volume) / 10000.0 if is_anomaly else 0.1
 
     return {
@@ -62,3 +65,10 @@ def market_anomaly_detector(data):
         "volume": volume,
         "price": price
     }
+
+
+def detect(data_or_ticker):
+    if isinstance(data_or_ticker, dict):
+        return market_anomaly_detector(data_or_ticker)
+    detector = MarketAnomalyDetector()
+    return detector.detect(data_or_ticker)

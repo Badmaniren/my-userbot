@@ -1,8 +1,14 @@
 import json
 import os
 import uuid
-import requests
-from bs4 import BeautifulSoup
+try:
+    import requests
+except ImportError:
+    requests = None
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 
 class MarketParser:

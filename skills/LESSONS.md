@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-market_portfolio_monitor (refactor) — раундов: 1
-- Последняя ошибка перед фиксом: from skills.market_portfolio_stress_recovery_coordinator_bridge import (
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+Н Унгой, передан на эскалацию
 
 ## market_portfolio_stress_audit_summary_report (create) — раундов: 4
 - Античит поймал: АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'db_storage' глобальной переменной!
@@ -290,5 +288,9 @@ market_portfolio_monitor (refactor) — раундов: 1
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_stress_alert_emitter (compose) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_alert_dashboard_bridge (compose) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main

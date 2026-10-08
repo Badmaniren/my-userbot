@@ -84,6 +84,21 @@ class MarketInsiderAnomalyAnalyzer:
 
         return result
 
+    def analyze_insider_transactions(self, insider_activities):
+        results = []
+        for activity in insider_activities:
+            asset = activity.get("asset")
+            transaction_value = activity.get("transaction_value", 0.0)
+            shares_traded = activity.get("shares_traded", 0)
+            # Calculate score based on transaction size/value
+            anomaly_score = min(transaction_value / 5000000.0, 1.0)
+            results.append({
+                "asset": asset,
+                "anomaly_score": anomaly_score,
+                "activity": activity
+            })
+        return results
+
     def analyze_stream(self, exchange):
         anomaly_items = []
         if hasattr(self.anomaly_detector, "analyze_stream"):

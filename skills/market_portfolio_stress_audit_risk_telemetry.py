@@ -41,7 +41,9 @@ def start_new(dependencies, telemetry_stream=None):
         if isinstance(export_result, dict):
             collected_data.update(export_result)
 
-    if collected_data and "telemetry_id" in collected_data:
+    if collected_data:
+        if "telemetry_id" not in collected_data:
+            collected_data["telemetry_id"] = uuid.uuid4().hex
         requests.post("http://localhost/telemetry", json=collected_data)
 
     return collected_data

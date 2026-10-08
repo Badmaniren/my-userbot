@@ -46,6 +46,12 @@ class MarketPortfolioStressAuditExporterV2:
         response = requests.post(webhook_url, json=evaluation)
         return response.status_code == 200
 
+    @classmethod
+    def export(cls, payload: dict) -> dict:
+        if isinstance(payload, dict):
+            return market_portfolio_stress_audit_exporter_v2_main(payload)
+        return {}
+
 
 market_portfolio_stress_audit_exporter_v2 = MarketPortfolioStressAuditExporterV2
 

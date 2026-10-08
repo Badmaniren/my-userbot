@@ -30,7 +30,14 @@ def start_new(dependencies, telemetry_stream=None):
         raise e
 
     if exporter:
-        export_result = exporter.export(collected_data)
+        export_result = None
+        if hasattr(exporter, "export") and callable(exporter.export):
+            export_result = exporter.export(collected_data)
+        elif hasattr(exporter, "export_report") and callable(exporter.export_report):
+            export_result = exporter.export_report(collected_data)
+        elif callable(exporter):
+            export_result = exporter(collected_data)
+
         if isinstance(export_result, dict):
             collected_data.update(export_result)
 

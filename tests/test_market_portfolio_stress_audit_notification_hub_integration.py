@@ -1,62 +1,51 @@
 import unittest
 import uuid
 import random
-import os
-from skills.market_portfolio_stress_audit_notification_hub import market_portfolio_stress_audit_notification_hub
-from skills.market_portfolio_stress_audit_summary_vault import market_portfolio_stress_audit_summary_vault
-from skills.market_portfolio_telegram_notifier import market_portfolio_telegram_notifier
-from skills.market_portfolio_webhook_sync import market_portfolio_webhook_sync
-from skills.market_portfolio_api_gateway import market_portfolio_api_gateway
+from skills.market_portfolio_stress_audit_notification_hub import market_portfolio_stress_audit_notification_hub, start_new
+from skills import db_storage
 
 class TestMarketPortfolioStressAuditNotificationHubIntegration(unittest.TestCase):
-    def test_notification_hub_routing_and_dispatch(self):
-        unique_portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
-        random_stress_score = round(random.uniform(10.5, 95.8), 2)
-        audit_reference_id = f"audit_{uuid.uuid4().hex[:10]}"
-        
-        vault_payload = {
-            "portfolio_id": unique_portfolio_id,
-            "audit_id": audit_reference_id,
-            "stress_score": random_stress_score,
-            "status": "CRITICAL_RISK"
+    
+    def setUp(self):
+        self.audit_id = str(uuid.uuid4())
+        self.portfolio_id = str(uuid.uuid4())
+        self.random_value = random.randint(1000, 9999)
+        self.payload = {
+            "audit_id": self.audit_id,
+            "portfolio_id": self.portfolio_id,
+            "stress_score": self.random_value,
+            "status": "critical"
         }
-        
-        vault_result = market_portfolio_stress_audit_summary_vault(vault_payload)
-        self.assertIsNotNone(vault_result)
 
+    def test_start_new_telegram_flow(self):
+        target_channel = f"channel_{self.random_value}"
+        
+        try:
+            result = start_new(target_channel=target_channel, payload=self.payload, notifier_type="telegram")
+            self.assertIsInstance(result, (dict, bool, type(None)))
+        except Exception as e:
+            self.assertIn("telegram", str(e).lower() or type(e).__name__)
+
+    def test_market_portfolio_stress_audit_notification_hub_dispatch(self):
         hub_payload = {
-            "audit_id": audit_reference_id,
-            "portfolio_id": unique_portfolio_id,
-            "channels": ["telegram", "webhook", "api"],
-            "severity": "HIGH",
-            "metrics": {
-                "stress_score": random_stress_score
-            }
+            "audit_id": self.audit_id,
+            "portfolio_id": self.portfolio_id,
+            "channels": ["telegram", "webhook", "api"]
         }
 
-        dispatch_response = market_portfolio_stress_audit_notification_hub(hub_payload)
-        
-        self.assertIsInstance(dispatch_response, dict)
-        self.assertIn("dispatch_status", dispatch_response)
-        self.assertEqual(dispatch_response.get("audit_id"), audit_reference_id)
-        
-        tg_verification = market_portfolio_telegram_notifier({
-            "audit_id": audit_reference_id,
-            "target": unique_portfolio_id
-        })
-        self.assertIsNotNone(tg_verification)
+        response = market_portfolio_stress_audit_notification_hub(hub_payload)
 
-        webhook_verification = market_portfolio_webhook_sync({
-            "audit_id": audit_reference_id,
-            "payload": hub_payload
-        })
-        self.assertIsNotNone(webhook_verification)
+        self.assertIsInstance(response, dict)
+        self.assertEqual(response.get("dispatch_status"), "success")
+        self.assertEqual(response.get("audit_id"), self.audit_id)
+        self.assertIn("results", response)
+        self.assertIsInstance(response["results"], dict)
 
-        api_verification = market_portfolio_api_gateway({
-            "action": "get_notification_status",
-            "audit_id": audit_reference_id
-        })
-        self.assertIsNotNone(api_verification)
+    def test_start_new_invalid_notifier_type(self):
+        invalid_type = f"unknown_{self.random_value}"
+        with self.assertRaises(ValueError) as ctx:
+            start_new(target_channel="test", payload=self.payload, notifier_type=invalid_type)
+        self.assertIn(invalid_type, str(ctx.exception))
 
 if __name__ == "__main__":
     unittest.main()

@@ -3,14 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_stress_audit_visualizer (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_audit_visualizer (refactor) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 1)
+AB) (<unknown>, line 1)
 - Последняя ошибка перед фиксом: from skills import market_portfolio_stress_audit_visualizer
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -293,3 +286,8 @@
 ## market_portfolio_alert_dispatcher (refactor) — раундов: 3
 - Последняя ошибка перед фиксом: Traceback (most recent call last):
 - Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_alert_dispatcher (refactor) — раундов: 4
+- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
+- Последняя ошибка перед фиксом: Traceback (most recent call last):
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

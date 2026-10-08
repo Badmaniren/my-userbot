@@ -1,90 +1,142 @@
 import unittest
+from unittest.mock import MagicMock, patch
 import os
 import json
 import uuid
 import random
-import tempfile
-import shutil
-from unittest.mock import MagicMock, patch
-from skills.market_portfolio_stress_audit_summary_vault import (
-    start_new,
-    market_portfolio_stress_audit_summary_vault_process,
-    market_portfolio_stress_audit_summary_vault_validate,
-    market_portfolio_stress_audit_summary_vault_export
-)
+import io
+from skills import market_portfolio_stress_audit_summary_vault as vault
 
 class TestMarketPortfolioStressAuditSummaryVault(unittest.TestCase):
 
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp()
+        self.random_prefix = uuid.uuid4().hex[:8]
+        self.storage_target = f"test_vault_{self.random_prefix}.json"
 
     def tearDown(self):
-        shutil.rmtree(self.test_dir)
+        if os.path.exists(self.storage_target):
+            try:
+                os.remove(self.storage_target)
+            except OSError:
+                pass
+        dirname = os.path.dirname(self.storage_target)
+        if dirname and os.path.exists(dirname):
+            try:
+                os.rmdir(dirname)
+            except OSError:
+                pass
 
-    def test_start_new_execution_flow(self):
+    def test_start_new_missing_db_storage(self):
+        with self.assertRaises(ValueError):
+            vault.start_new()
+
+    def test_start_new_invalid_payload_type(self):
         mock_db = MagicMock()
-        random_save_res = uuid.uuid4().hex
-        mock_db.save.return_value = random_save_res
-        
-        mock_extractor = MagicMock()
         mock_reporter = MagicMock()
-        random_payload = {"data": uuid.uuid4().hex}
-        mock_reporter.generate.return_value = random_payload
-        
+        rand_val = random.randint(1000, 9999)
+        mock_reporter.generate.return_value = rand_val
+
+        with self.assertRaises(TypeError):
+            vault.start_new(db_storage=mock_db, market_portfolio_stress_reporter=mock_reporter)
+
+    def test_start_new_success_flow(self):
+        mock_db = MagicMock()
+        save_return_val = uuid.uuid4().hex
+        mock_db.save.return_value = save_return_val
+
+        mock_extractor = MagicMock()
+        mock_parser = MagicMock()
+        mock_reporter = MagicMock()
+
+        expected_key = uuid.uuid4().hex
+        expected_val = uuid.uuid4().hex
+        mock_reporter.generate.return_value = {expected_key: expected_val}
+
         kwargs = {
             "db_storage": mock_db,
             "extractor_tool": mock_extractor,
+            "market_parser": mock_parser,
             "market_portfolio_stress_reporter": mock_reporter
         }
-        
-        result = start_new(**kwargs)
-        
-        self.assertEqual(result["save_result"], random_save_res)
-        self.assertEqual(result["payload"], random_payload)
+
+        result = vault.start_new(**kwargs)
+
         mock_extractor.extract.assert_called_once()
-        mock_db.save.assert_called_with(random_payload)
+        mock_parser.parse_stream.assert_called_once()
+        mock_reporter.generate.assert_called_once()
+        mock_db.save.assert_called_once_with({expected_key: expected_val})
 
-    def test_process_and_validate_integrity(self):
-        random_filename = os.path.join(self.test_dir, f"{uuid.uuid4().hex}.json")
-        random_audit_id = uuid.uuid4().hex
-        audit_data = {"audit_id": random_audit_id, "val": random.random()}
-        
-        process_res = market_portfolio_stress_audit_summary_vault_process(random_filename, audit_data)
-        
-        self.assertEqual(process_res["audit_id"], random_audit_id)
-        self.assertTrue(os.path.exists(random_filename))
-        
-        is_valid = market_portfolio_stress_audit_summary_vault_validate(random_filename, random_audit_id)
-        self.assertTrue(is_valid)
-        
-        is_invalid = market_portfolio_stress_audit_summary_vault_validate(random_filename, uuid.uuid4().hex)
-        self.assertFalse(is_invalid)
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["save_result"], save_return_val)
+        self.assertEqual(result["payload"], {expected_key: expected_val})
 
-    def test_export_functionality(self):
-        random_filename = os.path.join(self.test_dir, f"{uuid.uuid4().hex}.json")
-        random_data = {"metrics": [random.random() for _ in range(5)], "id": uuid.uuid4().hex}
-        
-        with open(random_filename, "w") as f:
-            json.dump(random_data, f)
-            
-        export_res = market_portfolio_stress_audit_summary_vault_export(random_filename, format="json")
-        
-        self.assertEqual(export_res["data"], random_data)
-        self.assertEqual(export_res["format"], "json")
-
-    def test_start_new_missing_db_raises(self):
-        with self.assertRaises(ValueError):
-            start_new(db_storage=None)
-
-    def test_process_invalid_data_type(self):
-        random_filename = os.path.join(self.test_dir, f"{uuid.uuid4().hex}.json")
+    def test_market_portfolio_stress_audit_summary_vault_process_type_error(self):
+        invalid_data = uuid.uuid4().hex
         with self.assertRaises(TypeError):
-            market_portfolio_stress_audit_summary_vault_process(random_filename, "not_a_dict")
+            vault.market_portfolio_stress_audit_summary_vault_process(self.storage_target, invalid_data)
 
-    def test_export_nonexistent_file(self):
-        random_path = os.path.join(self.test_dir, uuid.uuid4().hex)
+    def test_market_portfolio_stress_audit_summary_vault_process_success(self):
+        audit_id = uuid.uuid4().hex
+        audit_data = {
+            "audit_id": audit_id,
+            "scenario": uuid.uuid4().hex,
+            "metrics": random.random()
+        }
+
+        result = vault.market_portfolio_stress_audit_summary_vault_process(self.storage_target, audit_data)
+
+        self.assertEqual(result["status"], "saved")
+        self.assertEqual(result["audit_id"], audit_id)
+        self.assertTrue(os.path.exists(self.storage_target))
+
+        with open(self.storage_target, "r", encoding="utf-8") as f:
+            loaded_data = json.load(f)
+
+        self.assertEqual(loaded_data, audit_data)
+
+    def test_market_portfolio_stress_audit_summary_vault_validate_nonexistent(self):
+        nonexistent_path = f"missing_{uuid.uuid4().hex}.json"
+        expected_id = uuid.uuid4().hex
+        is_valid = vault.market_portfolio_stress_audit_summary_vault_validate(nonexistent_path, expected_id)
+        self.assertFalse(is_valid)
+
+    def test_market_portfolio_stress_audit_summary_vault_validate_corrupted_json(self):
+        expected_id = uuid.uuid4().hex
+        garbage_content = uuid.uuid4().bytes
+
+        with patch("builtins.open", create=True) as mock_open:
+            mock_open.return_value.__enter__.return_value = io.BytesIO(garbage_content)
+            is_valid = vault.market_portfolio_stress_audit_summary_vault_validate(self.storage_target, expected_id)
+            self.assertFalse(is_valid)
+
+    def test_market_portfolio_stress_audit_summary_vault_validate_mismatch_and_match(self):
+        correct_id = uuid.uuid4().hex
+        wrong_id = uuid.uuid4().hex
+        audit_data = {"audit_id": correct_id}
+
+        vault.market_portfolio_stress_audit_summary_vault_process(self.storage_target, audit_data)
+
+        self.assertFalse(vault.market_portfolio_stress_audit_summary_vault_validate(self.storage_target, wrong_id))
+        self.assertTrue(vault.market_portfolio_stress_audit_summary_vault_validate(self.storage_target, correct_id))
+
+    def test_market_portfolio_stress_audit_summary_vault_export_file_not_found(self):
+        nonexistent_path = f"missing_export_{uuid.uuid4().hex}.json"
         with self.assertRaises(FileNotFoundError):
-            market_portfolio_stress_audit_summary_vault_export(random_path)
+            vault.market_portfolio_stress_audit_summary_vault_export(nonexistent_path)
+
+    def test_market_portfolio_stress_audit_summary_vault_export_success(self):
+        audit_id = uuid.uuid4().hex
+        audit_data = {
+            "audit_id": audit_id,
+            "data_payload": uuid.uuid4().hex
+        }
+        vault.market_portfolio_stress_audit_summary_vault_process(self.storage_target, audit_data)
+
+        export_format = uuid.uuid4().hex[:5]
+        export_result = vault.market_portfolio_stress_audit_summary_vault_export(self.storage_target, format=export_format)
+
+        self.assertEqual(export_result["format"], export_format)
+        self.assertEqual(export_result["data"], audit_data)
 
 if __name__ == "__main__":
     unittest.main()

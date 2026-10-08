@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-portfolio_stress_predictive_hedge_engine (create) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
-- Последняя ошибка перед фиксом: FAILED (errors=2)
+ фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_stress_monte_carlo_engine (refactor) — раундов: 4
@@ -287,3 +285,7 @@ portfolio_stress_predictive_hedge_engine (create) — раундов: 4
 ## market_portfolio_stress_audit_metrics_bridge (start_new) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_audit_realtime_streamer (create) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: успешно прошёл тесты и влит в main

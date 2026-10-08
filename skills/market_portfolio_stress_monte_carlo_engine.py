@@ -169,3 +169,16 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
         market_portfolio_stress_audit_visualizer.visualize_stress_test(result_dict)
 
     return result_dict
+
+
+def run_simulation(portfolio_id_or_payload, simulations=100, horizon_days=10) -> dict:
+    if isinstance(portfolio_id_or_payload, dict):
+        pid = str(portfolio_id_or_payload.get("portfolio_id", "gen"))
+        sims = int(portfolio_id_or_payload.get("simulations", simulations))
+        hdays = int(portfolio_id_or_payload.get("horizon_days", horizon_days))
+    else:
+        pid = str(portfolio_id_or_payload)
+        sims = int(simulations)
+        hdays = int(horizon_days)
+    engine = MonteCarloStressEngine()
+    return engine.run_simulation(pid, sims, hdays)

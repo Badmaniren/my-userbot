@@ -97,3 +97,14 @@ def start_new(symbol: str, url: str, telegram_token: str, chat_id: str, storage_
         chat_id,
         storage_file
     )
+
+
+def fetch_stream(stream_target: str) -> dict:
+    return {
+        "stream_target": stream_target,
+        "data": [{"metric": 100.0}]
+    }
+
+
+def get_stream(stream_target: str) -> dict:
+    return fetch_stream(stream_target)

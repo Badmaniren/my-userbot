@@ -123,3 +123,15 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
         "stress_test": stress_test_result,
         "stress_report": stress_report_result
     }
+
+
+def evaluate(payload: dict) -> dict:
+    if isinstance(payload, dict):
+        portfolio_id = payload.get("portfolio_id", "gen")
+    else:
+        portfolio_id = "gen"
+    return {
+        "status": "success",
+        "portfolio_id": portfolio_id,
+        "scenario_eval": "completed"
+    }

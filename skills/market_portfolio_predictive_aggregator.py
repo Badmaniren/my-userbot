@@ -47,3 +47,16 @@ MarketPortfolioPredictiveAggregator = PredictiveAggregator
 def aggregate_market_forecast(storage_file: str, symbol: str, url: str, percentage_shift: float) -> dict:
     aggregator = PredictiveAggregator(storage_file)
     return aggregator.build_advanced_forecast(symbol, url, percentage_shift)
+
+
+def aggregate_predictions(payload: dict) -> dict:
+    if not isinstance(payload, dict):
+        return None
+    if "aggregate_target" not in payload and "simulated_drawdown" not in payload:
+        return None
+    token = payload.get("aggregate_target") or payload.get("symbol") or "UNKNOWN"
+    drawdown = payload.get("simulated_drawdown") or payload.get("drawdown") or 0.0
+    return {
+        "token": token,
+        "predicted_drawdown": drawdown
+    }

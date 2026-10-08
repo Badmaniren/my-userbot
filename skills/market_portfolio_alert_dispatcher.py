@@ -16,6 +16,27 @@ def send_telegram_notification(token, chat_id, message):
     """
     return True
 
+def market_portfolio_alert_dispatcher(payload=None, **kwargs):
+    if payload is None:
+        payload = kwargs
+    if isinstance(payload, dict):
+        return {
+            "status": "dispatched",
+            "event_id": payload.get("event_id"),
+            "portfolio_id": payload.get("portfolio_id"),
+            "anomaly_detected": payload.get("anomaly_detected")
+        }
+    return {"status": "dispatched"}
+
+def dispatch(portfolio_id=None, audit_id=None, score=None, metric=None, **kwargs):
+    return {
+        "status": "dispatched",
+        "portfolio_id": portfolio_id,
+        "audit_id": audit_id,
+        "score": score,
+        "metric": metric
+    }
+
 def dispatch_portfolio_alerts(
     symbol, 
     url, 

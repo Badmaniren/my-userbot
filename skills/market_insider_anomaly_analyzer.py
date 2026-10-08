@@ -91,7 +91,7 @@ class MarketInsiderAnomalyAnalyzer:
             transaction_value = activity.get("transaction_value", 0.0)
             shares_traded = activity.get("shares_traded", 0)
             # Calculate score based on transaction size/value
-            anomaly_score = min(transaction_value / 5000000.0, 1.0)
+            anomaly_score = min(transaction_value / 1000000.0, 100.0)
             results.append({
                 "asset": asset,
                 "anomaly_score": anomaly_score,

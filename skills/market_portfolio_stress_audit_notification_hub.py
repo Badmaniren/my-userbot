@@ -9,6 +9,13 @@ from skills import (
 
 def start_new(target_channel: str, payload: dict, notifier_type: str) -> dict:
     """
+    Централизованная маршрутизация и отправка уведомлений для юнит-тестов (интеграционный интерфейс).
+    """
+    return start_v2(target_channel, payload, notifier_type)
+
+
+def start_v2(target_channel: str, payload: dict, notifier_type: str) -> dict:
+    """
     Централизованная маршрутизация и отправка уведомлений для юнит-тестов.
     """
     if notifier_type == "telegram":
@@ -39,6 +46,7 @@ def market_portfolio_stress_audit_notification_hub(hub_payload: dict) -> dict:
     Интеграционная функция маршрутизации и отправки уведомлений по нескольким каналам.
     """
     audit_id = hub_payload.get("audit_id")
+    portfolio_id = hub_payload.get("portfolio_id")
     channels = hub_payload.get("channels", [])
     
     results = {}
@@ -46,14 +54,14 @@ def market_portfolio_stress_audit_notification_hub(hub_payload: dict) -> dict:
         if ch == "telegram":
             results["telegram"] = market_portfolio_telegram_notifier({
                 "audit_id": audit_id,
-                "target": hub_payload.get("portfolio_id")
+                "target": portfolio_id
             })
         elif ch == "webhook":
             results["webhook"] = market_portfolio_webhook_sync({
                 "audit_id": audit_id,
                 "payload": hub_payload
             })
-        elif ch == "api":
+        elif ch == "api" or ch == "api_gateway":
             results["api"] = market_portfolio_api_gateway({
                 "action": "get_notification_status",
                 "audit_id": audit_id

@@ -3,14 +3,21 @@ import json
 import os
 import random
 import string
+import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 import uuid
 
-import requests
+try:
+    import requests
+except ImportError:
+    requests = MagicMock()
 
 from skills.market_portfolio_stress_audit_exporter_v2 import (
     MarketPortfolioStressAuditExporterV2,
+    StressAuditExporterV2,
+    AntiCheatSecurityGuard,
+    StressTelemetryException,
     market_portfolio_stress_audit_exporter_v2_main,
 )
 
@@ -93,7 +100,7 @@ class TestMarketPortfolioStressAuditExporterV2(unittest.TestCase):
         mock_response = MagicMock()
         mock_response.status_code = 200
 
-        with patch("requests.post", return_value=mock_response) as mock_post:
+        with patch("skills.market_portfolio_stress_audit_exporter_v2.requests.post", return_value=mock_response) as mock_post:
             result = self.exporter.process_and_dispatch_anomaly_audit(audit_id, webhook_url)
 
         self.extractor_tool_1.extract.assert_called_once_with(audit_id)
@@ -113,11 +120,48 @@ class TestMarketPortfolioStressAuditExporterV2(unittest.TestCase):
         mock_response = MagicMock()
         mock_response.status_code = random.choice([400, 404, 500, 502])
 
-        with patch("requests.post", return_value=mock_response) as mock_post:
+        with patch("skills.market_portfolio_stress_audit_exporter_v2.requests.post", return_value=mock_response) as mock_post:
             result = self.exporter.process_and_dispatch_anomaly_audit(audit_id, webhook_url)
 
         mock_post.assert_called_once_with(webhook_url, json=evaluation_result)
         self.assertFalse(result)
+
+    def test_anti_cheat_security_guard(self):
+        guard = AntiCheatSecurityGuard()
+        self.assertTrue(guard.verify_record_integrity({"anti_cheat_hash": "valid_hash_01"}))
+        self.assertFalse(guard.verify_record_integrity({"anti_cheat_hash": "tampered_bad_hash"}))
+        self.assertFalse(guard.verify_record_integrity({}))
+        self.assertFalse(guard.verify_record_integrity("invalid_type"))
+
+    def test_stress_telemetry_exception(self):
+        with self.assertRaises(StressTelemetryException):
+            raise StressTelemetryException("Telemetry error")
+
+    def test_telemetry_methods(self):
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as tmp:
+            test_records = [
+                {"status": "CRITICAL_BREACH", "anti_cheat_hash": "valid_1"},
+                {"status": "WARNING", "anti_cheat_hash": "valid_2"},
+                {"status": "STABLE", "anti_cheat_hash": "valid_3"}
+            ]
+            json.dump(test_records, tmp)
+            tmp_filename = tmp.name
+
+        try:
+            exporter = StressAuditExporterV2(storage_path=tmp_filename)
+            loaded = exporter.load_telemetry_stream()
+            self.assertEqual(len(loaded), 3)
+
+            summary = exporter.compute_stress_audit_summary(loaded)
+            self.assertEqual(summary["total_audited"], 3)
+            self.assertEqual(summary["critical_breaches_count"], 1)
+
+            bundle = exporter.export_final_telemetry_bundle(loaded)
+            self.assertEqual(bundle["status"], "SUCCESS")
+            self.assertIn("checksum", bundle)
+        finally:
+            if os.path.exists(tmp_filename):
+                os.remove(tmp_filename)
 
     def test_market_portfolio_stress_audit_exporter_v2_main(self):
         run_id = uuid.uuid4().hex

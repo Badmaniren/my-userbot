@@ -63,7 +63,7 @@ def market_portfolio_stress_audit_summary_vault_process(storage_target, audit_da
     with open(storage_target, "w", encoding="utf-8") as f:
         json.dump(audit_data, f)
         
-    audit_id = audit_data.get("audit_id")
+    audit_id = audit_data.get("audit_id") or audit_data.get("portfolio_id")
     logger.info(f"Successfully processed and stored audit with ID: {audit_id}")
     return {
         "status": "saved",
@@ -84,7 +84,7 @@ def market_portfolio_stress_audit_summary_vault_validate(storage_target, expecte
         logger.error(f"Failed to read or parse storage target {storage_target}: {e}")
         return False
 
-    is_valid = data.get("audit_id") == expected_audit_id
+    is_valid = (data.get("audit_id") == expected_audit_id) or (data.get("portfolio_id") == expected_audit_id)
     logger.info(f"Validation result for target {storage_target}: {is_valid}")
     return is_valid
 

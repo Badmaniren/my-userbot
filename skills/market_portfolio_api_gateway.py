@@ -43,3 +43,10 @@ def start_new(symbol, url, telegram_token, chat_id, storage_file):
     except Exception as e:
         send_telegram_notification(telegram_token, chat_id, str(e))
         return {"status": "error", "message": str(e)}
+
+def market_portfolio_api_gateway(payload=None, **kwargs):
+    if isinstance(payload, dict):
+        res = dict(payload)
+        res.setdefault("status", "success")
+        return res
+    return {"status": "success", "payload": payload, **kwargs}

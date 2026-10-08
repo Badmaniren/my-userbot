@@ -50,6 +50,19 @@ def start_new(**kwargs):
     return {"status": "success", "save_result": save_res, "payload": payload}
 
 
+def market_portfolio_stress_audit_summary_vault(payload=None, **kwargs):
+    if payload is not None and isinstance(payload, dict):
+        try:
+            from skills.db_storage import db_storage
+            key = payload.get("stress_audit_id") or payload.get("audit_id") or payload.get("portfolio_id")
+            if db_storage:
+                db_storage({"action": "set", "key": key, "value": payload})
+        except ImportError:
+            pass
+        return {"status": "success", "audit_id": payload.get("stress_audit_id"), "payload": payload}
+    return {"status": "success"}
+
+
 def market_portfolio_stress_audit_summary_vault_process(storage_target, audit_data):
     logger.info(f"Processing audit data for target: {storage_target}")
     if not isinstance(audit_data, dict):

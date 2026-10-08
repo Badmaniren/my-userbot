@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-щено создавать заглушки. Используй честный импорт: 'from skills.market_portfolio_stress_monte_carlo_engine i
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_stress_extreme_tail_risk_model (create) — раундов: 4
+market_portfolio_stress_extreme_tail_risk_model (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -259,3 +255,7 @@
 ## market_portfolio_stress_audit_analytics_hub (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_audit_visualizer (refactor) — раундов: 2
+- Последняя ошибка перед фиксом: from skills.market_portfolio_stress_monte_carlo_engine import (
+- Статус: успешно прошёл тесты и влит в main

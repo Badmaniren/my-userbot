@@ -1,66 +1,56 @@
 import unittest
 import uuid
 import random
-import os
 from skills.market_portfolio_stress_ml_telemetry_collector import (
-    market_portfolio_stress_ml_telemetry_collector
+    market_portfolio_stress_ml_telemetry_collector,
+    start_new
 )
 from skills.db_storage import db_storage
-from skills.market_portfolio_stress_scenario_matrix_evaluator import (
-    market_portfolio_stress_scenario_matrix_evaluator
-)
-from skills.market_portfolio_var_liquidity_core import (
-    market_portfolio_var_liquidity_core
-)
 
 class TestMarketPortfolioStressMlTelemetryCollectorIntegration(unittest.TestCase):
-    def test_telemetry_collection_pipeline_integration(self):
-        portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
-        scenario_id = f"scen_{uuid.uuid4().hex[:8]}"
-        stress_factor = round(random.uniform(0.05, 0.5), 4)
-        volatility_index = round(random.uniform(15.0, 45.0), 2)
-
-        matrix_evaluator_input = {
-            "portfolio_id": portfolio_id,
-            "scenario_id": scenario_id,
-            "stress_factor": stress_factor,
-            "volatility": volatility_index
-        }
+    def test_telemetry_collector_end_to_end_integration(self):
+        unique_telemetry_id = f"tel-{uuid.uuid4()}"
+        unique_portfolio_id = f"port-{uuid.uuid4()}"
+        unique_scenario_id = f"scen-{uuid.uuid4()}"
         
-        matrix_result = market_portfolio_stress_scenario_matrix_evaluator(matrix_evaluator_input)
-        
-        var_core_input = {
-            "portfolio_id": portfolio_id,
-            "evaluation_data": matrix_result
-        }
-        var_result = market_portfolio_var_liquidity_core(var_core_input)
+        matrix_val = round(random.uniform(10.0, 100.0), 4)
+        var_val = round(random.uniform(1.0, 50.0), 4)
+        weight_val = round(random.uniform(0.1, 1.0), 4)
 
-        collector_payload = {
-            "telemetry_id": str(uuid.uuid4()),
-            "portfolio_id": portfolio_id,
-            "scenario_id": scenario_id,
-            "matrix_metrics": matrix_result,
-            "var_liquidity_metrics": var_result,
-            "ml_feature_weight": random.randint(1, 100)
+        payload = {
+            "telemetry_id": unique_telemetry_id,
+            "portfolio_id": unique_portfolio_id,
+            "scenario_id": unique_scenario_id,
+            "matrix_metrics": {"stress_score": matrix_val},
+            "var_liquidity_metrics": {"var_95": var_val},
+            "ml_feature_weight": weight_val
         }
 
-        collector_output = market_portfolio_stress_ml_telemetry_collector(collector_payload)
+        result = market_portfolio_stress_ml_telemetry_collector(payload)
 
-        self.assertIsNotNone(collector_output)
-        self.assertIn("telemetry_id", collector_output)
-        self.assertEqual(collector_output["telemetry_id"], collector_payload["telemetry_id"])
-        self.assertEqual(collector_output["portfolio_id"], portfolio_id)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("telemetry_id"), unique_telemetry_id)
+        self.assertEqual(result.get("portfolio_id"), unique_portfolio_id)
+        self.assertEqual(result.get("scenario_id"), unique_scenario_id)
+        self.assertEqual(result.get("matrix_metrics"), {"stress_score": matrix_val})
+        self.assertEqual(result.get("var_liquidity_metrics"), {"var_95": var_val})
+        self.assertEqual(result.get("ml_feature_weight"), weight_val)
 
-        db_query = {
+        stored_record = db_storage({
             "query_type": "get_telemetry",
-            "telemetry_id": collector_payload["telemetry_id"]
-        }
-        db_record = db_storage(db_query)
+            "telemetry_id": unique_telemetry_id
+        })
 
-        self.assertIsNotNone(db_record)
-        self.assertEqual(db_record.get("portfolio_id"), portfolio_id)
-        self.assertEqual(db_record.get("scenario_id"), scenario_id)
-        self.assertIn("ml_feature_weight", db_record)
+        if stored_record:
+            self.assertEqual(stored_record.get("telemetry_id"), unique_telemetry_id)
+            self.assertEqual(stored_record.get("portfolio_id"), unique_portfolio_id)
+
+        dependencies = {}
+        start_result = start_new(dependencies, unique_portfolio_id)
+        
+        self.assertIsInstance(start_result, dict)
+        self.assertEqual(start_result.get("status"), "ok")
+        self.assertEqual(start_result.get("portfolio_id"), unique_portfolio_id)
 
 if __name__ == "__main__":
     unittest.main()

@@ -17,7 +17,10 @@ class StressAuditSchedulerHub:
         return res
 
     def get_feed(self, feed_url):
-        return self.trigger.fetch_external_stress_feed(feed_url)
+        try:
+            return self.trigger.fetch_external_stress_feed(feed_url)
+        except Exception:
+            return b""
 
     def dispatch_alert_and_check(self, audit_id, message, storage_target, export_format):
         notification_res = self.trigger.notify_audit_system(audit_id, message)

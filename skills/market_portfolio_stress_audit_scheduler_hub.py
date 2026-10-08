@@ -7,13 +7,17 @@ from skills.market_portfolio_stress_audit_summary_vault import (
 
 
 class StressAuditSchedulerHub:
+    """
+    Центральный узел агрегации потоковой телеметрии.
+    Обеспечивает взаимодействие между триггерами ребалансировки и хранилищем аудита.
+    """
     def __init__(self):
         self.trigger = StressAutoRebalanceTrigger()
 
     def run_audit_cycle(self, portfolio_id, threshold, storage_target):
         res = self.trigger.evaluate_and_trigger(portfolio_id, threshold)
-        if res is not None:
-            market_portfolio_stress_audit_summary_vault_process(storage_target, res)
+        audit_payload = res if isinstance(res, dict) else {"portfolio_id": portfolio_id, "threshold": threshold}
+        market_portfolio_stress_audit_summary_vault_process(storage_target, audit_payload)
         return res
 
     def get_feed(self, feed_url):
@@ -43,6 +47,9 @@ class StressAuditSchedulerHub:
 
 
 def market_portfolio_stress_audit_scheduler_hub_process(portfolio_id, threshold, storage_target, audit_data):
+    """
+    Точка входа для обработки цикла аудита с интеграцией в хранилище.
+    """
     scheduler = StressAuditSchedulerHub()
     trigger_result = scheduler.run_audit_cycle(portfolio_id, threshold, storage_target)
     

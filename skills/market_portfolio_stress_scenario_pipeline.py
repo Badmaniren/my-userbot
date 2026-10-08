@@ -39,23 +39,25 @@ class PortfolioStressScenarioPipeline:
             if "percentage" not in sim_result:
                 sim_result["percentage"] = percentage
 
+        shifts_arg = list(range(shifts)) if isinstance(shifts, int) else shifts
+
         try:
-            stress_test_result = self.simulator.run_stress_test(symbol, shifts)
+            stress_test_result = self.simulator.run_stress_test(symbol, shifts_arg)
             if isinstance(stress_test_result, list):
-                stress_test_result = {"symbol": symbol, "shifts": shifts, "results": stress_test_result}
+                stress_test_result = {"symbol": symbol, "shifts": shifts_arg, "results": stress_test_result}
         except (KeyError, RuntimeError, AttributeError):
-            stress_test_result = {"symbol": symbol, "shifts": shifts, "results": []}
+            stress_test_result = {"symbol": symbol, "shifts": shifts_arg, "results": []}
 
         if isinstance(stress_test_result, dict):
             if "symbol" not in stress_test_result:
                 stress_test_result["symbol"] = symbol
             if "shifts" not in stress_test_result:
-                stress_test_result["shifts"] = shifts
+                stress_test_result["shifts"] = shifts_arg
             if "results" not in stress_test_result:
                 stress_test_result["results"] = []
 
         try:
-            stress_report_result = self.reporter.run_stress_report(symbol, shifts)
+            stress_report_result = self.reporter.run_stress_report(symbol, shifts_arg)
         except (KeyError, RuntimeError, AttributeError):
             stress_report_result = {"symbol": symbol, "status": "default", "impact_score": 0}
 

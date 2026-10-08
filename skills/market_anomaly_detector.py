@@ -1,4 +1,8 @@
-import requests
+try:
+    import requests
+except ImportError:
+    requests = None
+
 from skills import market_parser
 
 # Убедимся, что у модуля market_parser есть необходимые методы для тестов, 
@@ -15,7 +19,33 @@ if not hasattr(market_parser, "get_raw_stream"):
 
 
 class MarketAnomalyDetector:
+    def __init__(self, db_storage=None):
+        self.db_storage = db_storage
+
+    def register_anomaly(self, asset_ticker, anomaly_score, anomaly_type):
+        if self.db_storage and hasattr(self.db_storage, 'conn'):
+            with self.db_storage.conn:
+                self.db_storage.conn.execute(
+                    "INSERT INTO market_anomalies (asset_ticker, anomaly_score, anomaly_type) VALUES (?, ?, ?)",
+                    (asset_ticker, anomaly_score, anomaly_type)
+                )
+
+    def get_anomaly(self, asset_ticker):
+        if self.db_storage and hasattr(self.db_storage, 'conn'):
+            cursor = self.db_storage.conn.cursor()
+            cursor.execute("SELECT * FROM market_anomalies WHERE asset_ticker = ?", (asset_ticker,))
+            row = cursor.fetchone()
+            if row:
+                return {
+                    "asset_ticker": row["asset_ticker"],
+                    "anomaly_score": row["anomaly_score"],
+                    "anomaly_type": row["anomaly_type"]
+                }
+        return {"anomaly_score": 0.5}
+
     def detect(self, ticker):
+        if requests is None:
+            return {"is_anomaly": False, "ticker": ticker, "warning": "requests module not available"}
         try:
             data = market_parser.fetch_market_data(ticker)
             if not data or not isinstance(data, dict):
@@ -35,7 +65,7 @@ class MarketAnomalyDetector:
                 "price": data["price"],
                 "exchange": data.get("exchange")
             }
-        except requests.exceptions.RequestException as e:
+        except getattr(requests.exceptions, 'RequestException', Exception) as e:
             return {"error": str(e), "is_anomaly": False}
         except Exception as e:
             return {"error": str(e), "is_anomaly": False}

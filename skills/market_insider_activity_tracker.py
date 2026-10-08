@@ -6,9 +6,26 @@ class MarketInsiderActivityTracker:
     """
     Tracker for market insider activity analyzing raw data streams.
     """
-    def __init__(self, **kwargs: Any) -> None:
+    def __init__(self, db_storage=None, **kwargs: Any) -> None:
         self.deps: Dict[str, Any] = kwargs
-        self.db_storage: Optional[Any] = kwargs.get("db_storage")
+        self.db_storage: Optional[Any] = db_storage or kwargs.get("db_storage")
+
+    def log_insider_transaction(self, asset_ticker, transaction_type, volume, insider_role):
+        if self.db_storage and hasattr(self.db_storage, 'conn'):
+            with self.db_storage.conn:
+                self.db_storage.conn.execute(
+                    "INSERT INTO insider_transactions (asset_ticker, transaction_type, volume, insider_role) VALUES (?, ?, ?, ?)",
+                    (asset_ticker, transaction_type, volume, insider_role)
+                )
+
+    def get_activity(self, asset_ticker):
+        if self.db_storage and hasattr(self.db_storage, 'conn'):
+            cursor = self.db_storage.conn.cursor()
+            cursor.execute("SELECT SUM(volume) as total_vol FROM insider_transactions WHERE asset_ticker = ?", (asset_ticker,))
+            row = cursor.fetchone()
+            if row and row["total_vol"]:
+                return {"multiplier": 1.5, "total_volume": row["total_vol"]}
+        return {"multiplier": 1.2}
 
     def analyze_activity(self, raw_data_stream: Any) -> Dict[str, str]:
         if raw_data_stream is None:

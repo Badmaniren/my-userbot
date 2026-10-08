@@ -1,9 +1,19 @@
 import skills.db_storage as db_storage
 from skills.market_parser import MarketParser
 
-class PortfolioValuation:
-    def __init__(self, storage_file=None):
+class MarketPortfolioValuation:
+    def __init__(self, db_storage=None, storage_file=None):
+        self.db_storage = db_storage
         self.storage_file = storage_file
+
+    def save_portfolio_valuation(self, portfolio_id, total_value, asset_allocations):
+        if self.db_storage:
+            self.db_storage.save_portfolio_valuation(portfolio_id, total_value, asset_allocations)
+
+    def get_valuation(self, portfolio_id):
+        if self.db_storage:
+            return self.db_storage.get_portfolio_valuation(portfolio_id)
+        return None
 
     def load_data(self, storage_file=None):
         file_to_load = storage_file or self.storage_file
@@ -66,3 +76,6 @@ class PortfolioValuation:
 
     def calculate_portfolio_pnl(self, url):
         return self.get_total_summary(url)
+
+
+PortfolioValuation = MarketPortfolioValuation

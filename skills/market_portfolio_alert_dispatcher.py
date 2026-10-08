@@ -85,10 +85,10 @@ def process_stream_alert(alert_id):
         generator_instance = market_report_generator.MarketReportGenerator()
         if hasattr(generator_instance, "get_raw_stream_dump"):
             try:
-                return generator_instance.get_raw_stream_dump(alert_id)
+                return generator_instance.get_raw_stream_dump()
             except TypeError:
                 try:
-                    return generator_instance.get_raw_stream_dump()
+                    return generator_instance.get_raw_stream_dump(alert_id)
                 except Exception:
                     return io.BytesIO(b"")
             except Exception:

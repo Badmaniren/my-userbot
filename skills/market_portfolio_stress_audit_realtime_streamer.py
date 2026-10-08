@@ -1,12 +1,54 @@
 import sys
+import os
+import json
 import uuid
 from skills import db_storage as default_db_storage
 
 class MarketPortfolioStressAuditRealtimeStreamer:
-    def __init__(self, db_storage=None):
-        self.db_storage = db_storage if db_storage is not None else default_db_storage
+    def __init__(self, db_storage=None, source_path=None):
+        if isinstance(db_storage, str) and source_path is None:
+            self.source_path = db_storage
+            self.db_storage = default_db_storage
+        else:
+            self.source_path = source_path
+            self.db_storage = db_storage if db_storage is not None else default_db_storage
         self.market_anomaly_detector = None
         self.market_portfolio_alert_event_sink = None
+
+    def stream_events(self):
+        if self.source_path and os.path.exists(self.source_path):
+            with open(self.source_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line_str = line.strip()
+                    if not line_str:
+                        continue
+                    try:
+                        data = json.loads(line_str)
+                        if isinstance(data, dict):
+                            yield data
+                    except json.JSONDecodeError:
+                        continue
+        else:
+            while True:
+                line_data = sys.stdin.readline()
+                if isinstance(line_data, bytes):
+                    line_str = line_data.decode('utf-8', errors='ignore').strip()
+                else:
+                    line_str = str(line_data).strip()
+                if not line_str:
+                    break
+                try:
+                    data = json.loads(line_str)
+                    if isinstance(data, dict):
+                        yield data
+                except json.JSONDecodeError:
+                    parts = line_str.split(":")
+                    if len(parts) >= 3:
+                        yield {
+                            "portfolio_id": parts[0],
+                            "metric_name": parts[1],
+                            "value": parts[2]
+                        }
 
     def stream_and_persist(self, portfolio_id: str) -> bool:
         line_data = sys.stdin.readline()

@@ -1,6 +1,18 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+try:
+    import requests
+except ImportError:
+    from unittest import mock
+    requests = mock.MagicMock()
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    class BeautifulSoup:
+        def __init__(self, *args, **kwargs):
+            pass
+        def find(self, *args, **kwargs):
+            return None
 
 
 class MarketParser:

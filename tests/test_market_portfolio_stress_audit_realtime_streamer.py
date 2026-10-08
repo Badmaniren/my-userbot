@@ -1,6 +1,8 @@
 import unittest
 from unittest.mock import MagicMock, patch
 import io
+import os
+import json
 import uuid
 import random
 import string
@@ -15,6 +17,46 @@ class TestMarketPortfolioStressAuditRealtimeStreamer(unittest.TestCase):
     def test_init_default_storage(self):
         streamer_default = MarketPortfolioStressAuditRealtimeStreamer()
         self.assertIsNotNone(streamer_default.db_storage)
+
+    def test_init_source_path_positional(self):
+        test_path = "test_source.jsonl"
+        streamer = MarketPortfolioStressAuditRealtimeStreamer(test_path)
+        self.assertEqual(streamer.source_path, test_path)
+
+    def test_init_source_path_kwarg(self):
+        test_path = "test_source.jsonl"
+        streamer = MarketPortfolioStressAuditRealtimeStreamer(source_path=test_path)
+        self.assertEqual(streamer.source_path, test_path)
+
+    def test_stream_events_from_source_path(self):
+        test_path = f"tmp_test_stream_{uuid.uuid4().hex[:8]}.jsonl"
+        records = [
+            {"portfolio_id": "PF-1", "var_99": 100.5, "drawdown_pct": 5.2},
+            {"portfolio_id": "PF-2", "var_99": 200.0, "drawdown_pct": 12.1}
+        ]
+        with open(test_path, "w", encoding="utf-8") as f:
+            for r in records:
+                f.write(json.dumps(r) + "\n")
+
+        try:
+            streamer = MarketPortfolioStressAuditRealtimeStreamer(source_path=test_path)
+            events = list(streamer.stream_events())
+            self.assertEqual(len(events), 2)
+            self.assertEqual(events[0]["portfolio_id"], "PF-1")
+            self.assertEqual(events[1]["portfolio_id"], "PF-2")
+        finally:
+            if os.path.exists(test_path):
+                os.remove(test_path)
+
+    def test_stream_events_from_stdin_json(self):
+        json_line = json.dumps({"portfolio_id": "PF-3", "var_99": 150.0}) + "\n"
+        streamer = MarketPortfolioStressAuditRealtimeStreamer()
+
+        with patch('sys.stdin', io.StringIO(json_line)):
+            events = list(streamer.stream_events())
+
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["portfolio_id"], "PF-3")
 
     def test_stream_and_persist_valid_float_metric(self):
         portfolio_id = uuid.uuid4().hex
@@ -170,3 +212,6 @@ class TestMarketPortfolioStressAuditRealtimeStreamer(unittest.TestCase):
         self.assertIn("portfolio_id", result)
         self.assertEqual(result["portfolio_id"], portfolio_id)
         self.assertTrue(uuid.UUID(result["stream_id"]))
+
+if __name__ == '__main__':
+    unittest.main()

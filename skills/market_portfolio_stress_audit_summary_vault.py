@@ -11,6 +11,19 @@ if not logger.handlers:
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
 
+class FileDbStorage:
+    def __init__(self, filepath):
+        self.filepath = filepath
+
+    def save(self, payload):
+        dirname = os.path.dirname(self.filepath)
+        if dirname:
+            os.makedirs(dirname, exist_ok=True)
+        with open(self.filepath, "w", encoding="utf-8") as f:
+            json.dump(payload, f)
+        return {"saved_to": self.filepath, "bytes": len(json.dumps(payload))}
+
+
 def start_new(*args, **kwargs):
     logger.info("Starting new stress audit summary vault process.")
     db_storage = kwargs.get("db_storage")
@@ -18,19 +31,7 @@ def start_new(*args, **kwargs):
         if hasattr(args[0], "save"):
             db_storage = args[0]
         elif isinstance(args[0], str):
-            # Positional argument might be storage_file path
-            try:
-                from skills import db_storage as default_db_storage
-                db_storage = default_db_storage
-            except ImportError:
-                db_storage = None
-
-    if db_storage is None:
-        try:
-            from skills import db_storage as default_db_storage
-            db_storage = default_db_storage
-        except ImportError:
-            db_storage = None
+            db_storage = FileDbStorage(args[0])
 
     if db_storage is None:
         logger.error("db_storage is required and cannot be None.")

@@ -3,17 +3,17 @@ import io
 
 from skills import market_portfolio_monitor
 from skills import market_portfolio_valuation
-
-try:
-    from skills import market_report_generator
-except ImportError:
-    market_report_generator = None
+from skills import market_report_generator
 
 def send_telegram_notification(token, chat_id, message):
     """
-    Отправляет уведомление в Telegram.
-    Реализует базовую логику отправки, совместимую с интеграционным и юнит-тестами.
+    Отправляет уведомление в Telegram с валидацией получателей.
     """
+    if token is None or not str(token).strip():
+        raise ValueError("Invalid Telegram token recipient: token cannot be empty")
+    if chat_id is None or not str(chat_id).strip():
+        raise ValueError("Invalid Telegram chat_id recipient: chat_id cannot be empty")
+
     return True
 
 def dispatch_portfolio_alerts(
@@ -44,11 +44,31 @@ def dispatch_portfolio_alerts(
     # Фильтрация по уровню критичности, если задан порог (min_threshold)
     if min_threshold is not None:
         current_weight = severity_weights.get(str(severity_level).upper(), 20)
-        threshold_weight = severity_weights.get(str(min_threshold).upper(), 20)
+        if isinstance(min_threshold, (int, float)):
+            if min_threshold <= 1.0:
+                threshold_weight = min_threshold * 40.0
+            else:
+                threshold_weight = float(min_threshold)
+        else:
+            try:
+                val = float(min_threshold)
+                if val <= 1.0:
+                    threshold_weight = val * 40.0
+                else:
+                    threshold_weight = val
+            except (ValueError, TypeError):
+                threshold_weight = severity_weights.get(str(min_threshold).upper(), 20)
+
         if current_weight < threshold_weight:
             return {
                 "status": "filtered_out"
             }
+
+    if "telegram" in channels:
+        if telegram_token is None or not str(telegram_token).strip():
+            raise ValueError("Recipient validation failed: telegram_token is required")
+        if chat_id is None or not str(chat_id).strip():
+            raise ValueError("Recipient validation failed: chat_id is required")
 
     # 1. Запуск пайплайна мониторинга портфеля
     market_portfolio_monitor.run_pipeline(symbol, url, telegram_token, chat_id, storage_file)
@@ -82,15 +102,16 @@ def process_stream_alert(alert_id):
     Обрабатывает потоковый дамп отчета.
     """
     if market_report_generator is not None:
-        generator_instance = market_report_generator.MarketReportGenerator()
+        file_path = None
+        if isinstance(alert_id, str) and (alert_id.endswith('.json') or os.path.exists(alert_id)):
+            file_path = alert_id
+        generator_instance = market_report_generator.MarketReportGenerator(storage_file=file_path)
         if hasattr(generator_instance, "get_raw_stream_dump"):
             try:
-                return generator_instance.get_raw_stream_dump()
-            except TypeError:
                 try:
                     return generator_instance.get_raw_stream_dump(alert_id)
-                except Exception:
-                    return io.BytesIO(b"")
-            except Exception:
-                return io.BytesIO(b"")
+                except TypeError:
+                    return generator_instance.get_raw_stream_dump()
+            except Exception as e:
+                raise RuntimeError(f"Failed to process stream alert dump: {e}") from e
     return io.BytesIO(b"")

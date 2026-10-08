@@ -1,7 +1,6 @@
 import os
 import json
 import logging
-import requests
 
 # Настройка логирования для модуля
 logger = logging.getLogger("market_portfolio_stress_audit_summary_vault")

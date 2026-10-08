@@ -59,5 +59,3 @@ class MarketPortfolioStressAuditRealtimeStreamer:
             "stream_id": stream_id,
             "portfolio_id": portfolio_id
         }
-
-market_portfolio_stress_audit_realtime_streamer = MarketPortfolioStressAuditRealtimeStreamer()

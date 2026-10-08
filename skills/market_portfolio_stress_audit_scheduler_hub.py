@@ -24,8 +24,16 @@ class StressAuditSchedulerHub:
 
     def dispatch_alert_and_check(self, audit_id, message, storage_target, export_format):
         notification_res = self.trigger.notify_audit_system(audit_id, message)
-        is_valid = market_portfolio_stress_audit_summary_vault_validate(storage_target, audit_id)
-        export_data = market_portfolio_stress_audit_summary_vault_export(storage_target, export_format)
+        
+        try:
+            is_valid = market_portfolio_stress_audit_summary_vault_validate(storage_target, audit_id)
+        except Exception:
+            is_valid = False
+
+        try:
+            export_data = market_portfolio_stress_audit_summary_vault_export(storage_target, export_format)
+        except Exception:
+            export_data = {}
         
         return {
             "notification": notification_res,

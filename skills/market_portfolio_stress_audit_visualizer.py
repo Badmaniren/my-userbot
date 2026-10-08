@@ -1,6 +1,6 @@
 import io
 import requests
-from bs45 import BeautifulSoup
+from bs4 import BeautifulSoup
 
 
 class MarketPortfolioStressAuditVisualizer:

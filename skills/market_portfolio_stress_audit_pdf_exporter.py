@@ -60,6 +60,8 @@ def start_new(
     market_sentiment_risk_hub,
     market_sentiment_telegram_publisher,
     market_telegram_pipeline,
+    *args,
+    **kwargs
 ):
     audit_data = db_storage.fetch_audit_data()
     if not audit_data:

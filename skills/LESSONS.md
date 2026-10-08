@@ -3,7 +3,12 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-der.py", line 419, in _find_test_path
+ый модуль 'market_portfolio_audit_log_exporter' глобальной переменной!
+- Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/unittest/mock.py", line 1446, in __enter__
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_reporter (refactor) — раундов: 1
+- Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/unittest/loader.py", line 419, in _find_test_path
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_sentiment_risk_hub (refactor) — раундов: 4
@@ -287,9 +292,4 @@ der.py", line 419, in _find_test_path
 ## market_portfolio_stress_audit_scheduler_hub (refactor) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 1); Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 1)
 - Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_stress_audit_telemetry_aggregator (create) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid character '—' (U+2014) (<unknown>, line 1); Синтаксическая ошибка в коде: invalid character '—' (U+2014) (<unknown>, line 1)
-- Последняя ошибка перед фиксом: FAILED (errors=3)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -2,11 +2,6 @@ import os
 import json
 import logging
 
-try:
-    from skills.db_storage import db_storage
-except ImportError:
-    db_storage = None
-
 # Настройка логирования для модуля
 logger = logging.getLogger("market_portfolio_stress_audit_summary_vault")
 if not logger.handlers:
@@ -18,10 +13,8 @@ if not logger.handlers:
 
 def start_new(**kwargs):
     logger.info("Starting new stress audit summary vault process.")
-    db_storage_obj = kwargs.get("db_storage")
-    if db_storage_obj is None and "db_storage" not in kwargs:
-        db_storage_obj = db_storage
-    if db_storage_obj is None:
+    db_storage = kwargs.get("db_storage")
+    if db_storage is None:
         logger.error("db_storage is required and cannot be None.")
         raise ValueError("db_storage is required and cannot be None.")
     
@@ -52,18 +45,21 @@ def start_new(**kwargs):
         raise TypeError("payload must be a dictionary")
 
     logger.info("Saving payload via db_storage.")
-    save_res = db_storage_obj.save(payload) if hasattr(db_storage_obj, "save") else True
+    save_res = db_storage.save(payload)
     logger.info("Payload successfully saved.")
     return {"status": "success", "save_result": save_res, "payload": payload}
 
 
 def market_portfolio_stress_audit_summary_vault(payload=None, **kwargs):
-    if payload is not None:
-        if isinstance(payload, dict):
+    if payload is not None and isinstance(payload, dict):
+        try:
+            from skills.db_storage import db_storage
             key = payload.get("stress_audit_id") or payload.get("audit_id") or payload.get("portfolio_id")
             if db_storage:
                 db_storage({"action": "set", "key": key, "value": payload})
-            return {"status": "success", "audit_id": key, "payload": payload}
+        except ImportError:
+            pass
+        return {"status": "success", "audit_id": payload.get("stress_audit_id"), "payload": payload}
     return {"status": "success"}
 
 

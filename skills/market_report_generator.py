@@ -55,8 +55,11 @@ class MarketReportGenerator:
         self.parser.fetch_and_store(symbol, price)
         return price
 
-    def get_raw_stream_dump(self):
-        return self.parser.load_data(self.storage_file)
+    def get_raw_stream_dump(self, *args, **kwargs):
+        storage_file = self.storage_file
+        if not storage_file and args and isinstance(args[0], str):
+            storage_file = args[0]
+        return self.parser.load_data(storage_file)
 
 
 def generate_market_report(storage_file, symbol):

@@ -9,7 +9,12 @@ class MarketPortfolioStressAuditRealtimeStreamer:
         self.market_portfolio_alert_event_sink = None
 
     def stream_and_persist(self, portfolio_id: str) -> bool:
-        line = sys.stdin.readline().strip()
+        line_data = sys.stdin.readline()
+        if isinstance(line_data, bytes):
+            line = line_data.decode('utf-8', errors='ignore').strip()
+        else:
+            line = str(line_data).strip()
+            
         if not line:
             return False
         

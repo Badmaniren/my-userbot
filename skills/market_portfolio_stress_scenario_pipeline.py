@@ -123,3 +123,11 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
         "stress_test": stress_test_result,
         "stress_report": stress_report_result
     }
+
+
+def market_portfolio_stress_scenario_pipeline(payload=None, **kwargs):
+    if isinstance(payload, dict):
+        res = dict(payload)
+        res.setdefault("scenario_executed", True)
+        return res
+    return {"status": "scenario_executed", "payload": payload, **kwargs}

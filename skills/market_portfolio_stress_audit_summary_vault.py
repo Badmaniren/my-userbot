@@ -103,3 +103,16 @@ def market_portfolio_stress_audit_summary_vault_export(storage_target, format="j
         "format": format,
         "data": data
     }
+
+
+class MarketPortfolioStressAuditSummaryVault:
+    def get_summary(self, audit_id: str) -> dict:
+        return {"audit_id": audit_id, "status": "ok"}
+
+    def __call__(self, *args, **kwargs):
+        if args and isinstance(args[0], dict):
+            return market_portfolio_stress_audit_summary_vault_process("/tmp/summary_vault.json", args[0])
+        return start_new(**kwargs)
+
+
+market_portfolio_stress_audit_summary_vault = MarketPortfolioStressAuditSummaryVault()

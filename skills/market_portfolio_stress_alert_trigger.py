@@ -13,12 +13,22 @@ def check_stress_thresholds_and_alert(
     min_threshold,
     channels
 ):
-    audit_data = market_portfolio_stress_audit_summary_vault.market_portfolio_stress_audit_summary_vault_validate(
+    is_valid = market_portfolio_stress_audit_summary_vault.market_portfolio_stress_audit_summary_vault_validate(
         storage_target, expected_audit_id
     )
 
-    if not audit_data:
+    if not is_valid:
         return None
+
+    if isinstance(is_valid, dict):
+        audit_data = is_valid
+    else:
+        try:
+            import json
+            with open(storage_target, "r", encoding="utf-8") as f:
+                audit_data = json.load(f)
+        except Exception:
+            return None
 
     status = audit_data.get("status", "")
     max_drawdown = audit_data.get("max_drawdown")

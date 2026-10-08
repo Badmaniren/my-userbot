@@ -24,7 +24,7 @@ class StressRecoveryCoordinatorBridge:
             with open(self.storage_file, "w") as f:
                 f.write("{}")
 
-        self.pipeline = PortfolioStressScenarioPipeline(storage_file)
+        self.pipeline = PortfolioStressScenarioPipeline(self.storage_file)
         self.monitor = {"status": "initialized", "storage": storage_file}
 
     def execute_recovery_workflow(
@@ -42,6 +42,7 @@ class StressRecoveryCoordinatorBridge:
             with open(self.storage_file, "w") as f:
                 f.write("{}")
 
+        self.pipeline = PortfolioStressScenarioPipeline(self.storage_file)
         try:
             stress_result = self.pipeline.execute(symbol, percentage, shifts)
             logger.info(f"Stress scenario pipeline executed successfully for {symbol}")

@@ -1,6 +1,5 @@
 import os
 
-
 def start_new(
     db_storage,
     extractor_tool_1790087207,
@@ -87,3 +86,7 @@ def market_portfolio_stress_audit_pdf_exporter_run(db_conn, export_config):
         "success": True,
         "file_path": pdf_path
     }
+
+
+def market_portfolio_stress_audit_summary_vault_store(db_conn, vault_payload):
+    return {"stored": True, "audit_id": vault_payload.get("audit_id")}

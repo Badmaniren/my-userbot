@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-LED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## none (start_new) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
+ом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_stress_audit_telemetry_logger (create) — раундов: 4
@@ -290,4 +286,7 @@ LED (errors=2)
 
 ## market_portfolio_stress_scenario_executor_bridge (compose) — раундов: 2
 - Последняя ошибка перед фиксом: Traceback (most recent call last):
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_ml_volatility_forecaster_v2 (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

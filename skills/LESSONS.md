@@ -3,16 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- эскалацию
-
-## market_portfolio_var_liquidity_core (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_liquidity_scenario_analyzer (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_stress_audit_visualizer (refactor) — раундов: 1
+audit_visualizer (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_audit_summary_vault (start_new) — раундов: 2
@@ -282,3 +273,8 @@
 ## market_portfolio_stress_audit_scheduler_hub (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_audit_summary_vault (create) — раундов: 3
+- Античит поймал: Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 1)
+- Последняя ошибка перед фиксом: json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+- Статус: успешно прошёл тесты и влит в main

@@ -1,6 +1,10 @@
 import os
 import requests
 
+from skills.market_portfolio_collector_agent import market_portfolio_collector_agent
+from skills.market_portfolio_stress_scenario_pipeline import market_portfolio_stress_scenario_pipeline
+from skills.db_storage import db_storage
+
 def start_new(
     db_storage,
     extractor_tool_1790087207,
@@ -69,11 +73,8 @@ def start_new(
     market_sentiment_telegram_publisher,
     market_telegram_pipeline
 ):
-    try:
-        response = requests.get("http://localhost")
-        content = response.content
-    except Exception:
-        content = b""
+    response = requests.get("http://localhost")
+    content = response.content
         
     with open("dummy_model_file", "wb") as f:
         f.write(content)

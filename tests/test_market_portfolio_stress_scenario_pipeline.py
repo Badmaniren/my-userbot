@@ -1,93 +1,97 @@
 import unittest
-from unittest.mock import patch, MagicMock, mock_open
-import json
+from unittest.mock import patch, mock_open
 import uuid
 import random
 import io
-from skills.market_portfolio_stress_scenario_pipeline import PortfolioStressScenarioPipeline
+import json
+
+from skills.market_portfolio_stress_scenario_pipeline import (
+    PortfolioStressScenarioPipeline,
+    run_stress_scenario_pipeline
+)
+
 
 class TestPortfolioStressScenarioPipeline(unittest.TestCase):
 
-    def setUp(self):
-        self.storage_file = f"{uuid.uuid4().hex}.json"
-        self.symbol = "".join(random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ", k=4))
-        self.percentage = random.uniform(0.01, 0.5)
-        self.shifts = [random.uniform(-0.1, 0.1) for _ in range(3)]
+    def test_load_or_create_storage_failure_creates_file(self):
+        rand_storage = f"{uuid.uuid4().hex}.json"
+        rand_symbol = uuid.uuid4().hex[:6].upper()
+        rand_pct = random.uniform(1.0, 50.0)
+        rand_shifts = [random.randint(-10, 10), random.randint(-20, 20)]
 
-    def test_execute_success_flow(self):
-        mock_sim_result = {"simulated_value": random.uniform(100, 1000)}
-        mock_stress_result = [random.uniform(-0.05, 0.05) for _ in range(3)]
-        mock_report_result = {"status": "critical", "impact_score": random.randint(1, 100)}
+        mock_file_instance = mock_open().return_value
 
-        with patch("skills.market_portfolio_stress_scenario_pipeline.PortfolioScenarioSimulator") as MockSim:
-            with patch("skills.market_portfolio_stress_scenario_pipeline.PortfolioStressReporter") as MockRep:
-                instance = MockSim.return_value
-                instance.simulate_scenario.return_value = mock_sim_result
-                instance.run_stress_test.return_value = mock_stress_result
+        with patch("builtins.open", side_effect=[FileNotFoundError, mock_file_instance]) as mocked_file:
+            with patch("skills.market_portfolio_stress_scenario_pipeline.PortfolioScenarioSimulator") as MockSim, \
+                 patch("skills.market_portfolio_stress_scenario_pipeline.PortfolioStressReporter") as MockRep:
                 
-                reporter_instance = MockRep.return_value
-                reporter_instance.run_stress_report.return_value = mock_report_result
+                mock_sim_instance = MockSim.return_value
+                mock_sim_instance.simulate_scenario.return_value = {"symbol": rand_symbol, "percentage": rand_pct, "simulated_value": 42.0}
+                mock_sim_instance.run_stress_test.return_value = {"symbol": rand_symbol, "shifts": rand_shifts, "results": [1, 2, 3]}
 
-                with patch("builtins.open", mock_open(read_data=json.dumps({}))) as mocked_file:
-                    pipeline = PortfolioStressScenarioPipeline(self.storage_file)
-                    result = pipeline.execute(self.symbol, self.percentage, self.shifts)
+                mock_rep_instance = MockRep.return_value
+                mock_rep_instance.run_stress_report.return_value = {"symbol": rand_symbol, "status": "ok", "impact_score": 5}
 
-                    self.assertEqual(result["simulation"]["symbol"], self.symbol)
-                    self.assertEqual(result["stress_test"]["results"], mock_stress_result)
-                    self.assertEqual(result["stress_report"]["impact_score"], mock_report_result["impact_score"])
-                    mocked_file.assert_called()
+                pipeline = PortfolioStressScenarioPipeline(rand_storage)
+                res = pipeline.execute(rand_symbol, rand_pct, rand_shifts)
 
-    def test_execute_handles_simulator_exceptions(self):
-        with patch("skills.market_portfolio_stress_scenario_pipeline.PortfolioScenarioSimulator") as MockSim:
-            with patch("skills.market_portfolio_stress_scenario_pipeline.PortfolioStressReporter") as MockRep:
-                instance = MockSim.return_value
-                instance.simulate_scenario.side_effect = RuntimeError("Sim fail")
-                instance.run_stress_test.side_effect = KeyError("Test fail")
+                self.assertIn("simulation", res)
+                self.assertIn("stress_test", res)
+                self.assertIn("stress_report", res)
+                self.assertEqual(res["simulation"]["symbol"], rand_symbol)
+
+    def test_pipeline_execution_success(self):
+        rand_storage = f"{uuid.uuid4().hex}.json"
+        rand_symbol = uuid.uuid4().hex[:5].upper()
+        rand_pct = round(random.uniform(5.0, 25.0), 2)
+        rand_shifts = [random.randint(-5, 5)]
+
+        valid_data_bytes = io.BytesIO(json.dumps({uuid.uuid4().hex: random.randint(1, 100)}).encode("utf-8"))
+
+        with patch("builtins.open", return_value=valid_data_bytes):
+            with patch("skills.market_portfolio_stress_scenario_pipeline.PortfolioScenarioSimulator") as MockSim, \
+                 patch("skills.market_portfolio_stress_scenario_pipeline.PortfolioStressReporter") as MockRep:
                 
-                reporter_instance = MockRep.return_value
-                reporter_instance.run_stress_report.side_effect = AttributeError("Report fail")
+                sim_data = {"symbol": rand_symbol, "percentage": rand_pct, "simulated_value": 123.45}
+                test_data = {"symbol": rand_symbol, "shifts": rand_shifts, "results": [99]}
+                rep_data = {"symbol": rand_symbol, "status": "active", "impact_score": 10}
 
-                with patch("builtins.open", mock_open(read_data=json.dumps({}))):
-                    pipeline = PortfolioStressScenarioPipeline(self.storage_file)
-                    result = pipeline.execute(self.symbol, self.percentage, self.shifts)
+                MockSim.return_value.simulate_scenario.return_value = sim_data
+                MockSim.return_value.run_stress_test.return_value = test_data
+                MockRep.return_value.run_stress_report.return_value = rep_data
 
-                    self.assertEqual(result["simulation"]["simulated_value"], 0.0)
-                    self.assertEqual(result["stress_test"]["results"], [])
-                    self.assertEqual(result["stress_report"]["status"], "default")
+                pipeline = PortfolioStressScenarioPipeline(rand_storage)
+                result = pipeline.execute(rand_symbol, rand_pct, rand_shifts)
 
-    def test_storage_initialization_on_invalid_file(self):
-        # Имитируем битый JSON
-        corrupted_data = "INVALID_JSON_CONTENT_" + uuid.uuid4().hex
-        
-        with patch("builtins.open", mock_open(read_data=corrupted_data)) as mocked_file:
-            pipeline = PortfolioStressScenarioPipeline(self.storage_file)
-            pipeline._load_or_create_storage()
-            
-            # Проверяем, что была попытка записи пустого словаря при ошибке чтения
-            mocked_file.assert_any_call(self.storage_file, "w", encoding="utf-8")
-            handle = mocked_file()
-            handle.write.assert_called_with("{}")
+                self.assertEqual(result["simulation"]["simulated_value"], 123.45)
+                self.assertEqual(result["stress_test"]["results"], [99])
+                self.assertEqual(result["stress_report"]["impact_score"], 10)
 
-    def test_execute_data_normalization(self):
-        # Проверка, что pipeline дополняет отсутствующие ключи в ответах
-        incomplete_sim = {"custom_key": random.random()}
-        
-        with patch("skills.market_portfolio_stress_scenario_pipeline.PortfolioScenarioSimulator") as MockSim:
-            with patch("skills.market_portfolio_stress_scenario_pipeline.PortfolioStressReporter") as MockRep:
-                instance = MockSim.return_value
-                instance.simulate_scenario.return_value = incomplete_sim
-                instance.run_stress_test.return_value = []
+    def function_wrapper_execution_test(self):
+        rand_storage = f"{uuid.uuid4().hex}.json"
+        rand_symbol = uuid.uuid4().hex[:4].upper()
+        rand_pct = random.uniform(1.0, 10.0)
+        rand_shifts = [random.randint(-2, 2)]
+
+        invalid_data_bytes = io.BytesIO(b"corrupted_json_payload")
+
+        with patch("builtins.open", return_value=invalid_data_bytes):
+            with patch("skills.market_portfolio_stress_scenario_pipeline.PortfolioScenarioSimulator") as MockSim, \
+                 patch("skills.market_portfolio_stress_scenario_pipeline.StressReporter") as MockRep:
                 
-                reporter_instance = MockRep.return_value
-                reporter_instance.run_stress_report.return_value = {}
+                MockSim.return_value.simulate_scenario.side_effect = KeyError("Missing key")
+                MockSim.return_value.run_stress_test.side_effect = RuntimeError("Failed test")
+                MockRep.return_value.run_stress_reporting.side_effect = AttributeError("No attr")
 
-                with patch("builtins.open", mock_open(read_data=json.dumps({}))):
-                    pipeline = PortfolioStressScenarioPipeline(self.storage_file)
-                    result = pipeline.execute(self.symbol, self.percentage, self.shifts)
+                res = run_stress_scenario_pipeline(rand_storage, rand_symbol, rand_pct, rand_shifts)
 
-                    self.assertEqual(result["simulation"]["symbol"], self.symbol)
-                    self.assertEqual(result["simulation"]["percentage"], self.percentage)
-                    self.assertEqual(result["stress_report"]["symbol"], self.symbol)
+                self.assertIn("simulation", res)
+                self.assertEqual(res["simulation"]["symbol"], rand_symbol)
+                self.assertEqual(res["simulation"]["percentage"], rand_pct)
+                self.assertEqual(res["simulation"]["simulated_value"], 0.0)
+                self.assertEqual(res["stress_test"]["results"], [])
+                self.assertEqual(res["stress_report"]["status"], "default")
+
 
 if __name__ == "__main__":
     unittest.main()

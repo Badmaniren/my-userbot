@@ -2,6 +2,10 @@ import uuid
 import os
 import json
 
+from skills.market_portfolio_backtester import run_portfolio_backtester
+from skills.market_portfolio_stress_scenario_pipeline import execute_stress_scenario_pipeline
+from skills.db_storage import save_audit_record, fetch_audit_record
+
 class AggregatorError(Exception):
     """Кастомное исключение для ошибок агрегации."""
     pass

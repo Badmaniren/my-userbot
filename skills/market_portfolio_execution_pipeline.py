@@ -81,16 +81,7 @@ class MarketPortfolioExecutionPipeline:
     def run_batch_pipeline_execution(self, orders: list, contexts: Any = None, percentage: float = 0.0) -> list:
         try:
             if contexts is None:
-                contexts = {}
-            if isinstance(contexts, list):
-                ctx_dict = {}
-                for i, order in enumerate(orders):
-                    sym = order.get("symbol", f"SYM_{i}")
-                    if i < len(contexts):
-                        ctx_dict[sym] = contexts[i]
-                    else:
-                        ctx_dict[sym] = {"adv": 100000, "volatility": 0.2, "spread_bps": 5.0}
-                contexts = ctx_dict
+                contexts = []
 
             batch_results = self.slippage_model.simulate_batch(orders, contexts)
             sim_id = "batch_execution"

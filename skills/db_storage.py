@@ -66,3 +66,121 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+_STORAGE = {}
+_REPORTS = {}
+
+class DBStorageCallable:
+    def __init__(self):
+        self.storage = _STORAGE
+
+    def __call__(self, record=None, *args, **kwargs):
+        if record is not None:
+            if isinstance(record, dict):
+                rec_id = record.get("id") or record.get("portfolio_id") or "latest"
+                self.storage[rec_id] = record
+            return record
+        return self.storage
+
+    def get(self, key, default=None):
+        return self.storage.get(key, default)
+
+    def save(self, data):
+        return save(data)
+
+    def get_from_database(self, table, key):
+        return get_from_database(table, key)
+
+    def save_to_database(self, table, key, value):
+        return save_to_database(table, key, value)
+
+
+db_storage = DBStorageCallable()
+
+
+def get_from_database(table, key):
+    return _STORAGE.get(f"{table}:{key}")
+
+
+def save_to_database(table, key, value):
+    _STORAGE[f"{table}:{key}"] = value
+    return True
+
+
+def save_record(key, data):
+    _STORAGE[key] = data
+    return data
+
+
+def get_record(key):
+    return _STORAGE.get(key)
+
+
+def save_audit_record(audit_key, audit_data):
+    return save_record(f"audit:{audit_key}", audit_data)
+
+
+def fetch_audit_record(audit_key):
+    return get_record(f"audit:{audit_key}")
+
+
+def save_portfolio(portfolio_id, data):
+    return save_record(f"portfolio:{portfolio_id}", data)
+
+
+def store_portfolio(portfolio_id, data):
+    return save_portfolio(portfolio_id, data)
+
+
+def fetch_portfolio(portfolio_id, db_path=None):
+    return get_record(f"portfolio:{portfolio_id}")
+
+
+def save_evaluation_result(record_id, data):
+    return save_record(f"eval:{record_id}", data)
+
+
+def get_evaluation_result(record_id):
+    return get_record(f"eval:{record_id}")
+
+
+def save(data):
+    if isinstance(data, dict):
+        data_id = data.get("id") or data.get("portfolio_id") or "latest"
+        _STORAGE[data_id] = data
+    return data
+
+
+def store_report(data):
+    return save_report("report_latest", data)
+
+
+def save_report(report_id, data):
+    _REPORTS[report_id] = data
+    return data
+
+
+def fetch_stored_report(report_id):
+    return _REPORTS.get(report_id)
+
+
+def db_storage_handler(payload):
+    return save(payload)
+
+
+class DBStorage:
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def connect(self, db_path="market_data.db"):
+        return sqlite3.connect(db_path)
+
+    def save_record(self, key, data):
+        return save_record(key, data)
+
+    def get_record(self, key):
+        return get_record(key)
+
+
+DbStorage = DBStorage

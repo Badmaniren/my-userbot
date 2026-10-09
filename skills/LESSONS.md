@@ -3,8 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-- Античит поймал: Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 74); Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 74); Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 1)
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
+rors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_stress_audit_summary_vault (refactor) — раундов: 1
@@ -286,5 +285,10 @@
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_stress_ml_volatility_predictor (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_ml_volatility_forecaster (create) — раундов: 4
+- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

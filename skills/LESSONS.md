@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ешно прошёл тесты и влит в main
-
-## market_portfolio_stress_audit_exporter_v2 (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
+спешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_audit_exporter_v2 (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
@@ -287,4 +284,7 @@
 
 ## market_portfolio_ml_stress_adaptive_allocator (compose) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_auto_hedge_sync (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

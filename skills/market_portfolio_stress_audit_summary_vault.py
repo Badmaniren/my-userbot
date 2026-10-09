@@ -88,11 +88,15 @@ def market_portfolio_stress_audit_summary_vault_validate(storage_target, expecte
         logger.warning(f"Storage target not found during validation: {storage_target}")
         return False
     
-    # Чтение файла без подавления ошибок парсинга
-    with open(storage_target, "r", encoding="utf-8") as f:
-        data = json.load(f)
+    # Чтение файла с корректной обработкой битого JSON (тесты ожидают False при ошибке парсинга)
+    try:
+        with open(storage_target, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        logger.warning(f"Failed to parse JSON from validation target: {storage_target}")
+        return False
 
-    is_valid = data.get("audit_id") == expected_audit_id
+    is_valid = isinstance(data, dict) and data.get("audit_id") == expected_audit_id
     logger.info(f"Validation result for target {storage_target}: {is_valid}")
     return is_valid
 

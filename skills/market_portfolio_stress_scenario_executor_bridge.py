@@ -5,7 +5,7 @@ class PortfolioStressScenarioExecutorBridge:
     def __init__(self, storage_file: str):
         self.storage_file = storage_file
         self.pipeline = PortfolioStressScenarioPipeline(storage_file)
-        self.simulator = PortfolioScenarioSimulator()
+        self.simulator = PortfolioScenarioSimulator(storage_file)
 
     def execute_stress_workflow(self, symbol: str, percentage: float, shifts: list) -> dict:
         pipeline_report = self.pipeline.execute(symbol, percentage, shifts)

@@ -1,11 +1,12 @@
 import requests
 
-from skills.market_portfolio_scenario_simulator import (
-    market_portfolio_scenario_simulator,
-)
-from skills.market_portfolio_stress_auto_hedge_engine_v2 import (
-    market_portfolio_stress_auto_hedge_engine_v2,
-)
+try:
+    from skills.market_portfolio_scenario_simulator import (
+        market_portfolio_scenario_simulator,
+    )
+except ImportError:
+    market_portfolio_scenario_simulator = None
+
 from skills.market_portfolio_execution_pipeline import (
     market_portfolio_execution_pipeline,
 )

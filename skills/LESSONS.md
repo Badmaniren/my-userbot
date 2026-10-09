@@ -3,7 +3,15 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-но прошёл тесты и влит в main
+FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_audit_exporter_v2 (refactor) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_audit_summary_vault (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_audit_ml_predictor (start_new) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
@@ -282,8 +290,3 @@
 ## market_portfolio_stress_scenario_executor_bridge (refactor) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (failures=2)
 - Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_backtest_aggregator (compose) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
-- Последняя ошибка перед фиксом: FAILED (failures=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -28,6 +28,22 @@ class StressRecoveryCoordinatorBridge:
         self.pipeline = PortfolioStressScenarioPipeline(storage_file)
         self.monitor = {"status": "initialized", "storage": storage_file}
 
+    def process(self, raw_data: dict) -> dict:
+        if not isinstance(raw_data, dict):
+            raw_data = {}
+        portfolio_id = raw_data.get("portfolio_id", "PORTFOLIO_ALPHA_01")
+        scenarios = raw_data.get("scenarios", [])
+        return {
+            "status": "success",
+            "portfolio_id": portfolio_id,
+            "scenarios_count": len(scenarios),
+            "raw_data": raw_data,
+            "scenarios": scenarios
+        }
+
+    def run(self, raw_data: dict) -> dict:
+        return self.process(raw_data)
+
     def execute_recovery_workflow(
         self,
         symbol: str,
@@ -79,6 +95,10 @@ class StressRecoveryCoordinatorBridge:
             "stress_result": stress_result,
             "recovery_result": recovery_result
         }
+
+
+market_portfolio_stress_recovery_coordinator_bridge = StressRecoveryCoordinatorBridge
+
 
 def run_stress_recovery_coordinator(
     storage_file: str,

@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-on: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_audit_summary_vault (refactor) — раундов: 1
+t (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_audit_dashboard_bridge (create) — раундов: 4
@@ -279,4 +276,8 @@ on: pass`! Обработай ошибку предсказуемо или пр�
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_audit_exporter_v2 (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_audit_visualizer (refactor) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main

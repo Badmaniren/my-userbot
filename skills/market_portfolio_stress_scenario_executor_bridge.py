@@ -9,7 +9,9 @@ class PortfolioStressScenarioExecutorBridge:
 
     def execute_stress_workflow(self, symbol: str, percentage: float, shifts: list) -> dict:
         pipeline_report = self.pipeline.execute(symbol, percentage, shifts)
-        simulation_report = self.simulator.run_stress_test(symbol, shifts)
+        simulation_res = self.simulator.run_stress_test(symbol, shifts)
+        
+        simulation_report = simulation_res if isinstance(simulation_res, dict) else {"results": simulation_res}
         
         return {
             "pipeline_report": pipeline_report,
@@ -18,7 +20,9 @@ class PortfolioStressScenarioExecutorBridge:
 
     def execute_stress_test_workflow(self, symbol: str, percentage: float, shifts: list) -> dict:
         pipeline_result = self.pipeline.execute(symbol, percentage, shifts)
-        simulation_result = self.simulator.run_stress_test(symbol, shifts)
+        simulation_res = self.simulator.run_stress_test(symbol, shifts)
+        
+        simulation_result = simulation_res if isinstance(simulation_res, dict) else {"results": simulation_res}
         
         return {
             "pipeline_result": pipeline_result,

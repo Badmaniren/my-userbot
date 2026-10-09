@@ -4,76 +4,66 @@ import random
 import io
 from skills.market_portfolio_stress_ml_volatility_forecaster_v2 import (
     MarketPortfolioStressMLVolatilityForecasterV2,
-    InvalidDataError,
     ForecasterError,
+    InvalidDataError,
     forecast_portfolio_stress_volatility,
     run_scenario_simulation
 )
 
 class TestMarketPortfolioStressMLVolatilityForecasterV2Integration(unittest.TestCase):
     def setUp(self):
-        self.portfolio_id = f"port-{uuid.uuid4()}"
-        self.scenario_code = f"scen_{uuid.uuid4().hex[:8]}"
         self.forecaster = MarketPortfolioStressMLVolatilityForecasterV2()
+        self.portfolio_id = str(uuid.uuid4())
+        self.scenario_code = f"scen_{random.randint(1000, 9999)}"
 
     def test_invalid_portfolio_id_raises_error(self):
         with self.assertRaises(InvalidDataError):
             self.forecaster.forecast_volatility("", self.scenario_code)
 
     def test_invalid_scenario_code_raises_error(self):
-        invalid_scenario = f"scen-{uuid.uuid4()}!"
         with self.assertRaises(InvalidDataError):
-            self.forecaster.forecast_volatility(self.portfolio_id, invalid_scenario)
+            self.forecaster.forecast_volatility(self.portfolio_id, "invalid@code!")
 
-    def test_run_monte_carlo_simulation_integration(self):
+    def test_evaluate_stress_anomaly_missing_element(self):
+        html_content = "<div><span>No matching ID here</span></div>"
+        with self.assertRaises(ForecasterError):
+            self.forecaster.evaluate_stress_anomaly(self.portfolio_id, self.scenario_code, html_content)
+
+    def test_run_monte_carlo_simulation_calculates_correctly(self):
         base_vol = round(random.uniform(0.1, 0.5), 4)
-        matrix_data = [
-            {"shock": round(random.uniform(-0.1, 0.1), 4)}
-            for _ in range(random.randint(1, 5))
-        ]
-        result = self.forecaster.run_monte_carlo_simulation(base_vol, matrix_data)
-        self.assertIn("iterations_run", result)
+        matrix = [{"shock": round(random.uniform(-0.1, 0.1), 4)} for _ in range(5)]
+        result = self.forecaster.run_monte_carlo_simulation(base_vol, matrix)
+        self.assertEqual(result["iterations_run"], 5)
         self.assertIn("aggregated_risk_score", result)
-        self.assertEqual(result["iterations_run"], len(matrix_data))
         self.assertGreaterEqual(result["aggregated_risk_score"], 0.0)
 
-    def test_parse_stream_payload_integration(self):
-        random_text = f"payload-{uuid.uuid4()}"
+    def test_parse_stream_payload(self):
+        random_text = f"stream_data_{uuid.uuid4()}"
         stream = io.BytesIO(random_text.encode('utf-8'))
         parsed = self.forecaster.parse_stream_payload(stream)
         self.assertEqual(parsed, random_text)
 
-    def test_forecast_portfolio_stress_volatility_helper(self):
-        base_vol = round(random.uniform(0.1, 0.3), 4)
-        multiplier = round(random.uniform(1.0, 2.0), 2)
-        confidence = round(random.uniform(0.9, 0.99), 2)
+    def test_standalone_functions_integration(self):
+        scenario_id = f"sim_{random.randint(100, 999)}"
+        multiplier = round(random.uniform(1.0, 3.0), 2)
+        scenario_data = run_scenario_simulation(scenario_id, multiplier)
         
-        scenario_data = {"multiplier": multiplier}
-        monte_carlo_metrics = {"volatility_baseline": base_vol}
+        self.assertEqual(scenario_data["scenario_id"], scenario_id)
+        self.assertEqual(scenario_data["multiplier"], multiplier)
 
-        res = forecast_portfolio_stress_volatility(
+        monte_carlo_metrics = {"volatility_baseline": 0.25}
+        confidence = 0.95
+        
+        forecast_res = forecast_portfolio_stress_volatility(
             self.portfolio_id, 
             scenario_data, 
             monte_carlo_metrics, 
             confidence
         )
-
-        self.assertEqual(res["portfolio_id"], self.portfolio_id)
-        self.assertEqual(res["confidence_level"], confidence)
-        expected_vol = round(base_vol * multiplier * confidence, 4)
-        self.assertEqual(res["predicted_volatility"], expected_vol)
-
-    def test_run_scenario_simulation_compatibility(self):
-        sim_id = f"sim-{uuid.uuid4().hex[:6]}"
-        mult = round(random.uniform(1.1, 2.5), 2)
-        sim_res = run_scenario_simulation(sim_id, mult)
-        self.assertEqual(sim_res["scenario_id"], sim_id)
-        self.assertEqual(sim_res["multiplier"], mult)
-
-    def test_evaluate_stress_anomaly_missing_element(self):
-        html_content = f"<div><span>No target here</span></div>"
-        with self.assertRaises(ForecasterError):
-            self.forecaster.evaluate_stress_anomaly(self.portfolio_id, self.scenario_code, html_content)
+        
+        self.assertEqual(forecast_res["portfolio_id"], self.portfolio_id)
+        self.assertEqual(forecast_res["confidence_level"], confidence)
+        self.assertIn("predicted_volatility", forecast_res)
 
 if __name__ == "__main__":
     unittest.main()

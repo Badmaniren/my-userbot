@@ -3,7 +3,12 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-or (refactor) — раундов: 4
+ёл тесты и влит в main
+
+## market_portfolio_stress_monte_carlo_engine (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_scenario_matrix_evaluator (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -267,8 +272,4 @@ or (refactor) — раундов: 4
 
 ## market_portfolio_stress_auto_hedge_executor (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_stress_auto_hedge_dispatcher (compose) — раундов: 4
-- Последняя ошибка перед фиксом: AssertionError: None != 'req_8c7204'
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

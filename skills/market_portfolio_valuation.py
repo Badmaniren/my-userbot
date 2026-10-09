@@ -66,3 +66,21 @@ class PortfolioValuation:
 
     def calculate_portfolio_pnl(self, url):
         return self.get_total_summary(url)
+
+
+def calculate_portfolio_valuation(portfolio_data=None, url=None):
+    pv = PortfolioValuation()
+    if url:
+        return pv.get_total_summary(url)
+    if isinstance(portfolio_data, dict):
+        total_val = 0.0
+        for item in portfolio_data.values():
+            if isinstance(item, dict):
+                total_val += float(item.get("quantity", 0.0)) * float(item.get("buy_price", 0.0))
+        return {"total_value": round(total_val, 2)}
+    return {"total_value": 0.0}
+
+
+MarketPortfolioValuation = PortfolioValuation
+market_portfolio_valuation = calculate_portfolio_valuation
+calculate_portfolio_value = calculate_portfolio_valuation

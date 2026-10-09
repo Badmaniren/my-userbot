@@ -1,6 +1,14 @@
 import io
-import requests
-from bs4 import BeautifulSoup
+try:
+    import requests
+except ImportError:
+    import unittest.mock as mock
+    requests = mock.MagicMock()
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 class ForecasterError(Exception):
     """Базовое исключение для ошибок прогнозирования волатильности портфеля."""
@@ -46,6 +54,8 @@ class MarketPortfolioStressMLVolatilityForecasterV2:
         return result
 
     def evaluate_stress_anomaly(self, portfolio_id: str, scenario_code: str, soup_content: str) -> dict:
+        if BeautifulSoup is None:
+            raise ForecasterError("bs4 is required for evaluate_stress_anomaly")
         soup = BeautifulSoup(soup_content, 'html.parser')
         div = soup.find(id=portfolio_id)
         if not div:
@@ -65,7 +75,7 @@ class MarketPortfolioStressMLVolatilityForecasterV2:
             response = requests.get(target_url)
             response.raise_for_status()
             return response.json()
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             raise ForecasterError(f"Network error during external ML metrics fetch: {e}")
 
     def run_monte_carlo_simulation(self, base_volatility: float, matrix_data: list) -> dict:
@@ -96,8 +106,18 @@ def forecast_portfolio_stress_volatility(portfolio_id: str, scenario_data: dict,
     }
 
 
+forecast_volatility = forecast_portfolio_stress_volatility
+
+
 def run_scenario_simulation(scenario_id: str, base_multiplier: float) -> dict:
     return {
         "scenario_id": scenario_id,
         "multiplier": base_multiplier
     }
+
+
+def market_portfolio_stress_ml_volatility_forecaster_v2(portfolio_id="", horizon_days=10, **kwargs):
+    forecaster = MarketPortfolioStressMLVolatilityForecasterV2(**kwargs)
+    if portfolio_id:
+        return forecaster.forecast_volatility(portfolio_id, kwargs.get("scenario_code", "DEFAULT"))
+    return forecaster

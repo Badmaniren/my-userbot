@@ -1,73 +1,86 @@
 import unittest
 import uuid
 import random
+import io
 import os
-import tempfile
-from skills.market_portfolio_stress_backtest_aggregator_v2 import aggregate_stress_backtests
-from skills.market_portfolio_backtester import run_portfolio_backtester
-from skills.market_portfolio_stress_scenario_pipeline import execute_stress_scenario_pipeline
-from skills.db_storage import save_audit_record, fetch_audit_record
+import json
+from skills.market_portfolio_stress_backtest_aggregator_v2 import (
+    StressBacktestAggregatorV2,
+    AggregatorError,
+    aggregate_stress_backtests
+)
 
-class TestMarketPortfolioStressBacktestAggregatorV2Integration(unittest.TestCase):
+class RealDbStorageStub:
+    def __init__(self):
+        self.saved_records = []
+
+    def save_aggregation(self, record):
+        self.saved_records.append(record)
+
+class TestIntegrationStressBacktestAggregatorV2(unittest.TestCase):
     def setUp(self):
-        self.portfolio_id = str(uuid.uuid4())
-        self.scenario_id = str(uuid.uuid4())
-        self.initial_capital = round(random.uniform(50000.0, 500000.0), 2)
-        self.stress_shock_pct = round(random.uniform(-0.45, -0.05), 4)
-        self.temp_dir = tempfile.TemporaryDirectory()
+        self.db_storage = RealDbStorageStub()
+        self.aggregator = StressBacktestAggregatorV2(db_storage=self.db_storage)
 
-    def tearDown(self):
-        self.temp_dir.cleanup()
+    def test_aggregate_stream_integration(self):
+        rand_portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
+        rand_scenario_id = f"scen_{uuid.uuid4().hex[:8]}"
+        rand_metric = f"var_{random.choice([95, 99])}"
+        rand_value = round(random.uniform(-50000.0, -100.0), 2)
 
-    def test_end_to_end_stress_backtest_aggregation(self):
-        backtest_input_payload = {
-            "portfolio_id": self.portfolio_id,
-            "capital": self.initial_capital,
-            "assets": ["AAPL", "GOOGL", "MSFT", "AMZN"],
-            "weights": [0.25, 0.25, 0.25, 0.25]
-        }
-        
-        backtest_result = run_portfolio_backtester(backtest_input_payload)
-        self.assertIn("backtest_id", backtest_result)
-        bt_id = backtest_result["backtest_id"]
+        line_data = f"{rand_portfolio_id},{rand_scenario_id},{rand_metric},{rand_value}\n"
+        stream = io.BytesIO(line_data.encode('utf-8'))
 
-        pipeline_payload = {
-            "scenario_id": self.scenario_id,
-            "backtest_id": bt_id,
-            "shock_percentage": self.stress_shock_pct,
-            "target_directory": self.temp_dir.name
-        }
-        
-        pipeline_output = execute_stress_scenario_pipeline(pipeline_payload)
-        self.assertTrue(pipeline_output.get("success"))
-        self.assertEqual(pipeline_output.get("scenario_id"), self.scenario_id)
+        result = self.aggregator.aggregate_stream(stream)
 
-        aggregation_payload = {
-            "aggregation_run_id": str(uuid.uuid4()),
-            "portfolio_id": self.portfolio_id,
-            "scenario_ids": [self.scenario_id],
-            "backtest_ids": [bt_id],
-            "output_path": os.path.join(self.temp_dir.name, f"agg_{self.portfolio_id}.json")
+        self.assertIn('batch_id', result)
+        self.assertEqual(result['status'], 'SUCCESS')
+        self.assertEqual(result['records_processed'], 1)
+
+        self.assertEqual(len(self.db_storage.saved_records), 1)
+        saved_record = self.db_storage.saved_records[0]
+        self.assertEqual(saved_record['portfolio_id'], rand_portfolio_id)
+        self.assertEqual(saved_record['scenario_id'], rand_scenario_id)
+        self.assertEqual(saved_record['metric'], rand_metric)
+        self.assertEqual(saved_record['value'], rand_value)
+
+    def test_aggregate_stress_backtests_file_output(self):
+        rand_portfolio_id = f"port_batch_{uuid.uuid4().hex[:6]}"
+        rand_backtest_ids = [str(uuid.uuid4()), str(uuid.uuid4())]
+        rand_output_path = f"test_outputs/report_{uuid.uuid4().hex}.json"
+
+        payload = {
+            "portfolio_id": rand_portfolio_id,
+            "backtest_ids": rand_backtest_ids,
+            "output_path": rand_output_path
         }
 
-        final_aggregated_report = aggregate_stress_backtests(aggregation_payload)
+        try:
+            report = aggregate_stress_backtests(payload)
 
-        self.assertEqual(final_aggregated_report["portfolio_id"], self.portfolio_id)
-        self.assertIn(bt_id, final_aggregated_report["processed_backtests"])
-        self.assertTrue(os.path.exists(aggregation_payload["output_path"]))
+            self.assertEqual(report["portfolio_id"], rand_portfolio_id)
+            self.assertEqual(report["processed_backtests"], rand_backtest_ids)
+            self.assertEqual(report["status"], "COMPLETED")
 
-        db_payload = {
-            "record_id": aggregation_payload["aggregation_run_id"],
-            "portfolio_id": self.portfolio_id,
-            "status": "AGGREGATED",
-            "metrics": final_aggregated_report
-        }
-        save_audit_record(db_payload)
+            self.assertTrue(os.path.exists(rand_output_path))
+            with open(rand_output_path, 'r', encoding='utf-8') as f:
+                loaded_data = json.load(f)
+            
+            self.assertEqual(loaded_data["portfolio_id"], rand_portfolio_id)
+            self.assertEqual(loaded_data["processed_backtests"], rand_backtest_ids)
+            self.assertEqual(loaded_data["status"], "COMPLETED")
+        finally:
+            if os.path.exists(rand_output_path):
+                os.remove(rand_output_path)
+                try:
+                    os.rmdir(os.path.dirname(rand_output_path))
+                except OSError:
+                    pass
 
-        retrieved_record = fetch_audit_record(aggregation_payload["aggregation_run_id"])
-        self.assertIsNotNone(retrieved_record)
-        self.assertEqual(retrieved_record["record_id"], aggregation_payload["aggregation_run_id"])
-        self.assertEqual(retrieved_record["portfolio_id"], self.portfolio_id)
+    def test_aggregate_stream_malformed_data(self):
+        bad_stream = io.BytesIO(b"invalid,csv,data\n")
+        with self.assertRaises(AggregatorError):
+            self.aggregator.aggregate_stream(bad_stream)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

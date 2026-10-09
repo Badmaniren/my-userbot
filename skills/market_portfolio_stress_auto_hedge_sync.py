@@ -7,6 +7,11 @@ class DummyMonitor:
         return {"portfolio_id": portfolio_id, "status": "active"}
 
 
+class DummyRebalancer:
+    def set_trigger_status(self, portfolio_id, status_data):
+        return {"portfolio_id": portfolio_id, "status": "updated", "data": status_data}
+
+
 class MarketPortfolioStressAutoHedgeSync:
     def __init__(
         self,
@@ -21,7 +26,7 @@ class MarketPortfolioStressAutoHedgeSync:
         self.db_storage = db_storage
         self.monitor = monitor if monitor is not None else DummyMonitor()
         self.evaluator = evaluator
-        self.rebalancer = rebalancer
+        self.rebalancer = rebalancer if rebalancer is not None else DummyRebalancer()
         self.storage_file = storage_file
         
         self.advisor = advisor if advisor is not None else MarketPortfolioStressHedgeAdvisor(
@@ -45,10 +50,13 @@ class MarketPortfolioStressAutoHedgeSync:
         percentage,
         shifts
     ):
-        # Гарантируем, что если переданный advisor имеет монитор равный None,
-        # метод analyze_and_recommend не упадет по AttributeError.
         if getattr(self.advisor, 'monitor', None) is None:
             self.advisor.monitor = self.monitor
+
+        if getattr(self.advisor, 'rebalancer', None) is None:
+            self.advisor.rebalancer = self.rebalancer
+        elif getattr(self.advisor.rebalancer, 'set_trigger_status', None) is None:
+            self.advisor.rebalancer = self.rebalancer
 
         advisor_recommendation = self.advisor.analyze_and_recommend(
             portfolio_id=portfolio_id,

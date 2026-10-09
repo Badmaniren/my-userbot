@@ -47,7 +47,7 @@ class MarketPortfolioStressAuditExporterV2:
         return response.status_code == 200
 
 
-def market_portfolio_stress_audit_exporter_v2_main(payload: dict) -> dict:
+def market_portfolio_stress_audit_summary_vault_main(payload: dict) -> dict:
     run_id = payload.get("run_id")
     portfolio_id = payload.get("portfolio_id")
     stress_factor = payload.get("stress_factor")
@@ -70,3 +70,7 @@ def market_portfolio_stress_audit_exporter_v2_main(payload: dict) -> dict:
         "portfolio_id": portfolio_id,
         "export_path": export_path
     }
+
+
+def market_portfolio_stress_audit_exporter_v2_main(payload: dict) -> dict:
+    return market_portfolio_stress_audit_summary_vault_main(payload)

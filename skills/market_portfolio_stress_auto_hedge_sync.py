@@ -63,6 +63,9 @@ class MarketPortfolioStressAutoHedgeSync:
             request_id=request_id
         )
         
+        if isinstance(advisor_recommendation, dict) and "portfolio_id" not in advisor_recommendation:
+            advisor_recommendation["portfolio_id"] = portfolio_id
+        
         stress_pipeline_result = self.pipeline.execute(
             symbol=symbol,
             percentage=percentage,

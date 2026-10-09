@@ -3,8 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-it_summary_vault (start_new) — раундов: 2
-- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
+on: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_audit_summary_vault (refactor) — раундов: 1
@@ -277,4 +276,7 @@ it_summary_vault (start_new) — раундов: 2
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_audit_scheduler_hub (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_audit_exporter_v2 (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

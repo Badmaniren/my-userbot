@@ -1,13 +1,25 @@
 import math
 from typing import Any, Dict, List, Optional
 
-from skills.market_portfolio_ml_feature_builder import (
-    InsufficientDataError,
-    MarketPortfolioMLFeatureBuilder,
-)
-from skills.market_portfolio_stress_ml_volatility_forecaster_v2 import (
-    MarketPortfolioStressMLVolatilityForecasterV2,
-)
+try:
+    from skills.market_portfolio_ml_feature_builder import (
+        InsufficientDataError,
+        MarketPortfolioMLFeatureBuilder,
+    )
+except ImportError:
+    from market_portfolio_ml_feature_builder import (
+        InsufficientDataError,
+        MarketPortfolioMLFeatureBuilder,
+    )
+
+try:
+    from skills.market_portfolio_stress_ml_volatility_forecaster_v2 import (
+        MarketPortfolioStressMLVolatilityForecasterV2,
+    )
+except ImportError:
+    from market_portfolio_stress_ml_volatility_forecaster_v2 import (
+        MarketPortfolioStressMLVolatilityForecasterV2,
+    )
 
 
 class StressEvaluationError(Exception):
@@ -27,6 +39,7 @@ class MarketPortfolioMLStressEvaluator:
         extractor_tool: Any = None,
         market_anomaly_detector: Any = None,
         window_size: int = 10,
+        **kwargs
     ):
         self.db_storage = db_storage
         self.extractor_tool = extractor_tool
@@ -39,6 +52,26 @@ class MarketPortfolioMLStressEvaluator:
             self.feature_builder = MarketPortfolioMLFeatureBuilder()
 
         self.volatility_forecaster = MarketPortfolioStressMLVolatilityForecasterV2()
+
+    def evaluate_risk(self, features: Any, volatility_forecast: Any) -> float:
+        base_vol = 0.2
+        if isinstance(volatility_forecast, (int, float)):
+            base_vol = float(volatility_forecast)
+        elif isinstance(volatility_forecast, dict):
+            if "predicted_volatility" in volatility_forecast:
+                base_vol = float(volatility_forecast["predicted_volatility"])
+            elif "forecasted_volatility" in volatility_forecast:
+                base_vol = float(volatility_forecast["forecasted_volatility"])
+
+        var_penalty = 0.0
+        if isinstance(features, dict):
+            if "var" in features and isinstance(features["var"], (int, float)):
+                var_penalty = abs(float(features["var"]))
+            elif "tail_risk_metrics" in features and isinstance(features["tail_risk_metrics"], dict):
+                var_penalty = abs(float(features["tail_risk_metrics"].get("var", 0.0)))
+
+        risk_score = round(min(100.0, max(0.0, (base_vol * 100.0) + (var_penalty * 50.0))), 2)
+        return risk_score
 
     def evaluate_portfolio_stress_resilience(
         self,
@@ -163,6 +196,18 @@ class MarketPortfolioMLStressEvaluator:
             target_url,
             portfolio_id,
             scenario_code,
+        )
+
+
+class market_portfolio_ml_stress_evaluator(MarketPortfolioMLStressEvaluator):
+    """Subclass entry point ensuring compatibility with both class instantiation and default construction."""
+    def __init__(self, db_storage=None, extractor_tool=None, market_anomaly_detector=None, window_size=10, **kwargs):
+        super().__init__(
+            db_storage=db_storage,
+            extractor_tool=extractor_tool,
+            market_anomaly_detector=market_anomaly_detector,
+            window_size=window_size,
+            **kwargs
         )
 
 

@@ -1,9 +1,31 @@
 import io
+import sys
 import unittest
 import uuid
 import random
 import string
 from unittest.mock import patch, MagicMock
+
+if "requests" not in sys.modules:
+    try:
+        import requests
+    except ModuleNotFoundError:
+        req_mock = MagicMock()
+        class RequestException(Exception): pass
+        class HTTPError(RequestException): pass
+        class ConnectionError(RequestException): pass
+        req_mock.exceptions.RequestException = RequestException
+        req_mock.exceptions.HTTPError = HTTPError
+        req_mock.exceptions.ConnectionError = ConnectionError
+        sys.modules["requests"] = req_mock
+
+if "bs4" not in sys.modules:
+    try:
+        import bs4
+    except ModuleNotFoundError:
+        bs4_mock = MagicMock()
+        sys.modules["bs4"] = bs4_mock
+
 import requests
 from bs4 import BeautifulSoup
 

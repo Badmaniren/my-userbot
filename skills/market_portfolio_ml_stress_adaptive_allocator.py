@@ -1,12 +1,29 @@
 from typing import Dict, Any, Optional
-from skills.market_portfolio_ml_stress_evaluator import (
-    MarketPortfolioMLStressEvaluator,
-    StressEvaluationError
-)
-from skills.market_portfolio_ml_feature_builder import InsufficientDataError
-from skills.market_portfolio_stress_auto_rebalance_trigger import (
-    StressAutoRebalanceTrigger
-)
+
+try:
+    from skills.market_portfolio_ml_stress_evaluator import (
+        MarketPortfolioMLStressEvaluator,
+        StressEvaluationError
+    )
+except ImportError:
+    from market_portfolio_ml_stress_evaluator import (
+        MarketPortfolioMLStressEvaluator,
+        StressEvaluationError
+    )
+
+try:
+    from skills.market_portfolio_ml_feature_builder import InsufficientDataError
+except ImportError:
+    from market_portfolio_ml_feature_builder import InsufficientDataError
+
+try:
+    from skills.market_portfolio_stress_auto_rebalance_trigger import (
+        StressAutoRebalanceTrigger
+    )
+except ImportError:
+    from market_portfolio_stress_auto_rebalance_trigger import (
+        StressAutoRebalanceTrigger
+    )
 
 
 class AdaptiveAllocationError(Exception):
@@ -25,7 +42,8 @@ class MLStressAdaptiveAllocator:
         db_storage: Any = None,
         extractor_tool: Any = None,
         market_anomaly_detector: Any = None,
-        window_size: int = 30
+        window_size: int = 30,
+        **kwargs
     ) -> None:
         self.db_storage = db_storage
         self.extractor_tool = extractor_tool
@@ -39,6 +57,34 @@ class MLStressAdaptiveAllocator:
             window_size=self.window_size
         )
         self.rebalance_trigger = StressAutoRebalanceTrigger()
+
+    def process_allocation(self, risk_score: Any) -> Dict[str, Any]:
+        score = 0.0
+        if isinstance(risk_score, (int, float)):
+            score = float(risk_score)
+        elif isinstance(risk_score, dict):
+            score = float(risk_score.get("risk_score", risk_score.get("stress_score", 0.0)))
+
+        if score >= 60.0:
+            action = "REBALANCE_AND_HEDGE"
+            cash_buffer_percent = 25.0
+            risk_level = "HIGH"
+        elif score >= 30.0:
+            action = "ADJUST_POSITIONS"
+            cash_buffer_percent = 10.0
+            risk_level = "MODERATE"
+        else:
+            action = "MAINTAIN_ALLOCATION"
+            cash_buffer_percent = 5.0
+            risk_level = "LOW"
+
+        return {
+            "status": "SUCCESS",
+            "risk_score": score,
+            "risk_level": risk_level,
+            "action": action,
+            "cash_buffer_percent": cash_buffer_percent
+        }
 
     def evaluate_and_adapt(
         self,
@@ -109,6 +155,18 @@ class MLStressAdaptiveAllocator:
             "portfolio_id": portfolio_id,
             "result": result
         }
+
+
+class market_portfolio_ml_stress_adaptive_allocator(MLStressAdaptiveAllocator):
+    """Subclass entry point ensuring compatibility with both class instantiation and default construction."""
+    def __init__(self, db_storage=None, extractor_tool=None, market_anomaly_detector=None, window_size=30, **kwargs):
+        super().__init__(
+            db_storage=db_storage,
+            extractor_tool=extractor_tool,
+            market_anomaly_detector=market_anomaly_detector,
+            window_size=window_size,
+            **kwargs
+        )
 
 
 class AdaptiveStressAllocator(MLStressAdaptiveAllocator):

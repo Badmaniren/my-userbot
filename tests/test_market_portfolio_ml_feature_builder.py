@@ -7,6 +7,12 @@ import random
 import uuid
 import string
 
+if "requests" not in sys.modules:
+    try:
+        import requests
+    except ModuleNotFoundError:
+        sys.modules["requests"] = MagicMock()
+
 # Инквизиторское решение: виртуальный stub для numpy в sys.modules,
 # если зависимость отсутствует в окружении запуска (ModuleNotFoundError: No module named 'numpy').
 if "numpy" not in sys.modules:

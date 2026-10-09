@@ -1,6 +1,10 @@
 import os
-import requests
 from typing import Optional, Dict, Any
+
+try:
+    import requests
+except ImportError:
+    requests = None
 
 try:
     from skills.db_storage import db_storage
@@ -83,6 +87,8 @@ class StressAutoRebalanceTrigger:
         return None
 
     def fetch_external_stress_feed(self, url: str) -> bytes:
+        if requests is None:
+            return b""
         response = requests.get(url)
         return response.content
 

@@ -12,13 +12,18 @@ if not logger.handlers:
     logger.setLevel(logging.INFO)
 
 def start_new(**kwargs):
+    """
+    Инициализирует процесс аудита стресс-тестов.
+    Вызывает зависимости строго по контракту.
+    """
     logger.info("Starting new stress audit summary vault process.")
     db_storage = kwargs.get("db_storage")
+    
     if db_storage is None:
         logger.error("db_storage is required and cannot be None.")
         raise ValueError("db_storage is required and cannot be None.")
     
-    # Вызов зависимостей без глушения исключений (Античит соблюден)
+    # Выполнение зависимостей без подавления исключений
     for key, val in kwargs.items():
         if hasattr(val, "extract"):
             logger.info(f"Extracting data using dependency: {key}")
@@ -39,7 +44,7 @@ def start_new(**kwargs):
         logger.warning("Payload generated as None, defaulting to status 'ok'.")
         payload = {"status": "ok"}
 
-    # Валидация данных перед сохранением
+    # Валидация структуры данных
     if not isinstance(payload, dict):
         logger.error("Generated payload must be a dictionary.")
         raise TypeError("payload must be a dictionary")
@@ -51,6 +56,9 @@ def start_new(**kwargs):
 
 
 def market_portfolio_stress_audit_summary_vault_process(storage_target, audit_data):
+    """
+    Сохраняет данные аудита в целевой файл.
+    """
     logger.info(f"Processing audit data for target: {storage_target}")
     if not isinstance(audit_data, dict):
         logger.error("audit_data must be a dictionary.")
@@ -72,17 +80,17 @@ def market_portfolio_stress_audit_summary_vault_process(storage_target, audit_da
 
 
 def market_portfolio_stress_audit_summary_vault_validate(storage_target, expected_audit_id):
+    """
+    Валидирует целостность и соответствие ID сохраненного файла.
+    """
     logger.info(f"Validating storage target: {storage_target} for audit_id: {expected_audit_id}")
     if not os.path.exists(storage_target):
         logger.warning(f"Storage target not found during validation: {storage_target}")
         return False
     
-    try:
-        with open(storage_target, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except Exception as e:
-        logger.error(f"Failed to read or parse storage target {storage_target}: {e}")
-        return False
+    # Чтение файла без подавления ошибок парсинга
+    with open(storage_target, "r", encoding="utf-8") as f:
+        data = json.load(f)
 
     is_valid = data.get("audit_id") == expected_audit_id
     logger.info(f"Validation result for target {storage_target}: {is_valid}")
@@ -90,6 +98,9 @@ def market_portfolio_stress_audit_summary_vault_validate(storage_target, expecte
 
 
 def market_portfolio_stress_audit_summary_vault_export(storage_target, format="json"):
+    """
+    Экспортирует данные из хранилища.
+    """
     logger.info(f"Exporting storage target: {storage_target} in format: {format}")
     if not os.path.exists(storage_target):
         logger.error(f"Storage target {storage_target} not found for export.")

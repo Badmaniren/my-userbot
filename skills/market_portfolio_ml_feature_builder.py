@@ -42,7 +42,6 @@ class MarketPortfolioMLFeatureBuilder:
             returns = self.compute_log_returns()
         
         if len(returns) < self.window_size:
-            # Возвращаем общую волатильность или частичное окно, если данных меньше окна
             window = len(returns) if len(returns) > 0 else 1
         else:
             window = self.window_size
@@ -100,7 +99,6 @@ class MarketPortfolioMLFeatureBuilder:
         response = requests.get(url)
         content = response.content.decode('utf-8')
         
-        # Парсим CSV-подобный поток в список цен из цифр, если возможно, или симулируем
         prices = []
         for line in content.splitlines():
             for part in line.split(','):

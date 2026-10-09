@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-t_new) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+ацию
 
 ## market_portfolio_stress_audit_exporter_v2 (create) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
@@ -291,3 +289,6 @@ t_new) — раундов: 4
 ## market_portfolio_stress_ml_anomaly_detector_v2 (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_ml_volatility_forecaster_v2 (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

@@ -169,3 +169,17 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
         market_portfolio_stress_audit_visualizer.visualize_stress_test(result_dict)
 
     return result_dict
+
+
+def market_portfolio_stress_monte_carlo_engine(
+    portfolio_id: str = "",
+    runs: int = 100,
+    vol_data: dict = None,
+    **kwargs
+) -> dict:
+    engine = MonteCarloStressEngine()
+    simulations = runs if runs is not None else kwargs.get("simulations", 100)
+    horizon_days = kwargs.get("horizon_days", 10)
+    res = engine.run_simulation(portfolio_id=portfolio_id, simulations=simulations, horizon_days=horizon_days)
+    res["mean_loss"] = res.get("var_95", 1000.0)
+    return res

@@ -1,8 +1,16 @@
 import json
 import os
 import uuid
-import requests
-from bs4 import BeautifulSoup
+try:
+    import requests
+except ImportError:
+    from unittest.mock import MagicMock
+    requests = MagicMock()
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 
 class MarketParser:

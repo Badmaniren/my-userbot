@@ -4,16 +4,19 @@ import uuid
 import random
 import string
 from unittest.mock import patch, MagicMock
-import requests
-from bs4 import BeautifulSoup
-
 from skills.market_portfolio_stress_ml_volatility_forecaster_v2 import (
     ForecasterError,
     InvalidDataError,
     MarketPortfolioStressMLVolatilityForecasterV2,
     forecast_portfolio_stress_volatility,
-    run_scenario_simulation
+    run_scenario_simulation,
+    requests
 )
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 class TestMarketPortfolioStressMLVolatilityForecasterV2(unittest.TestCase):
 

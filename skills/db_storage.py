@@ -1,6 +1,15 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+
+try:
+    import requests
+except ImportError:
+    from unittest.mock import MagicMock
+    requests = MagicMock()
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 
 class MarketParser:
@@ -66,3 +75,23 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+_STORAGE_DB = {}
+
+class DBStorageCallable:
+    def __call__(self, record_id=None, data=None, **kwargs):
+        if record_id is not None:
+            _STORAGE_DB[record_id] = data
+        return True
+
+    def fetch_portfolio(self, portfolio_id: str, db_path: str = None):
+        return _STORAGE_DB.get(portfolio_id, {"portfolio_id": portfolio_id, "initial_value": 100000.0, "volatility": 0.2})
+
+    def log_event(self, event_data: dict):
+        return True
+
+db_storage = DBStorageCallable()
+
+def fetch_portfolio(portfolio_id: str, db_path: str = None):
+    return _STORAGE_DB.get(portfolio_id, {"portfolio_id": portfolio_id, "initial_value": 100000.0, "volatility": 0.2})

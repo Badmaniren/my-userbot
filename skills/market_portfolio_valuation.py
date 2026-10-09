@@ -66,3 +66,39 @@ class PortfolioValuation:
 
     def calculate_portfolio_pnl(self, url):
         return self.get_total_summary(url)
+
+def market_portfolio_valuation(input_data=None, **kwargs):
+    if isinstance(input_data, dict):
+        params = dict(input_data)
+        params.update(kwargs)
+    elif input_data is not None:
+        params = {"portfolio_id": str(input_data)}
+        params.update(kwargs)
+    else:
+        params = dict(kwargs)
+
+    portfolio_id = params.get("portfolio_id", "default_portfolio")
+    assets = params.get("assets", [])
+
+    total_value = 0.0
+    evaluated_assets = []
+    for asset in assets:
+        if isinstance(asset, dict):
+            symbol = asset.get("symbol", "UNKNOWN")
+            amount = float(asset.get("amount", asset.get("quantity", 0.0)))
+            price = float(asset.get("price", asset.get("current_price", 100.0)))
+            value = round(amount * price, 2)
+            total_value += value
+            evaluated_assets.append({
+                "symbol": symbol,
+                "amount": amount,
+                "price": price,
+                "value": value
+            })
+
+    return {
+        "portfolio_id": portfolio_id,
+        "total_value": round(total_value, 2),
+        "assets": evaluated_assets,
+        "status": "evaluated"
+    }

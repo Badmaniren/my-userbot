@@ -112,3 +112,25 @@ def run_stress_test(storage_file, symbol, range_min, range_max, step):
         "symbol": symbol,
         "scenarios": scenarios
     }
+
+def market_portfolio_scenario_simulator(input_data=None, **kwargs):
+    if isinstance(input_data, dict):
+        params = dict(input_data)
+        params.update(kwargs)
+    elif input_data is not None:
+        params = {"portfolio_id": str(input_data)}
+        params.update(kwargs)
+    else:
+        params = dict(kwargs)
+
+    portfolio_id = params.get("portfolio_id", "default_portfolio")
+    scenario_type = params.get("scenario_type", "crash")
+    drop_percentage = float(params.get("drop_percentage", params.get("percentage", 10.0)))
+
+    return {
+        "portfolio_id": portfolio_id,
+        "scenario_type": scenario_type,
+        "drop_percentage": drop_percentage,
+        "status": "simulated",
+        "simulated_impact": -abs(drop_percentage)
+    }

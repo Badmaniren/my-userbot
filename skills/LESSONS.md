@@ -3,16 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-следняя ошибка перед фиксом: from skills.market_portfolio_stress_monte_carlo_engine import (
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_audit_summary_vault (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_audit_summary_vault (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_audit_pdf_exporter (start_new) — раундов: 4
+porter (start_new) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -284,3 +275,7 @@
 
 ## market_portfolio_stress_recovery_coordinator_bridge (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_auto_hedge_sync (refactor) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

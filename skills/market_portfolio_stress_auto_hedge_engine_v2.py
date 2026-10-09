@@ -91,3 +91,12 @@ def start_new(
         "portfolio": portfolio_data,
         "simulation": simulation_result,
     }
+
+
+def market_portfolio_stress_auto_hedge_engine_v2(portfolio_id, simulation_data, capital):
+    return {
+        "portfolio_id": portfolio_id,
+        "hedge_order": "BUY",
+        "volume": capital * 0.1,
+        "simulation_data": simulation_data
+    }

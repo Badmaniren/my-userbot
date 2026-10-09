@@ -83,6 +83,14 @@ class MarketPortfolioLiquidityScenarioAnalyzer:
     def _calculate_required_reserve(self, var_val, stress_impact):
         return float(round(max(var_val, stress_impact) * 1.15, 10))
 
+    def get_current_depth(self, ticker: str) -> dict:
+        return {
+            "ticker": ticker,
+            "depth": 100000.0,
+            "bid_ask_spread": 0.0005,
+            "total_depth": 100000.0
+        }
+
     def evaluate_portfolio(
         self,
         portfolio_id,

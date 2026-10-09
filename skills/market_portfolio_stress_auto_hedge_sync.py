@@ -1,3 +1,5 @@
+import skills.market_portfolio_stress_hedge_advisor as market_portfolio_stress_hedge_advisor
+import skills.market_portfolio_stress_scenario_pipeline as market_portfolio_stress_scenario_pipeline
 from skills.market_portfolio_stress_hedge_advisor import MarketPortfolioStressHedgeAdvisor
 from skills.market_portfolio_stress_scenario_pipeline import PortfolioStressScenarioPipeline
 
@@ -29,16 +31,32 @@ class MarketPortfolioStressAutoHedgeSync:
         self.rebalancer = rebalancer if rebalancer is not None else DummyRebalancer()
         self.storage_file = storage_file
         
-        self.advisor = advisor if advisor is not None else MarketPortfolioStressHedgeAdvisor(
-            db_storage=self.db_storage,
-            monitor=self.monitor,
-            evaluator=self.evaluator,
-            rebalancer=self.rebalancer
-        )
+        if advisor is not None:
+            self.advisor = advisor
+        else:
+            advisor_cls = getattr(
+                market_portfolio_stress_hedge_advisor,
+                "MarketPortfolioStressHedgeAdvisor",
+                MarketPortfolioStressHedgeAdvisor
+            )
+            self.advisor = advisor_cls(
+                db_storage=self.db_storage,
+                monitor=self.monitor,
+                evaluator=self.evaluator,
+                rebalancer=self.rebalancer
+            )
         
-        self.pipeline = pipeline if pipeline is not None else PortfolioStressScenarioPipeline(
-            storage_file=self.storage_file
-        )
+        if pipeline is not None:
+            self.pipeline = pipeline
+        else:
+            pipeline_cls = getattr(
+                market_portfolio_stress_scenario_pipeline,
+                "PortfolioStressScenarioPipeline",
+                PortfolioStressScenarioPipeline
+            )
+            self.pipeline = pipeline_cls(
+                storage_file=self.storage_file
+            )
         
         self.stream_handler = None
 

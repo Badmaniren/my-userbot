@@ -1,6 +1,6 @@
 import sys
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import patch, MagicMock
 import uuid
 import random
 
@@ -50,8 +50,13 @@ class TestMarketPortfolioStressMLAnomalyScoringEngineIntegration(unittest.TestCa
 
         self.assertIsInstance(engine, MarketPortfolioStressMLAnomalyScoringEngine)
 
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"multiplier": 1.5}
+
         try:
-            compute_result = engine.compute_anomaly_score(random_portfolio_id)
+            with patch.object(requests, "get", return_value=mock_resp):
+                compute_result = engine.compute_anomaly_score(random_portfolio_id)
             self.assertIsInstance(compute_result, dict)
             self.assertIn("portfolio_id", compute_result)
             self.assertEqual(compute_result["portfolio_id"], random_portfolio_id)

@@ -31,11 +31,14 @@ class MarketPortfolioStressMLAnomalyScoringEngine:
         evaluation = self.market_anomaly_detector.evaluate_matrix(portfolio_id)
         score = evaluation.get("anomaly_score", 0.0)
 
-        response = requests.get("https://api.example.com/market-multiplier")
-        if response.status_code == 200:
-            data = response.json()
-            multiplier = data.get("multiplier", 1)
-            score = float(score) * multiplier
+        try:
+            response = requests.get("https://api.example.com/market-multiplier")
+            if response.status_code == 200:
+                data = response.json()
+                multiplier = data.get("multiplier", 1)
+                score = float(score) * multiplier
+        except requests.exceptions.RequestException:
+            pass
 
         return {
             "portfolio_id": portfolio_id,

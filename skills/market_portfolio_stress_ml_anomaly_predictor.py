@@ -69,8 +69,12 @@ def start_new(
     market_sentiment_telegram_publisher,
     market_telegram_pipeline
 ):
-    response = requests.get("http://localhost")
-    content = response.content
+    try:
+        response = requests.get("http://localhost")
+        content = response.content
+    except Exception:
+        content = b""
+        
     with open("dummy_model_file", "wb") as f:
         f.write(content)
         

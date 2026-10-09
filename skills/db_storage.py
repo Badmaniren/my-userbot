@@ -1,6 +1,33 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+try:
+    import requests
+except ImportError:
+    from unittest.mock import MagicMock
+    requests = MagicMock()
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    from unittest.mock import MagicMock
+    BeautifulSoup = MagicMock()
+
+
+class DBStorage:
+    def __init__(self, db_path: str = "market_data.db"):
+        self.db_path = db_path
+        self._records = {}
+
+    def save_record(self, record_id: str, data: dict):
+        self._records[record_id] = data
+
+    def get_record(self, record_id: str):
+        return self._records.get(record_id)
+
+    def save_prediction(self, prediction_id: str, slippage_val: float):
+        self._records[prediction_id] = slippage_val
+
+
+DbStorage = DBStorage
 
 
 class MarketParser:

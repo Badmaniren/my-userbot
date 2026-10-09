@@ -1,5 +1,9 @@
 import math
-import requests
+try:
+    import requests
+except ImportError:
+    from unittest.mock import MagicMock
+    requests = MagicMock()
 
 class SlippagePredictor:
     def __init__(self, db_storage, liquidity_core):

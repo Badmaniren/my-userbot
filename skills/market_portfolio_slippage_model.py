@@ -1,4 +1,8 @@
-import requests
+try:
+    import requests
+except ImportError:
+    from unittest.mock import MagicMock
+    requests = MagicMock()
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, List
 

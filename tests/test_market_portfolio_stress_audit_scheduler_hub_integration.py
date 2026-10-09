@@ -1,65 +1,69 @@
 import unittest
 import uuid
 import random
+import os
 from skills.market_portfolio_stress_audit_scheduler_hub import (
     StressAuditSchedulerHub,
     market_portfolio_stress_audit_scheduler_hub_process
 )
 
-
 class TestStressAuditSchedulerHubIntegration(unittest.TestCase):
-
     def setUp(self):
-        self.portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
-        self.threshold = round(random.uniform(0.01, 0.99), 4)
-        self.storage_target = f"storage_{uuid.uuid4().hex[:8]}"
-        self.audit_id = f"audit_{uuid.uuid4().hex[:8]}"
-        self.message = f"Test stress alert message {uuid.uuid4().hex[:6]}"
-        self.export_format = random.choice(["json", "csv", "xml"])
         self.scheduler = StressAuditSchedulerHub()
+        self.portfolio_id = str(uuid.uuid4())
+        self.threshold = random.uniform(0.01, 0.15)
+        self.storage_target = f"test_storage_{uuid.uuid4().hex[:8]}.json"
+        self.audit_id = str(uuid.uuid4())
 
-    def test_run_audit_cycle_integration(self):
-        res = self.scheduler.run_audit_cycle(
-            portfolio_id=self.portfolio_id,
-            threshold=self.threshold,
-            storage_target=self.storage_target
-        )
-        # Так как это интеграционный тест без моков, проверяем тип возвращаемого значения (может быть None или dict)
-        if res is not None:
-            self.assertIsInstance(res, dict)
+    def tearDown(self):
+        if os.path.exists(self.storage_target):
+            os.remove(self.storage_target)
 
-    def test_dispatch_alert_and_check_integration(self):
-        result = self.scheduler.dispatch_alert_and_check(
-            audit_id=self.audit_id,
-            message=self.message,
-            storage_target=self.storage_target,
-            export_format=self.export_format
+    def test_full_audit_cycle_integration(self):
+        # Проверка цикла аудита без моков
+        result = self.scheduler.run_audit_cycle(self.portfolio_id, self.threshold, self.storage_target)
+        
+        # Если триггер сработал, проверяем наличие данных в хранилище
+        if result is not None:
+            self.assertTrue(os.path.exists(self.storage_target))
+
+    def test_dispatch_alert_and_check_flow(self):
+        # Проверка сквозного процесса уведомления и валидации
+        message = f"Stress alert for {self.portfolio_id}"
+        export_format = "json"
+        
+        response = self.scheduler.dispatch_alert_and_check(
+            self.audit_id, 
+            message, 
+            self.storage_target, 
+            export_format
         )
         
-        self.assertIsInstance(result, dict)
-        self.assertIn("notification", result)
-        self.assertIn("is_valid", result)
-        self.assertIn("export_data", result)
-        self.assertIsInstance(result["is_valid"], bool)
+        self.assertIn("notification", response)
+        self.assertIn("is_valid", response)
+        self.assertIn("export_data", response)
+        # Валидация должна вернуть bool, даже если файл не создан
+        self.assertIsInstance(response["is_valid"], bool)
 
-    def test_market_portfolio_stress_audit_scheduler_hub_process_integration(self):
-        audit_data = {
-            "audit_id": self.audit_id,
-            "metric": random.randint(100, 999),
-            "status": "COMPLETED"
-        }
+    def test_scheduler_hub_process_execution(self):
+        # Проверка интеграции через основной процесс модуля
+        audit_data = {"risk_score": random.random(), "timestamp": uuid.uuid4().hex}
         
         process_result = market_portfolio_stress_audit_scheduler_hub_process(
-            portfolio_id=self.portfolio_id,
-            threshold=self.threshold,
-            storage_target=self.storage_target,
-            audit_data=audit_data
+            self.portfolio_id,
+            self.threshold,
+            self.storage_target,
+            audit_data
         )
-
-        self.assertIsInstance(process_result, dict)
-        self.assertIn("trigger_result", process_result)
+        
         self.assertEqual(process_result["vault_storage"], self.storage_target)
+        self.assertTrue(os.path.exists(self.storage_target))
 
+    def test_feed_fetching_resilience(self):
+        # Проверка обработки внешних фидов (античит: не должно падать при плохом URL)
+        bad_url = f"http://invalid-url-{uuid.uuid4()}.local"
+        feed = self.scheduler.get_feed(bad_url)
+        self.assertEqual(feed, b"")
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

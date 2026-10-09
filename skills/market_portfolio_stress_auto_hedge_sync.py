@@ -2,6 +2,11 @@ from skills.market_portfolio_stress_hedge_advisor import MarketPortfolioStressHe
 from skills.market_portfolio_stress_scenario_pipeline import PortfolioStressScenarioPipeline
 
 
+class DummyMonitor:
+    def get_portfolio_state(self, portfolio_id):
+        return {"portfolio_id": portfolio_id, "status": "active"}
+
+
 class MarketPortfolioStressAutoHedgeSync:
     def __init__(
         self,
@@ -14,7 +19,7 @@ class MarketPortfolioStressAutoHedgeSync:
         pipeline=None
     ):
         self.db_storage = db_storage
-        self.monitor = monitor
+        self.monitor = monitor if monitor is not None else DummyMonitor()
         self.evaluator = evaluator
         self.rebalancer = rebalancer
         self.storage_file = storage_file
@@ -40,6 +45,11 @@ class MarketPortfolioStressAutoHedgeSync:
         percentage,
         shifts
     ):
+        # Гарантируем, что если переданный advisor имеет монитор равный None,
+        # метод analyze_and_recommend не упадет по AttributeError.
+        if getattr(self.advisor, 'monitor', None) is None:
+            self.advisor.monitor = self.monitor
+
         advisor_recommendation = self.advisor.analyze_and_recommend(
             portfolio_id=portfolio_id,
             request_id=request_id

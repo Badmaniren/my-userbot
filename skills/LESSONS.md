@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ный 'market_portfolio_collector_agent'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.market_portfolio_collector_agent import ...'; Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_stress_audit_analytics_hub (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
+s=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_stress_audit_visualizer (refactor) — раундов: 2
@@ -284,3 +280,8 @@
 
 ## market_portfolio_stress_audit_summary_vault (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_execution_slippage_predictor (create) — раундов: 4
+- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.; Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

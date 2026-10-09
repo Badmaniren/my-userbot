@@ -1,22 +1,24 @@
 import unittest
 import os
+import json
 import uuid
 import random
 from skills.market_portfolio_stress_scenario_pipeline import PortfolioStressScenarioPipeline, run_stress_scenario_pipeline
 
 class TestPortfolioStressScenarioPipelineIntegration(unittest.TestCase):
     def setUp(self):
-        self.storage_file = f"test_storage_{uuid.uuid4().hex}.json"
+        self.test_dir = f"test_storage_{uuid.uuid4().hex}"
+        os.makedirs(self.test_dir, exist_ok=True)
+        self.storage_file = os.path.join(self.test_dir, f"storage_{uuid.uuid4().hex}.json")
         self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
-        self.percentage = round(random.uniform(1.0, 50.0), 2)
+        self.percentage = round(random.uniform(-50.0, 50.0), 2)
         self.shifts = [round(random.uniform(-10.0, 10.0), 2) for _ in range(random.randint(1, 3))]
 
     def tearDown(self):
         if os.path.exists(self.storage_file):
-            try:
-                os.remove(self.storage_file)
-            except OSError:
-                pass
+            os.remove(self.storage_file)
+        if os.path.exists(self.test_dir):
+            os.rmdir(self.test_dir)
 
     def test_pipeline_class_execution(self):
         pipeline = PortfolioStressScenarioPipeline(self.storage_file)
@@ -32,8 +34,12 @@ class TestPortfolioStressScenarioPipelineIntegration(unittest.TestCase):
         self.assertEqual(result["stress_report"].get("symbol"), self.symbol)
         
         self.assertTrue(os.path.exists(self.storage_file))
+        with open(self.storage_file, "r", encoding="utf-8") as f:
+            content = f.read()
+        data = json.loads(content)
+        self.assertIsInstance(data, dict)
 
-    def test_pipeline_functional_execution(self):
+    def test_pipeline_function_execution(self):
         result = run_stress_scenario_pipeline(self.storage_file, self.symbol, self.percentage, self.shifts)
         
         self.assertIsInstance(result, dict)

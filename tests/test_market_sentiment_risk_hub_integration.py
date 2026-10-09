@@ -1,61 +1,53 @@
 import unittest
+import os
 import uuid
 import random
-import os
-
-from skills.market_sentiment_risk_hub import MarketSentimentRiskHub
-from skills.market_news_sentiment_analyzer import MarketNewsSentimentAnalyzer
-from skills.market_anomaly_detector import MarketAnomalyDetector
-
+from skills.market_sentiment_risk_hub import MarketSentimentRiskHub, compute_market_risk_index, process_risk_stream
 
 class TestMarketSentimentRiskHubIntegration(unittest.TestCase):
-
     def setUp(self):
-        self.risk_hub = MarketSentimentRiskHub()
-        self.sentiment_analyzer = MarketNewsSentimentAnalyzer()
-        self.anomaly_detector = MarketAnomalyDetector()
-        
-        self.random_ticker = f"TICKER_{uuid.uuid4().hex[:6].upper()}"
-        self.random_news_id = str(uuid.uuid4())
-        self.random_price_factor = round(random.uniform(10.0, 1000.0), 2)
-        
-        self.raw_news = (
-            f"ID: {self.random_news_id}. Company {self.random_ticker} "
-            f"reported unexpected revenue drop of {self.random_price_factor} percent, "
-            "causing massive panic and selloff in the market."
-        )
+        self.hub = MarketSentimentRiskHub()
+        self.test_ticker = f"TICKER_{uuid.uuid4().hex[:6].upper()}"
+        self.test_exchange = f"EXCH_{uuid.uuid4().hex[:6].upper()}"
+        self.random_sentiment_text = f"Market crash anticipated due to random economic factors {uuid.uuid4().hex}"
+        self.report_filename = f"report_{uuid.uuid4().hex}.txt"
 
-    def test_composite_risk_hub_integration(self):
-        sentiment_result = self.sentiment_analyzer.analyze(self.raw_news)
-        self.assertIsInstance(sentiment_result, dict, "Sentiment analyzer must return a dictionary")
+    def tearDown(self):
+        if os.path.exists(self.report_filename):
+            try:
+                os.remove(self.report_filename)
+            except OSError:
+                pass
 
-        anomaly_result = self.anomaly_detector.detect(self.random_ticker)
-        
-        integrated_risk_index = self.risk_hub.evaluate_risk(
-            ticker=self.random_ticker,
-            news_snippet=self.raw_news
-        )
+    def test_evaluate_risk_integration(self):
+        result = self.hub.evaluate_risk(ticker=self.test_ticker, exchange=self.test_exchange, news_snippet=self.random_sentiment_text)
+        self.assertIsInstance(result, dict)
+        self.assertIn("risk_index", result)
+        self.assertIn("risk_score", result)
+        self.assertIn("sentiment_score", result)
+        self.assertIn("anomaly_score", result)
+        self.assertGreaterEqual(result["risk_score"], 0.0)
 
-        self.assertIsInstance(
-            integrated_risk_index, 
-            (int, float, dict), 
-            "Integration hub must return a valid calculated risk index or report"
-        )
+    def test_compute_market_risk_index_integration(self):
+        res = compute_market_risk_index(ticker=self.test_ticker, exchange=self.test_exchange)
+        self.assertIsInstance(res, dict)
+        self.assertIn("risk_index", res)
 
-        if isinstance(integrated_risk_index, dict):
-            self.assertIn("risk_score", integrated_risk_index)
-            self.assertGreaterEqual(integrated_risk_index["risk_score"], 0.0)
-        else:
-            self.assertGreaterEqual(integrated_risk_index, 0.0)
+    def test_export_report_integration(self):
+        export_status = self.hub.export_report(self.test_ticker, self.report_filename)
+        self.assertTrue(export_status)
+        self.assertTrue(os.path.exists(self.report_filename))
+        with open(self.report_filename, "r", encoding="utf-8") as f:
+            content = f.read()
+            self.assertIn(self.test_ticker, content)
 
-        output_artifact = f"risk_report_{uuid.uuid4().hex}.log"
-        if hasattr(self.risk_hub, "export_report"):
-            exported = self.risk_hub.export_report(self.random_ticker, output_artifact)
-            if exported:
-                self.assertTrue(os.path.exists(output_artifact), "Integration module must generate real audit/report file artifacts")
-                if os.path.exists(output_artifact):
-                    os.remove(output_artifact)
-
+    def test_process_stream_integration(self):
+        stream_data = f"Stream data packet {uuid.uuid4().hex}".encode('utf-8')
+        from io import BytesIO
+        stream_source = BytesIO(stream_data)
+        stream_result = process_risk_stream(stream_source)
+        self.assertIsInstance(stream_result, dict)
+        self.assertEqual(stream_result.get("stream_status"), "PROCESSED")
 
 if __name__ == "__main__":
     unittest.main()

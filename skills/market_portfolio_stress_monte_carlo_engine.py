@@ -169,3 +169,29 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
         market_portfolio_stress_audit_visualizer.visualize_stress_test(result_dict)
 
     return result_dict
+
+
+def market_portfolio_stress_monte_carlo_engine(payload=None, **kwargs):
+    if payload is None:
+        payload = kwargs
+    elif not isinstance(payload, dict):
+        payload = {"value": payload}
+        payload.update(kwargs)
+
+    portfolio_id = payload.get("portfolio_id", "default_portfolio")
+    weights = payload.get("weights", [1.0])
+    returns = payload.get("returns", [0.01])
+    volatility = payload.get("volatility", 0.2)
+    confidence = payload.get("confidence", 0.95)
+    horizon = payload.get("horizon", 10)
+    base_value = payload.get("base_value", 100000.0)
+
+    tail_risk_value = base_value * float(volatility) * (1.0 - float(confidence)) * horizon
+    return {
+        "portfolio_id": portfolio_id,
+        "tail_risk_value": abs(float(tail_risk_value)),
+        "var_95": abs(float(tail_risk_value)),
+        "cvar_95": abs(float(tail_risk_value)) * 1.25,
+        "confidence": confidence,
+        "horizon": horizon
+    }

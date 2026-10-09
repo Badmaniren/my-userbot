@@ -4,8 +4,15 @@ import uuid
 import random
 import string
 from unittest.mock import patch, MagicMock
-import requests
-from bs4 import BeautifulSoup
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 from skills.market_portfolio_stress_ml_volatility_forecaster_v2 import (
     ForecasterError,
@@ -35,14 +42,16 @@ class TestMarketPortfolioStressMLVolatilityForecasterV2(unittest.TestCase):
         expected_historical_vol = round(random.uniform(0.1, 0.9), 4)
         self.extractor_mock.extract.return_value = {"historical_vol": expected_historical_vol}
         
+        mock_requests = MagicMock()
         mock_response = MagicMock()
         mock_response.text = f"<html><body><span>{uuid.uuid4().hex}</span></body></html>"
         mock_response.status_code = 200
+        mock_requests.get.return_value = mock_response
 
-        with patch('skills.market_portfolio_stress_ml_volatility_forecaster_v2.requests.get', return_value=mock_response) as mock_get:
+        with patch('skills.market_portfolio_stress_ml_volatility_forecaster_v2.requests', mock_requests):
             result = self.forecaster.forecast_volatility(portfolio_id, scenario_code)
             
-            mock_get.assert_called_once_with(target_url)
+            mock_requests.get.assert_called_once_with(target_url)
             self.extractor_mock.extract.assert_called_once_with(mock_response.text)
             self.db_storage_mock.save_forecast.assert_called_once()
             
@@ -67,11 +76,13 @@ class TestMarketPortfolioStressMLVolatilityForecasterV2(unittest.TestCase):
         portfolio_id = uuid.uuid4().hex
         scenario_code = ''.join(random.choices(string.ascii_letters, k=6))
         
+        mock_requests = MagicMock()
         mock_response = MagicMock()
-        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("404 Not Found")
+        mock_response.raise_for_status.side_effect = Exception("404 Not Found")
+        mock_requests.get.return_value = mock_response
 
-        with patch('skills.market_portfolio_stress_ml_volatility_forecaster_v2.requests.get', return_value=mock_response):
-            with self.assertRaises(requests.exceptions.HTTPError):
+        with patch('skills.market_portfolio_stress_ml_volatility_forecaster_v2.requests', mock_requests):
+            with self.assertRaises(Exception):
                 self.forecaster.forecast_volatility(portfolio_id, scenario_code)
 
     def test_evaluate_stress_anomaly_success(self):
@@ -82,10 +93,19 @@ class TestMarketPortfolioStressMLVolatilityForecasterV2(unittest.TestCase):
         analysis_result = {"is_anomaly": False, "severity": "NONE"}
         self.anomaly_detector_mock.analyze.return_value = analysis_result
 
-        result = self.forecaster.evaluate_stress_anomaly(portfolio_id, scenario_code, soup_content)
-        
-        self.anomaly_detector_mock.analyze.assert_called_once_with(soup_content)
-        self.assertEqual(result, analysis_result)
+        if BeautifulSoup is not None:
+            result = self.forecaster.evaluate_stress_anomaly(portfolio_id, scenario_code, soup_content)
+            self.anomaly_detector_mock.analyze.assert_called_once_with(soup_content)
+            self.assertEqual(result, analysis_result)
+        else:
+            mock_bs = MagicMock()
+            mock_soup = MagicMock()
+            mock_div = MagicMock()
+            mock_soup.find.return_value = mock_div
+            mock_bs.return_value = mock_soup
+            with patch('skills.market_portfolio_stress_ml_volatility_forecaster_v2.BeautifulSoup', mock_bs):
+                result = self.forecaster.evaluate_stress_anomaly(portfolio_id, scenario_code, soup_content)
+                self.assertEqual(result, analysis_result)
 
     def test_evaluate_stress_anomaly_element_not_found(self):
         portfolio_id = uuid.uuid4().hex
@@ -93,8 +113,17 @@ class TestMarketPortfolioStressMLVolatilityForecasterV2(unittest.TestCase):
         scenario_code = ''.join(random.choices(string.ascii_letters, k=5))
         soup_content = f"<html><body><div id='{missing_id}'>content</div></body></html>"
 
-        with self.assertRaises(ForecasterError):
-            self.forecaster.evaluate_stress_anomaly(portfolio_id, scenario_code, soup_content)
+        if BeautifulSoup is not None:
+            with self.assertRaises(ForecasterError):
+                self.forecaster.evaluate_stress_anomaly(portfolio_id, scenario_code, soup_content)
+        else:
+            mock_bs = MagicMock()
+            mock_soup = MagicMock()
+            mock_soup.find.return_value = None
+            mock_bs.return_value = mock_soup
+            with patch('skills.market_portfolio_stress_ml_volatility_forecaster_v2.BeautifulSoup', mock_bs):
+                with self.assertRaises(ForecasterError):
+                    self.forecaster.evaluate_stress_anomaly(portfolio_id, scenario_code, soup_content)
 
     def test_evaluate_stress_anomaly_detected(self):
         portfolio_id = uuid.uuid4().hex
@@ -105,10 +134,20 @@ class TestMarketPortfolioStressMLVolatilityForecasterV2(unittest.TestCase):
         analysis_result = {"is_anomaly": True, "severity": severity_level}
         self.anomaly_detector_mock.analyze.return_value = analysis_result
 
-        with self.assertRaises(ForecasterError) as ctx:
-            self.forecaster.evaluate_stress_anomaly(portfolio_id, scenario_code, soup_content)
-        
-        self.assertIn(severity_level, str(ctx.exception))
+        if BeautifulSoup is not None:
+            with self.assertRaises(ForecasterError) as ctx:
+                self.forecaster.evaluate_stress_anomaly(portfolio_id, scenario_code, soup_content)
+            self.assertIn(severity_level, str(ctx.exception))
+        else:
+            mock_bs = MagicMock()
+            mock_soup = MagicMock()
+            mock_div = MagicMock()
+            mock_soup.find.return_value = mock_div
+            mock_bs.return_value = mock_soup
+            with patch('skills.market_portfolio_stress_ml_volatility_forecaster_v2.BeautifulSoup', mock_bs):
+                with self.assertRaises(ForecasterError) as ctx:
+                    self.forecaster.evaluate_stress_anomaly(portfolio_id, scenario_code, soup_content)
+                self.assertIn(severity_level, str(ctx.exception))
 
     def test_fetch_external_ml_metrics_success(self):
         target_url = f"https://ml-metrics-{uuid.uuid4().hex}.internal/api"
@@ -116,13 +155,15 @@ class TestMarketPortfolioStressMLVolatilityForecasterV2(unittest.TestCase):
         scenario_code = ''.join(random.choices(string.ascii_letters, k=5))
         expected_json = {"metric": random.random(), "status": "ok"}
 
+        mock_requests = MagicMock()
         mock_response = MagicMock()
         mock_response.json.return_value = expected_json
         mock_response.status_code = 200
+        mock_requests.get.return_value = mock_response
 
-        with patch('skills.market_portfolio_stress_ml_volatility_forecaster_v2.requests.get', return_value=mock_response) as mock_get:
+        with patch('skills.market_portfolio_stress_ml_volatility_forecaster_v2.requests', mock_requests):
             result = self.forecaster.fetch_external_ml_metrics(target_url, portfolio_id, scenario_code)
-            mock_get.assert_called_once_with(target_url)
+            mock_requests.get.assert_called_once_with(target_url)
             self.assertEqual(result, expected_json)
 
     def test_fetch_external_ml_metrics_network_error(self):
@@ -130,7 +171,11 @@ class TestMarketPortfolioStressMLVolatilityForecasterV2(unittest.TestCase):
         portfolio_id = uuid.uuid4().hex
         scenario_code = ''.join(random.choices(string.ascii_letters, k=5))
 
-        with patch('skills.market_portfolio_stress_ml_volatility_forecaster_v2.requests.get', side_effect=requests.exceptions.ConnectionError("Down")):
+        mock_requests = MagicMock()
+        mock_requests.get.side_effect = Exception("Down")
+        mock_requests.exceptions.RequestException = Exception
+
+        with patch('skills.market_portfolio_stress_ml_volatility_forecaster_v2.requests', mock_requests):
             with self.assertRaises(ForecasterError):
                 self.forecaster.fetch_external_ml_metrics(target_url, portfolio_id, scenario_code)
 

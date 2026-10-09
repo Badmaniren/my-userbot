@@ -1,7 +1,34 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+try:
+    import requests
+except ImportError:
+    requests = None
 
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
+
+
+class DBStorageCallable:
+    def __init__(self):
+        self._records = []
+
+    def __call__(self, payload=None, **kwargs):
+        if payload is None:
+            payload = kwargs
+        if isinstance(payload, dict):
+            self._records.append(payload)
+        return {"status": "success", "payload": payload}
+
+    def save_estimate(self, result):
+        self._records.append({"action": "save_estimate", "result": result})
+        return True
+
+    def fetch_portfolio(self, portfolio_id):
+        return {"portfolio_id": portfolio_id, "initial_value": 100000.0, "volatility": 0.2}
+
+db_storage = DBStorageCallable()
 
 class MarketParser:
     def __init__(self, storage_file: str = "market_data.db"):

@@ -1,6 +1,14 @@
 import io
-import requests
-from bs4 import BeautifulSoup
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 class ForecasterError(Exception):
     """Базовое исключение для ошибок прогнозирования волатильности портфеля."""
@@ -22,6 +30,9 @@ class MarketPortfolioStressMLVolatilityForecasterV2:
             raise InvalidDataError("Invalid portfolio_id")
         if not scenario_code or not isinstance(scenario_code, str) or any(c in "!@#$%^&*()_+=-[]{}|;':\",./<>?" for c in scenario_code):
             raise InvalidDataError("Invalid scenario_code")
+
+        if requests is None:
+            raise ForecasterError("requests package is required for forecast_volatility")
 
         url = f"https://api.market-stress-{portfolio_id}.internal/v2/forecast"
         response = requests.get(url)
@@ -46,6 +57,8 @@ class MarketPortfolioStressMLVolatilityForecasterV2:
         return result
 
     def evaluate_stress_anomaly(self, portfolio_id: str, scenario_code: str, soup_content: str) -> dict:
+        if BeautifulSoup is None:
+            raise ForecasterError("bs4 package is required for evaluate_stress_anomaly")
         soup = BeautifulSoup(soup_content, 'html.parser')
         div = soup.find(id=portfolio_id)
         if not div:
@@ -61,6 +74,8 @@ class MarketPortfolioStressMLVolatilityForecasterV2:
         return analysis
 
     def fetch_external_ml_metrics(self, target_url: str, portfolio_id: str, scenario_code: str) -> dict:
+        if requests is None:
+            raise ForecasterError("requests package is required for fetch_external_ml_metrics")
         try:
             response = requests.get(target_url)
             response.raise_for_status()
@@ -100,4 +115,35 @@ def run_scenario_simulation(scenario_id: str, base_multiplier: float) -> dict:
     return {
         "scenario_id": scenario_id,
         "multiplier": base_multiplier
+    }
+
+
+def market_portfolio_stress_ml_volatility_forecaster_v2(portfolio_id="", horizon_days=10, **kwargs):
+    if isinstance(portfolio_id, dict):
+        payload = portfolio_id
+        pid = payload.get("portfolio_id", "")
+        horizon = payload.get("horizon", payload.get("horizon_days", horizon_days))
+        returns = payload.get("returns", [])
+        vol_baseline = payload.get("volatility_baseline", 0.2)
+        confidence = payload.get("confidence_level", 0.95)
+    else:
+        pid = portfolio_id
+        horizon = kwargs.get("horizon", horizon_days)
+        returns = kwargs.get("returns", [])
+        vol_baseline = kwargs.get("volatility_baseline", 0.2)
+        confidence = kwargs.get("confidence_level", 0.95)
+
+    if returns:
+        calc_vol = sum(abs(r) for r in returns) / len(returns)
+        vol = calc_vol if calc_vol > 0 else vol_baseline
+    else:
+        vol = vol_baseline
+
+    forecast_val = round(float(vol), 4)
+    return {
+        "portfolio_id": pid,
+        "horizon_days": horizon,
+        "volatility_forecast": forecast_val,
+        "predicted_volatility": forecast_val,
+        "confidence_level": confidence
     }

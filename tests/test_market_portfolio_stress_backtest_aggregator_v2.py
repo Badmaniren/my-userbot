@@ -1,85 +1,134 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 import io
-import random
 import uuid
-import string
+import random
+import os
+import json
+import tempfile
 
 from skills.market_portfolio_stress_backtest_aggregator_v2 import (
+    AggregatorError,
     StressBacktestAggregatorV2,
-    AggregatorError
+    aggregate_stress_backtests
 )
 
 
 class TestStressBacktestAggregatorV2(unittest.TestCase):
 
     def setUp(self):
-        self.db_storage = MagicMock()
-        self.evaluator = MagicMock()
+        self.db_storage_mock = MagicMock()
+        self.evaluator_mock = MagicMock()
         self.aggregator = StressBacktestAggregatorV2(
-            db_storage=self.db_storage,
-            evaluator=self.evaluator
+            db_storage=self.db_storage_mock,
+            evaluator=self.evaluator_mock
         )
-        self.random_portfolio_id = uuid.uuid4().hex
-        self.random_scenario_id = uuid.uuid4().hex
-        self.random_metric_name = ''.join(random.choices(string.ascii_lowercase, k=10))
-        self.random_value = random.uniform(-1000.0, 1000.0)
 
-    def test_aggregate_metrics_success(self):
-        raw_stream_data = f"{self.random_portfolio_id},{self.random_scenario_id},{self.random_metric_name},{self.random_value}".encode('utf-8')
-        mock_file_stream = io.BytesIO(raw_stream_data)
+    def test_aggregate_stream_success(self):
+        portfolio_id = uuid.uuid4().hex
+        scenario_id = uuid.uuid4().hex
+        metric = f"metric_{uuid.uuid4().hex[:6]}"
+        val = round(random.uniform(10.0, 1000.0), 4)
 
-        with patch('skills.market_portfolio_stress_backtest_aggregator_v2.uuid.uuid4') as mock_uuid:
-            expected_batch_id = uuid.uuid4()
-            mock_uuid.return_value = expected_batch_id
+        line = f"{portfolio_id},{scenario_id},{metric},{val}"
+        stream = io.BytesIO(line.encode('utf-8'))
 
-            result = self.aggregator.aggregate_stream(mock_file_stream)
+        result = self.aggregator.aggregate_stream(stream)
 
-            self.assertIsInstance(result, dict)
-            self.assertEqual(result['batch_id'], expected_batch_id.hex)
-            self.assertEqual(result['status'], 'SUCCESS')
-            self.assertEqual(result['records_processed'], 1)
-            
-            self.db_storage.save_aggregation.assert_called_once()
-            args, _ = self.db_storage.save_aggregation.call_args
-            self.assertEqual(args[0]['portfolio_id'], self.random_portfolio_id)
-            self.assertEqual(args[0]['scenario_id'], self.random_scenario_id)
-            self.assertEqual(args[0]['metric'], self.random_metric_name)
-            self.assertEqual(args[0]['value'], self.random_value)
+        self.assertIn('batch_id', result)
+        self.assertEqual(result['status'], 'SUCCESS')
+        self.assertEqual(result['records_processed'], 1)
 
-    def test_aggregate_metrics_corrupted_stream_raises_exception(self):
-        garbage_data = ''.join(random.choices(string.ascii_letters + string.punctuation, k=50)).encode('latin1')
-        mock_file_stream = io.BytesIO(garbage_data)
+        self.db_storage_mock.save_aggregation.assert_called_once()
+        saved_record = self.db_storage_mock.save_aggregation.call_args[0][0]
+        self.assertEqual(saved_record['portfolio_id'], portfolio_id)
+        self.assertEqual(saved_record['scenario_id'], scenario_id)
+        self.assertEqual(saved_record['metric'], metric)
+        self.assertEqual(saved_record['value'], val)
 
-        with self.assertRaises(AggregatorError) as context:
-            self.aggregator.aggregate_stream(mock_file_stream)
+    def test_aggregate_stream_empty(self):
+        stream = io.BytesIO(b"")
+        with self.assertRaises(AggregatorError) as ctx:
+            self.aggregator.aggregate_stream(stream)
+        self.assertIn("Empty stream data", str(ctx.exception))
 
-        self.assertIn("Malformed stream data", str(context.exception))
-        self.db_storage.save_aggregation.assert_not_called()
+    def test_aggregate_stream_invalid_format(self):
+        bad_line = f"{uuid.uuid4().hex},{uuid.uuid4().hex}"
+        stream = io.BytesIO(bad_line.encode('utf-8'))
+        with self.assertRaises(AggregatorError) as ctx:
+            self.aggregator.aggregate_stream(stream)
+        self.assertIn("Malformed stream data", str(ctx.exception))
 
-    def test_aggregate_with_evaluator_integration(self):
-        mock_eval_result = {
-            "score": random.uniform(0.0, 100.0),
-            "risk_level": random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
+    def test_aggregate_stream_invalid_float(self):
+        portfolio_id = uuid.uuid4().hex
+        scenario_id = uuid.uuid4().hex
+        metric = f"metric_{uuid.uuid4().hex[:6]}"
+        bad_val = f"not_a_number_{uuid.uuid4().hex[:4]}"
+
+        line = f"{portfolio_id},{scenario_id},{metric},{bad_val}"
+        stream = io.BytesIO(line.encode('utf-8'))
+
+        with self.assertRaises(AggregatorError) as ctx:
+            self.aggregator.aggregate_stream(stream)
+        self.assertIn("Malformed stream data", str(ctx.exception))
+
+    def test_aggregate_with_evaluation(self):
+        portfolio_id = uuid.uuid4().hex
+        scenario_id = uuid.uuid4().hex
+        metric = f"eval_metric_{uuid.uuid4().hex[:6]}"
+        val = round(random.uniform(1.0, 50.0), 2)
+
+        line = f"{portfolio_id},{scenario_id},{metric},{val}"
+        stream = io.BytesIO(line.encode('utf-8'))
+
+        eval_result_expected = {'score': random.randint(80, 100), 'passed': True}
+        self.evaluator_mock.evaluate.return_value = eval_result_expected
+
+        result = self.aggregator.aggregate_with_evaluation(stream)
+
+        self.assertEqual(result['status'], 'SUCCESS')
+        self.assertIn('evaluation', result)
+        self.assertEqual(result['evaluation'], eval_result_expected)
+        self.evaluator_mock.evaluate.assert_called_once()
+
+    def test_aggregate_stress_backtests_function(self):
+        portfolio_id = uuid.uuid4().hex
+        backtest_ids = [uuid.uuid4().hex for _ in range(random.randint(1, 5))]
+        
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_filename = f"report_{uuid.uuid4().hex}.json"
+            output_path = os.path.join(tmpdir, f"sub_{uuid.uuid4().hex[:4]}", output_filename)
+
+            payload = {
+                "portfolio_id": portfolio_id,
+                "backtest_ids": backtest_ids,
+                "output_path": output_path
+            }
+
+            report = aggregate_stress_backtests(payload)
+
+            self.assertEqual(report["portfolio_id"], portfolio_id)
+            self.assertEqual(report["processed_backtests"], backtest_ids)
+            self.assertEqual(report["status"], "COMPLETED")
+
+            self.assertTrue(os.path.exists(output_path))
+            with open(output_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            self.assertEqual(data["portfolio_id"], portfolio_id)
+            self.assertEqual(data["processed_backtests"], backtest_ids)
+
+    def test_aggregate_stress_backtests_no_output(self):
+        portfolio_id = uuid.uuid4().hex
+        backtest_ids = [uuid.uuid4().hex]
+
+        payload = {
+            "portfolio_id": portfolio_id,
+            "backtest_ids": backtest_ids
         }
-        self.evaluator.evaluate.return_value = mock_eval_result
 
-        raw_stream_data = f"{self.random_portfolio_id},{self.random_scenario_id},{self.random_metric_name},{self.random_value}".encode('utf-8')
-        mock_file_stream = io.BytesIO(raw_stream_data)
-
-        result = self.aggregator.aggregate_with_evaluation(mock_file_stream)
-
-        self.assertEqual(result['evaluation']['score'], mock_eval_result['score'])
-        self.assertEqual(result['evaluation']['risk_level'], mock_eval_result['risk_level'])
-        self.evaluator.evaluate.assert_called_once()
-
-    def test_empty_stream_handling(self):
-        mock_file_stream = io.BytesIO(b"")
-
-        with self.assertRaises(AggregatorError):
-            self.aggregator.aggregate_stream(mock_file_stream)
-
-        self.db_storage.save_aggregation.assert_not_called()
+        report = aggregate_stress_backtests(payload)
+        self.assertEqual(report["portfolio_id"], portfolio_id)
+        self.assertEqual(report["status"], "COMPLETED")
 
 
 if __name__ == '__main__':

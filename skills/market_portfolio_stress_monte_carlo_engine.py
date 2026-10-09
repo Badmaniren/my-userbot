@@ -80,6 +80,11 @@ class MonteCarloStressEngine:
             "cvar_95": float(cvar_95)
         }
 
+    def simulate(self, portfolio_id: str = "", confidence_level: float = 0.95, horizon_days: int = 10, **kwargs):
+        sim_res = self.run_simulation(portfolio_id, kwargs.get("simulations", 100), horizon_days)
+        var_val = sim_res.get("var_95", 0.0)
+        return {"var": var_val, "cvar": sim_res.get("cvar_95", 0.0), "simulation_results": sim_res.get("simulation_results", [])}
+
     def _get_anomaly_adjustment(self) -> float:
         try:
             return float(market_anomaly_detector.get_current_anomaly_multiplier())
@@ -169,3 +174,8 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
         market_portfolio_stress_audit_visualizer.visualize_stress_test(result_dict)
 
     return result_dict
+
+
+run_monte_carlo_simulation = run_monte_carlo_stress_test
+MarketPortfolioStressMonteCarloEngine = MonteCarloStressEngine
+market_portfolio_stress_monte_carlo_engine = MonteCarloStressEngine

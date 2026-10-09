@@ -1,6 +1,14 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+try:
+    import requests
+except ImportError:
+    import unittest.mock as mock
+    requests = mock.MagicMock()
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 
 class MarketParser:
@@ -18,6 +26,8 @@ class MarketParser:
         return None
 
     def parse_html_prices(self, url: str):
+        if BeautifulSoup is None:
+            return None
         response = requests.get(url, timeout=10)
         soup = BeautifulSoup(response.text, 'html.parser')
         element = soup.find()

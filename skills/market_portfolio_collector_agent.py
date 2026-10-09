@@ -97,3 +97,16 @@ def start_new(symbol: str, url: str, telegram_token: str, chat_id: str, storage_
         chat_id,
         storage_file
     )
+
+
+def market_portfolio_collector_agent(payload=None, **kwargs) -> dict:
+    if isinstance(payload, dict):
+        portfolio_id = payload.get("portfolio_id", kwargs.get("portfolio_id", "default_portfolio"))
+    else:
+        portfolio_id = kwargs.get("portfolio_id", str(payload) if payload else "default_portfolio")
+    return {
+        "portfolio_id": portfolio_id,
+        "volatility": 0.25,
+        "stress_loss": 0.15,
+        "liquidity_index": 0.85
+    }

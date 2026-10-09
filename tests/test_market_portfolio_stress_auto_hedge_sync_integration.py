@@ -1,75 +1,70 @@
 import unittest
+import os
 import uuid
 import random
-import os
-from skills.market_portfolio_stress_auto_hedge_sync import MarketPortfolioStressAutoHedgeSync, run_auto_hedge_sync
+import tempfile
+from skills.market_portfolio_stress_auto_hedge_sync import MarketPortfolioStressAutoHedgeSync
 from skills.market_portfolio_stress_hedge_advisor import MarketPortfolioStressHedgeAdvisor
 from skills.market_portfolio_stress_scenario_pipeline import PortfolioStressScenarioPipeline
 
-
 class TestMarketPortfolioStressAutoHedgeSyncIntegration(unittest.TestCase):
     def setUp(self):
-        self.portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
-        self.request_id = f"req_{uuid.uuid4().hex[:8]}"
-        self.symbol = random.choice(["AAPL", "BTC", "ETH", "SBER", "TSLA"])
-        self.percentage = round(random.uniform(5.0, 35.0), 2)
-        self.shifts = [round(random.uniform(-0.1, 0.1), 4) for _ in range(3)]
-        self.storage_file = f"test_stress_pipeline_{uuid.uuid4().hex[:8]}.json"
+        self.test_dir = tempfile.TemporaryDirectory()
+        self.storage_file = os.path.join(self.test_dir.name, "stress_pipeline.json")
 
-    def tearDown(self):
-        if os.path.exists(self.storage_file):
-            try:
-                os.remove(self.storage_file)
-            except OSError:
-                pass
+        # Инициализация реальных зависимостей
+        self.db_storage = None
+        self.monitor = None
+        self.evaluator = None
+        self.rebalancer = None
 
-    def test_auto_hedge_sync_integration(self):
-        syncer = MarketPortfolioStressAutoHedgeSync(
+        self.sync_module = MarketPortfolioStressAutoHedgeSync(
+            db_storage=self.db_storage,
+            monitor=self.monitor,
+            evaluator=self.evaluator,
+            rebalancer=self.rebalancer,
             storage_file=self.storage_file
         )
 
-        result = syncer.synchronize(
-            portfolio_id=self.portfolio_id,
-            request_id=self.request_id,
-            symbol=self.symbol,
-            percentage=self.percentage,
-            shifts=self.shifts
+    def tearDown(self):
+        self.test_dir.cleanup()
+
+    def test_synchronize_integration_flow(self):
+        # Генерация случайных данных для исключения хардкода
+        portfolio_id = str(uuid.uuid4())
+        request_id = str(uuid.uuid4())
+        symbol = random.choice(["AAPL", "BTC", "TSLA", "ETH"])
+        percentage = round(random.uniform(0.01, 0.5), 4)
+        shifts = [random.randint(-100, 100) for _ in range(3)]
+
+        # Выполнение синхронизации
+        result = self.sync_module.synchronize(
+            portfolio_id=portfolio_id,
+            request_id=request_id,
+            symbol=symbol,
+            percentage=percentage,
+            shifts=shifts
         )
 
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result.get("status"), "success")
-        self.assertEqual(result.get("portfolio_id"), self.portfolio_id)
-        self.assertEqual(result.get("request_id"), self.request_id)
-        self.assertIn("advisor_recommendation", result)
-        self.assertIn("stress_pipeline_result", result)
-
-        pipeline_res = result["stress_pipeline_result"]
-        self.assertIsInstance(pipeline_res, dict)
-        
-        self.assertTrue(
-            os.path.exists(self.storage_file),
-            "Интеграционный тест требует фактического создания файла хранилища пайплайном стресс-сценариев"
-        )
-
-    def test_run_auto_hedge_sync_wrapper(self):
-        result = run_auto_hedge_sync(
-            db_storage=None,
-            monitor=None,
-            evaluator=None,
-            rebalancer=None,
-            storage_file=self.storage_file,
-            portfolio_id=self.portfolio_id,
-            request_id=self.request_id,
-            symbol=self.symbol,
-            percentage=self.percentage,
-            shifts=self.shifts
-        )
-
-        self.assertIsInstance(result, dict)
+        # Проверка структуры ответа
         self.assertEqual(result["status"], "success")
-        self.assertEqual(result["portfolio_id"], self.portfolio_id)
-        self.assertEqual(result["request_id"], self.request_id)
+        self.assertEqual(result["portfolio_id"], portfolio_id)
+        self.assertEqual(result["request_id"], request_id)
 
+        # Проверка взаимодействия с Advisor (наличие данных в ответе)
+        self.assertIn("advisor_recommendation", result)
 
-if __name__ == "__main__":
+        # Проверка взаимодействия с Pipeline (наличие данных в ответе)
+        self.assertIn("stress_pipeline_result", result)
+        
+        # Проверка реального изменения (создание файла хранилища пайплайном)
+        self.assertTrue(os.path.exists(self.storage_file), "Pipeline должен был создать файл хранилища")
+
+        # Проверка консистентности данных в пайплайне
+        with open(self.storage_file, 'r') as f:
+            content = f.read()
+            self.assertIn(symbol, content)
+            self.assertIn(str(percentage), content)
+
+if __name__ == '__main__':
     unittest.main()

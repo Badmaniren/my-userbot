@@ -7,13 +7,15 @@ from skills.market_portfolio_stress_audit_summary_vault import (
 
 
 class StressAuditSchedulerHub:
-    def __init__(self):
-        self.trigger = StressAutoRebalanceTrigger()
+    def __init__(self, **kwargs):
+        trigger = kwargs.get("trigger")
+        self.trigger = trigger if trigger is not None else StressAutoRebalanceTrigger(**kwargs)
 
     def run_audit_cycle(self, portfolio_id, threshold, storage_target):
         res = self.trigger.evaluate_and_trigger(portfolio_id, threshold)
-        if res is not None:
-            market_portfolio_stress_audit_summary_vault_process(storage_target, res)
+        if res is None:
+            return None
+        market_portfolio_stress_audit_summary_vault_process(storage_target, res)
         return res
 
     def get_feed(self, feed_url):

@@ -33,7 +33,11 @@ class MarketPortfolioMLStressEvaluator:
         self.market_anomaly_detector = market_anomaly_detector
         self.window_size = window_size
 
-        self.feature_builder = MarketPortfolioMLFeatureBuilder()
+        try:
+            self.feature_builder = MarketPortfolioMLFeatureBuilder(asset_id="default_asset", window_size=self.window_size)
+        except TypeError:
+            self.feature_builder = MarketPortfolioMLFeatureBuilder()
+
         self.volatility_forecaster = MarketPortfolioStressMLVolatilityForecasterV2()
 
     def evaluate_portfolio_stress_resilience(
@@ -45,7 +49,11 @@ class MarketPortfolioMLStressEvaluator:
         feature_builder_cls = MarketPortfolioMLFeatureBuilder
         volatility_forecaster_cls = MarketPortfolioStressMLVolatilityForecasterV2
 
-        fb = feature_builder_cls()
+        try:
+            fb = feature_builder_cls(asset_id=portfolio_id, window_size=self.window_size)
+        except TypeError:
+            fb = feature_builder_cls()
+
         vf = volatility_forecaster_cls()
 
         try:

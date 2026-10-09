@@ -3,7 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-альной переменной!; АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'db_storage' глобальной переменной!
+переменной!
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_stress_audit_pdf_report_builder (create) — раундов: 4
@@ -285,3 +285,6 @@
 ## market_portfolio_hedge_order_router (compose) — раундов: 4
 - Последняя ошибка перед фиксом: execution_result = self._execute_pipeline(symbol, recommended_volume, percentage)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_auto_hedge_sync (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

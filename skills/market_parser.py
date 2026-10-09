@@ -1,19 +1,18 @@
 import json
 import os
 import uuid
+from unittest.mock import MagicMock
 
 try:
     import requests
     _IS_MOCK_REQUESTS = False
 except ImportError:
-    from unittest.mock import MagicMock
     requests = MagicMock()
     _IS_MOCK_REQUESTS = True
 
 try:
     from bs4 import BeautifulSoup
 except ImportError:
-    from unittest.mock import MagicMock
     BeautifulSoup = MagicMock()
 
 

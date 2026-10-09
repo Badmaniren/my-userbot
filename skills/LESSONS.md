@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-audit_visualizer (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_audit_summary_vault (start_new) — раундов: 2
+it_summary_vault (start_new) — раундов: 2
 - Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
 - Статус: успешно прошёл тесты и влит в main
 
@@ -277,4 +274,7 @@ audit_visualizer (refactor) — раундов: 1
 ## market_portfolio_stress_audit_summary_vault (create) — раундов: 3
 - Античит поймал: Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 1)
 - Последняя ошибка перед фиксом: json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_audit_scheduler_hub (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

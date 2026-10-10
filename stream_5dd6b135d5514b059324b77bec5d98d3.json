@@ -1,0 +1,1 @@
+{"session_id": "8eabbf723c3a4e69876a3e3baeba9d90", "result": {"ingest_result": {"status": "ingested", "id": "f7c5e3a44d5848948ae98f9e7029db9b"}, "detection_result": {"is_anomaly": true, "score": 0.40053963680239213}, "payload": {"ticker": "TICK_D206DE", "session_id": "8eabbf723c3a4e69876a3e3baeba9d90"}, "status": "success"}}

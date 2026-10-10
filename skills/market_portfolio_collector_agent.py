@@ -2,6 +2,16 @@ import os
 import json
 from datetime import datetime
 
+
+def collect_portfolio_stress_data(portfolio_id: str, limit: int = 100, volatility: float = 1.0) -> dict:
+    return {
+        "portfolio_id": portfolio_id,
+        "limit": limit,
+        "volatility": volatility,
+        "data": [{"val": i * volatility} for i in range(limit or 10)]
+    }
+
+
 class MarketParser:
     def __init__(self, storage_file: str):
         self.storage_file = storage_file

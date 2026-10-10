@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-аундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_execution_slippage_predictor (create) — раундов: 4
+раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.; Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
@@ -276,6 +273,9 @@
 
 ## market_portfolio_stress_auto_hedge_sync (refactor) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_backtest_evaluator_bridge (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_backtest_evaluator_bridge (refactor) — раундов: 1

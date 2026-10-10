@@ -1,51 +1,46 @@
 import unittest
+import os
+import json
 import uuid
 import random
-import os
-import tempfile
 from skills.market_portfolio_realtime_stream_ingestor import market_portfolio_realtime_stream_ingestor
 
-class IntegrationTestMarketPortfolioRealtimeStreamIngestor(unittest.TestCase):
-    def test_stream_ingestor_integration(self):
-        random_id = str(uuid.uuid4())
-        random_price = round(random.uniform(10.0, 5000.0), 2)
-        random_volume = random.randint(100, 100000)
+class TestMarketPortfolioRealtimeStreamIngestorIntegration(unittest.TestCase):
+    def test_realtime_stream_ingestor_integration(self):
+        random_event_id = str(uuid.uuid4())
+        random_ticker = f"TICK_{random.randint(1000, 9999)}"
+        random_price = round(random.uniform(10.0, 1500.0), 2)
         
-        test_payload = {
-            "event_id": random_id,
-            "symbol": f"TEST_{random.randint(100, 999)}",
+        payload = {
+            "event_id": random_event_id,
+            "ticker": random_ticker,
             "price": random_price,
-            "volume": random_volume,
-            "timestamp": random.randint(1600000000, 1700000000)
+            "volume": random.randint(100, 10000)
         }
-
-        temp_dir = tempfile.gettempdir()
-        target_file = os.path.join(temp_dir, f"ingest_audit_{random_id}.log")
-
+        
+        output_dir = f"test_audit_storage_{uuid.uuid4()}"
+        output_path = os.path.join(output_dir, "stream_audit.json")
+        
         try:
-            result = market_portfolio_realtime_stream_ingestor(
-                payload=test_payload,
-                output_path=target_file
-            )
-
-            self.assertIsNotNone(result, "Модуль не должен возвращать None")
+            result = market_portfolio_realtime_stream_ingestor(payload, output_path)
             
-            if isinstance(result, dict):
-                self.assertIn("status", result)
-                self.assertEqual(result.get("processed_id"), random_id)
-            elif isinstance(result, str):
-                self.assertIn(random_id, result)
-
-            self.assertTrue(os.path.exists(target_file), "Интеграционный модуль должен зафиксировать поток в хранилище/файле")
+            self.assertEqual(result.get("status"), "SUCCESS")
+            self.assertEqual(result.get("processed_id"), random_event_id)
             
-            with open(target_file, "r", encoding="utf-8") as f:
-                content = f.read()
-                self.assertIn(random_id, content)
-                self.assertIn(str(random_price), content)
-
+            self.assertTrue(os.path.exists(output_path))
+            
+            with open(output_path, "r", encoding="utf-8") as f:
+                saved_data = json.load(f)
+                
+            self.assertEqual(saved_data.get("event_id"), random_event_id)
+            self.assertEqual(saved_data.get("ticker"), random_ticker)
+            self.assertEqual(saved_data.get("price"), random_price)
+            
         finally:
-            if os.path.exists(target_file):
-                os.remove(target_file)
+            if os.path.exists(output_path):
+                os.remove(output_path)
+            if os.path.exists(output_dir):
+                os.rmdir(output_dir)
 
 if __name__ == "__main__":
     unittest.main()

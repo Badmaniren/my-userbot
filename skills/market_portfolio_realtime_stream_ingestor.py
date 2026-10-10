@@ -33,7 +33,10 @@ def market_portfolio_realtime_stream_ingestor(payload: Dict[str, Any], output_pa
     event_id = payload.get("event_id")
     
     # Фиксация потока в файл аудита для прохождения интеграционных тестов
-    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+    dir_name = os.path.dirname(os.path.abspath(output_path))
+    if dir_name:
+        os.makedirs(dir_name, exist_ok=True)
+        
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(json.dumps(payload, ensure_ascii=False))
 

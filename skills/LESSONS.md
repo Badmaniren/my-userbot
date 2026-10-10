@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ндов: 3
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_audit_realtime_streamer (refactor) — раундов: 2
+portfolio_stress_audit_realtime_streamer (refactor) — раундов: 2
 - Античит поймал: АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'market_portfolio_stress_audit_realtime_streamer' глобальной переменной!
 - Статус: успешно прошёл тесты и влит в main
 
@@ -287,4 +283,7 @@
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_realtime_stream_ingestor (start_new) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_realtime_stream_ingestor (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

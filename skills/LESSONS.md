@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_ml_anomaly_detector_v2 (create) — раундов: 4
+t_portfolio_stress_ml_anomaly_detector_v2 (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -287,3 +283,6 @@
 ## market_portfolio_predictive_var_stress_validation_nexus (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_integration_hub (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

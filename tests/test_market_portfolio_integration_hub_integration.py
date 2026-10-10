@@ -4,44 +4,47 @@ import uuid
 import random
 from skills.market_portfolio_integration_hub import MarketPortfolioIntegrationHub
 
-class TestMarketPortfolioIntegrationHubIntegration(unittest.TestCase):
+class TestMarketPortfolioIntegrationHubReal(unittest.TestCase):
     def setUp(self):
-        self.storage_file = f"test_storage_{uuid.uuid4()}.json"
+        self.storage_file = f"test_storage_{uuid.uuid4().hex}.json"
         self.hub = MarketPortfolioIntegrationHub(storage_file=self.storage_file)
-        self.url = f"http://localhost:{random.randint(1000, 9999)}/api/v1"
-        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
-        self.shifts = [random.randint(-10, 10), random.randint(-5, 5)]
-        self.telegram_token = f"token_{uuid.uuid4().hex}"
-        self.chat_id = str(random.randint(100000, 999999))
+        self.test_url = f"https://api.test-portfolio-{uuid.uuid4().hex[:8]}.local/v1"
+        self.test_symbol = f"TICKER_{random.randint(1000, 9999)}"
+        self.test_shifts = [random.randint(-10, 10), random.randint(-20, 20)]
+        self.telegram_token = f"bot{random.randint(100000, 999999)}:ABC{uuid.uuid4().hex[:6]}"
+        self.chat_id = str(random.randint(1000000, 99999999))
 
     def tearDown(self):
         if os.path.exists(self.storage_file):
-            try:
-                os.remove(self.storage_file)
-            except OSError:
-                pass
+            os.remove(self.storage_file)
 
-    def test_run_integrated_pipeline_real_execution(self):
+    def test_integration_pipeline_execution(self):
         result = self.hub.run_integrated_pipeline(
-            self.url, self.symbol, self.shifts, self.telegram_token, self.chat_id
+            url=self.test_url,
+            symbol=self.test_symbol,
+            shifts=self.test_shifts,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id
         )
         self.assertIsInstance(result, bool)
 
-    def test_process_and_export_returns_structure(self):
-        result = self.hub.process_and_export(
-            self.url, self.symbol, self.shifts, self.telegram_token, self.chat_id
+    def test_full_integration_pipeline_payload(self):
+        pipeline_output = self.hub.run_full_integration_pipeline(
+            symbol=self.test_symbol,
+            url=self.test_url,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id,
+            shifts=self.test_shifts
         )
-        self.assertIsInstance(result, dict)
-        self.assertIn("summary", result)
-        self.assertIn("export_data", result)
+        self.assertIsInstance(pipeline_output, dict)
+        self.assertIn("summary", pipeline_output)
+        self.assertIn("export_data", pipeline_output)
 
-    def test_run_full_integration_pipeline_data_consistency(self):
-        result = self.hub.run_full_integration_pipeline(
-            self.symbol, self.url, self.telegram_token, self.chat_id, self.shifts
-        )
-        self.assertIsInstance(result, dict)
-        self.assertIn("summary", result)
-        self.assertIn("export_data", result)
+    def test_custom_export_and_stream(self):
+        custom_export_result = self.hub.execute_custom_export(self.test_url, self.test_shifts)
+        stream_result = self.hub.export_and_dispatch_stream()
+        self.assertIsNotNone(custom_export_result)
+        self.assertIsNotNone(stream_result)
 
 if __name__ == "__main__":
     unittest.main()

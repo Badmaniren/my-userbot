@@ -2,18 +2,12 @@ import io
 import json
 import os
 import logging
-import types
+import websockets
 from typing import Any, Dict, Optional, Set, Callable
 
-try:
-    import websockets
-except ImportError:
-    websockets = types.ModuleType("websockets")
-    websockets.connect = lambda *args, **kwargs: None
-
-from skills import market_portfolio_realtime_stream_ingestor as _ingestor_module
-from skills import market_portfolio_api_gateway as _api_gateway_module
-from skills import db_storage as _db_storage_module
+from skills.market_portfolio_realtime_stream_ingestor import market_portfolio_realtime_stream_ingestor as _ingestor_func
+from skills.market_portfolio_api_gateway import MarketPortfolioAPIGateway
+from skills.db_storage import db_storage as _db_storage_obj
 
 
 class WebsocketHubException(Exception):
@@ -30,10 +24,6 @@ class MarketPortfolioRealtimeWebsocketHub:
         self._callbacks: Dict[str, Callable[[Dict[str, Any]], None]] = {}
 
     def connect(self, client_id: Optional[str] = None) -> bool:
-        if not hasattr(websockets, "connect"):
-            self.is_connected = False
-            self._ws_connection = None
-            raise WebsocketHubException("websockets library connect attribute is not available")
         try:
             self._ws_connection = websockets.connect(self.endpoint)
             if hasattr(self._ws_connection, "recv"):

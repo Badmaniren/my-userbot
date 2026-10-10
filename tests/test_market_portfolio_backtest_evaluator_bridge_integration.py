@@ -1,73 +1,68 @@
 import unittest
 import os
-import json
+import tempfile
 import uuid
 import random
+import json
 from skills.market_portfolio_backtest_evaluator_bridge import MarketPortfolioBacktestEvaluatorBridge
 
 class TestMarketPortfolioBacktestEvaluatorBridgeIntegration(unittest.TestCase):
     def setUp(self):
-        self.random_suffix = uuid.uuid4().hex[:8]
-        self.storage_file = f"test_backtest_storage_{self.random_suffix}.json"
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.storage_file = os.path.join(self.temp_dir.name, f"test_storage_{uuid.uuid4()}.json")
         self.bridge = MarketPortfolioBacktestEvaluatorBridge(self.storage_file)
-        self.symbol = f"TEST_{uuid.uuid4().hex[:6].upper()}"
-
-    def tearDown(self):
-        if os.path.exists(self.storage_file):
-            os.remove(self.storage_file)
-
-    def test_run_comprehensive_evaluation_integration(self):
-        initial_capital = round(random.uniform(10000.0, 100000.0), 2)
-        strategy_params = {
-            "stop_loss": round(random.uniform(0.01, 0.05), 4),
-            "take_profit": round(random.uniform(0.05, 0.15), 4),
-            "leverage": random.randint(1, 5)
+        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
+        self.initial_capital = float(random.randint(10000, 100000))
+        self.strategy_params = {
+            "threshold": round(random.uniform(0.01, 0.05), 4),
+            "window": random.randint(10, 50)
         }
 
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def test_storage_creation_and_comprehensive_evaluation(self):
+        self.assertFalse(os.path.exists(self.storage_file))
+
         result = self.bridge.run_comprehensive_evaluation(
-            symbol=self.symbol,
-            initial_capital_or_shifts=initial_capital,
-            strategy_params=strategy_params
+            self.symbol, 
+            self.initial_capital, 
+            self.strategy_params
         )
+
+        self.assertTrue(os.path.exists(self.storage_file))
+        self.assertGreater(os.path.getsize(self.storage_file), 0)
 
         self.assertIn("backtest_execution", result)
         self.assertIn("summary", result)
         self.assertIn("metrics", result)
         self.assertIn("evaluation", result)
 
-        self.assertTrue(os.path.exists(self.storage_file))
-        self.assertGreater(os.path.getsize(self.storage_file), 0)
-
-        with open(self.storage_file, "r") as f:
-            data = json.load(f)
-        self.assertIsInstance(data, dict)
-
-    def test_evaluate_strategy_backtest_integration(self):
-        initial_capital = round(random.uniform(5000.0, 50000.0), 2)
-        strategy_params = {
-            "hedge_ratio": round(random.uniform(0.1, 0.9), 2),
-            "rebalance_threshold": round(random.uniform(0.02, 0.1), 4)
-        }
-
+    def test_evaluate_strategy_backtest_flow(self):
         result = self.bridge.evaluate_strategy_backtest(
-            symbol=self.symbol,
-            initial_capital=initial_capital,
-            strategy_params=strategy_params
+            self.symbol,
+            self.initial_capital,
+            self.strategy_params
         )
 
         self.assertIn("backtest_summary", result)
         self.assertIn("performance_metrics", result)
         self.assertIn("performance_evaluation", result)
 
-        self.assertTrue(os.path.exists(self.storage_file))
+        with open(self.storage_file, "r") as f:
+            data = json.load(f)
+        
+        self.assertIsInstance(data, dict)
 
-    def test_evaluate_backtest_performance_integration(self):
-        result = self.bridge.evaluate_backtest_performance(symbol=self.symbol)
+    def test_evaluate_backtest_performance_existing_storage(self):
+        with open(self.storage_file, "w") as f:
+            json.dump({self.symbol: {"prefilled": random.random()}}, f)
+
+        result = self.bridge.evaluate_backtest_performance(self.symbol)
 
         self.assertIn("backtest_summary", result)
         self.assertIn("performance_metrics", result)
         self.assertIn("performance_evaluation", result)
-        self.assertTrue(os.path.exists(self.storage_file))
 
 if __name__ == "__main__":
     unittest.main()

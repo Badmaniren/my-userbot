@@ -2,8 +2,12 @@ import json
 import os
 import logging
 
-from skills.market_parser import MarketParser
-from skills.market_portfolio_valuation import PortfolioValuation
+try:
+    from skills.market_parser import MarketParser
+    from skills.market_portfolio_valuation import PortfolioValuation
+except ImportError:
+    from market_parser import MarketParser
+    from market_portfolio_valuation import PortfolioValuation
 
 logger = logging.getLogger("PortfolioScenarioSimulator")
 if not logger.handlers:
@@ -14,16 +18,19 @@ if not logger.handlers:
     logger.setLevel(logging.INFO)
 
 class PortfolioScenarioSimulator:
-    def __init__(self, storage_file):
+    def __init__(self, storage_file=None, input_data=None, **kwargs):
         self.storage_file = storage_file
 
-    def load_data(self, storage_file):
-        logger.info("Loading portfolio data from %s", storage_file)
+    def load_data(self, storage_file=None):
+        path = storage_file or self.storage_file
+        if not path:
+            return {}
+        logger.info("Loading portfolio data from %s", path)
         try:
-            with open(storage_file, 'r') as f:
+            with open(path, 'r') as f:
                 return json.load(f)
         except (IOError, OSError, json.JSONDecodeError) as e:
-            logger.error("Failed to load data from %s: %s", storage_file, e)
+            logger.error("Failed to load data from %s: %s", path, e)
             return {}
 
     def simulate_scenario(self, symbol, percentage, slippage_factor=0.0):
@@ -78,8 +85,25 @@ class PortfolioScenarioSimulator:
             "portfolio_value_delta": pnl_impact
         }
 
+    def simulate_stress(self, initial_value=100000.0, drop_pct=0.0, volatility=0.0, symbol="PORTFOLIO", **kwargs):
+        initial_val = float(initial_value)
+        drop = float(drop_pct)
+        simulated_value = initial_val * (1.0 + drop / 100.0)
+        pnl_impact = simulated_value - initial_val
+        return {
+            "symbol": symbol,
+            "initial_value": initial_val,
+            "drop_pct": drop,
+            "volatility": float(volatility),
+            "simulated_value": round(simulated_value, 2),
+            "pnl_impact": round(pnl_impact, 2),
+            "portfolio_value_delta": round(pnl_impact, 2)
+        }
+
     def run_stress_test(self, symbol, shifts):
         logger.info("Running stress test for symbol: %s with shifts: %s", symbol, shifts)
+        if isinstance(shifts, (int, float)):
+            shifts = [shifts]
         report = []
         for shift in shifts:
             try:
@@ -112,3 +136,22 @@ def run_stress_test(storage_file, symbol, range_min, range_max, step):
         "symbol": symbol,
         "scenarios": scenarios
     }
+
+def market_portfolio_scenario_simulator(input_data=None, **kwargs):
+    if isinstance(input_data, str) and not kwargs and not os.path.exists(input_data) and not input_data.endswith(".json"):
+        # If passed string as symbol or storage_file
+        return PortfolioScenarioSimulator(input_data)
+    if input_data is None and not kwargs:
+        return PortfolioScenarioSimulator()
+    if isinstance(input_data, str) and (input_data.endswith(".json") or os.path.exists(input_data)):
+        return PortfolioScenarioSimulator(input_data)
+
+    # Otherwise treat as input simulation call
+    data = input_data or kwargs
+    symbol = data.get("symbol", "PORTFOLIO")
+    initial_val = data.get("initial_value", data.get("portfolio_initial_value", 100000.0))
+    drop = data.get("drop_pct", data.get("market_drop_pct", 0.0))
+    vol = data.get("volatility", data.get("historical_volatility", 0.0))
+
+    sim = PortfolioScenarioSimulator()
+    return sim.simulate_stress(initial_value=initial_val, drop_pct=drop, volatility=vol, symbol=symbol)

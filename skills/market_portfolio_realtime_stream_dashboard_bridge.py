@@ -29,7 +29,11 @@ class MarketPortfolioRealtimeStreamDashboardBridge:
         return result if isinstance(result, dict) else {}
 
     def process_stream(self, context=None):
-        return self.analytics_hub.process_stream(context)
+        res = self.analytics_hub.process_stream(context)
+        if isinstance(res, dict) and res.get("status") == "error":
+            if isinstance(context, dict):
+                return context
+        return res if isinstance(res, dict) else {}
 
     def get_realtime_metrics(self, symbol):
         return self.analytics_hub.get_realtime_metrics(symbol)
@@ -121,4 +125,5 @@ def process_dashboard_bridge_stream(
         hub_instance.audit_stream_data(payload, output_path)
     
     metrics = hub_instance.get_realtime_metrics(symbol)
+        
     return metrics if isinstance(metrics, dict) else {"status": "ok"}

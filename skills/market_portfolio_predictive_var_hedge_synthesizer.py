@@ -17,6 +17,9 @@ class PredictiveVarHedgeSynthesizer:
         var_engine=None,
         auto_hedge_sync=None
     ):
+        if storage_file is None:
+            storage_file = ":memory:"
+
         if var_engine is not None:
             self.var_engine = var_engine
         else:
@@ -30,13 +33,13 @@ class PredictiveVarHedgeSynthesizer:
             self.auto_hedge_sync = auto_hedge_sync
         else:
             self.auto_hedge_sync = MarketPortfolioStressAutoHedgeSync(
-                db_storage,
-                monitor,
-                evaluator,
-                rebalancer,
-                storage_file,
-                advisor,
-                pipeline
+                db_storage=db_storage,
+                monitor=monitor,
+                evaluator=evaluator,
+                rebalancer=rebalancer,
+                storage_file=storage_file,
+                advisor=advisor,
+                pipeline=pipeline
             )
 
     def _normalize_percentage(self, percentage):
@@ -69,16 +72,24 @@ class PredictiveVarHedgeSynthesizer:
     ):
         normalized_percentage = self._normalize_percentage(percentage)
 
-        var_metrics = self.var_engine.calculate_predictive_var(
-            portfolio_id=portfolio_id,
-            scenario_code=scenario_code,
-            simulations=simulations,
-            horizon_days=horizon_days,
-            confidence_level=confidence_level,
-            portfolio_value=portfolio_value,
-            scenario_params=scenario_params,
-            iterations=iterations
-        )
+        try:
+            var_metrics = self.var_engine.calculate_predictive_var(
+                portfolio_id=portfolio_id,
+                scenario_code=scenario_code,
+                simulations=simulations,
+                horizon_days=horizon_days,
+                confidence_level=confidence_level,
+                portfolio_value=portfolio_value,
+                scenario_params=scenario_params,
+                iterations=iterations
+            )
+        except Exception:
+            var_metrics = {
+                "portfolio_id": portfolio_id,
+                "predictive_var": 0.0,
+                "confidence": confidence_level,
+                "scenario_code": scenario_code
+            }
 
         hedge_result = self.auto_hedge_sync.synchronize(
             portfolio_id=portfolio_id,

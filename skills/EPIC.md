@@ -4,3 +4,4 @@
 
 - market_portfolio_backtest_evaluator_bridge: Создаем базовый модуль бэктестинга стратегий автоматического хеджирования на исторических стресс-сценариях для запуска нового эпика
 - market_portfolio_backtest_evaluator_bridge: Оптимизация и расширение модуля market_portfolio_backtest_evaluator_bridge в рамках эпика исторического валидирования и бэктестинга систем защиты портфеля.
+- market_portfolio_backtest_evaluator_bridge: Продолжаем углубление и оптимизацию модуля market_portfolio_backtest_evaluator_bridge для исторического валидирования и бэктестинга систем защиты портфеля.

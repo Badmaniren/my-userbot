@@ -72,12 +72,15 @@ def market_portfolio_realtime_stream_alert_sink(
     chat_id,
     severity,
     threshold,
-    channels
+    channels,
+    symbol=None
 ):
+    target_symbol = symbol if symbol is not None else payload.get("symbol", "DEFAULT_SYM")
+    
     market_portfolio_realtime_stream_ingestor.market_portfolio_realtime_stream_ingestor(payload, output_path)
     
     sink_res = market_portfolio_alert_event_sink.handle_portfolio_alert_event(
-        symbol=symbol,
+        symbol=target_symbol,
         url=url,
         token=token,
         chat_id=chat_id,
@@ -89,7 +92,7 @@ def market_portfolio_realtime_stream_alert_sink(
     
     route_res = market_portfolio_alert_event_sink.route_and_sink_alerts(
         storage=storage,
-        symbol=symbol,
+        symbol=target_symbol,
         url=url,
         token=token,
         chat_id=chat_id,

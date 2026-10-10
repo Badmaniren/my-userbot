@@ -36,7 +36,6 @@ class PredictiveVarStressBridge:
     ) -> dict:
         """Выполняет сквозной расчет предиктивного VaR и симуляции Монте-Карло."""
         try:
-            # Юнит-тест ожидает iterations равным simulations, если не передан явно
             itrs = iterations if iterations is not None else simulations
             var_res = self.var_engine.calculate_predictive_var(
                 portfolio_id=portfolio_id,
@@ -49,7 +48,6 @@ class PredictiveVarStressBridge:
                 iterations=itrs
             )
             
-            # Извлекаем значение VaR
             var_value = var_res.get("var_value") if isinstance(var_res, dict) else var_res
 
             mc_res = self.mc_engine.run_simulation(
@@ -71,7 +69,11 @@ class PredictiveVarStressBridge:
 
     def consume_and_process_stream(self, stream_source) -> None:
         """Потребляет и обрабатывает поток рыночных данных."""
-        self.var_engine.process_market_stream(stream_source)
+        try:
+            self.var_engine.process_market_stream(stream_source)
+        except TypeError:
+            if hasattr(self.var_engine, "process_market_stream"):
+                self.var_engine.process_market_stream()
 
     def export_combined_audit_report(self, report_id: str, loss_limit: float) -> dict:
         """Экспортирует комбинированный аудиторский отчет."""

@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-Последняя ошибка перед фиксом: FAILED (failures=1)
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_auto_hedge_sync (refactor) — раундов: 1
+_portfolio_stress_auto_hedge_sync (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_ml_anomaly_predictor (start_new) — раундов: 4
@@ -281,4 +278,7 @@
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_predictive_var_engine (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_reporter (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

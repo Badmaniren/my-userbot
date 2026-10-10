@@ -60,7 +60,13 @@ def market_portfolio_realtime_anomaly_reactor_bridge(
         "status": "reacted"
     }
 
-    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+    dir_name = os.path.dirname(os.path.abspath(output_path))
+    if dir_name and not os.path.exists(dir_name):
+        try:
+            os.makedirs(dir_name, exist_ok=True)
+        except OSError:
+            output_path = os.path.basename(output_path)
+
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(reaction_event, f, ensure_ascii=False, indent=2)
 

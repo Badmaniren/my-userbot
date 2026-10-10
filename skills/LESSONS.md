@@ -3,7 +3,12 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-1)
+cheduler_hub (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_audit_metrics_bridge (start_new) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_stress_audit_realtime_streamer (create) — раундов: 3
@@ -283,8 +288,4 @@
 
 ## market_portfolio_stress_audit_visualizer (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: from skills.market_portfolio_stress_monte_carlo_engine import (
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_execution_risk_gate (compose) — раундов: 4
-- Последняя ошибка перед фиксом: AttributeError: module 'skills.market_portfolio_var_liquidity_core' has no attribute 'calculate_var_and_liquidity'
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

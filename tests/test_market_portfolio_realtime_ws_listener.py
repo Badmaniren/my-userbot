@@ -1,124 +1,150 @@
 import unittest
-from unittest.mock import patch, MagicMock
-import random
-import uuid
-import string
+from unittest.mock import patch, AsyncMock, MagicMock
+import asyncio
 import io
 import json
-import asyncio
-
+import uuid
+import random
+import string
 from skills.market_portfolio_realtime_ws_listener import (
     MarketPortfolioRealtimeWsListener,
+    market_portfolio_realtime_ws_listener,
     WebSocketConnectionError,
-    InvalidMessageError
+    InvalidMessageError,
+    websockets
 )
+
 
 class TestMarketPortfolioRealtimeWsListener(unittest.TestCase):
 
     def setUp(self):
-        self.random_uri = f"wss://exchange.{uuid.uuid4().hex[:8]}.io/ws/{random.randint(1000, 9999)}"
-        self.random_channel = "".join(random.choices(string.ascii_lowercase, k=10))
-        self.listener = MarketPortfolioRealtimeWsListener(uri=self.random_uri, channel=self.random_channel)
+        self.random_uri = f"ws://{uuid.uuid4().hex}.local/{uuid.uuid4().hex}"
+        self.random_channel = uuid.uuid4().hex
+        self.random_file = f"{uuid.uuid4().hex}.log"
+        self.random_event_id = uuid.uuid4().hex
+        self.listener = MarketPortfolioRealtimeWsListener(
+            uri=self.random_uri,
+            channel=self.random_channel,
+            target_file=self.random_file,
+            expected_event_id=self.random_event_id
+        )
 
-    def test_initialization_state(self):
-        self.assertEqual(self.listener.uri, self.random_uri)
-        self.assertEqual(self.listener.channel, self.random_channel)
-        self.assertFalse(self.listener.is_connected)
+    def test_factory_function(self):
+        inst = market_portfolio_realtime_ws_listener(
+            uri=self.random_uri,
+            channel=self.random_channel,
+            target_file=self.random_file,
+            expected_event_id=self.random_event_id
+        )
+        self.assertIsInstance(inst, MarketPortfolioRealtimeWsListener)
+        self.assertEqual(inst.uri, self.random_uri)
+        self.assertEqual(inst.channel, self.random_channel)
+        self.assertEqual(inst.target_file, self.random_file)
+        self.assertEqual(inst.expected_event_id, self.random_event_id)
 
-    def test_validate_message_success(self):
-        valid_id = str(uuid.uuid4())
-        random_price = round(random.uniform(10.0, 5000.0), 4)
-        random_symbol = "".join(random.choices(string.ascii_uppercase, k=4))
+    def test_validate_and_parse_success(self):
+        sym = ''.join(random.choices(string.ascii_uppercase, k=5))
+        prc = round(random.uniform(10.0, 1000.0), 2)
+        payload = json.dumps({
+            "event_id": self.random_event_id,
+            "symbol": sym,
+            "price": prc,
+            "extra": uuid.uuid4().hex
+        })
+        parsed = self.listener.validate_and_parse(payload)
+        self.assertEqual(parsed["event_id"], self.random_event_id)
+        self.assertEqual(parsed["symbol"], sym)
+        self.assertEqual(parsed["price"], prc)
+
+    def test_validate_and_parse_invalid_json(self):
+        bad_json = uuid.uuid4().hex + "{"
+        with self.assertRaises(InvalidMessageError):
+            self.listener.validate_and_parse(bad_json)
+
+    def test_validate_and_parse_not_dict(self):
+        not_a_dict = json.dumps([random.randint(1, 100), uuid.uuid4().hex])
+        with self.assertRaises(InvalidMessageError):
+            self.listener.validate_and_parse(not_a_dict)
+
+    def test_validate_and_parse_missing_fields(self):
+        partial_data = json.dumps({
+            "event_id": self.random_event_id,
+            "symbol": uuid.uuid4().hex
+        })
+        with self.assertRaises(InvalidMessageError):
+            self.listener.validate_and_parse(partial_data)
+
+    def test_process_stream_buffer(self):
+        sym = uuid.uuid4().hex
+        prc = random.random() * 500
+        raw_dict = {
+            "event_id": self.random_event_id,
+            "symbol": sym,
+            "price": prc
+        }
+        stream_data = io.BytesIO(json.dumps(raw_dict).encode('utf-8'))
+        res = self.listener.process_stream_buffer(stream_data)
+        self.assertEqual(res["symbol"], sym)
+        self.assertEqual(res["price"], prc)
+
+    def test_process_raw_message_with_target_file(self):
+        sym = uuid.uuid4().hex
+        prc = random.random() * 100
+        raw_dict = {
+            "event_id": self.random_event_id,
+            "symbol": sym,
+            "price": prc
+        }
+        msg = json.dumps(raw_dict)
+        mock_file_open = MagicMock()
         
-        raw_payload = json.dumps({
-            "event_id": valid_id,
-            "symbol": random_symbol,
-            "price": random_price,
-            "status": "active"
-        })
+        async def run_test():
+            with patch("builtins.open", mock_file_open):
+                res = await self.listener.process_raw_message(msg)
+                self.assertEqual(res["event_id"], self.random_event_id)
+                mock_file_open.assert_called_once_with(self.random_file, "a")
 
-        parsed = self.listener.validate_and_parse(raw_payload)
-        self.assertIsInstance(parsed, dict)
-        self.assertEqual(parsed["event_id"], valid_id)
-        self.assertEqual(parsed["symbol"], random_symbol)
-        self.assertEqual(parsed["price"], random_price)
+        asyncio.run(run_test())
 
-    def test_validate_message_invalid_json(self):
-        garbage_bytes = "".join(random.choices(string.ascii_letters + string.digits, k=32))
-        raw_payload = f"INVALID_JSON_{garbage_bytes}"
-
-        with self.assertRaises(InvalidMessageError):
-            self.listener.validate_and_parse(raw_payload)
-
-    def test_validate_message_missing_required_fields(self):
-        missing_id_payload = json.dumps({
-            "symbol": "".join(random.choices(string.ascii_uppercase, k=3)),
-            "price": random.randint(1, 100)
-        })
-
-        with self.assertRaises(InvalidMessageError):
-            self.listener.validate_and_parse(missing_id_payload)
+    def test_connect_and_listen_missing_websockets(self):
+        with patch("skills.market_portfolio_realtime_ws_listener.websockets", None):
+            with self.assertRaises(WebSocketConnectionError):
+                asyncio.run(self.listener.connect_and_listen(max_retries=1))
 
     def test_stream_ingestion_loop(self):
-        event_id = uuid.uuid4().hex
-        symbol = "".join(random.choices(string.ascii_uppercase, k=5))
-        price = round(random.uniform(1.0, 1000.0), 2)
-        
-        mock_messages = [
-            json.dumps({"event_id": event_id, "symbol": symbol, "price": price}),
-            None
-        ]
+        if websockets is None:
+            self.skipTest("websockets module not present")
 
-        with patch('skills.market_portfolio_realtime_ws_listener.websockets.connect') as mock_connect:
-            mock_ws = MagicMock()
-            mock_ws.recv.side_effect = mock_messages
-            mock_connect.return_value.__aenter__.return_value = mock_ws
+        sym = uuid.uuid4().hex
+        prc = random.random() * 1000
+        msg_str = json.dumps({
+            "event_id": self.random_event_id,
+            "symbol": sym,
+            "price": prc
+        })
 
-            received_data = []
-            def callback(msg):
-                received_data.append(msg)
+        mock_ws = AsyncMock()
+        mock_ws.recv.side_effect = [msg_str, None]
 
-            self.listener.on_message_callback = callback
+        mock_connect_context = AsyncMock()
+        mock_connect_context.__aenter__.return_value = mock_ws
 
-            try:
-                asyncio.run(self.listener.connect_and_listen())
-            except Exception:
-                pass
+        callback_mock = MagicMock()
+        self.listener.on_message_callback = callback_mock
 
-            self.assertTrue(len(received_data) > 0)
-            self.assertEqual(received_data[0]["event_id"], event_id)
-            self.assertEqual(received_data[0]["symbol"], symbol)
-            self.assertEqual(received_data[0]["price"], price)
+        with patch('skills.market_portfolio_realtime_ws_listener.websockets.connect', return_value=mock_connect_context) as mock_connect:
+            asyncio.run(self.listener.connect_and_listen(max_retries=1))
+            mock_connect.assert_called_once_with(self.random_uri)
+            callback_mock.assert_called_once()
+            args, _ = callback_mock.call_args
+            self.assertEqual(args[0]["symbol"], sym)
 
     def test_reconnection_logic_on_failure(self):
-        fail_attempts = random.randint(2, 4)
-        success_id = uuid.uuid4().hex
+        if websockets is None:
+            self.skipTest("websockets module not present")
 
-        side_effects = [Exception("Network down")] * fail_attempts
-        
-        mock_ws = MagicMock()
-        mock_ws.recv.return_value = json.dumps({"event_id": success_id, "symbol": "BTC", "price": 123.45})
-
-        with patch('skills.market_portfolio_realtime_ws_listener.websockets.connect') as mock_connect:
-            mock_connect.side_effect = side_effects + [MagicMock(__aenter__=MagicMock(return_value=mock_ws))]
-            
-            with patch('asyncio.sleep', return_value=None) as mock_sleep:
-                try:
-                    asyncio.run(self.listener.connect_and_listen(max_retries=fail_attempts + 1))
-                except Exception:
-                    pass
-
-                self.assertGreaterEqual(mock_connect.call_count, fail_attempts)
-                self.assertEqual(mock_sleep.call_count, fail_attempts)
-
-    def test_stream_io_buffer_processing(self):
-        stream_token = uuid.uuid4().hex
-        stream_data = f"{{\n  \"event_id\": \"{stream_token}\",\n  \"symbol\": \"ETH\",\n  \"price\": 999.99\n}}\n".encode('utf-8')
-        
-        mock_io = io.BytesIO(stream_data)
-        
-        result = self.listener.process_stream_buffer(mock_io)
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result["event_id"], stream_token)
-        self.assertEqual(result["symbol"], "ETH")
-        self.assertEqual(result["price"], 999.99)
+        with patch('skills.market_portfolio_realtime_ws_listener.websockets.connect', side_effect=Exception(uuid.uuid4().hex)) as mock_connect:
+            with self.assertRaises(WebSocketConnectionError):
+                asyncio.run(self.listener.connect_and_listen(max_retries=2))
+            self.assertGreaterEqual(mock_connect.call_count, 2)
+            self.assertFalse(self.listener.is_connected)

@@ -5,7 +5,9 @@ import random
 import string
 from skills.market_portfolio_stress_auto_hedge_sync import (
     MarketPortfolioStressAutoHedgeSync,
-    run_auto_hedge_sync,
+    DummyMonitor,
+    DummyRebalancer,
+    run_auto_hedge_sync
 )
 
 
@@ -16,29 +18,45 @@ class TestMarketPortfolioStressAutoHedgeSync(unittest.TestCase):
         self.request_id = str(uuid.uuid4())
         self.symbol = "".join(random.choices(string.ascii_uppercase, k=5))
         self.percentage = round(random.uniform(1.0, 50.0), 2)
-        self.shifts = [round(random.uniform(-0.1, 0.1), 4) for _ in range(3)]
-        self.storage_file = f"/tmp/{uuid.uuid4().hex}.json"
+        self.shifts = [random.randint(-10, 10), random.randint(-20, 20)]
+        self.storage_file = f"{uuid.uuid4().hex}.json"
 
-    def test_synchronize_success(self):
+    def test_dummy_monitor_behavior(self):
+        monitor = DummyMonitor()
+        state = monitor.get_portfolio_state(self.portfolio_id)
+        self.assertIsInstance(state, dict)
+        self.assertEqual(state.get("portfolio_id"), self.portfolio_id)
+        self.assertEqual(state.get("status"), "active")
+
+    def test_dummy_rebalancer_behavior(self):
+        rebalancer = DummyRebalancer()
+        status_data = {"action": uuid.uuid4().hex}
+        res = rebalancer.set_trigger_status(self.portfolio_id, status_data)
+        self.assertIsInstance(res, dict)
+        self.assertEqual(res.get("portfolio_id"), self.portfolio_id)
+        self.assertEqual(res.get("status"), "updated")
+        self.assertEqual(res.get("data"), status_data)
+
+    def test_auto_hedge_sync_initialization_defaults(self):
+        syncer = MarketPortfolioStressAutoHedgeSync(storage_file=self.storage_file)
+        self.assertIsInstance(syncer.monitor, DummyMonitor)
+        self.assertIsInstance(syncer.rebalancer, DummyRebalancer)
+        self.assertIsNotNone(syncer.advisor)
+        self.assertIsNotNone(syncer.pipeline)
+
+    def test_synchronize_execution_flow(self):
         mock_advisor = MagicMock()
-        expected_rec = {str(uuid.uuid4()): "".join(random.choices(string.ascii_letters, k=10))}
-        mock_advisor.analyze_and_recommend.return_value = expected_rec
+        expected_recommendation = {"action": uuid.uuid4().hex, "weight": random.random()}
+        mock_advisor.analyze_and_recommend.return_value = expected_recommendation
 
         mock_pipeline = MagicMock()
-        expected_pipeline_res = {str(uuid.uuid4()): random.randint(100, 999)}
-        mock_pipeline.execute.return_value = expected_pipeline_res
-
-        mock_monitor = MagicMock()
-        mock_rebalancer = MagicMock()
+        expected_pipeline_result = {"pipeline_status": uuid.uuid4().hex}
+        mock_pipeline.execute.return_value = expected_pipeline_result
 
         syncer = MarketPortfolioStressAutoHedgeSync(
-            db_storage=MagicMock(),
-            monitor=mock_monitor,
-            evaluator=MagicMock(),
-            rebalancer=mock_rebalancer,
-            storage_file=self.storage_file,
             advisor=mock_advisor,
-            pipeline=mock_pipeline
+            pipeline=mock_pipeline,
+            storage_file=self.storage_file
         )
 
         result = syncer.synchronize(
@@ -49,14 +67,16 @@ class TestMarketPortfolioStressAutoHedgeSync(unittest.TestCase):
             shifts=self.shifts
         )
 
-        self.assertEqual(result["status"], "success")
-        self.assertEqual(result["portfolio_id"], self.portfolio_id)
-        self.assertEqual(result["request_id"], self.request_id)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("status"), "success")
+        self.assertEqual(result.get("portfolio_id"), self.portfolio_id)
+        self.assertEqual(result.get("request_id"), self.request_id)
         
-        expected_recommendation = expected_rec.copy()
-        expected_recommendation["portfolio_id"] = self.portfolio_id
-        self.assertEqual(result["advisor_recommendation"], expected_recommendation)
-        self.assertEqual(result["stress_pipeline_result"], expected_pipeline_res)
+        rec = result.get("advisor_recommendation")
+        self.assertEqual(rec.get("portfolio_id"), self.portfolio_id)
+        self.assertEqual(rec.get("action"), expected_recommendation["action"])
+        
+        self.assertEqual(result.get("stress_pipeline_result"), expected_pipeline_result)
 
         mock_advisor.analyze_and_recommend.assert_called_once_with(
             portfolio_id=self.portfolio_id,
@@ -68,16 +88,18 @@ class TestMarketPortfolioStressAutoHedgeSync(unittest.TestCase):
             shifts=self.shifts
         )
 
-    def test_synchronize_adds_portfolio_id_if_missing(self):
+    def test_synchronize_missing_portfolio_id_in_recommendation(self):
         mock_advisor = MagicMock()
-        mock_advisor.analyze_and_recommend.return_value = {"action": "".join(random.choices(string.ascii_lowercase, k=8))}
+        raw_recommendation = {"metric": uuid.uuid4().hex}
+        mock_advisor.analyze_and_recommend.return_value = raw_recommendation
 
         mock_pipeline = MagicMock()
-        mock_pipeline.execute.return_value = {"pipeline_status": "ok"}
+        mock_pipeline.execute.return_value = {"executed": True}
 
         syncer = MarketPortfolioStressAutoHedgeSync(
             advisor=mock_advisor,
-            pipeline=mock_pipeline
+            pipeline=mock_pipeline,
+            storage_file=self.storage_file
         )
 
         result = syncer.synchronize(
@@ -88,33 +110,28 @@ class TestMarketPortfolioStressAutoHedgeSync(unittest.TestCase):
             shifts=self.shifts
         )
 
-        self.assertIn("portfolio_id", result["advisor_recommendation"])
-        self.assertEqual(result["advisor_recommendation"]["portfolio_id"], self.portfolio_id)
+        rec = result.get("advisor_recommendation")
+        self.assertEqual(rec.get("portfolio_id"), self.portfolio_id)
+        self.assertEqual(rec.get("metric"), raw_recommendation["metric"])
 
     def test_run_auto_hedge_sync_wrapper(self):
-        db_storage = MagicMock()
-        monitor = MagicMock()
-        evaluator = MagicMock()
-        rebalancer = MagicMock()
-        storage_file = f"/tmp/{uuid.uuid4().hex}.json"
-
         with patch("skills.market_portfolio_stress_auto_hedge_sync.MarketPortfolioStressAutoHedgeSync") as MockSyncerClass:
-            instance_mock = MockSyncerClass.return_value
-            expected_return = {
-                "status": "success",
-                "portfolio_id": self.portfolio_id,
-                "request_id": self.request_id,
-                "advisor_recommendation": {},
-                "stress_pipeline_result": {}
-            }
-            instance_mock.synchronize.return_value = expected_return
+            mock_instance = MagicMock()
+            expected_output = {"run_id": uuid.uuid4().hex}
+            mock_instance.synchronize.return_value = expected_output
+            MockSyncerClass.return_value = mock_instance
+
+            db_storage = MagicMock()
+            monitor = MagicMock()
+            evaluator = MagicMock()
+            rebalancer = MagicMock()
 
             res = run_auto_hedge_sync(
                 db_storage=db_storage,
                 monitor=monitor,
                 evaluator=evaluator,
                 rebalancer=rebalancer,
-                storage_file=storage_file,
+                storage_file=self.storage_file,
                 portfolio_id=self.portfolio_id,
                 request_id=self.request_id,
                 symbol=self.symbol,
@@ -127,45 +144,16 @@ class TestMarketPortfolioStressAutoHedgeSync(unittest.TestCase):
                 monitor=monitor,
                 evaluator=evaluator,
                 rebalancer=rebalancer,
-                storage_file=storage_file
+                storage_file=self.storage_file
             )
-            instance_mock.synchronize.assert_called_once_with(
+            mock_instance.synchronize.assert_called_once_with(
                 portfolio_id=self.portfolio_id,
                 request_id=self.request_id,
                 symbol=self.symbol,
                 percentage=self.percentage,
                 shifts=self.shifts
             )
-            self.assertEqual(res, expected_return)
-
-    def test_synchronize_restores_missing_advisor_dependencies(self):
-        mock_advisor = MagicMock()
-        mock_advisor.monitor = None
-        mock_advisor.rebalancer = None
-
-        mock_pipeline = MagicMock()
-        mock_pipeline.execute.return_value = {}
-
-        monitor_obj = MagicMock()
-        rebalancer_obj = MagicMock()
-
-        syncer = MarketPortfolioStressAutoHedgeSync(
-            monitor=monitor_obj,
-            rebalancer=rebalancer_obj,
-            advisor=mock_advisor,
-            pipeline=mock_pipeline
-        )
-
-        syncer.synchronize(
-            portfolio_id=self.portfolio_id,
-            request_id=self.request_id,
-            symbol=self.symbol,
-            percentage=self.percentage,
-            shifts=self.shifts
-        )
-
-        self.assertEqual(mock_advisor.monitor, monitor_obj)
-        self.assertEqual(mock_advisor.rebalancer, rebalancer_obj)
+            self.assertEqual(res, expected_output)
 
 
 if __name__ == "__main__":

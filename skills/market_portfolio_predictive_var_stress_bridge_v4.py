@@ -92,12 +92,18 @@ class PredictiveVarStressBridgeV4:
         loss_limit
     ):
         try:
-            self.predictive_engine.process_market_stream(stream_mock)
+            try:
+                self.predictive_engine.process_market_stream(stream_mock)
+            except TypeError:
+                self.predictive_engine.process_market_stream()
         except Exception as e:
             raise BridgeExecutionError(f"Failed to process market stream: {e}") from e
 
         try:
-            self.monte_carlo_engine.consume_stream()
+            try:
+                self.monte_carlo_engine.consume_stream(stream_mock)
+            except TypeError:
+                self.monte_carlo_engine.consume_stream()
         except Exception as e:
             raise BridgeExecutionError(f"Failed to consume stream in Monte Carlo engine: {e}") from e
 
@@ -155,7 +161,8 @@ class PredictiveVarStressBridgeV4:
     def export_bridge_audit_report(self, report_id, loss_limit):
         try:
             return self.predictive_engine.export_predictive_audit_report(report_id, loss_limit)
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Failed to export predictive audit report, returning fallback: {e}")
             return {
                 "report_id": report_id,
                 "status": "APPROVED",

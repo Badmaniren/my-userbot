@@ -1,70 +1,93 @@
 import unittest
 import os
 import uuid
-import random
+import tempfile
 from skills.market_portfolio_stream_alert_bridge import (
+    process_stream_and_dispatch,
+    evaluate_stream_anomaly_bridge,
     process_stream_and_dispatch_alert
 )
 
 class TestMarketPortfolioStreamAlertBridgeIntegration(unittest.TestCase):
     def setUp(self):
-        self.unique_id = str(uuid.uuid4())
-        self.symbol = f"TEST_{random.randint(1000, 9999)}"
-        self.stream_source = f"wss://stream.integration.test/{self.symbol}"
-        self.output_path = f"test_stream_output_{self.unique_id}.json"
-        self.storage_file = f"test_storage_{self.unique_id}.json"
-        self.telegram_token = f"token_{random.randint(100000, 999999)}"
-        self.chat_id = str(random.randint(10000000, 99999999))
-        self.price_jump = round(random.uniform(5.0, 50.0), 2)
+        self.test_dir = tempfile.TemporaryDirectory()
+        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
+        self.output_path = os.path.join(self.test_dir.name, f"stream_out_{uuid.uuid4().hex}.json")
+        self.storage_file = os.path.join(self.test_dir.name, f"storage_{uuid.uuid4().hex}.json")
         
         self.payload = {
-            "event_id": self.unique_id,
+            "event_id": str(uuid.uuid4()),
             "symbol": self.symbol,
-            "price_delta": self.price_jump,
-            "timestamp": random.randint(1600000000, 1700000000)
-        }
-
-    def tearDown(self):
-        for path in [self.output_path, self.storage_file]:
-            if os.path.exists(path):
-                try:
-                    os.remove(path)
-                except OSError:
-                    pass
-
-    def test_stream_ingest_and_alert_dispatch_composition(self):
-        context = {
-            "run_id": self.unique_id,
-            "mode": "integration_test"
+            "price": 150.25,
+            "volume": 1000,
+            "anomaly_detected": True
         }
         
-        result = process_stream_and_dispatch_alert(
-            context=context,
-            stream_source=self.stream_source,
+        self.url = "https://api.test-target-endpoint.local/webhook"
+        self.telegram_token = "test_token_123456:ABC-DEF1234abcd"
+        self.chat_id = "@test_channel_alerts"
+        self.severity_level = "HIGH"
+        self.min_threshold = 5.0
+        self.channels = ["telegram", "webhook"]
+        self.context = {"env": "test", "session_id": str(uuid.uuid4())}
+        self.stream_source = "websocket://market.feed.local/v1/stream"
+        self.alert_message_template = "PRICE_SPIKE_ALERT"
+
+    def tearDown(self):
+        self.test_dir.cleanup()
+
+    def test_process_stream_and_dispatch_integration(self):
+        result = process_stream_and_dispatch(
             payload=self.payload,
             output_path=self.output_path,
-            url=f"https://api.integration.test/alert/{self.unique_id}",
+            symbol=self.symbol,
+            url=self.url,
             telegram_token=self.telegram_token,
             chat_id=self.chat_id,
             storage_file=self.storage_file,
-            severity_level="HIGH",
-            min_threshold=self.price_jump - 1.0,
-            channels=["telegram", "webhook"]
+            severity_level=self.severity_level,
+            min_threshold=self.min_threshold,
+            channels=self.channels
+        )
+
+        self.assertIn("stream_processing", result)
+        self.assertIn("alert_dispatch_status", result)
+        self.assertTrue(result["alert_dispatched"])
+        self.assertTrue(os.path.exists(self.output_path))
+
+    def test_evaluate_stream_anomaly_bridge_integration(self):
+        result = evaluate_stream_anomaly_bridge(
+            context=self.context,
+            stream_source=self.stream_source,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id,
+            alert_message_template=self.alert_message_template
         )
 
         self.assertIsInstance(result, dict)
-        self.assertIn("status", result)
-        self.assertEqual(result.get("event_id"), self.unique_id)
-        
-        self.assertTrue(
-            os.path.exists(self.output_path),
-            f"Ожидается создание файла вывода потока: {self.output_path}"
+        self.assertIn("source_id", result)
+
+    def test_process_stream_and_dispatch_alert_integration(self):
+        result = process_stream_and_dispatch_alert(
+            context=self.context,
+            stream_source=self.stream_source,
+            payload=self.payload,
+            output_path=self.output_path,
+            url=self.url,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id,
+            storage_file=self.storage_file,
+            severity_level=self.severity_level,
+            min_threshold=self.min_threshold,
+            channels=self.channels
         )
-        
-        self.assertTrue(
-            os.path.exists(self.storage_file) or result.get("dispatched") is True,
-            "Интеграционный модуль должен выполнить диспетчеризацию алертов через связанные навыки"
-        )
+
+        self.assertEqual(result.get("status"), "success")
+        self.assertEqual(result.get("event_id"), self.payload["event_id"])
+        self.assertTrue(result.get("dispatched"))
+        self.assertIn("stream_processing", result)
+        self.assertIn("alert_dispatch_status", result)
+        self.assertTrue(os.path.exists(self.output_path))
 
 if __name__ == "__main__":
     unittest.main()

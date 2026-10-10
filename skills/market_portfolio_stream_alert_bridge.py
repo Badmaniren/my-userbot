@@ -1,0 +1,107 @@
+from skills.market_portfolio_realtime_stream_ingestor import market_portfolio_realtime_stream_ingestor, start_new
+from skills.market_portfolio_alert_dispatcher import dispatch_portfolio_alerts, send_telegram_notification
+
+def process_stream_and_dispatch(
+    payload,
+    output_path,
+    symbol,
+    url,
+    telegram_token,
+    chat_id,
+    storage_file,
+    severity_level,
+    min_threshold,
+    channels
+):
+    stream_processing = market_portfolio_realtime_stream_ingestor(payload, output_path)
+
+    alert_dispatch_status = None
+    alert_dispatched = False
+
+    anomaly_detected = stream_processing.get("anomaly_detected", payload.get("anomaly_detected", False))
+    if anomaly_detected:
+        alert_dispatch_status = dispatch_portfolio_alerts(
+            symbol,
+            url,
+            telegram_token,
+            chat_id,
+            storage_file,
+            severity_level,
+            min_threshold,
+            channels
+        )
+        alert_dispatched = True
+    else:
+        alert_dispatched = False
+
+    return {
+        "stream_processing": stream_processing,
+        "alert_dispatch_status": alert_dispatch_status,
+        "alert_dispatched": alert_dispatched
+    }
+
+def evaluate_stream_anomaly_bridge(
+    context,
+    stream_source,
+    telegram_token,
+    chat_id,
+    alert_message_template
+):
+    try:
+        start_result = start_new(context, stream_source)
+    except Exception as e:
+        start_result = {"source_id": "fallback_source_id", "error": str(e)}
+
+    source_id = start_result.get("source_id") if isinstance(start_result, dict) else None
+    if not source_id:
+        source_id = str(stream_source) if stream_source else "fallback_source_id"
+
+    message = f"{alert_message_template} - {source_id}"
+    send_telegram_notification(telegram_token, chat_id, message)
+
+    return start_result
+
+def process_stream_and_dispatch_alert(
+    context,
+    stream_source,
+    payload,
+    output_path,
+    url,
+    telegram_token,
+    chat_id,
+    storage_file,
+    severity_level,
+    min_threshold,
+    channels
+):
+    try:
+        start_new(context, stream_source)
+    except Exception:
+        raise
+
+    symbol = payload.get("symbol", "TEST_SYMBOL")
+    stream_result = market_portfolio_realtime_stream_ingestor(payload, output_path)
+
+    dispatched = False
+    dispatch_res = None
+    anomaly_detected = stream_result.get("anomaly_detected", payload.get("anomaly_detected", True))
+    if anomaly_detected:
+        dispatch_res = dispatch_portfolio_alerts(
+            symbol,
+            url,
+            telegram_token,
+            chat_id,
+            storage_file,
+            severity_level,
+            min_threshold,
+            channels
+        )
+        dispatched = True
+
+    return {
+        "status": "success",
+        "event_id": payload.get("event_id"),
+        "stream_processing": stream_result,
+        "alert_dispatch_status": dispatch_res,
+        "dispatched": dispatched
+    }

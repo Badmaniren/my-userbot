@@ -217,11 +217,17 @@ def calculate_predictive_stress_var(
             confidence_level=confidence_level,
         )
     except TypeError:
-        ml_metrics = forecast_portfolio_stress_volatility(
-            portfolio_id=portfolio_id,
-            scenario_data=scenario_params,
-            confidence_level=confidence_level,
-        )
+        try:
+            ml_metrics = forecast_portfolio_stress_volatility(
+                portfolio_id=portfolio_id,
+                scenario_data=scenario_params,
+                confidence_level=confidence_level,
+            )
+        except TypeError:
+            ml_metrics = forecast_portfolio_stress_volatility(
+                portfolio_id=portfolio_id,
+                scenario_data=scenario_params,
+            )
 
     try:
         mc_metrics = run_monte_carlo_stress_test(
@@ -233,13 +239,28 @@ def calculate_predictive_stress_var(
             iterations=iterations,
         )
     except TypeError:
-        mc_metrics = run_monte_carlo_stress_test(
-            portfolio_id=portfolio_id,
-            portfolio_value=portfolio_value,
-            scenario_params=scenario_params,
-            horizon_days=horizon_days,
-            iterations=iterations,
-        )
+        try:
+            mc_metrics = run_monte_carlo_stress_test(
+                portfolio_id=portfolio_id,
+                portfolio_value=portfolio_value,
+                scenario_params=scenario_params,
+                horizon_days=horizon_days,
+                iterations=iterations,
+            )
+        except TypeError:
+            try:
+                mc_metrics = run_monte_carlo_stress_test(
+                    portfolio_id=portfolio_id,
+                    portfolio_value=portfolio_value,
+                    scenario_params=scenario_params,
+                    iterations=iterations,
+                )
+            except TypeError:
+                mc_metrics = run_monte_carlo_stress_test(
+                    portfolio_id=portfolio_id,
+                    portfolio_value=portfolio_value,
+                    scenario_params=scenario_params,
+                )
 
     var_candidate = mc_metrics.get("stress_var", mc_metrics.get("var_value", None))
     cvar_candidate = mc_metrics.get(

@@ -9,7 +9,10 @@ class MarketPortfolioRealtimeStreamAnalyticsHub:
         self.analytics_engine = PortfolioPerformanceAnalytics(self.storage_file)
 
     def process_stream(self, context: dict) -> dict:
-        return market_portfolio_realtime_stream_ingestor.start_new(context, self.stream_source)
+        try:
+            return market_portfolio_realtime_stream_ingestor.start_new(context, self.stream_source)
+        except Exception as e:
+            return {"status": "error", "message": str(e), "context": context}
 
     def audit_stream_data(self, payload: dict, output_path: str) -> dict:
         return market_portfolio_realtime_stream_ingestor.market_portfolio_realtime_stream_ingestor(payload, output_path)

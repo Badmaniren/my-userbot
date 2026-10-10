@@ -1,8 +1,15 @@
 import json
 import os
 import uuid
-import requests
-from bs4 import BeautifulSoup
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 
 class MarketParser:
@@ -62,7 +69,7 @@ class MarketParser:
         return record_id
 
     def load_data(self, filename):
-        if os.path.exists(filename):
+        if filename and isinstance(filename, (str, bytes, os.PathLike)) and os.path.exists(filename):
             with open(filename, 'r', encoding='utf-8') as f:
                 return json.load(f)
         return {}

@@ -53,11 +53,14 @@ class MarketPortfolioPredictiveVarStressValidationNexus:
             except Exception:
                 var_result = float(portfolio_value * 0.05)
 
-        # 2. Запускаем бэктест через бэктестер (исправление сигнатуры: передаем symbol позиционно или без initial_capital)
+        # 2. Запускаем бэктест через бэктестер с учетом сигнатуры run_backtest(symbol, initial_capital_or_shifts)
         try:
-            equity_curve = self.backtester.run_backtest(symbol)
+            equity_curve = self.backtester.run_backtest(symbol, initial_capital)
         except TypeError:
-            equity_curve = self.backtester.run_backtest(symbol=symbol, initial_capital=initial_capital)
+            try:
+                equity_curve = self.backtester.run_backtest(symbol)
+            except TypeError:
+                equity_curve = self.backtester.run_backtest(symbol=symbol, initial_capital_or_shifts=initial_capital)
 
         # 3. Рассчитываем максимальную просадку
         max_drawdown = self.backtester.calculate_maximum_drawdown(equity_curve)
@@ -81,14 +84,11 @@ class MarketPortfolioPredictiveVarStressValidationNexus:
         )
 
     def export_validation_audit_nexus(self, audit_report_id: str, loss_limit: float) -> bool:
-        try:
-            res = self.var_engine.export_predictive_audit_report(
-                report_id=audit_report_id,
-                loss_limit=loss_limit
-            )
-            return bool(res)
-        except Exception:
-            return True
+        res = self.var_engine.export_predictive_audit_report(
+            report_id=audit_report_id,
+            loss_limit=loss_limit
+        )
+        return bool(res)
 
 
 # Алиас для совместимости с интеграционными тестами

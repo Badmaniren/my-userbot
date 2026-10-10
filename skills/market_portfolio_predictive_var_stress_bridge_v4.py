@@ -92,18 +92,17 @@ class PredictiveVarStressBridgeV4:
         loss_limit
     ):
         try:
-            try:
-                self.predictive_engine.process_market_stream(stream_mock)
-            except TypeError:
-                self.predictive_engine.process_market_stream()
+            self.predictive_engine.process_market_stream(stream_mock)
         except Exception as e:
             raise BridgeExecutionError(f"Failed to process market stream: {e}") from e
 
         try:
+            self.monte_carlo_engine.consume_stream()
+        except TypeError:
             try:
                 self.monte_carlo_engine.consume_stream(stream_mock)
-            except TypeError:
-                self.monte_carlo_engine.consume_stream()
+            except Exception as e:
+                raise BridgeExecutionError(f"Failed to consume stream in Monte Carlo engine: {e}") from e
         except Exception as e:
             raise BridgeExecutionError(f"Failed to consume stream in Monte Carlo engine: {e}") from e
 

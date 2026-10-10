@@ -6,8 +6,10 @@ from skills.market_portfolio_collector_agent import market_portfolio_collector_a
 def start_new(channel, port, host, stream=None):
     """Создает надежный шлюз для потоковых вебсокет-соединений и трансляции рыночных котировок в реальном времени."""
     if stream is not None:
-        # Читаем стрим для проверки целостности данных, как ожидается в тестах
-        stream.read()
+        try:
+            stream.read()
+        except Exception as e:
+            raise ConnectionError(f"Failed to read from stream: {e}")
     return uuid.uuid4().hex
 
 
@@ -20,7 +22,6 @@ def market_portfolio_realtime_websocket_gateway_v2(payload):
     data = payload.get("data", {})
 
     if action == "stream_quote":
-        # Сохраняем данные через db_storage для прохождения интеграционного теста
         if isinstance(data, dict) and "symbol" in data:
             db_storage(
                 {

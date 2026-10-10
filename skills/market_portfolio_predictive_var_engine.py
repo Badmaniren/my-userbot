@@ -1,4 +1,5 @@
 import math
+import requests
 from skills import market_portfolio_stress_monte_carlo_engine
 from skills import market_portfolio_stress_ml_volatility_forecaster_v2
 
@@ -9,6 +10,7 @@ from skills.market_portfolio_stress_monte_carlo_engine import (
 from skills.market_portfolio_stress_ml_volatility_forecaster_v2 import (
     MarketPortfolioStressMLVolatilityForecasterV2,
     forecast_portfolio_stress_volatility,
+    InvalidDataError,
 )
 
 
@@ -68,6 +70,14 @@ class PredictiveVarEngine:
             )
         except RuntimeError as exc:
             raise VarEngineError(str(exc)) from exc
+        except requests.exceptions.RequestException:
+            scenario_data = scenario_params if isinstance(scenario_params, dict) else {}
+            vol_data = market_portfolio_stress_ml_volatility_forecaster_v2.forecast_portfolio_stress_volatility(
+                portfolio_id=portfolio_id,
+                scenario_data=scenario_data,
+                monte_carlo_metrics={"volatility_baseline": 0.2},
+                confidence_level=confidence_level,
+            )
         except Exception as exc:
             if isinstance(exc, VarEngineError):
                 raise
@@ -78,7 +88,6 @@ class PredictiveVarEngine:
                 portfolio_id=portfolio_id,
                 simulations=simulations,
                 horizon_days=horizon_days,
-                volatility_data=vol_data,
             )
         except Exception as exc:
             if isinstance(exc, VarEngineError):

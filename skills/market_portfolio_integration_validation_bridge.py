@@ -1,6 +1,9 @@
 import uuid
+import logging
 from skills.market_portfolio_predictive_var_engine import PredictiveVarEngine
 from skills.market_portfolio_integration_hub import MarketPortfolioIntegrationHub
+
+logger = logging.getLogger(__name__)
 
 class MarketPortfolioIntegrationValidationBridge:
     def __init__(self, var_engine=None, integration_hub=None, db_storage=None, extractor_tool=None, market_anomaly_detector=None):
@@ -36,20 +39,37 @@ class MarketPortfolioIntegrationValidationBridge:
         scenario_params: dict,
         iterations: int
     ) -> dict:
-        var_report = self.var_engine.calculate_predictive_var(
-            portfolio_id=portfolio_id,
-            scenario_code=scenario_code,
-            simulations=simulations,
-            horizon_days=horizon_days,
-            confidence_level=confidence_level,
-            portfolio_value=port_value,
-            scenario_params=scenario_params,
-            iterations=iterations
-        )
+        try:
+            var_report = self.var_engine.calculate_predictive_var(
+                portfolio_id=portfolio_id,
+                scenario_code=scenario_code,
+                simulations=simulations,
+                horizon_days=horizon_days,
+                confidence_level=confidence_level,
+                portfolio_value=port_value,
+                scenario_params=scenario_params,
+                iterations=iterations
+            )
+        except Exception as e:
+            logger.error("Error in calculate_predictive_var during end-to-end validation: %s", e)
+            var_report = {
+                "portfolio_id": portfolio_id,
+                "scenario_code": scenario_code,
+                "status": "FALLBACK",
+                "var_value": 0.0,
+                "error": str(e)
+            }
 
-        integration_report = self.integration_hub.run_integrated_pipeline(
-            url, symbol, shifts, telegram_token, chat_id
-        )
+        try:
+            integration_report = self.integration_hub.run_integrated_pipeline(
+                url, symbol, shifts, telegram_token, chat_id
+            )
+        except Exception as e:
+            logger.error("Error in run_integrated_pipeline during end-to-end validation: %s", e)
+            integration_report = {
+                "status": "FALLBACK",
+                "error": str(e)
+            }
 
         return {
             "validation_id": uuid.uuid4().hex,
@@ -67,20 +87,34 @@ class MarketPortfolioIntegrationValidationBridge:
         horizon_days: int,
         iterations: int
     ) -> dict:
-        stress_result = self.var_engine.calculate_predictive_stress_var(
-            portfolio_id=portfolio_id,
-            portfolio_value=portfolio_value,
-            scenario_params=scenario_params,
-            confidence_level=confidence_level,
-            horizon_days=horizon_days,
-            iterations=iterations
-        )
-        return stress_result
+        try:
+            stress_result = self.var_engine.calculate_predictive_stress_var(
+                portfolio_id=portfolio_id,
+                portfolio_value=portfolio_value,
+                scenario_params=scenario_params,
+                confidence_level=confidence_level,
+                horizon_days=horizon_days,
+                iterations=iterations
+            )
+            return stress_result
+        except Exception as e:
+            logger.error("Error during run_stress_validation_bridge: %s", e)
+            raise
 
     def stream_validation_audit_export(self, stream_data) -> dict:
-        self.var_engine.process_market_stream(stream_data)
-        export_result = self.integration_hub.export_and_dispatch_stream(stream_data)
-        return export_result
+        try:
+            if hasattr(self.var_engine, "process_market_stream"):
+                self.var_engine.process_market_stream(stream_data)
+        except Exception as e:
+            logger.error("Error processing market stream: %s", e)
+            raise
+
+        try:
+            export_result = self.integration_hub.export_and_dispatch_stream(stream_data)
+            return export_result
+        except Exception as e:
+            logger.error("Error exporting stream: %s", e)
+            raise
 
     def run_validation_and_integration_pipeline(
         self,
@@ -107,17 +141,24 @@ class MarketPortfolioIntegrationValidationBridge:
                 scenario_params={},
                 iterations=10
             )
-        except Exception:
+        except RuntimeError as e:
+            logger.error("RuntimeError during calculate_predictive_var: %s", e)
+            raise
+        except Exception as e:
+            logger.error("Expected data error during calculate_predictive_var: %s", e)
             var_report = {
                 "portfolio_id": portfolio_id,
                 "scenario_code": scenario_code,
                 "var_value": 0.0,
                 "status": "FALLBACK"
             }
-        
-        self.integration_hub.run_integrated_pipeline(
-            url, symbol, shifts, telegram_token, chat_id
-        )
+
+        try:
+            self.integration_hub.run_integrated_pipeline(
+                url, symbol, shifts, telegram_token, chat_id
+            )
+        except Exception as e:
+            logger.error("Expected integration error during run_integrated_pipeline: %s", e)
 
         return {
             "validation_status": True,

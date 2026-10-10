@@ -20,7 +20,7 @@ class MarketPortfolioStressMLVolatilityForecasterV2:
     def forecast_volatility(self, portfolio_id: str, scenario_code: str) -> dict:
         if not portfolio_id or not isinstance(portfolio_id, str):
             raise InvalidDataError("Invalid portfolio_id")
-        if not scenario_code or not isinstance(scenario_code, str) or any(c in "!@#$%^&*()_+=-[]{}|;':\",./<>?" for c in scenario_code):
+        if not scenario_code or not isinstance(scenario_code, str) or any(c in "!@#$%^&*()+=[]{}|;':\",./<>?" for c in scenario_code):
             raise InvalidDataError("Invalid scenario_code")
 
         url = f"https://api.market-stress-{portfolio_id}.internal/v2/forecast"

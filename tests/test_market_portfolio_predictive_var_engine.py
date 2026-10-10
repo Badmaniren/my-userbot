@@ -1,231 +1,328 @@
 import unittest
-from unittest.mock import patch, MagicMock
-import uuid
+from unittest.mock import patch
 import random
-import string
+import uuid
+import math
 import io
 
 from skills.market_portfolio_predictive_var_engine import (
     PredictiveVarEngine,
+    MarketPortfolioPredictiveVarEngine,
     VarEngineError,
-    InsufficientDataError
+    InsufficientDataError,
+    calculate_predictive_stress_var,
 )
 
-class TestPredictiveVarEngine(unittest.TestCase):
 
+class TestPredictiveVarEngine(unittest.TestCase):
     def setUp(self):
-        self.db_storage = MagicMock()
-        self.extractor_tool = MagicMock()
-        self.anomaly_detector = MagicMock()
-        
-        self.engine = PredictiveVarEngine(
-            db_storage=self.db_storage,
-            extractor_tool=self.extractor_tool,
-            market_anomaly_detector=self.anomaly_detector
-        )
+        self.portfolio_id = uuid.uuid4().hex
+        self.scenario_code = uuid.uuid4().hex
+        self.simulations = random.randint(100, 2000)
+        self.horizon_days = random.randint(1, 30)
+        self.confidence_level = round(random.uniform(0.8, 0.99), 2)
+        self.portfolio_value = round(random.uniform(10000.0, 1000000.0), 2)
+        self.engine = PredictiveVarEngine()
+
+    def test_init_defaults(self):
+        eng = PredictiveVarEngine()
+        self.assertIsNone(eng.db_storage)
+        self.assertIsNone(eng.extractor_tool)
+        self.assertIsNone(eng.market_anomaly_detector)
+        self.assertIsNotNone(eng.forecaster)
+        self.assertIsNotNone(eng.monte_carlo_engine)
 
     def test_calculate_predictive_var_success(self):
-        portfolio_id = uuid.uuid4().hex
-        scenario_code = uuid.uuid4().hex
-        simulations_count = random.randint(100, 5000)
-        horizon = random.randint(1, 30)
-        confidence = round(random.uniform(0.90, 0.99), 4)
+        simulated_losses_list = [round(random.uniform(100.0, 5000.0), 2) for _ in range(50)]
+        vol_mock_data = {"volatility_score": random.uniform(0.1, 0.5), "id": self.portfolio_id}
+        mc_mock_data = {"simulated_losses": simulated_losses_list}
 
-        mock_volatility_data = {
-            uuid.uuid4().hex: random.uniform(0.1, 0.5),
-            uuid.uuid4().hex: random.uniform(0.2, 0.8)
-        }
+        with patch("skills.market_portfolio_stress_ml_volatility_forecaster_v2.MarketPortfolioStressMLVolatilityForecasterV2.forecast_volatility", return_value=vol_mock_data) as m_vol, \
+             patch("skills.market_portfolio_stress_monte_carlo_engine.MonteCarloStressEngine.run_simulation", return_value=mc_mock_data) as m_mc:
 
-        mock_mc_results = {
-            "portfolio_id": portfolio_id,
-            "simulations": simulations_count,
-            "horizon_days": horizon,
-            "simulated_losses": [random.uniform(-1000, 50000) for _ in range(50)]
-        }
-
-        with patch("skills.market_portfolio_predictive_var_engine.market_portfolio_stress_ml_volatility_forecaster_v2.MarketPortfolioStressMLVolatilityForecasterV2") as mock_forecaster_cls, \
-             patch("skills.market_portfolio_predictive_var_engine.market_portfolio_stress_monte_carlo_engine.MonteCarloStressEngine") as mock_mc_cls:
-
-            instance_forecaster = mock_forecaster_cls.return_value
-            instance_forecaster.forecast_volatility.return_value = mock_volatility_data
-
-            instance_mc = mock_mc_cls.return_value
-            instance_mc.run_simulation.return_value = mock_mc_results
-
-            result = self.engine.calculate_predictive_var(
-                portfolio_id=portfolio_id,
-                scenario_code=scenario_code,
-                simulations=simulations_count,
-                horizon_days=horizon,
-                confidence_level=confidence
+            res = self.engine.calculate_predictive_var(
+                portfolio_id=self.portfolio_id,
+                scenario_code=self.scenario_code,
+                simulations=self.simulations,
+                horizon_days=self.horizon_days,
+                confidence_level=self.confidence_level,
+                portfolio_value=self.portfolio_value
             )
 
-            self.assertIsInstance(result, dict)
-            self.assertIn("var_value", result)
-            self.assertIn("cvar_value", result)
-            self.assertEqual(result["portfolio_id"], portfolio_id)
-            self.assertEqual(result["confidence_level"], confidence)
+            m_vol.assert_called_once_with(portfolio_id=self.portfolio_id, scenario_code=self.scenario_code)
+            m_mc.assert_called_once()
+            self.assertEqual(res["portfolio_id"], self.portfolio_id)
+            self.assertEqual(res["scenario_code"], self.scenario_code)
+            self.assertIn("var_value", res)
+            self.assertIn("cvar_value", res)
+            self.assertIsInstance(res["ml_volatility_metrics"], dict)
+            self.assertIsInstance(res["monte_carlo_metrics"], dict)
 
-    def test_calculate_predictive_var_insufficient_data(self):
-        portfolio_id = uuid.uuid4().hex
-        scenario_code = uuid.uuid4().hex
+    def test_calculate_predictive_var_iterations_override(self):
+        iterations_val = random.randint(50, 500)
+        vol_mock_data = {}
+        mc_mock_data = {"simulated_losses": [10.0, 20.0, 30.0]}
 
-        with patch("skills.market_portfolio_predictive_var_engine.market_portfolio_stress_ml_volatility_forecaster_v2.MarketPortfolioStressMLVolatilityForecasterV2") as mock_forecaster_cls:
-            instance_forecaster = mock_forecaster_cls.return_value
-            instance_forecaster.forecast_volatility.side_effect = Exception("ML model failure")
+        with patch("skills.market_portfolio_stress_ml_volatility_forecaster_v2.MarketPortfolioStressMLVolatilityForecasterV2.forecast_volatility", return_value=vol_mock_data), \
+             patch("skills.market_portfolio_stress_monte_carlo_engine.MonteCarloStressEngine.run_simulation", return_value=mc_mock_data) as m_mc:
 
-            with self.assertRaises(InsufficientDataError):
-                self.engine.calculate_predictive_var(
-                    portfolio_id=portfolio_id,
-                    scenario_code=scenario_code,
-                    simulations=random.randint(100, 1000),
-                    horizon_days=random.randint(1, 10),
-                    confidence_level=0.95
-                )
+            res = self.engine.calculate_predictive_var(
+                portfolio_id=self.portfolio_id,
+                iterations=iterations_val
+            )
+            self.assertEqual(res["simulations_run"], iterations_val)
 
-    def test_stream_payload_processing(self):
-        random_bytes = "".join(random.choices(string.ascii_letters + string.digits, k=64)).encode("utf-8")
-        stream_mock = io.BytesIO(random_bytes)
-
-        with patch("skills.market_portfolio_predictive_var_engine.market_portfolio_stress_monte_carlo_engine.MonteCarloStressEngine") as mock_mc_cls:
-            instance_mc = mock_mc_cls.return_value
-            instance_mc.consume_stream.return_value = random_bytes.decode("utf-8")
-
-            processed_data = self.engine.process_market_stream(stream_mock)
-            self.assertIsInstance(processed_data, str)
-            self.assertTrue(len(processed_data) > 0)
-
-    def test_evaluate_var_risk_anomaly(self):
-        portfolio_id = uuid.uuid4().hex
-        scenario_code = uuid.uuid4().hex
-        html_content = f"<html><body><div>{uuid.uuid4().hex}</div></body></html>"
-
-        with patch("skills.market_portfolio_predictive_var_engine.market_portfolio_stress_ml_volatility_forecaster_v2.MarketPortfolioStressMLVolatilityForecasterV2") as mock_forecaster_cls:
-            instance_forecaster = mock_forecaster_cls.return_value
-            anomaly_payload = {
-                "anomaly_detected": True,
-                "score": random.uniform(0.5, 1.0),
-                "token": uuid.uuid4().hex
-            }
-            instance_forecaster.evaluate_stress_anomaly.return_value = anomaly_payload
-
-            result = self.engine.evaluate_risk_anomaly(
-                portfolio_id=portfolio_id,
-                scenario_code=scenario_code,
-                soup_content=html_content
+    def test_calculate_predictive_var_invalid_values(self):
+        with self.assertRaises(ValueError):
+            self.engine.calculate_predictive_var(
+                portfolio_id=self.portfolio_id,
+                portfolio_value=-100.0
             )
 
-            self.assertEqual(result, anomaly_payload)
-            self.assertTrue(result["anomaly_detected"])
+        with self.assertRaises(ValueError):
+            self.engine.calculate_predictive_var(
+                portfolio_id=self.portfolio_id,
+                confidence_level=1.5
+            )
 
-    def test_export_predictive_audit_report(self):
+        with self.assertRaises(ValueError):
+            self.engine.calculate_predictive_var(
+                portfolio_id=self.portfolio_id,
+                confidence_level=0.0
+            )
+
+    def test_calculate_predictive_var_scenario_params_mapping(self):
+        custom_scenario = uuid.uuid4().hex
+        scenario_params = {"scenario_code": custom_scenario}
+        vol_mock_data = {}
+        mc_mock_data = {"simulated_losses": [5.0, 15.0]}
+
+        with patch("skills.market_portfolio_stress_ml_volatility_forecaster_v2.MarketPortfolioStressMLVolatilityForecasterV2.forecast_volatility", return_value=vol_mock_data) as m_vol, \
+             patch("skills.market_portfolio_stress_monte_carlo_engine.MonteCarloStressEngine.run_simulation", return_value=mc_mock_data):
+
+            self.engine.calculate_predictive_var(
+                portfolio_id=self.portfolio_id,
+                scenario_params=scenario_params
+            )
+            m_vol.assert_called_once_with(portfolio_id=self.portfolio_id, scenario_code=custom_scenario)
+
+    def test_calculate_predictive_var_forecaster_runtime_error(self):
+        err_msg = uuid.uuid4().hex
+        with patch("skills.market_portfolio_stress_ml_volatility_forecaster_v2.MarketPortfolioStressMLVolatilityForecasterV2.forecast_volatility", side_effect=RuntimeError(err_msg)):
+            with self.assertRaises(VarEngineError) as ctx:
+                self.engine.calculate_predictive_var(portfolio_id=self.portfolio_id)
+            self.assertIn(err_msg, str(ctx.exception))
+
+    def test_calculate_predictive_var_forecaster_generic_error(self):
+        err_msg = uuid.uuid4().hex
+        with patch("skills.market_portfolio_stress_ml_volatility_forecaster_v2.MarketPortfolioStressMLVolatilityForecasterV2.forecast_volatility", side_effect=Exception(err_msg)):
+            with self.assertRaises(InsufficientDataError) as ctx:
+                self.engine.calculate_predictive_var(portfolio_id=self.portfolio_id)
+            self.assertIn(err_msg, str(ctx.exception))
+
+    def test_calculate_predictive_var_monte_carlo_error(self):
+        err_msg = uuid.uuid4().hex
+        with patch("skills.market_portfolio_stress_ml_volatility_forecaster_v2.MarketPortfolioStressMLVolatilityForecasterV2.forecast_volatility", return_value={}), \
+             patch("skills.market_portfolio_stress_monte_carlo_engine.MonteCarloStressEngine.run_simulation", side_effect=Exception(err_msg)):
+            with self.assertRaises(VarEngineError) as ctx:
+                self.engine.calculate_predictive_var(portfolio_id=self.portfolio_id)
+            self.assertIn(err_msg, str(ctx.exception))
+
+    def test_calculate_predictive_var_empty_losses(self):
+        vol_mock_data = {}
+        mc_mock_data = {"simulated_losses": []}
+        with patch("skills.market_portfolio_stress_ml_volatility_forecaster_v2.MarketPortfolioStressMLVolatilityForecasterV2.forecast_volatility", return_value=vol_mock_data), \
+             patch("skills.market_portfolio_stress_monte_carlo_engine.MonteCarloStressEngine.run_simulation", return_value=mc_mock_data):
+            res = self.engine.calculate_predictive_var(
+                portfolio_id=self.portfolio_id,
+                portfolio_value=self.portfolio_value
+            )
+            self.assertEqual(res["var_value"], 0.0)
+            self.assertEqual(res["cvar_value"], 0.0)
+
+    def test_delegated_methods(self):
+        stream_mock = io.BytesIO(uuid.uuid4().bytes)
+        soup_content = uuid.uuid4().hex
         report_id = uuid.uuid4().hex
-        loss_limit = round(random.uniform(10000.0, 500000.0), 2)
-
-        expected_report = {
-            "report_id": report_id,
-            "status": "APPROVED",
-            "threshold": loss_limit,
-            "signature": uuid.uuid4().hex
-        }
-
-        with patch("skills.market_portfolio_predictive_var_engine.market_portfolio_stress_monte_carlo_engine.MonteCarloStressEngine") as mock_mc_cls:
-            instance_mc = mock_mc_cls.return_value
-            instance_mc.export_report.return_value = expected_report
-
-            report = self.engine.export_predictive_audit_report(
-                report_id=report_id,
-                loss_limit=loss_limit
-            )
-
-            self.assertEqual(report, expected_report)
-            self.assertEqual(report["report_id"], report_id)
-            self.assertEqual(report["threshold"], loss_limit)
-
-    def test_fetch_external_predictive_metrics(self):
-        target_url = f"https://{uuid.uuid4().hex}.com/api/v1/metrics"
-        portfolio_id = uuid.uuid4().hex
-        scenario_code = uuid.uuid4().hex
-
-        external_metrics = {
-            "volatility_index": random.uniform(10.0, 35.0),
-            "confidence_bound": random.uniform(0.01, 0.05),
-            "reference": uuid.uuid4().hex
-        }
-
-        with patch("skills.market_portfolio_predictive_var_engine.market_portfolio_stress_ml_volatility_forecaster_v2.MarketPortfolioStressMLVolatilityForecasterV2") as mock_forecaster_cls:
-            instance_forecaster = mock_forecaster_cls.return_value
-            instance_forecaster.fetch_external_ml_metrics.return_value = external_metrics
-
-            metrics = self.engine.fetch_external_predictive_metrics(
-                target_url=target_url,
-                portfolio_id=portfolio_id,
-                scenario_code=scenario_code
-            )
-
-            self.assertEqual(metrics, external_metrics)
-            self.assertIn("volatility_index", metrics)
-
-    def test_run_standalone_scenario_simulation(self):
+        loss_limit = round(random.uniform(1000.0, 50000.0), 2)
+        target_url = f"https://{uuid.uuid4().hex}.com/api"
         scenario_id = uuid.uuid4().hex
         base_multiplier = round(random.uniform(1.0, 5.0), 2)
 
-        sim_result = {
-            "scenario_id": scenario_id,
-            "multiplier": base_multiplier,
-            "stress_impact": random.uniform(-0.5, -0.05)
-        }
+        with patch("skills.market_portfolio_stress_monte_carlo_engine.MonteCarloStressEngine.consume_stream", return_value={"status": "consumed"}) as m1, \
+             patch("skills.market_portfolio_stress_ml_volatility_forecaster_v2.MarketPortfolioStressMLVolatilityForecasterV2.evaluate_stress_anomaly", return_value={"anomaly": False}) as m2, \
+             patch("skills.market_portfolio_stress_monte_carlo_engine.MonteCarloStressEngine.export_report", return_value={"exported": True}) as m3, \
+             patch("skills.market_portfolio_stress_ml_volatility_forecaster_v2.MarketPortfolioStressMLVolatilityForecasterV2.fetch_external_ml_metrics", return_value={"metric": 123}) as m4, \
+             patch("skills.market_portfolio_stress_ml_volatility_forecaster_v2.run_scenario_simulation", return_value={"sim": True}) as m5, \
+             patch("skills.market_portfolio_stress_ml_volatility_forecaster_v2.forecast_portfolio_stress_volatility", return_value={"vol": True}) as m6:
 
-        with patch("skills.market_portfolio_predictive_var_engine.market_portfolio_stress_ml_volatility_forecaster_v2.run_scenario_simulation") as mock_run_sim:
-            mock_run_sim.return_value = sim_result
+            self.assertEqual(self.engine.process_market_stream(stream_mock), {"status": "consumed"})
+            m1.assert_called_once_with(stream_mock)
 
-            result = self.engine.run_standalone_scenario_simulation(
-                scenario_id=scenario_id,
-                base_multiplier=base_multiplier
+            self.assertEqual(self.engine.evaluate_risk_anomaly(self.portfolio_id, self.scenario_code, soup_content), {"anomaly": False})
+            m2.assert_called_once_with(portfolio_id=self.portfolio_id, scenario_code=self.scenario_code, soup_content=soup_content)
+
+            self.assertEqual(self.engine.export_predictive_audit_report(report_id, loss_limit), {"exported": True})
+            m3.assert_called_once_with(report_id=report_id, loss_limit=loss_limit)
+
+            self.assertEqual(self.engine.fetch_external_predictive_metrics(target_url, self.portfolio_id, self.scenario_code), {"metric": 123})
+            m4.assert_called_once_with(target_url=target_url, portfolio_id=self.portfolio_id, scenario_code=self.scenario_code)
+
+            self.assertEqual(self.engine.run_standalone_scenario_simulation(scenario_id, base_multiplier), {"sim": True})
+            m5.assert_called_once_with(scenario_id=scenario_id, base_multiplier=base_multiplier)
+
+            scenario_data = {"test": True}
+            monte_carlo_metrics = {"mc": True}
+            self.assertEqual(self.engine.forecast_portfolio_stress_volatility_wrapper(self.portfolio_id, scenario_data, monte_carlo_metrics, self.confidence_level), {"vol": True})
+            m6.assert_called_once_with(portfolio_id=self.portfolio_id, scenario_data=scenario_data, monte_carlo_metrics=monte_carlo_metrics, confidence_level=self.confidence_level)
+
+    def test_calculate_predictive_stress_var_wrapper(self):
+        scenario_params = {"param": uuid.uuid4().hex}
+        with patch("skills.market_portfolio_predictive_var_engine.calculate_predictive_stress_var", return_value={"wrapped": True}) as m_calc:
+            res = self.engine.calculate_predictive_stress_var(
+                portfolio_id=self.portfolio_id,
+                portfolio_value=self.portfolio_value,
+                scenario_params=scenario_params,
+                confidence_level=self.confidence_level,
+                horizon_days=self.horizon_days,
+                iterations=self.simulations
+            )
+            self.assertEqual(res, {"wrapped": True})
+            m_calc.assert_called_once_with(
+                portfolio_id=self.portfolio_id,
+                portfolio_value=self.portfolio_value,
+                scenario_params=scenario_params,
+                confidence_level=self.confidence_level,
+                horizon_days=self.horizon_days,
+                iterations=self.simulations
             )
 
-            self.assertEqual(result, sim_result)
-            self.assertEqual(result["scenario_id"], scenario_id)
+    def test_market_portfolio_predictive_var_engine_alias(self):
+        alias_engine = MarketPortfolioPredictiveVarEngine()
+        self.assertIsInstance(alias_engine, PredictiveVarEngine)
 
-    def test_forecast_portfolio_stress_volatility_wrapper(self):
-        portfolio_id = uuid.uuid4().hex
-        scenario_data = {uuid.uuid4().hex: random.randint(1, 100)}
-        monte_carlo_metrics = {uuid.uuid4().hex: random.random()}
-        confidence_level = round(random.uniform(0.90, 0.99), 2)
 
-        expected_forecast = {
-            "portfolio_id": portfolio_id,
-            "forecasted_var": random.uniform(1000, 10000)
-        }
+class TestCalculatePredictiveStressVarStandalone(unittest.TestCase):
+    def setUp(self):
+        self.portfolio_id = uuid.uuid4().hex
+        self.portfolio_value = round(random.uniform(50000.0, 500000.0), 2)
+        self.scenario_params = {"macro_shock": round(random.uniform(0.05, 0.3), 2)}
+        self.confidence_level = round(random.uniform(0.85, 0.99), 2)
+        self.horizon_days = random.randint(1, 15)
+        self.iterations = random.randint(100, 1000)
 
-        with patch("skills.market_portfolio_predictive_var_engine.market_portfolio_stress_ml_volatility_forecaster_v2.forecast_portfolio_stress_volatility") as mock_forecast:
-            mock_forecast.return_value = expected_forecast
-
-            res = self.engine.forecast_portfolio_stress_volatility_wrapper(
-                portfolio_id=portfolio_id,
-                scenario_data=scenario_data,
-                monte_carlo_metrics=monte_carlo_metrics,
-                confidence_level=confidence_level
+    def test_validation_errors(self):
+        with self.assertRaises(ValueError):
+            calculate_predictive_stress_var(
+                portfolio_id=self.portfolio_id,
+                portfolio_value=-10.0,
+                scenario_params=self.scenario_params
             )
 
-            self.assertEqual(res, expected_forecast)
+        with self.assertRaises(ValueError):
+            calculate_predictive_stress_var(
+                portfolio_id=self.portfolio_id,
+                portfolio_value=self.portfolio_value,
+                scenario_params=self.scenario_params,
+                confidence_level=1.1
+            )
 
-    def test_engine_raises_var_error_on_general_failure(self):
-        portfolio_id = uuid.uuid4().hex
-        scenario_code = uuid.uuid4().hex
+    def test_forecast_and_mc_success_with_candidates(self):
+        ml_mock = {"ml_score": random.uniform(0.1, 0.9)}
+        mc_mock = {"stress_var": round(random.uniform(100.0, 1000.0), 2), "conditional_var": round(random.uniform(1100.0, 2000.0), 2)}
 
-        with patch("skills.market_portfolio_predictive_var_engine.market_portfolio_stress_ml_volatility_forecaster_v2.MarketPortfolioStressMLVolatilityForecasterV2") as mock_forecaster_cls:
-            instance_forecaster = mock_forecaster_cls.return_value
-            instance_forecaster.forecast_volatility.side_effect = RuntimeError("Critical System Failure")
+        with patch("skills.market_portfolio_predictive_var_engine.forecast_portfolio_stress_volatility", return_value=ml_mock) as m_forecast, \
+             patch("skills.market_portfolio_predictive_var_engine.run_monte_carlo_stress_test", return_value=mc_mock) as m_run_mc:
 
-            with self.assertRaises(VarEngineError):
-                self.engine.calculate_predictive_var(
-                    portfolio_id=portfolio_id,
-                    scenario_code=scenario_code,
-                    simulations=100,
-                    horizon_days=5,
-                    confidence_level=0.95
-                )
+            res = calculate_predictive_stress_var(
+                portfolio_id=self.portfolio_id,
+                portfolio_value=self.portfolio_value,
+                scenario_params=self.scenario_params,
+                confidence_level=self.confidence_level,
+                horizon_days=self.horizon_days,
+                iterations=self.iterations
+            )
+
+            m_forecast.assert_called_once()
+            m_run_mc.assert_called_once()
+            self.assertEqual(res["portfolio_id"], self.portfolio_id)
+            self.assertEqual(res["portfolio_value"], self.portfolio_value)
+            self.assertEqual(res["ml_volatility_metrics"], ml_mock)
+            self.assertEqual(res["monte_carlo_metrics"], mc_mock)
+            self.assertIn("stress_var", res)
+            self.assertIn("conditional_var", res)
+
+    def test_forecast_typeerror_fallbacks(self):
+        ml_mock = {"fallback": True}
+        mc_mock = {"var_value": 500.0, "cvar_value": 600.0}
+
+        def mock_forecast_side_effect(*args, **kwargs):
+            if "monte_carlo_metrics" in kwargs:
+                raise TypeError("No such argument")
+            if "confidence_level" in kwargs:
+                raise TypeError("No such argument")
+            return ml_mock
+
+        with patch("skills.market_portfolio_predictive_var_engine.forecast_portfolio_stress_volatility", side_effect=mock_forecast_side_effect), \
+             patch("skills.market_portfolio_predictive_var_engine.run_monte_carlo_stress_test", return_value=mc_mock):
+
+            res = calculate_predictive_stress_var(
+                portfolio_id=self.portfolio_id,
+                portfolio_value=self.portfolio_value,
+                scenario_params=self.scenario_params,
+                confidence_level=self.confidence_level,
+                horizon_days=self.horizon_days,
+                iterations=self.iterations
+            )
+            self.assertEqual(res["ml_volatility_metrics"], ml_mock)
+
+    def test_run_monte_carlo_typeerror_fallbacks(self):
+        ml_mock = {}
+        mc_mock = {"stress_var": 400.0}
+
+        def mock_mc_side_effect(*args, **kwargs):
+            if "volatility_metrics" in kwargs:
+                raise TypeError("No vol metrics")
+            if "horizon_days" in kwargs and "iterations" in kwargs:
+                raise TypeError("No horizon")
+            if "iterations" in kwargs:
+                raise TypeError("No iterations")
+            return mc_mock
+
+        with patch("skills.market_portfolio_predictive_var_engine.forecast_portfolio_stress_volatility", return_value=ml_mock), \
+             patch("skills.market_portfolio_predictive_var_engine.run_monte_carlo_stress_test", side_effect=mock_mc_side_effect):
+
+            res = calculate_predictive_stress_var(
+                portfolio_id=self.portfolio_id,
+                portfolio_value=self.portfolio_value,
+                scenario_params=self.scenario_params,
+                confidence_level=self.confidence_level,
+                horizon_days=self.horizon_days,
+                iterations=self.iterations
+            )
+            self.assertEqual(res["monte_carlo_metrics"], mc_mock)
+
+    def test_fallback_when_var_candidate_is_none(self):
+        ml_mock = {}
+        mc_mock = {}  # No stress_var or var_value
+
+        with patch("skills.market_portfolio_predictive_var_engine.forecast_portfolio_stress_volatility", return_value=ml_mock), \
+             patch("skills.market_portfolio_predictive_var_engine.run_monte_carlo_stress_test", return_value=mc_mock):
+
+            res = calculate_predictive_stress_var(
+                portfolio_id=self.portfolio_id,
+                portfolio_value=self.portfolio_value,
+                scenario_params=self.scenario_params,
+                confidence_level=self.confidence_level,
+                horizon_days=self.horizon_days,
+                iterations=self.iterations
+            )
+
+            self.assertIsNotNone(res["stress_var"])
+            self.assertIsNotNone(res["conditional_var"])
+            self.assertLessEqual(res["stress_var"], self.portfolio_value)
+            self.assertGreaterEqual(res["conditional_var"], res["stress_var"])
+
 
 if __name__ == "__main__":
     unittest.main()

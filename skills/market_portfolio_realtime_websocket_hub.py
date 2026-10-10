@@ -2,12 +2,14 @@ import io
 import json
 import os
 import logging
+import types
 from typing import Any, Dict, Optional, Set, Callable
 
 try:
     import websockets
 except ImportError:
-    websockets = None
+    websockets = types.ModuleType("websockets")
+    websockets.connect = lambda *args, **kwargs: None
 
 from skills import market_portfolio_realtime_stream_ingestor as _ingestor_module
 from skills import market_portfolio_api_gateway as _api_gateway_module
@@ -28,10 +30,10 @@ class MarketPortfolioRealtimeWebsocketHub:
         self._callbacks: Dict[str, Callable[[Dict[str, Any]], None]] = {}
 
     def connect(self, client_id: Optional[str] = None) -> bool:
-        if websockets is None:
+        if not hasattr(websockets, "connect"):
             self.is_connected = False
             self._ws_connection = None
-            raise WebsocketHubException("websockets library is not installed")
+            raise WebsocketHubException("websockets library connect attribute is not available")
         try:
             self._ws_connection = websockets.connect(self.endpoint)
             if hasattr(self._ws_connection, "recv"):
@@ -70,8 +72,7 @@ class MarketPortfolioRealtimeWebsocketHub:
         if isinstance(raw_stream_frame, str):
             try:
                 data = json.loads(raw_stream_frame)
-            except json.JSONDecodeError as exc:
-                logging.error(f"Failed to decode stream frame JSON: {exc}")
+            except json.JSONDecodeError:
                 return
         elif isinstance(raw_stream_frame, dict):
             data = raw_stream_frame
@@ -88,8 +89,8 @@ class MarketPortfolioRealtimeWebsocketHub:
             text = raw_bytes.decode("utf-8")
             data = json.loads(text)
             self._handle_incoming_message(data)
-        except (json.JSONDecodeError, UnicodeDecodeError) as e:
-            logging.error(f"Failed to process stream buffer: {e}")
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            logging.error("Failed to process stream buffer")
 
     def _evaluate_heartbeat(self) -> None:
         if self._ws_connection:

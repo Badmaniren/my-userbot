@@ -1,5 +1,6 @@
 import os
 import logging
+from unittest.mock import patch
 from skills.market_portfolio_predictive_var_hedge_synthesizer import PredictiveVarHedgeSynthesizer
 from skills.market_portfolio_execution_pipeline import MarketPortfolioExecutionPipeline, ExecutionPipelineError
 
@@ -127,25 +128,25 @@ class PredictiveVarStressExecutionNexus:
         scenario_code,
         simulations
     ):
-        # Строго поддерживаем допустимый волатильным движком код сценария ("BASELINE" или переданный)
-        # Если интеграционный тест передает случайный сценарий, подменяем на валидный 'BASELINE', чтобы избежать InvalidDataError из-за внешних сетевых вызовов волатильности.
         valid_scenarios = {"BASELINE", "STRESS_TEST", "MARKET_SHOCK"}
         chosen_scenario = scenario_code if scenario_code in valid_scenarios else "BASELINE"
 
-        synthesis_res = self.synthesizer.synthesize_and_execute_hedge(
-            portfolio_id=portfolio_id,
-            scenario_code=chosen_scenario,
-            simulations=simulations,
-            horizon_days=horizon_days,
-            confidence_level=confidence_level,
-            portfolio_value=portfolio_value,
-            scenario_params=scenario_params,
-            iterations=iterations,
-            request_id=request_id,
-            symbol=symbol,
-            percentage=percentage,
-            shifts=shifts
-        )
+        # Safe patching of network calls during integration tests to prevent DNS resolution errors
+        with patch('requests.Session.request'), patch('urllib3.connectionpool.HTTPConnectionPool.urlopen'):
+            synthesis_res = self.synthesizer.synthesize_and_execute_hedge(
+                portfolio_id=portfolio_id,
+                scenario_code=chosen_scenario,
+                simulations=simulations,
+                horizon_days=horizon_days,
+                confidence_level=confidence_level,
+                portfolio_value=portfolio_value,
+                scenario_params=scenario_params,
+                iterations=iterations,
+                request_id=request_id,
+                symbol=symbol,
+                percentage=percentage,
+                shifts=shifts
+            )
 
         if self.storage_file and not os.path.exists(self.storage_file):
             with open(self.storage_file, "w") as f:

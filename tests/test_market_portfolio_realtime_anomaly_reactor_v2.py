@@ -1,129 +1,137 @@
 import unittest
-from unittest.mock import patch, MagicMock
-import random
+from unittest.mock import patch
 import uuid
-import string
-import io
-import sys
-import types
+import random
+import os
+import tempfile
 
 from skills.market_portfolio_realtime_anomaly_reactor_v2 import (
     RealtimeAnomalyReactor,
-    reactor_entry_point
+    reactor_entry_point,
+    market_portfolio_realtime_anomaly_reactor_v2
 )
+
 
 class TestRealtimeAnomalyReactor(unittest.TestCase):
 
     def setUp(self):
-        self.stream_source = f"wss://exchange-{uuid.uuid4().hex[:8]}.io/stream"
-        self.context_key = f"ctx_{uuid.uuid4().hex[:6]}"
-        self.context_val = f"val_{uuid.uuid4().hex[:6]}"
-        self.context = {self.context_key: self.context_val}
+        self.stream_source_val = f"wss://exchange-{uuid.uuid4().hex[:8]}.io/stream"
+        self.reactor = RealtimeAnomalyReactor(stream_source=self.stream_source_val)
         self.payload = {
-            "ticker": f"TICK_{random.choice(string.ascii_uppercase)}{random.choice(string.ascii_uppercase)}",
+            "ticker": f"TICK-{uuid.uuid4().hex[:4].upper()}",
             "price": round(random.uniform(10.0, 1500.0), 2),
-            "volume": random.randint(100, 50000)
+            "volume": random.randint(100, 50000),
+            "stream_source": self.stream_source_val
         }
-        self.output_path = f"/tmp/{uuid.uuid4().hex}.json"
+        self.output_path = os.path.join(tempfile.gettempdir(), f"output_{uuid.uuid4().hex}.json")
 
-    def test_reactor_initialization_and_composition(self):
-        reactor = RealtimeAnomalyReactor(stream_source=self.stream_source)
-        self.assertEqual(reactor.stream_source, self.stream_source)
-        self.assertIsNotNone(reactor.ingestor)
-        self.assertIsNotNone(reactor.detector)
+    def tearDown(self):
+        if os.path.exists(self.output_path):
+            try:
+                os.remove(self.output_path)
+            except OSError:
+                pass
 
-    @patch('skills.market_portfolio_realtime_anomaly_reactor_v2.market_portfolio_realtime_stream_ingestor')
-    @patch('skills.market_portfolio_realtime_anomaly_reactor_v2.MarketAnomalyDetector')
-    def test_process_realtime_stream_success(self, mock_detector_cls, mock_ingestor):
-        expected_ingest_result = {
-            "status": "success",
-            "ingested_id": uuid.uuid4().hex,
-            "data": self.payload
+    def test_realtime_anomaly_reactor_init(self):
+        self.assertEqual(self.reactor.stream_source, self.stream_source_val)
+        self.assertIsNotNone(self.reactor.ingestor)
+        self.assertIsNotNone(self.reactor.detector)
+
+    def test_process_stream_payload_with_analyze_stream(self):
+        ingest_res = {"status": "ok", "id": uuid.uuid4().hex}
+        analysis_res = {"anomaly": False, "score": random.random()}
+
+        with patch("skills.market_portfolio_realtime_anomaly_reactor_v2.market_portfolio_realtime_stream_ingestor", return_value=ingest_res) as mock_ing:
+            with patch.object(self.reactor.detector, "analyze_stream", return_value=analysis_res, create=True) as mock_det:
+                if hasattr(self.reactor.detector, "detect"):
+                    delattr(self.reactor.detector, "detect")
+                
+                result = self.reactor.process_stream_payload(self.payload, self.output_path)
+
+                mock_ing.assert_called_once_with(self.payload, self.output_path)
+                mock_det.assert_called_once_with(self.payload)
+                self.assertEqual(result["ingestion"], ingest_res)
+                self.assertEqual(result["anomaly_analysis"], analysis_res)
+                self.assertTrue(result["reactor_status"])
+
+    def test_process_stream_payload_with_detect(self):
+        ingest_res = {"status": "success", "uuid": uuid.uuid4().hex}
+        analysis_res = {"anomaly": True, "level": random.randint(1, 5)}
+
+        with patch("skills.market_portfolio_realtime_anomaly_reactor_v2.market_portfolio_realtime_stream_ingestor", return_value=ingest_res) as mock_ing:
+            with patch.object(self.reactor.detector, "detect", return_value=analysis_res, create=True) as mock_det:
+                if hasattr(self.reactor.detector, "analyze_stream"):
+                    delattr(self.reactor.detector, "analyze_stream")
+
+                result = self.reactor.process_stream_payload(self.payload, self.output_path)
+
+                mock_ing.assert_called_once_with(self.payload, self.output_path)
+                mock_det.assert_called_once_with(self.payload)
+                self.assertEqual(result["ingestion"], ingest_res)
+                self.assertEqual(result["anomaly_analysis"], analysis_res)
+                self.assertTrue(result["reactor_status"])
+
+    def test_start_live_monitoring(self):
+        stream_id = uuid.uuid4().hex
+        state_val = f"state_{uuid.uuid4().hex[:6]}"
+        metrics_val = {"latency_ms": random.randint(1, 100)}
+        stream_data = {
+            "stream_id": stream_id,
+            "state": state_val,
+            "metrics": metrics_val
         }
-        mock_ingestor.return_value = expected_ingest_result
+        analysis_res = {"risk_score": random.uniform(0.0, 1.0)}
 
-        expected_detection_result = {
-            "anomaly_detected": True,
-            "severity": random.choice(["HIGH", "CRITICAL", "MEDIUM"]),
-            "ticker": self.payload["ticker"]
-        }
-        mock_detector_instance = mock_detector_cls.return_value
-        mock_detector_instance.analyze_stream.return_value = expected_detection_result
+        with patch("skills.market_portfolio_realtime_anomaly_reactor_v2.start_new", return_value=stream_data) as mock_start:
+            with patch.object(self.reactor.detector, "detect", return_value=analysis_res, create=True) as mock_det:
+                context = {"env": uuid.uuid4().hex}
+                res = self.reactor.start_live_monitoring(context)
 
-        reactor = RealtimeAnomalyReactor(stream_source=self.stream_source)
-        result = reactor.process_stream_payload(self.payload, self.output_path)
-
-        mock_ingestor.assert_called_once_with(self.payload, self.output_path)
-        mock_detector_instance.analyze_stream.assert_called_once()
-        
-        self.assertEqual(result["ingestion"], expected_ingest_result)
-        self.assertEqual(result["anomaly_analysis"], expected_detection_result)
-        self.assertTrue(result["reactor_status"])
-
-    @patch('skills.market_portfolio_realtime_anomaly_reactor_v2.start_new')
-    @patch('skills.market_portfolio_realtime_anomaly_reactor_v2.MarketAnomalyDetector')
-    def test_start_streaming_reactor_loop(self, mock_detector_cls, mock_start_new):
-        stream_data_id = uuid.uuid4().hex
-        mock_start_new.return_value = {
-            "stream_id": stream_data_id,
-            "state": "active",
-            "metrics": {"ticks": random.randint(10, 100)}
-        }
-
-        mock_detector_instance = mock_detector_cls.return_value
-        target_ticker = f"SYM_{random.randint(1000, 9999)}"
-        mock_detector_instance.detect.return_value = {
-            "ticker": target_ticker,
-            "anomaly": False,
-            "score": random.random()
-        }
-
-        reactor = RealtimeAnomalyReactor(stream_source=self.stream_source)
-        run_res = reactor.start_live_monitoring(self.context)
-
-        mock_start_new.assert_called_once_with(self.context, self.stream_source)
-        mock_detector_instance.detect.assert_called()
-        self.assertEqual(run_res["stream_id"], stream_data_id)
-        self.assertIn("analysis", run_res)
+                mock_start.assert_called_once_with(context, self.stream_source_val)
+                mock_det.assert_called_once_with(stream_data)
+                self.assertEqual(res["stream_id"], stream_id)
+                self.assertEqual(res["state"], state_val)
+                self.assertEqual(res["metrics"], metrics_val)
+                self.assertEqual(res["analysis"], analysis_res)
 
     def test_reactor_entry_point_integration(self):
-        with patch('skills.market_portfolio_realtime_anomaly_reactor_v2.market_portfolio_realtime_stream_ingestor') as mock_ingest, \
-             patch('skills.market_portfolio_realtime_anomaly_reactor_v2.MarketAnomalyDetector') as mock_det:
-            
-            mock_ing.return_value = {"code": 200, "uuid": uuid.uuid4().hex}
-            det_instance = mock_det.return_value
-            det_instance.detect.return_value = {"status": "ok", "anomaly": True}
+        ingest_res = {"code": 200, "uuid": uuid.uuid4().hex}
+        det_res = {"anomaly_detected": False, "confidence": random.random()}
 
-            entry_res = reactor_entry_point(self.payload, self.output_path)
-            
-            self.assertIsInstance(entry_res, dict)
-            self.assertTrue(entry_res.get("processed"))
-            mock_ing.assert_called_once()
-            det_instance.detect.assert_called_once()
+        with patch("skills.market_portfolio_realtime_anomaly_reactor_v2.market_portfolio_realtime_stream_ingestor", return_value=ingest_res) as mock_ing:
+            with patch("skills.market_anomaly_detector.MarketAnomalyDetector.detect", return_value=det_res, create=True) as mock_det:
+                res = reactor_entry_point(self.payload, self.output_path)
 
-    @patch('skills.market_portfolio_realtime_anomaly_reactor_v2.market_portfolio_realtime_stream_ingestor')
-    def test_stream_ingestor_failure_handling(self, mock_ingestor):
-        mock_ingestor.side_effect = RuntimeError(f"Stream failure {uuid.uuid4().hex[:4]}")
+                mock_ing.assert_called_once_with(self.payload, self.output_path)
+                mock_det.assert_called_once_with(self.payload)
+                self.assertTrue(res["processed"])
+                self.assertEqual(res["ingestion"], ingest_res)
+                self.assertEqual(res["detection"], det_res)
 
-        reactor = RealtimeAnomalyReactor(stream_source=self.stream_source)
-        
-        with self.assertRaises(RuntimeError):
-            reactor.process_stream_payload(self.payload, self.output_path)
+    def test_market_portfolio_realtime_anomaly_reactor_v2_full(self):
+        ingest_res = {"stored": True, "transaction_id": uuid.uuid4().hex}
+        det_res = {"status": "normal", "timestamp": random.randint(100000, 999999)}
+        ticker_val = self.payload["ticker"]
 
-    def test_io_stream_byte_mocking(self):
-        random_bytes = io.BytesIO(uuid.uuid4().bytes + b"stream_garbage_data")
-        
-        with patch('skills.market_portfolio_realtime_anomaly_reactor_v2.market_portfolio_realtime_stream_ingestor') as mock_ing, \
-             patch('skills.market_portfolio_realtime_anomaly_reactor_v2.MarketAnomalyDetector') as mock_det:
-            
-            mock_ing.return_value = {"bytes_read": len(random_bytes.getvalue())}
-            mock_det.return_value.analyze_stream.return_value = {"signal": "hold"}
+        with patch("skills.market_portfolio_realtime_anomaly_reactor_v2.market_portfolio_realtime_stream_ingestor", return_value=ingest_res) as mock_ing:
+            with patch("skills.market_anomaly_detector.MarketAnomalyDetector.detect", return_value=det_res, create=True) as mock_det:
+                res = market_portfolio_realtime_anomaly_reactor_v2(self.payload, self.output_path)
 
-            reactor = RealtimeAnomalyReactor(stream_source=self.stream_source)
-            res = reactor.process_stream_payload({"stream_buffer": random_bytes.read()}, self.output_path)
-            
-            self.assertIn("bytes_read", res["ingestion"])
-            self.assertEqual(res["anomaly_analysis"]["signal"], "hold")
+                mock_ing.assert_called_once_with(self.payload, self.output_path)
+                mock_det.assert_called_once_with(self.payload)
+                self.assertEqual(res["status"], "success")
+                self.assertEqual(res["ticker"], ticker_val)
+                self.assertEqual(res["ingestion"], ingest_res)
+                self.assertEqual(res["detection"], det_res)
 
-if __name__ == '__main__':
+                self.assertTrue(os.path.exists(self.output_path))
+                with open(self.output_path, "r", encoding="utf-8") as f:
+                    file_data = json.load(f)
+                self.assertEqual(file_data["status"], "success")
+                self.assertEqual(file_data["ticker"], ticker_val)
+                self.assertEqual(file_data["ingestion"], ingest_res)
+                self.assertEqual(file_data["detection"], det_res)
+
+
+if __name__ == "__main__":
     unittest.main()

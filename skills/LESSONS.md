@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_stress_audit_realtime_streamer (create) — раундов: 3
+ндов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: успешно прошёл тесты и влит в main
 
@@ -288,3 +285,6 @@
 ## market_portfolio_execution_risk_gate (compose) — раундов: 4
 - Последняя ошибка перед фиксом: AttributeError: module 'skills.market_portfolio_var_liquidity_core' has no attribute 'calculate_var_and_liquidity'
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_realtime_stream_ingestor (start_new) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

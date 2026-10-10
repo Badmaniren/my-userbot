@@ -1,6 +1,28 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
+
+_DB_STORAGE_DATA = {}
+
+def db_storage(data=None, **kwargs):
+    if isinstance(data, dict):
+        action = data.get("action")
+        if action == "save_hedge_record":
+            hedge_id = data.get("hedge_execution_id")
+            _DB_STORAGE_DATA[hedge_id] = data.get("data")
+            return {"status": "saved", "hedge_execution_id": hedge_id}
+        elif action == "get_hedge_record":
+            hedge_id = data.get("hedge_execution_id")
+            return _DB_STORAGE_DATA.get(hedge_id, {"hedge_execution_id": hedge_id})
+        return _DB_STORAGE_DATA
+    return _DB_STORAGE_DATA
 
 
 class MarketParser:

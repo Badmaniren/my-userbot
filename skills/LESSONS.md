@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-_portfolio_stress_auto_hedge_sync (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_ml_anomaly_predictor (start_new) — раундов: 4
+4
 - Античит поймал: ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'market_portfolio_collector_agent'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.market_portfolio_collector_agent import ...'
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
@@ -281,4 +278,8 @@ _portfolio_stress_auto_hedge_sync (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_reporter (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_predictive_var_hedge_synthesizer (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main

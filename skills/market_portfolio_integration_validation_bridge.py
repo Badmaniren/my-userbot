@@ -1,6 +1,9 @@
 import uuid
+import logging
 from skills.market_portfolio_predictive_var_engine import PredictiveVarEngine
 from skills.market_portfolio_integration_hub import MarketPortfolioIntegrationHub
+
+logger = logging.getLogger(__name__)
 
 class MarketPortfolioIntegrationValidationBridge:
     def __init__(self, var_engine=None, integration_hub=None, db_storage=None, extractor_tool=None, market_anomaly_detector=None):
@@ -107,7 +110,11 @@ class MarketPortfolioIntegrationValidationBridge:
                 scenario_params={},
                 iterations=10
             )
-        except Exception:
+        except RuntimeError as e:
+            logger.error("RuntimeError during calculate_predictive_var: %s", e)
+            raise
+        except Exception as e:
+            logger.error("Unexpected error during calculate_predictive_var: %s", e)
             var_report = {
                 "portfolio_id": portfolio_id,
                 "scenario_code": scenario_code,

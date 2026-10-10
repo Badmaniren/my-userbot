@@ -113,8 +113,8 @@ class MarketPortfolioIntegrationValidationBridge:
         except RuntimeError as e:
             logger.error("RuntimeError during calculate_predictive_var: %s", e)
             raise
-        except Exception as e:
-            logger.error("Unexpected error during calculate_predictive_var: %s", e)
+        except (ValueError, TypeError, KeyError) as e:
+            logger.error("Expected data error during calculate_predictive_var: %s", e)
             var_report = {
                 "portfolio_id": portfolio_id,
                 "scenario_code": scenario_code,
@@ -126,10 +126,8 @@ class MarketPortfolioIntegrationValidationBridge:
             self.integration_hub.run_integrated_pipeline(
                 url, symbol, shifts, telegram_token, chat_id
             )
-        except Exception as e:
-            logger.error("Error during run_integrated_pipeline: %s", e)
-            # Если интеграционный памп упал, позволим пайплайну отработать корректно для тестов с дефектными API
-            pass
+        except (ValueError, TypeError, KeyError, ConnectionError, TimeoutError) as e:
+            logger.error("Expected integration error during run_integrated_pipeline: %s", e)
 
         return {
             "validation_status": True,

@@ -3,7 +3,15 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ацию
+)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_auto_hedge_sync (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_hedge_order_router (compose) — раундов: 4
+- Последняя ошибка перед фиксом: execution_result = self._execute_pipeline(symbol, recommended_volume, percentage)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_stress_auto_hedge_sync (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
@@ -280,8 +288,4 @@
 
 ## market_portfolio_predictive_var_stress_bridge_v2 (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_predictive_var_stress_bridge_v3 (compose) — раундов: 4
-- Последняя ошибка перед фиксом: ERROR: test_execute_combined_predictive_stress_integration (tests.test_market_portfolio_predictive_var_stress_bridge_v3_integration.TestPredictiveVarStressBridgeIntegration.test_execute_combined_predictive_stress_integration)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

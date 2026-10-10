@@ -23,7 +23,7 @@ if "websockets" not in sys.modules:
 
     websockets_client.connect = DummyConnect
     websockets_sync.client = websockets_client
-    websockets_sync = websockets_client  # алиас для совместимости
+    websockets_sync.client = websockets_client  # алиас для совместимости
     websockets_mock.sync = websockets_sync
     websockets_mock.connect = DummyConnect
 

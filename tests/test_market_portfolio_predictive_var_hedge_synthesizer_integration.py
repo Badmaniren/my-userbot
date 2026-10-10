@@ -2,69 +2,85 @@ import unittest
 import uuid
 import random
 import os
-from skills.market_portfolio_predictive_var_engine import PredictiveVarEngine
-from skills.market_portfolio_stress_auto_hedge_sync import MarketPortfolioStressAutoHedgeSync
-from skills.market_portfolio_predictive_var_hedge_synthesizer import MarketPortfolioPredictiveVarHedgeSynthesizer
+from skills.market_portfolio_predictive_var_hedge_synthesizer import PredictiveVarHedgeSynthesizer
 
-class TestMarketPortfolioPredictiveVarHedgeSynthesizerIntegration(unittest.TestCase):
-    def test_predictive_var_hedge_synthesizer_integration(self):
-        portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
-        scenario_code = f"scen_{uuid.uuid4().hex[:8]}"
-        request_id = f"req_{uuid.uuid4().hex[:8]}"
-        symbol = random.choice(["BTC", "ETH", "SBER", "GAZP", "AAPL"])
-        portfolio_value = round(random.uniform(10000.0, 1000000.0), 2)
-        percentage = round(random.uniform(1.0, 25.0), 2)
-        
-        db_storage = f"test_db_{uuid.uuid4().hex[:6]}.db"
-        storage_file = f"test_storage_{uuid.uuid4().hex[:6]}.json"
+class TestPredictiveVarHedgeSynthesizerIntegration(unittest.TestCase):
+    def setUp(self):
+        self.synthesizer = PredictiveVarHedgeSynthesizer()
+        self.portfolio_id = f"port-{uuid.uuid4()}"
+        self.request_id = f"req-{uuid.uuid4()}"
+        self.scenario_code = f"SCENARIO-{random.randint(100, 999)}"
+        self.symbol = random.choice(["BTC-USD", "ETH-USD", "AAPL", "MSFT", "SPY"])
+        self.percentage = round(random.uniform(1.0, 25.0), 2)
+        self.portfolio_value = round(random.uniform(10000.0, 1000000.0), 2)
+        self.confidence_level = round(random.uniform(0.90, 0.99), 4)
+        self.horizon_days = random.randint(1, 30)
+        self.simulations = random.randint(100, 1000)
+        self.iterations = random.randint(10, 100)
+        self.shifts = [round(random.uniform(-0.1, 0.1), 4) for _ in range(3)]
+        self.scenario_params = {"volatility_multiplier": round(random.uniform(1.0, 3.0), 2)}
 
-        var_engine = PredictiveVarEngine(
-            db_storage=db_storage,
-            extractor_tool=None,
-            market_anomaly_detector=None
+    def test_synthesize_and_execute_hedge_integration(self):
+        result = self.synthesizer.synthesize_and_execute_hedge(
+            portfolio_id=self.portfolio_id,
+            scenario_code=self.scenario_code,
+            simulations=self.simulations,
+            horizon_days=self.horizon_days,
+            confidence_level=self.confidence_level,
+            portfolio_value=self.portfolio_value,
+            scenario_params=self.scenario_params,
+            iterations=self.iterations,
+            request_id=self.request_id,
+            symbol=self.symbol,
+            percentage=self.percentage,
+            shifts=self.shifts
         )
         
-        auto_hedge_sync = MarketPortfolioStressAutoHedgeSync(
-            db_storage=db_storage,
-            monitor=None,
-            evaluator=None,
-            rebalancer=None,
-            storage_file=storage_file,
-            advisor=None,
-            pipeline=None
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("portfolio_id"), self.portfolio_id)
+        self.assertIn("var_metrics", result)
+        self.assertIn("hedge_result", result)
+
+    def test_synthesize_stress_var_and_hedge_integration(self):
+        result = self.synthesizer.synthesize_stress_var_and_hedge(
+            portfolio_id=self.portfolio_id,
+            portfolio_value=self.portfolio_value,
+            scenario_params=self.scenario_params,
+            confidence_level=self.confidence_level,
+            horizon_days=self.horizon_days,
+            iterations=self.iterations,
+            request_id=self.request_id,
+            symbol=self.symbol,
+            percentage=self.percentage,
+            shifts=self.shifts
         )
 
-        synthesizer = MarketPortfolioPredictiveVarHedgeSynthesizer(
-            var_engine=var_engine,
-            auto_hedge_sync=auto_hedge_sync
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("portfolio_id"), self.portfolio_id)
+        self.assertIn("stress_var_metrics", result)
+        self.assertIn("hedge_result", result)
+
+    def test_synthesize_and_simulate_integration(self):
+        result = self.synthesizer.synthesize_and_simulate(
+            portfolio_id=self.portfolio_id,
+            scenario_code=self.scenario_code,
+            request_id=self.request_id,
+            symbol=self.symbol,
+            percentage=self.percentage,
+            portfolio_value=self.portfolio_value,
+            simulations=self.simulations,
+            horizon_days=self.horizon_days,
+            confidence_level=self.confidence_level,
+            scenario_params=self.scenario_params,
+            iterations=self.iterations,
+            shifts=self.shifts
         )
 
-        self.assertTrue(hasattr(synthesizer, "synthesize_and_simulate"))
-
-        simulation_result = synthesizer.synthesize_and_simulate(
-            portfolio_id=portfolio_id,
-            scenario_code=scenario_code,
-            request_id=request_id,
-            symbol=symbol,
-            percentage=percentage,
-            portfolio_value=portfolio_value,
-            simulations=100,
-            horizon_days=30,
-            confidence_level=0.95,
-            scenario_params={"volatility_multiplier": 1.5},
-            iterations=50,
-            shifts={"price_shift": -0.1}
-        )
-
-        self.assertIsNotNone(simulation_result)
-        self.assertIn("portfolio_id", simulation_result)
-        self.assertEqual(simulation_result["portfolio_id"], portfolio_id)
-        self.assertIn("hedge_status", simulation_result)
-
-        if os.path.exists(db_storage):
-            os.remove(db_storage)
-        if os.path.exists(storage_file):
-            os.remove(storage_file)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("portfolio_id"), self.portfolio_id)
+        self.assertIn("var_metrics", result)
+        self.assertIn("hedge_result", result)
+        self.assertIn("hedge_status", result)
 
 if __name__ == "__main__":
     unittest.main()

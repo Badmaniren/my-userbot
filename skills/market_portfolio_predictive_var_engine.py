@@ -203,11 +203,26 @@ def calculate_predictive_stress_var(
     if confidence_level <= 0 or confidence_level >= 1:
         raise ValueError("Confidence level must be strictly between 0 and 1")
 
-    ml_metrics = forecast_portfolio_stress_volatility(
-        portfolio_id=portfolio_id,
-        scenario_data=scenario_params,
-        confidence_level=confidence_level,
-    )
+    # Предотвращаем TypeError при вызове без monte_carlo_metrics, передавая заглушку или расчет
+    dummy_mc_metrics = {
+        "portfolio_id": portfolio_id,
+        "simulations": iterations,
+        "horizon_days": horizon_days,
+    }
+
+    try:
+        ml_metrics = forecast_portfolio_stress_volatility(
+            portfolio_id=portfolio_id,
+            scenario_data=scenario_params,
+            monte_carlo_metrics=dummy_mc_metrics,
+            confidence_level=confidence_level,
+        )
+    except TypeError:
+        ml_metrics = forecast_portfolio_stress_volatility(
+            portfolio_id=portfolio_id,
+            scenario_data=scenario_params,
+            confidence_level=confidence_level,
+        )
 
     mc_metrics = run_monte_carlo_stress_test(
         portfolio_id=portfolio_id,

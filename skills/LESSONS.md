@@ -3,11 +3,6 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-глушки. Используй честный импорт: 'from skills.market_portfolio_stress_ml_volatili
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_stress_ml_var_estimator_v2 (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -286,4 +281,8 @@
 ## market_portfolio_integration_validation_bridge (refactor) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_integration_validation_bridge (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: INFO:PortfolioScenarioSimulator:Found target for TEST_1EB6CA: price=206.8000, quantity=188.0000
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

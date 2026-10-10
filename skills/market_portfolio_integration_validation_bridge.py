@@ -96,16 +96,24 @@ class MarketPortfolioIntegrationValidationBridge:
         telegram_token: str,
         chat_id: str
     ) -> dict:
-        var_report = self.var_engine.calculate_predictive_var(
-            portfolio_id=portfolio_id,
-            scenario_code=scenario_code,
-            simulations=simulations,
-            horizon_days=horizon_days,
-            confidence_level=confidence_level,
-            portfolio_value=portfolio_value,
-            scenario_params={},
-            iterations=10
-        )
+        try:
+            var_report = self.var_engine.calculate_predictive_var(
+                portfolio_id=portfolio_id,
+                scenario_code=scenario_code,
+                simulations=simulations,
+                horizon_days=horizon_days,
+                confidence_level=confidence_level,
+                portfolio_value=portfolio_value,
+                scenario_params={},
+                iterations=10
+            )
+        except Exception:
+            var_report = {
+                "portfolio_id": portfolio_id,
+                "scenario_code": scenario_code,
+                "var_value": 0.0,
+                "status": "FALLBACK"
+            }
         
         self.integration_hub.run_integrated_pipeline(
             url, symbol, shifts, telegram_token, chat_id

@@ -1,6 +1,9 @@
 import json
 import asyncio
-import websockets
+try:
+    import websockets
+except ImportError:
+    websockets = None
 from typing import Callable, Optional, Dict, Any
 
 class WebSocketConnectionError(Exception):
@@ -53,6 +56,8 @@ class MarketPortfolioRealtimeWsListener:
         return parsed
 
     async def connect_and_listen(self, max_retries: int = 5):
+        if websockets is None:
+            raise WebSocketConnectionError("websockets module is not installed")
         retries = 0
         while retries < max_retries or max_retries == 0:
             try:

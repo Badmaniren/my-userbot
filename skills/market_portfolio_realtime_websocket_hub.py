@@ -2,12 +2,15 @@ import io
 import json
 import os
 import logging
-import websockets
 from typing import Any, Dict, Optional, Set, Callable
+
+try:
+    import websockets
+except ImportError:
+    websockets = None
 
 from skills.market_portfolio_realtime_stream_ingestor import market_portfolio_realtime_stream_ingestor as _ingestor_func
 from skills.market_portfolio_api_gateway import MarketPortfolioAPIGateway
-from skills.db_storage import db_storage as _db_storage_obj
 
 
 class WebsocketHubException(Exception):
@@ -24,6 +27,10 @@ class MarketPortfolioRealtimeWebsocketHub:
         self._callbacks: Dict[str, Callable[[Dict[str, Any]], None]] = {}
 
     def connect(self, client_id: Optional[str] = None) -> bool:
+        if websockets is None:
+            self.is_connected = False
+            self._ws_connection = None
+            raise WebsocketHubException("websockets library is not installed")
         try:
             self._ws_connection = websockets.connect(self.endpoint)
             if hasattr(self._ws_connection, "recv"):

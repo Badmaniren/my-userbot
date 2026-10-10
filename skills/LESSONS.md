@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ка в коде: invalid syntax (<unknown>, line 1)
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_alert_dispatcher (refactor) — раундов: 3
+ert_dispatcher (refactor) — раундов: 3
 - Последняя ошибка перед фиксом: Traceback (most recent call last):
 - Статус: успешно прошёл тесты и влит в main
 
@@ -293,5 +289,9 @@
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_realtime_anomaly_reactor_bridge (compose) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_realtime_stream_alert_sink (compose) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main

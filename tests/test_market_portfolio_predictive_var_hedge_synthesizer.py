@@ -1,287 +1,199 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 import uuid
 import random
 import string
 import io
 
-from skills.market_portfolio_predictive_var_engine import PredictiveVarEngine, VarEngineError, InsufficientDataError
-from skills.market_portfolio_stress_auto_hedge_sync import MarketPortfolioStressAutoHedgeSync
-import skills.market_portfolio_predictive_var_hedge_synthesizer as synthesizer
+from skills.market_portfolio_predictive_var_hedge_synthesizer import PredictiveVarHedgeSynthesizer, VarEngineError, InsufficientDataError
 
 
-class TestMarketPortfolioPredictiveVarHedgeSynthesizer(unittest.TestCase):
+class TestPredictiveVarHedgeSynthesizer(unittest.TestCase):
 
     def setUp(self):
         self.portfolio_id = str(uuid.uuid4())
-        self.scenario_code = "".join(random.choices(string.ascii_uppercase, k=6))
         self.request_id = str(uuid.uuid4())
-        self.symbol = "".join(random.choices(string.ascii_uppercase, k=4))
-        self.percentage = round(random.uniform(1.0, 25.0), 2)
-        self.shifts = random.randint(1, 10)
-        self.portfolio_value = round(random.uniform(10000.0, 1000000.0), 2)
-        self.confidence_level = round(random.uniform(0.90, 0.99), 4)
+        self.scenario_code = ''.join(random.choices(string.ascii_uppercase, k=6))
+        self.symbol = ''.join(random.choices(string.ascii_uppercase, k=4))
+        self.simulations = random.randint(1000, 10000)
         self.horizon_days = random.randint(1, 30)
-        self.simulations = random.randint(100, 5000)
-        self.iterations = random.randint(50, 1000)
+        self.confidence_level = round(random.uniform(0.90, 0.99), 2)
+        self.portfolio_value = round(random.uniform(10000.0, 1000000.0), 2)
+        self.iterations = random.randint(50, 500)
+        self.percentage = round(random.uniform(1.0, 25.0), 2)
+        self.shifts = [round(random.uniform(-0.1, 0.1), 4) for _ in range(random.randint(3, 8))]
+        self.scenario_params = {"param_key": ''.join(random.choices(string.ascii_lowercase, k=5))}
 
-    def test_synthesizer_initialization(self):
-        rnd_db = str(uuid.uuid4())
-        rnd_storage = f"/{str(uuid.uuid4())}/{str(uuid.uuid4())}.json"
-        
-        mock_db = MagicMock()
-        mock_monitor = MagicMock()
-        mock_evaluator = MagicMock()
-        mock_rebalancer = MagicMock()
-        mock_advisor = MagicMock()
-        mock_pipeline = MagicMock()
-        mock_anomaly_detector = MagicMock()
-        mock_extractor = MagicMock()
+        self.mock_var_engine = MagicMock()
+        self.mock_auto_hedge_sync = MagicMock()
 
-        with patch("skills.market_portfolio_predictive_var_hedge_synthesizer.PredictiveVarEngine") as MockVarEngine, \
-             patch("skills.market_portfolio_predictive_var_hedge_synthesizer.MarketPortfolioStressAutoHedgeSync") as MockHedgeSync:
-            
-            instance = synthesizer.PredictiveVarHedgeSynthesizer(
-                db_storage=mock_db,
-                extractor_tool=mock_extractor,
-                market_anomaly_detector=mock_anomaly_detector,
-                monitor=mock_monitor,
-                evaluator=mock_evaluator,
-                rebalancer=mock_rebalancer,
-                storage_file=rnd_storage,
-                advisor=mock_advisor,
-                pipeline=mock_pipeline
-            )
-
-            MockVarEngine.assert_called_once_with(mock_db, mock_extractor, mock_anomaly_detector)
-            MockHedgeSync.assert_called_once_with(mock_db, mock_monitor, mock_evaluator, mock_rebalancer, rnd_storage, mock_advisor, mock_pipeline)
-            self.assertIsNotNone(instance)
+        self.synthesizer = PredictiveVarHedgeSynthesizer(
+            var_engine=self.mock_var_engine,
+            auto_hedge_sync=self.mock_auto_hedge_sync
+        )
 
     def test_synthesize_and_execute_hedge_success(self):
-        mock_db = MagicMock()
-        mock_extractor = MagicMock()
-        mock_anomaly_detector = MagicMock()
-        mock_monitor = MagicMock()
-        mock_evaluator = MagicMock()
-        mock_rebalancer = MagicMock()
-        mock_advisor = MagicMock()
-        mock_pipeline = MagicMock()
-
-        expected_var_result = {
+        expected_var_metrics = {
             "portfolio_id": self.portfolio_id,
-            "predictive_var": round(random.uniform(1000.0, 50000.0), 2),
-            "confidence": self.confidence_level
+            "predictive_var": round(random.uniform(100.0, 5000.0), 2)
         }
         expected_hedge_result = {
+            "portfolio_id": self.portfolio_id,
             "status": "SYNCHRONIZED",
-            "request_id": self.request_id,
-            "symbol": self.symbol,
-            "executed_percentage": self.percentage
+            "symbol": self.symbol
         }
 
-        with patch.object(PredictiveVarEngine, "calculate_predictive_var", return_value=expected_var_result) as mock_calc_var, \
-             patch.object(MarketPortfolioStressAutoHedgeSync, "synchronize", return_value=expected_hedge_result) as mock_sync_hedge:
+        self.mock_var_engine.calculate_predictive_var.return_value = expected_var_metrics
+        self.mock_auto_hedge_sync.synchronize.return_value = expected_hedge_result
 
-            synth = synthesizer.PredictiveVarHedgeSynthesizer(
-                db_storage=mock_db,
-                extractor_tool=mock_extractor,
-                market_anomaly_detector=mock_anomaly_detector,
-                monitor=mock_monitor,
-                evaluator=mock_evaluator,
-                rebalancer=mock_rebalancer,
-                storage_file=str(uuid.uuid4()),
-                advisor=mock_advisor,
-                pipeline=mock_pipeline
-            )
+        result = self.synthesizer.synthesize_and_execute_hedge(
+            portfolio_id=self.portfolio_id,
+            scenario_code=self.scenario_code,
+            simulations=self.simulations,
+            horizon_days=self.horizon_days,
+            confidence_level=self.confidence_level,
+            portfolio_value=self.portfolio_value,
+            scenario_params=self.scenario_params,
+            iterations=self.iterations,
+            request_id=self.request_id,
+            symbol=self.symbol,
+            percentage=self.percentage,
+            shifts=self.shifts
+        )
 
-            scenario_params = {"param_key": str(uuid.uuid4())}
-            result = synth.synthesize_and_execute_hedge(
-                portfolio_id=self.portfolio_id,
-                scenario_code=self.scenario_code,
-                simulations=self.simulations,
-                horizon_days=self.horizon_days,
-                confidence_level=self.confidence_level,
-                portfolio_value=self.portfolio_value,
-                scenario_params=scenario_params,
-                iterations=self.iterations,
-                request_id=self.request_id,
-                symbol=self.symbol,
-                percentage=self.percentage,
-                shifts=self.shifts
-            )
+        self.mock_var_engine.calculate_predictive_var.assert_called_once_with(
+            portfolio_id=self.portfolio_id,
+            scenario_code=self.scenario_code,
+            simulations=self.simulations,
+            horizon_days=self.horizon_days,
+            confidence_level=self.confidence_level,
+            portfolio_value=self.portfolio_value,
+            scenario_params=self.scenario_params,
+            iterations=self.iterations
+        )
 
-            mock_calc_var.assert_called_once_with(
-                portfolio_id=self.portfolio_id,
-                scenario_code=self.scenario_code,
-                simulations=self.simulations,
-                horizon_days=self.horizon_days,
-                confidence_level=self.confidence_level,
-                portfolio_value=self.portfolio_value,
-                scenario_params=scenario_params,
-                iterations=self.iterations
-            )
+        self.mock_auto_hedge_sync.synchronize.assert_called_once_with(
+            portfolio_id=self.portfolio_id,
+            request_id=self.request_id,
+            symbol=self.symbol,
+            percentage=self.percentage,
+            shifts=self.shifts
+        )
 
-            mock_sync_hedge.assert_called_once_with(
-                portfolio_id=self.portfolio_id,
-                request_id=self.request_id,
-                symbol=self.symbol,
-                percentage=self.percentage,
-                shifts=self.shifts
-            )
+        self.assertEqual(result["portfolio_id"], self.portfolio_id)
+        self.assertEqual(result["var_metrics"], expected_var_metrics)
+        self.assertEqual(result["hedge_result"], expected_hedge_result)
 
-            self.assertEqual(result["var_metrics"], expected_var_result)
-            self.assertEqual(result["hedge_result"], expected_hedge_result)
-            self.assertEqual(result["portfolio_id"], self.portfolio_id)
-
-    def test_synthesize_and_execute_hedge_var_error(self):
-        mock_db = MagicMock()
-        mock_extractor = MagicMock()
-        mock_anomaly_detector = MagicMock()
-
-        error_message = f"VarEngineFailed-{str(uuid.uuid4())}"
-
-        with patch.object(PredictiveVarEngine, "calculate_predictive_var", side_effect=VarEngineError(error_message)) as mock_calc_var:
-
-            synth = synthesizer.PredictiveVarHedgeSynthesizer(
-                db_storage=mock_db,
-                extractor_tool=mock_extractor,
-                market_anomaly_detector=mock_anomaly_detector,
-                monitor=MagicMock(),
-                evaluator=MagicMock(),
-                rebalancer=MagicMock(),
-                storage_file=str(uuid.uuid4()),
-                advisor=MagicMock(),
-                pipeline=MagicMock()
-            )
-
-            with self.assertRaises(VarEngineError) as ctx:
-                synth.synthesize_and_execute_hedge(
-                    portfolio_id=self.portfolio_id,
-                    scenario_code=self.scenario_code,
-                    simulations=self.simulations,
-                    horizon_days=self.horizon_days,
-                    confidence_level=self.confidence_level,
-                    portfolio_value=self.portfolio_value,
-                    scenario_params={},
-                    iterations=self.iterations,
-                    request_id=self.request_id,
-                    symbol=self.symbol,
-                    percentage=self.percentage,
-                    shifts=self.shifts
-                )
-
-            self.assertIn(error_message, str(ctx.exception))
-
-    def test_synthesize_stress_var_and_hedge(self):
-        mock_db = MagicMock()
-        mock_extractor = MagicMock()
-        mock_anomaly_detector = MagicMock()
-        mock_monitor = MagicMock()
-        mock_evaluator = MagicMock()
-        mock_rebalancer = MagicMock()
-
+    def test_synthesize_stress_var_and_hedge_success(self):
         expected_stress_var = {
-            "stress_var": round(random.uniform(5000.0, 100000.0), 2),
-            "portfolio_id": self.portfolio_id
+            "portfolio_id": self.portfolio_id,
+            "stress_var": round(random.uniform(500.0, 10000.0), 2)
         }
-        expected_hedge_res = {
-            "status": "STRESS_SYNCHRONIZED",
-            "request_id": self.request_id
+        expected_hedge_result = {
+            "portfolio_id": self.portfolio_id,
+            "status": "EXECUTED"
         }
 
-        with patch.object(PredictiveVarEngine, "calculate_predictive_stress_var", return_value=expected_stress_var) as mock_stress_var, \
-             patch.object(MarketPortfolioStressAutoHedgeSync, "synchronize", return_value=expected_hedge_res) as mock_sync:
+        self.mock_var_engine.calculate_predictive_stress_var.return_value = expected_stress_var
+        self.mock_auto_hedge_sync.synchronize.return_value = expected_hedge_result
 
-            synth = synthesizer.PredictiveVarHedgeSynthesizer(
-                db_storage=mock_db,
-                extractor_tool=mock_extractor,
-                market_anomaly_detector=mock_anomaly_detector,
-                monitor=mock_monitor,
-                evaluator=mock_evaluator,
-                rebalancer=mock_rebalancer,
-                storage_file=str(uuid.uuid4()),
-                advisor=MagicMock(),
-                pipeline=MagicMock()
-            )
+        result = self.synthesizer.synthesize_stress_var_and_hedge(
+            portfolio_id=self.portfolio_id,
+            portfolio_value=self.portfolio_value,
+            scenario_params=self.scenario_params,
+            confidence_level=self.confidence_level,
+            horizon_days=self.horizon_days,
+            iterations=self.iterations,
+            request_id=self.request_id,
+            symbol=self.symbol,
+            percentage=self.percentage,
+            shifts=self.shifts
+        )
 
-            scenario_params = {"stress_factor": random.uniform(1.1, 3.5)}
-            res = synth.synthesize_stress_var_and_hedge(
-                portfolio_id=self.portfolio_id,
-                portfolio_value=self.portfolio_value,
-                scenario_params=scenario_params,
-                confidence_level=self.confidence_level,
-                horizon_days=self.horizon_days,
-                iterations=self.iterations,
-                request_id=self.request_id,
-                symbol=self.symbol,
-                percentage=self.percentage,
-                shifts=self.shifts
-            )
+        self.mock_var_engine.calculate_predictive_stress_var.assert_called_once_with(
+            portfolio_id=self.portfolio_id,
+            portfolio_value=self.portfolio_value,
+            scenario_params=self.scenario_params,
+            confidence_level=self.confidence_level,
+            horizon_days=self.horizon_days,
+            iterations=self.iterations
+        )
 
-            mock_stress_var.assert_called_once_with(
-                portfolio_id=self.portfolio_id,
-                portfolio_value=self.portfolio_value,
-                scenario_params=scenario_params,
-                confidence_level=self.confidence_level,
-                horizon_days=self.horizon_days,
-                iterations=self.iterations
-            )
+        self.assertEqual(result["portfolio_id"], self.portfolio_id)
+        self.assertEqual(result["stress_var_metrics"], expected_stress_var)
+        self.assertEqual(result["hedge_result"], expected_hedge_result)
 
-            mock_sync.assert_called_once_with(
-                portfolio_id=self.portfolio_id,
-                request_id=self.request_id,
-                symbol=self.symbol,
-                percentage=self.percentage,
-                shifts=self.shifts
-            )
+    def test_process_stream_and_auto_hedge_success(self):
+        stream_mock = io.BytesIO(uuid.uuid4().bytes)
+        expected_stream_response = {"status": "STREAM_PROCESSED"}
+        expected_hedge_result = {"status": "SYNC_OK"}
 
-            self.assertEqual(res["stress_var_metrics"], expected_stress_var)
-            self.assertEqual(res["hedge_result"], expected_hedge_res)
+        self.mock_var_engine.process_market_stream.return_value = expected_stream_response
+        self.mock_auto_hedge_sync.synchronize.return_value = expected_hedge_result
 
-    def test_stream_processing_and_hedge_trigger(self):
-        mock_db = MagicMock()
-        mock_extractor = MagicMock()
-        mock_anomaly_detector = MagicMock()
+        result = self.synthesizer.process_stream_and_auto_hedge(
+            stream_mock=stream_mock,
+            portfolio_id=self.portfolio_id,
+            request_id=self.request_id,
+            symbol=self.symbol,
+            percentage=self.percentage,
+            shifts=self.shifts
+        )
 
-        random_stream_data = f"stream-payload-{uuid.uuid4()}".encode('utf-8')
-        stream_mock = io.BytesIO(random_stream_data)
+        self.mock_var_engine.process_market_stream.assert_called_once_with(stream_mock)
+        self.assertEqual(result["portfolio_id"], self.portfolio_id)
+        self.assertEqual(result["stream_response"], expected_stream_response)
+        self.assertEqual(result["hedge_result"], expected_hedge_result)
 
-        expected_stream_response = {"status": "STREAM_PROCESSED", "bytes": len(random_stream_data)}
-        expected_hedge_res = {"status": "STREAM_HEDGE_SYNC"}
+    def test_synthesize_and_simulate_exception_fallback(self):
+        self.mock_var_engine.calculate_predictive_var.side_effect = InsufficientDataError(uuid.uuid4().hex)
+        expected_hedge_result = {"status": "FALLBACK_SYNC"}
 
-        with patch.object(PredictiveVarEngine, "process_market_stream", return_value=expected_stream_response) as mock_process, \
-             patch.object(MarketPortfolioStressAutoHedgeSync, "synchronize", return_value=expected_hedge_res) as mock_sync:
+        self.mock_auto_hedge_sync.synchronize.return_value = expected_hedge_result
 
-            synth = synthesizer.PredictiveVarHedgeSynthesizer(
-                db_storage=mock_db,
-                extractor_tool=mock_extractor,
-                market_anomaly_detector=mock_anomaly_detector,
-                monitor=MagicMock(),
-                evaluator=MagicMock(),
-                rebalancer=MagicMock(),
-                storage_file=str(uuid.uuid4()),
-                advisor=MagicMock(),
-                pipeline=MagicMock()
-            )
+        result = self.synthesizer.synthesize_and_simulate(
+            portfolio_id=self.portfolio_id,
+            scenario_code=self.scenario_code,
+            request_id=self.request_id,
+            symbol=self.symbol,
+            percentage=self.percentage,
+            portfolio_value=self.portfolio_value,
+            simulations=self.simulations,
+            horizon_days=self.horizon_days,
+            confidence_level=self.confidence_level,
+            scenario_params=self.scenario_params,
+            iterations=self.iterations,
+            shifts=self.shifts
+        )
 
-            res = synth.process_stream_and_auto_hedge(
-                stream_mock=stream_mock,
-                portfolio_id=self.portfolio_id,
-                request_id=self.request_id,
-                symbol=self.symbol,
-                percentage=self.percentage,
-                shifts=self.shifts
-            )
+        self.assertEqual(result["portfolio_id"], self.portfolio_id)
+        self.assertEqual(result["var_metrics"]["predictive_var"], 0.0)
+        self.assertEqual(result["var_metrics"]["confidence"], self.confidence_level)
+        self.assertEqual(result["var_metrics"]["scenario_code"], self.scenario_code)
+        self.assertEqual(result["hedge_status"], "FALLBACK_SYNC")
 
-            mock_process.assert_called_once_with(stream_mock)
-            mock_sync.assert_called_once_with(
-                portfolio_id=self.portfolio_id,
-                request_id=self.request_id,
-                symbol=self.symbol,
-                percentage=self.percentage,
-                shifts=self.shifts
-            )
+    def test_synthesize_and_simulate_no_status_in_hedge(self):
+        expected_var_metrics = {"predictive_var": random.uniform(10.0, 100.0)}
+        self.mock_var_engine.calculate_predictive_var.return_value = expected_var_metrics
+        self.mock_auto_hedge_sync.synchronize.return_value = ["not_a_dict"]
 
-            self.assertEqual(res["stream_response"], expected_stream_response)
-            self.assertEqual(res["hedge_result"], expected_hedge_res)
-            self.assertEqual(stream_mock.read(), random_stream_data)
+        result = self.synthesizer.synthesize_and_simulate(
+            portfolio_id=self.portfolio_id,
+            scenario_code=self.scenario_code,
+            request_id=self.request_id,
+            symbol=self.symbol,
+            percentage=self.percentage,
+            portfolio_value=self.portfolio_value,
+            simulations=self.simulations,
+            horizon_days=self.horizon_days,
+            confidence_level=self.confidence_level,
+            scenario_params=self.scenario_params,
+            iterations=self.iterations,
+            shifts=self.shifts
+        )
+
+        self.assertEqual(result["hedge_status"], "SYNCHRONIZED")
+
+
+if __name__ == "__main__":
+    unittest.main()

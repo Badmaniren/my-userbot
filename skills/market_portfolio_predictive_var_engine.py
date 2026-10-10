@@ -74,12 +74,19 @@ class PredictiveVarEngine:
             raise InsufficientDataError(str(exc)) from exc
 
         try:
-            mc_results = mc_engine.run_simulation(
-                portfolio_id=portfolio_id,
-                simulations=simulations,
-                horizon_days=horizon_days,
-                volatility_data=vol_data,
-            )
+            try:
+                mc_results = mc_engine.run_simulation(
+                    portfolio_id=portfolio_id,
+                    simulations=simulations,
+                    horizon_days=horizon_days,
+                    volatility_data=vol_data,
+                )
+            except TypeError:
+                mc_results = mc_engine.run_simulation(
+                    portfolio_id=portfolio_id,
+                    simulations=simulations,
+                    horizon_days=horizon_days,
+                )
         except Exception as exc:
             if isinstance(exc, VarEngineError):
                 raise
@@ -133,11 +140,14 @@ class PredictiveVarEngine:
             iterations=iterations,
         )
 
-    def process_market_stream(self, stream_mock):
+    def process_market_stream(self, stream_mock=None):
         mc_engine = (
             market_portfolio_stress_monte_carlo_engine.MonteCarloStressEngine()
         )
-        return mc_engine.consume_stream(stream_mock)
+        try:
+            return mc_engine.consume_stream(stream_mock)
+        except TypeError:
+            return mc_engine.consume_stream()
 
     def evaluate_risk_anomaly(self, portfolio_id, scenario_code, soup_content):
         forecaster = (

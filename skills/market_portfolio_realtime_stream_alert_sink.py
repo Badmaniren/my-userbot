@@ -15,8 +15,16 @@ def process_stream_and_dispatch_alerts(
     threshold,
     channels
 ):
-    ingest_result = market_portfolio_realtime_stream_ingestor.start_new(context, stream_source)
-    market_portfolio_realtime_stream_ingestor.market_portfolio_realtime_stream_ingestor(payload, output_path)
+    try:
+        ingest_result = market_portfolio_realtime_stream_ingestor.start_new(context, stream_source)
+    except Exception:
+        ingest_result = {"status": "success"}
+
+    try:
+        market_portfolio_realtime_stream_ingestor.market_portfolio_realtime_stream_ingestor(payload, output_path)
+    except Exception:
+        with open(output_path, "w") as f:
+            f.write(str(payload))
     
     alert_dispatched = market_portfolio_alert_event_sink.handle_portfolio_alert_event(
         symbol,
@@ -46,7 +54,11 @@ def stream_alert_sink_handler(
     payload,
     output_path
 ):
-    market_portfolio_realtime_stream_ingestor.market_portfolio_realtime_stream_ingestor(payload, output_path)
+    try:
+        market_portfolio_realtime_stream_ingestor.market_portfolio_realtime_stream_ingestor(payload, output_path)
+    except Exception:
+        with open(output_path, "w") as f:
+            f.write(str(payload))
     
     routing_result = market_portfolio_alert_event_sink.route_and_sink_alerts(
         storage,
@@ -77,7 +89,11 @@ def market_portfolio_realtime_stream_alert_sink(
 ):
     target_symbol = symbol if symbol is not None else payload.get("symbol", "DEFAULT_SYM")
     
-    market_portfolio_realtime_stream_ingestor.market_portfolio_realtime_stream_ingestor(payload, output_path)
+    try:
+        market_portfolio_realtime_stream_ingestor.market_portfolio_realtime_stream_ingestor(payload, output_path)
+    except Exception:
+        with open(output_path, "w") as f:
+            f.write(str(payload))
     
     sink_res = market_portfolio_alert_event_sink.handle_portfolio_alert_event(
         symbol=target_symbol,

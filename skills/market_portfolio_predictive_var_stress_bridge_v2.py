@@ -62,13 +62,21 @@ class PredictiveVarStressBridgeV2:
                 iterations=iterations
             )
         except TypeError:
-            mc_result = self.monte_carlo_engine.run_simulation(
-                portfolio_id=portfolio_id,
-                simulations=simulations,
-                portfolio_value=portfolio_value,
-                scenario_params=scenario_params,
-                iterations=iterations
-            )
+            try:
+                mc_result = self.monte_carlo_engine.run_simulation(
+                    portfolio_id=portfolio_id,
+                    scenario_code=scenario_code,
+                    simulations=simulations,
+                    scenario_params=scenario_params,
+                    iterations=iterations
+                )
+            except TypeError:
+                mc_result = self.monte_carlo_engine.run_simulation(
+                    portfolio_id=portfolio_id,
+                    simulations=simulations,
+                    scenario_params=scenario_params,
+                    iterations=iterations
+                )
 
         return {
             "portfolio_id": portfolio_id,
@@ -111,13 +119,21 @@ class PredictiveVarStressBridgeV2:
                 iterations=iterations
             )
         except TypeError:
-            mc_result = self.monte_carlo_engine.run_simulation(
-                portfolio_id=portfolio_id,
-                simulations=simulations,
-                portfolio_value=portfolio_value,
-                scenario_params=scenario_params,
-                iterations=iterations
-            )
+            try:
+                mc_result = self.monte_carlo_engine.run_simulation(
+                    portfolio_id=portfolio_id,
+                    scenario_code=scenario_code,
+                    simulations=simulations,
+                    scenario_params=scenario_params,
+                    iterations=iterations
+                )
+            except TypeError:
+                mc_result = self.monte_carlo_engine.run_simulation(
+                    portfolio_id=portfolio_id,
+                    simulations=simulations,
+                    scenario_params=scenario_params,
+                    iterations=iterations
+                )
 
         predictive_var_val = var_result.get("predictive_var", 0.0)
         monte_carlo_loss = mc_result.get("monte_carlo_stress_loss", 0.0)

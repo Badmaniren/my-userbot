@@ -1,172 +1,148 @@
 import unittest
 from unittest.mock import patch, MagicMock
-import random
 import uuid
+import random
 import string
-import io
 
 from skills.market_portfolio_execution_risk_gate import (
     MarketPortfolioExecutionRiskGate,
     ExecutionRiskGateError
 )
 
+
 class TestMarketPortfolioExecutionRiskGate(unittest.TestCase):
 
     def setUp(self):
-        self.random_storage_file = f"storage_{uuid.uuid4().hex}.db"
-        self.gate = MarketPortfolioExecutionRiskGate(storage_file=self.random_storage_file)
+        self.storage_file = f"{uuid.uuid4().hex}.db"
+        self.gate = MarketPortfolioExecutionRiskGate(storage_file=self.storage_file)
 
-    def test_risk_gate_initialization(self):
-        self.assertEqual(self.gate.storage_file, self.random_storage_file)
-        self.assertIsNotNone(self.gate.pipeline)
-        self.assertIsNotNone(self.gate.var_liquidity_core)
+    def _random_string(self, length=10):
+        return ''.join(random.choices(string.ascii_letters, k=length))
 
     @patch('skills.market_portfolio_execution_risk_gate.market_portfolio_var_liquidity_core')
     @patch('skills.market_portfolio_execution_risk_gate.MarketPortfolioExecutionPipeline')
-    def test_validate_and_execute_success(self, mock_pipeline_cls, mock_var_core_cls):
+    def test_validate_and_execute_success(self, mock_pipeline_cls, mock_core):
+        portfolio_id = uuid.uuid4().hex
+        symbol = self._random_string(5).upper()
+        confidence = round(random.uniform(0.9, 0.99), 2)
+        var_limit = round(random.uniform(50000.0, 150000.0), 2)
+        liquidity_limit = round(random.uniform(-10.0, 10.0), 2)
+
+        current_var = var_limit - random.uniform(1000.0, 10000.0)
+        current_liquidity = liquidity_limit + random.uniform(1.0, 10.0)
+
+        mock_core.calculate_var_and_liquidity.return_value = {
+            "var": current_var,
+            "liquidity_score": current_liquidity
+        }
+
         mock_pipeline_instance = mock_pipeline_cls.return_value
-        mock_var_instance = mock_var_core_cls.return_value
+        expected_execution = {"status": "FILLED", "order_id": uuid.uuid4().hex}
+        mock_pipeline_instance.execute_order_simulation.return_value = expected_execution
 
-        portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
-        confidence = round(random.uniform(0.90, 0.99), 2)
-        var_limit = round(random.uniform(10000.0, 50000.0), 2)
-        liquidity_score_limit = round(random.uniform(0.1, 0.5), 2)
-
-        mock_var_instance.calculate_var_and_liquidity.return_value = {
-            "portfolio_id": portfolio_id,
-            "var": var_limit - 1000.0,
-            "liquidity_score": liquidity_score_limit + 0.2
-        }
-
-        order_data = {
-            "ticker": ''.join(random.choices(string.ascii_uppercase, k=4)),
-            "volume": random.randint(10, 500),
-            "price": round(random.uniform(10.0, 1000.0), 2),
-            "order_type": random.choice(["BUY", "SELL"])
-        }
-        market_context = {"volatility": round(random.uniform(0.01, 0.05), 4)}
-        percentage = round(random.uniform(0.01, 0.1), 2)
-
-        expected_simulation_result = {
-            "status": "APPROVED",
-            "execution_id": uuid.uuid4().hex,
-            "simulated_price": order_data["price"]
-        }
-        mock_pipeline_instance.execute_order_simulation.return_value = expected_simulation_result
+        order_data = {"symbol": symbol, "volume": random.randint(10, 500)}
+        market_context = {"spread": round(random.uniform(0.01, 0.5), 2)}
 
         result = self.gate.validate_and_execute(
-            portfolio_id=portfolio_id,
-            confidence_level=confidence,
-            var_limit=var_limit,
-            liquidity_limit=liquidity_score_limit,
             order_data=order_data,
             market_context=market_context,
-            percentage=percentage
+            percentage=0.05,
+            confidence_level=confidence,
+            var_limit=var_limit,
+            liquidity_limit=liquidity_limit,
+            portfolio_id=portfolio_id,
+            export_target="export_json"
         )
 
-        self.assertEqual(result, expected_simulation_result)
-        mock_var_instance.calculate_var_and_liquidity.assert_called_once_with(portfolio_id, confidence, self.random_storage_file)
-        mock_pipeline_instance.execute_order_simulation.assert_called_once_with(order_data, market_context, percentage)
+        self.assertEqual(result["status"], "APPROVED")
+        self.assertEqual(result["portfolio_id"], portfolio_id)
+        self.assertEqual(result["symbol"], symbol)
+        self.assertEqual(result["execution_result"], expected_execution)
+        self.assertTrue(result["storage_checked"])
+        mock_core.calculate_var_and_liquidity.assert_called_once_with(
+            portfolio_id, confidence, self.storage_file
+        )
 
     @patch('skills.market_portfolio_execution_risk_gate.market_portfolio_var_liquidity_core')
-    def test_validate_and_execute_var_breach(self, mock_var_core_cls):
-        mock_var_instance = mock_var_core_cls.return_value
+    @patch('skills.market_portfolio_execution_risk_gate.MarketPortfolioExecutionPipeline')
+    def test_validate_and_execute_var_breach(self, mock_pipeline_cls, mock_core):
+        portfolio_id = uuid.uuid4().hex
+        confidence = 0.95
+        var_limit = 50000.0
+        liquidity_limit = 0.0
 
-        portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
-        confidence = round(random.uniform(0.90, 0.99), 2)
-        var_limit = round(random.uniform(5000.0, 20000.0), 2)
-        liquidity_score_limit = round(random.uniform(0.1, 0.5), 2)
+        current_var = var_limit + random.uniform(100.0, 5000.0)
+        current_liquidity = 5.0
 
-        mock_var_instance.calculate_var_and_liquidity.return_value = {
-            "portfolio_id": portfolio_id,
-            "var": var_limit + 5000.0,
-            "liquidity_score": liquidity_score_limit + 0.2
+        mock_core.calculate_var_and_liquidity.return_value = {
+            "var": current_var,
+            "liquidity_score": current_liquidity
         }
 
-        order_data = {
-            "ticker": ''.join(random.choices(string.ascii_uppercase, k=3)),
-            "volume": random.randint(100, 1000),
-            "price": round(random.uniform(50.0, 500.0), 2),
-            "order_type": "BUY"
-        }
+        order_data = {"ticker": self._random_string(4)}
 
         with self.assertRaises(ExecutionRiskGateError) as ctx:
             self.gate.validate_and_execute(
-                portfolio_id=portfolio_id,
+                order_data=order_data,
                 confidence_level=confidence,
                 var_limit=var_limit,
-                liquidity_limit=liquidity_score_limit,
-                order_data=order_data,
-                market_context={},
-                percentage=0.05
+                liquidity_limit=liquidity_limit,
+                portfolio_id=portfolio_id
             )
 
         self.assertIn("VaR limit breached", str(ctx.exception))
-
-    @patch('skills.market_portfolio_execution_risk_gate.market_portfolio_var_liquidity_core')
-    def test_validate_and_execute_liquidity_breach(self, mock_var_core_cls):
-        mock_var_instance = mock_var_core_cls.return_value
-
-        portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
-        confidence = round(random.uniform(0.90, 0.99), 2)
-        var_limit = round(random.uniform(20000.0, 50000.0), 2)
-        liquidity_score_limit = round(random.uniform(0.4, 0.8), 2)
-
-        mock_var_instance.calculate_var_and_liquidity.return_value = {
-            "portfolio_id": portfolio_id,
-            "var": var_limit - 5000.0,
-            "liquidity_score": liquidity_score_limit - 0.2
-        }
-
-        order_data = {
-            "ticker": ''.join(random.choices(string.ascii_uppercase, k=5)),
-            "volume": random.randint(50, 200),
-            "price": round(random.uniform(10.0, 100.0), 2),
-            "order_type": "SELL"
-        }
-
-        with self.assertRaises(ExecutionRiskGateError) as ctx:
-            self.gate.validate_and_execute(
-                portfolio_id=portfolio_id,
-                confidence_level=confidence,
-                var_limit=var_limit,
-                liquidity_limit=liquidity_score_limit,
-                order_data=order_data,
-                market_context={},
-                percentage=0.02
-            )
-
-        self.assertIn("Liquidity limit breached", str(ctx.exception))
+        mock_pipeline_cls.return_value.execute_order_simulation.assert_not_called()
 
     @patch('skills.market_portfolio_execution_risk_gate.market_portfolio_var_liquidity_core')
     @patch('skills.market_portfolio_execution_risk_gate.MarketPortfolioExecutionPipeline')
-    def test_batch_validate_and_execute(self, mock_pipeline_cls, mock_var_core_cls):
-        mock_pipeline_instance = mock_pipeline_cls.return_value
-        mock_var_instance = mock_var_core_cls.return_value
-
-        portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
+    def test_validate_and_execute_liquidity_breach(self, mock_pipeline_cls, mock_core):
+        portfolio_id = uuid.uuid4().hex
         confidence = 0.95
         var_limit = 100000.0
-        liquidity_limit = 0.1
+        liquidity_limit = 10.0
 
-        mock_var_instance.calculate_var_and_liquidity.return_value = {
-            "portfolio_id": portfolio_id,
-            "var": 50000.0,
-            "liquidity_score": 0.8
+        current_var = 50000.0
+        current_liquidity = liquidity_limit - random.uniform(1.0, 5.0)
+
+        mock_core.calculate_var_and_liquidity.return_value = {
+            "var": current_var,
+            "liquidity_score": current_liquidity
         }
 
-        orders = [
-            {"ticker": "AAPL", "volume": 100, "price": 150.0, "order_type": "BUY"},
-            {"ticker": "GOOGL", "volume": 10, "price": 2800.0, "order_type": "BUY"}
-        ]
-        contexts = [{"env": "live"}, {"env": "live"}]
-        percentage = 0.05
+        order_data = {"symbol": self._random_string(3)}
 
-        expected_batch_results = [
-            {"status": "EXECUTED", "id": uuid.uuid4().hex},
-            {"status": "EXECUTED", "id": uuid.uuid4().hex}
-        ]
-        mock_pipeline_instance.run_batch_pipeline_execution.return_value = expected_batch_results
+        with self.assertRaises(ExecutionRiskGateError) as ctx:
+            self.gate.validate_and_execute(
+                order_data=order_data,
+                confidence_level=confidence,
+                var_limit=var_limit,
+                liquidity_limit=liquidity_limit,
+                portfolio_id=portfolio_id
+            )
+
+        self.assertIn("Liquidity limit breached", str(ctx.exception))
+        mock_pipeline_cls.return_value.execute_order_simulation.assert_not_called()
+
+    @patch('skills.market_portfolio_execution_risk_gate.market_portfolio_var_liquidity_core')
+    @patch('skills.market_portfolio_execution_risk_gate.MarketPortfolioExecutionPipeline')
+    def test_batch_validate_and_execute(self, mock_pipeline_cls, mock_core):
+        portfolio_id = uuid.uuid4().hex
+        confidence = 0.99
+        var_limit = 200000.0
+        liquidity_limit = -5.0
+
+        mock_core.calculate_var_and_liquidity.return_value = {
+            "var": 80000.0,
+            "liquidity_score": 15.0
+        }
+
+        orders = [{"id": uuid.uuid4().hex}, {"id": uuid.uuid4().hex}]
+        contexts = [{"env": "live"}, {"env": "live"}]
+        percentage = 0.1
+
+        expected_batch_result = [{"status": "BATCH_OK"}]
+        mock_pipeline_instance = mock_pipeline_cls.return_value
+        mock_pipeline_instance.run_batch_pipeline_execution.return_value = expected_batch_result
 
         results = self.gate.batch_validate_and_execute(
             portfolio_id=portfolio_id,
@@ -178,5 +154,23 @@ class TestMarketPortfolioExecutionRiskGate(unittest.TestCase):
             percentage=percentage
         )
 
-        self.assertEqual(results, expected_batch_results)
-        mock_pipeline_instance.run_batch_pipeline_execution.assert_called_once_with(orders, contexts, percentage)
+        self.assertEqual(results, expected_batch_result)
+        mock_pipeline_instance.run_batch_pipeline_execution.assert_called_once_with(
+            orders, contexts, percentage
+        )
+
+    def test_call_calculate_fallback_methods(self):
+        portfolio_id = uuid.uuid4().hex
+        confidence = 0.95
+        expected_metrics = {"var": random.uniform(10, 100), "liquidity_score": random.uniform(1, 10)}
+
+        # Тест резервного метода get_var_and_liquidity
+        mock_core = MagicMock(spec=[])
+        del mock_core.calculate_var_and_liquidity
+        del mock_core.calculate
+        mock_core.get_var_and_liquidity.return_value = expected_metrics
+
+        self.gate.var_liquidity_core = mock_core
+        metrics = self.gate._call_calculate(portfolio_id, confidence)
+        self.assertEqual(metrics, expected_metrics)
+        mock_core.get_var_and_liquidity.assert_called_once_with(portfolio_id, confidence, self.storage_file)

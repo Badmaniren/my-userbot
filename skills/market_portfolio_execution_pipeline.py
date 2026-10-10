@@ -27,13 +27,15 @@ class MarketPortfolioExecutionPipeline:
             pass
 
     def execute_order_simulation(self, order_data: dict, market_context: dict, percentage: float) -> dict:
+        ticker = order_data.get("ticker") or order_data.get("symbol")
         try:
-            ticker = order_data.get("ticker") or order_data.get("symbol")
-            try:
-                scenario_result = self.scenario_simulator.simulate_scenario(ticker, percentage)
-            except Exception:
-                scenario_result = {"symbol": ticker, "simulated_price": order_data.get("price", 0.0), "pnl_impact": 0.0}
-            
+            scenario_result = self.scenario_simulator.simulate_scenario(ticker, percentage)
+        except (KeyError, ValueError, RuntimeError, AttributeError):
+            scenario_result = {"symbol": ticker, "simulated_price": order_data.get("price", 0.0), "pnl_impact": 0.0}
+        except Exception as e:
+            raise ExecutionPipelineError(f"Error in execute_order_simulation: {e}")
+
+        try:
             execution_result = self.slippage_model.simulate_order_execution(order_data, market_context)
             self._save_execution_logs("sim_order", [execution_result])
 
@@ -48,15 +50,7 @@ class MarketPortfolioExecutionPipeline:
 
     def run_batch_pipeline_execution(self, orders: list, contexts: list, percentage: float) -> list:
         try:
-            # If contexts is passed as a list matching orders, convert or pass dictionary/list safely
-            if isinstance(contexts, list) and isinstance(orders, list) and len(contexts) == len(orders):
-                context_dict = {}
-                for idx, ord_item in enumerate(orders):
-                    sym = ord_item.get("symbol") or ord_item.get("ticker") or f"order_{idx}"
-                    context_dict[sym] = contexts[idx]
-                batch_results = self.slippage_model.simulate_batch(orders, context_dict)
-            else:
-                batch_results = self.slippage_model.simulate_batch(orders, contexts)
+            batch_results = self.slippage_model.simulate_batch(orders, contexts)
             self._save_execution_logs("batch_sim", batch_results)
             return batch_results
         except Exception as e:

@@ -116,11 +116,16 @@ class MarketPortfolioSlippageModel:
             "effective_slippage": round(slippage_value, 4)
         }
 
-    def simulate_batch(self, orders_batch: List[Dict[str, Any]], contexts: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def simulate_batch(self, orders_batch: List[Dict[str, Any]], contexts: Any) -> List[Dict[str, Any]]:
         results = []
-        for order in orders_batch:
-            symbol = order.get("symbol")
-            context = contexts.get(symbol, {"adv": 100000, "volatility": 0.2, "spread_bps": 5.0})
+        for idx, order in enumerate(orders_batch):
+            symbol = order.get("symbol") or order.get("ticker")
+            if isinstance(contexts, dict):
+                context = contexts.get(symbol, {"adv": 100000, "volatility": 0.2, "spread_bps": 5.0})
+            elif isinstance(contexts, list):
+                context = contexts[idx] if idx < len(contexts) and isinstance(contexts[idx], dict) else {"adv": 100000, "volatility": 0.2, "spread_bps": 5.0}
+            else:
+                context = {"adv": 100000, "volatility": 0.2, "spread_bps": 5.0}
             res = self.simulate_order_execution(order, context)
             results.append(res)
         return results

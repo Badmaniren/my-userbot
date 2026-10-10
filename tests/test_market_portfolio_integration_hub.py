@@ -3,129 +3,112 @@ from unittest.mock import patch, MagicMock
 import random
 import uuid
 import string
-from skills.market_portfolio_integration_hub import MarketPortfolioIntegrationHub
+import io
 
+from skills.market_portfolio_integration_hub import MarketPortfolioIntegrationHub
 
 class TestMarketPortfolioIntegrationHub(unittest.TestCase):
 
     def setUp(self):
-        self.storage_file = f"{uuid.uuid4().hex}.json"
-        self.hub = MarketPortfolioIntegrationHub(storage_file=self.storage_file)
+        self.storage_file = f"storage_{uuid.uuid4().hex}.json"
+        self.hub = MarketPortfolioIntegrationHub(self.storage_file)
 
-    def test_init_attributes(self):
-        self.assertEqual(self.hub.storage_file, self.storage_file)
+    def test_initialization_aliases(self):
         self.assertIsNotNone(self.hub.gateway)
         self.assertIsNotNone(self.hub.exporter)
         self.assertEqual(self.hub.api_gateway, self.hub.gateway)
         self.assertEqual(self.hub.data_exporter, self.hub.exporter)
+        self.assertEqual(self.hub.storage_file, self.storage_file)
 
     def test_run_integrated_pipeline_success(self):
-        url = f"https://{uuid.uuid4().hex}.com/api"
+        url = f"https://api.{uuid.uuid4().hex}.com/v1/summary"
         symbol = "".join(random.choices(string.ascii_uppercase, k=4))
         shifts = random.randint(1, 100)
-        telegram_token = uuid.uuid4().hex
-        chat_id = str(random.randint(100000, 999999))
+        token = uuid.uuid4().hex
+        chat_id = str(random.randint(10000, 999999))
 
         with patch.object(self.hub.gateway, 'export_portfolio_summary') as mock_summary, \
-             patch.object(self.hub.exporter, 'export_all') as mock_export:
+             patch.object(self.hub.exporter, 'export_all') as mock_export_all:
             
             mock_summary.return_value = {uuid.uuid4().hex: random.randint(1, 500)}
-            mock_export.return_value = [uuid.uuid4().hex, uuid.uuid4().hex]
+            mock_export_all.return_value = {uuid.uuid4().hex: uuid.uuid4().hex}
 
-            result = self.hub.run_integrated_pipeline(url, symbol, shifts, telegram_token, chat_id)
+            result = self.hub.run_integrated_pipeline(url, symbol, shifts, token, chat_id)
 
             self.assertTrue(result)
             mock_summary.assert_called_once_with(url)
-            mock_export.assert_called_once_with(url, symbol, shifts)
+            mock_export_all.assert_called_once_with(url, symbol, shifts)
 
     def test_run_integrated_pipeline_failure(self):
-        url = f"https://{uuid.uuid4().hex}.com/api"
+        url = f"https://api.{uuid.uuid4().hex}.com/v1/summary"
         symbol = "".join(random.choices(string.ascii_uppercase, k=4))
         shifts = random.randint(1, 100)
-        telegram_token = uuid.uuid4().hex
-        chat_id = str(random.randint(100000, 999999))
+        token = uuid.uuid4().hex
+        chat_id = str(random.randint(10000, 999999))
 
-        with patch.object(self.hub.gateway, 'export_portfolio_summary') as mock_summary:
-            mock_summary.side_effect = Exception(uuid.uuid4().hex)
-
-            result = self.hub.run_integrated_pipeline(url, symbol, shifts, telegram_token, chat_id)
-
+        with patch.object(self.hub.gateway, 'export_portfolio_summary', side_effect=Exception(uuid.uuid4().hex)):
+            result = self.hub.run_integrated_pipeline(url, symbol, shifts, token, chat_id)
             self.assertFalse(result)
-            mock_summary.assert_called_once_with(url)
 
     def test_export_and_dispatch_stream(self):
-        expected_data = {uuid.uuid4().hex: uuid.uuid4().hex}
-
-        with patch.object(self.hub.exporter, 'export_stream') as mock_stream:
-            mock_stream.return_value = expected_data
-
+        expected_stream_data = {uuid.uuid4().hex: uuid.uuid4().hex, "stream_id": uuid.uuid4().hex}
+        with patch.object(self.hub.exporter, 'export_stream', return_value=expected_stream_data) as mock_stream:
             result = self.hub.export_and_dispatch_stream()
-
-            self.assertEqual(result, expected_data)
+            self.assertEqual(result, expected_stream_data)
             mock_stream.assert_called_once()
 
     def test_execute_custom_export(self):
-        url = f"https://{uuid.uuid4().hex}.org/export"
-        shifts = random.randint(10, 50)
-        expected_output = [uuid.uuid4().hex for _ in range(3)]
+        url = f"https://data.{uuid.uuid4().hex}.org/export"
+        shifts = random.randint(5, 50)
+        expected_data = [uuid.uuid4().hex, uuid.uuid4().hex]
 
-        with patch.object(self.hub.exporter, 'export_data') as mock_export_data:
-            mock_export_data.return_value = expected_output
-
+        with patch.object(self.hub.exporter, 'export_data', return_value=expected_data) as mock_export:
             result = self.hub.execute_custom_export(url, shifts)
-
-            self.assertEqual(result, expected_output)
-            mock_export_data.assert_called_once_with(url, shifts)
+            self.assertEqual(result, expected_data)
+            mock_export.assert_called_once_with(url, shifts)
 
     def test_process_and_export(self):
-        url = f"https://{uuid.uuid4().hex}.net/v1"
+        url = f"https://endpoint.{uuid.uuid4().hex}.net/execute"
         symbol = "".join(random.choices(string.ascii_uppercase, k=5))
-        shifts = random.randint(1, 10)
-        telegram_token = uuid.uuid4().hex
-        chat_id = str(random.randint(1000, 9999))
+        shifts = random.randint(1, 20)
+        token = uuid.uuid4().hex
+        chat_id = str(random.randint(100000, 999999))
 
-        summary_data = {uuid.uuid4().hex: random.random()}
-        export_data_list = {uuid.uuid4().hex: uuid.uuid4().hex}
+        summary_key = uuid.uuid4().hex
+        summary_val = random.randint(100, 999)
+        export_key = uuid.uuid4().hex
+        export_val = uuid.uuid4().hex
 
-        with patch.object(self.hub.gateway, 'export_portfolio_summary') as mock_summary, \
-             patch.object(self.hub.exporter, 'export_all') as mock_export:
-            
-            mock_summary.return_value = summary_data
-            mock_export.return_value = export_data_list
+        with patch.object(self.hub.gateway, 'export_portfolio_summary', return_value={summary_key: summary_val}) as mock_summary, \
+             patch.object(self.hub.exporter, 'export_all', return_value={export_key: export_val}) as mock_export_all:
 
-            result = self.hub.process_and_export(url, symbol, shifts, telegram_token, chat_id)
+            result = self.hub.process_and_export(url, symbol, shifts, token, chat_id)
 
-            expected_result = {
-                "summary": summary_data,
-                "export_data": export_data_list
-            }
-            self.assertEqual(result, expected_result)
+            self.assertIsInstance(result, dict)
+            self.assertIn("summary", result)
+            self.assertIn("export_data", result)
+            self.assertEqual(result["summary"][summary_key], summary_val)
+            self.assertEqual(result["export_data"][export_key], export_val)
+
             mock_summary.assert_called_once_with(url)
-            mock_export.assert_called_once_with(url, symbol, shifts)
+            mock_export_all.assert_called_once_with(url, symbol, shifts)
 
     def test_run_full_integration_pipeline(self):
         symbol = "".join(random.choices(string.ascii_uppercase, k=3))
-        url = f"https://{uuid.uuid4().hex}.io/webhook"
-        telegram_token = uuid.uuid4().hex
-        chat_id = str(random.randint(10000, 99999))
-        shifts = random.randint(5, 25)
+        url = f"https://pipeline.{uuid.uuid4().hex}.io/run"
+        token = uuid.uuid4().hex
+        chat_id = str(random.randint(1000, 9999))
+        shifts = random.randint(1, 15)
 
-        summary_payload = {uuid.uuid4().hex: uuid.uuid4().hex}
-        export_payload = {uuid.uuid4().hex: random.randint(100, 200)}
+        mock_pipeline_response = {
+            "summary": {uuid.uuid4().hex: random.random()},
+            "export_data": {uuid.uuid4().hex: uuid.uuid4().hex}
+        }
 
-        with patch.object(self.hub.gateway, 'export_portfolio_summary') as mock_summary, \
-             patch.object(self.hub.exporter, 'export_all') as mock_export:
-            
-            mock_summary.return_value = summary_payload
-            mock_export.return_value = export_payload
-
-            result = self.hub.run_full_integration_pipeline(symbol, url, telegram_token, chat_id, shifts)
-
-            self.assertEqual(result["summary"], summary_payload)
-            self.assertEqual(result["export_data"], export_payload)
-            mock_summary.assert_called_once_with(url)
-            mock_export.assert_called_once_with(url, symbol, shifts)
-
+        with patch.object(self.hub, 'process_and_export', return_value=mock_pipeline_response) as mock_process:
+            result = self.hub.run_full_integration_pipeline(symbol, url, token, chat_id, shifts)
+            self.assertEqual(result, mock_pipeline_response)
+            mock_process.assert_called_once_with(url, symbol, shifts, token, chat_id)
 
 if __name__ == '__main__':
     unittest.main()

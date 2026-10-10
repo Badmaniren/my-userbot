@@ -3,8 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-except ImportError:`! Импортируй честно, пусть падает, если модуля нет.
-- Последняя ошибка перед фиксом: FAILED (errors=2)
+ors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_stress_audit_scheduler_hub (refactor) — раундов: 4
@@ -268,6 +267,9 @@ except ImportError:`! Импортируй честно, пусть падает
 ## market_portfolio_realtime_ws_listener (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_monte_carlo_engine (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_monte_carlo_engine (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

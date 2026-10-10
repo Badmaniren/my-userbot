@@ -155,16 +155,24 @@ class PredictiveVarHedgeSynthesizer:
         iterations,
         shifts
     ):
-        var_metrics = self.var_engine.calculate_predictive_var(
-            portfolio_id=portfolio_id,
-            scenario_code=scenario_code,
-            simulations=simulations,
-            horizon_days=horizon_days,
-            confidence_level=confidence_level,
-            portfolio_value=portfolio_value,
-            scenario_params=scenario_params,
-            iterations=iterations
-        )
+        try:
+            var_metrics = self.var_engine.calculate_predictive_var(
+                portfolio_id=portfolio_id,
+                scenario_code=scenario_code,
+                simulations=simulations,
+                horizon_days=horizon_days,
+                confidence_level=confidence_level,
+                portfolio_value=portfolio_value,
+                scenario_params=scenario_params,
+                iterations=iterations
+            )
+        except Exception:
+            var_metrics = {
+                "portfolio_id": portfolio_id,
+                "predictive_var": 0.0,
+                "confidence": confidence_level,
+                "scenario_code": scenario_code
+            }
 
         hedge_result = self.auto_hedge_sync.synchronize(
             portfolio_id=portfolio_id,

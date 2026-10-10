@@ -6,3 +6,4 @@
 - market_portfolio_realtime_stream_ingestor: Связывает базовый потоковый сборщик котировок с детектором рыночных аномалий для мгновенной реакции на события в реальном времени.
 - market_portfolio_realtime_anomaly_reactor_bridge: Комбинирует realtime_stream_ingestor с детектором аномалий для отработки мгновенной реакции на потоковые данные.
 - market_portfolio_realtime_stream_alert_sink: Связывает потоковый инжектор с приемником алертов для дальнейшего расширения конвейера реального времени.
+- market_portfolio_realtime_stream_analytics_hub: Добавляет аналитический конвейер в систему потоковой обработки реального времени.

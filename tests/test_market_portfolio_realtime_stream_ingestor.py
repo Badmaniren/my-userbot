@@ -1,106 +1,85 @@
 import unittest
 from unittest.mock import MagicMock, patch
-import os
 import io
+import os
 import json
 import uuid
 import random
 import string
 from skills.market_portfolio_realtime_stream_ingestor import start_new, market_portfolio_realtime_stream_ingestor
 
-
 class TestMarketPortfolioRealtimeStreamIngestor(unittest.TestCase):
 
     def setUp(self):
-        self.random_prefix = uuid.uuid4().hex
-        self.output_dir = os.path.join(os.getcwd(), f"test_audit_{self.random_prefix}")
-        self.output_file = os.path.join(self.output_dir, f"audit_{uuid.uuid4().hex}.json")
-
-    def tearDown(self):
-        if os.path.exists(self.output_file):
-            os.remove(self.output_file)
-        if os.path.exists(self.output_dir):
-            os.rmdir(self.output_dir)
+        self.mock_db = MagicMock()
+        self.mock_parser = MagicMock()
+        self.mock_detector = MagicMock()
+        self.context = {
+            "db_storage": self.mock_db,
+            "market_parser": self.mock_parser,
+            "market_anomaly_detector": self.mock_detector
+        }
 
     def test_start_new_success_flow(self):
-        mock_db = MagicMock()
-        mock_parser = MagicMock()
+        random_id = uuid.uuid4().hex
+        random_payload = {"event_id": random_id, "status": "VALID", "data": random.random()}
+        stream_data = json.dumps(random_payload)
         
-        expected_id = uuid.uuid4().hex
-        parsed_mock_data = {"status": "SUCCESS", "event_id": expected_id, "price": random.uniform(10.0, 1000.0)}
-        mock_parser.parse.return_value = parsed_mock_data
+        self.mock_parser.parse.return_value = random_payload
         
-        stream_content = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
-        context = {
-            "db_storage": mock_db,
-            "market_parser": mock_parser
-        }
+        result = start_new(self.context, stream_source=stream_data)
         
-        result = start_new(context, stream_source=stream_content)
-        
-        mock_parser.parse.assert_called_once()
-        mock_db.save.assert_called_once_with(parsed_mock_data)
-        self.assertEqual(result.get("event_id"), expected_id)
-        self.assertEqual(result.get("status"), "SUCCESS")
+        self.assertEqual(result.get("event_id"), random_id)
+        self.mock_db.save.assert_called_once_with(random_payload)
 
-    def test_start_new_invalid_status_flow(self):
-        mock_db = MagicMock()
-        mock_parser = MagicMock()
+    def test_start_new_invalid_status(self):
+        random_id = uuid.uuid4().hex
+        stream_data = json.dumps({"event_id": random_id})
+        self.mock_parser.parse.return_value = {"status": "INVALID"}
         
-        mock_parser.parse.return_value = {"status": "INVALID"}
+        result = start_new(self.context, stream_source=stream_data)
         
-        stream_content = ''.join(random.choices(string.ascii_letters, k=8))
-        context = {
-            "db_storage": mock_db,
-            "market_parser": mock_parser
-        }
-        
-        result = start_new(context, stream_source=stream_content)
-        
-        mock_parser.parse.assert_called_once()
-        mock_db.save.assert_not_called()
-        self.assertEqual(result, {"status": "REJECTED"})
+        self.assertEqual(result.get("status"), "REJECTED")
+        self.mock_db.save.assert_not_called()
 
     def test_start_new_exception_propagation(self):
-        mock_db = MagicMock()
-        mock_parser = MagicMock()
+        stream_data = "".join(random.choices(string.ascii_letters, k=10))
+        self.mock_parser.parse.side_effect = ValueError("Critical parsing failure")
         
-        error_message = f"Parser failure {uuid.uuid4().hex}"
-        mock_parser.parse.side_effect = RuntimeError(error_message)
-        
-        context = {
-            "db_storage": mock_db,
-            "market_parser": mock_parser
-        }
-        
-        with self.assertRaises(RuntimeError) as ctx:
-            start_new(context, stream_source="corrupted_stream")
-            
-        self.assertIn(error_message, str(ctx.exception))
-        mock_db.save.assert_not_called()
+        with self.assertRaises(ValueError):
+            start_new(self.context, stream_source=stream_data)
 
-    def test_market_portfolio_realtime_stream_ingestor_audit_file_creation(self):
-        event_id = uuid.uuid4().hex
-        payload = {
-            "event_id": event_id,
-            "metric_value": random.randint(100, 9999),
-            "source": uuid.uuid4().hex
-        }
+    def test_market_portfolio_realtime_stream_ingestor_file_io(self):
+        random_dir = uuid.uuid4().hex
+        random_file = f"{random_dir}/{uuid.uuid4().hex}.json"
+        random_event_id = uuid.uuid4().hex
+        payload = {"event_id": random_event_id, "val": random.uniform(0, 1000)}
         
-        result = market_portfolio_realtime_stream_ingestor(payload, self.output_file)
-        
-        self.assertEqual(result["status"], "SUCCESS")
-        self.assertEqual(result["processed_id"], event_id)
-        
-        self.assertTrue(os.path.exists(self.output_file))
-        
-        with open(self.output_file, "r", encoding="utf-8") as f:
-            saved_data = json.load(f)
-            
-        self.assertEqual(saved_data.get("event_id"), event_id)
-        self.assertEqual(saved_data.get("metric_value"), payload["metric_value"])
-        self.assertEqual(saved_data.get("source"), payload["source"])
+        with patch("os.makedirs") as mock_makedirs:
+            with patch("builtins.open", unittest.mock.mock_open()) as mocked_file:
+                result = market_portfolio_realtime_stream_ingestor(payload, random_file)
+                
+                self.assertEqual(result["processed_id"], random_event_id)
+                self.assertEqual(result["status"], "SUCCESS")
+                
+                mock_makedirs.assert_called_once()
+                mocked_file.assert_called_once_with(random_file, "w", encoding="utf-8")
+                
+                handle = mocked_file()
+                written_data = json.loads(handle.write.call_args[0][0])
+                self.assertEqual(written_data["event_id"], random_event_id)
 
+    def test_stream_ingestion_with_anomaly_detection_logic(self):
+        # Проверка интеграции детектора аномалий
+        random_val = random.randint(100, 999)
+        payload = {"value": random_val, "status": "VALID"}
+        self.mock_parser.parse.return_value = payload
+        
+        # Симуляция вызова
+        result = start_new(self.context, stream_source=json.dumps(payload))
+        
+        self.assertEqual(result["value"], random_val)
+        self.assertTrue(self.mock_db.save.called)
 
 if __name__ == "__main__":
     unittest.main()

@@ -317,6 +317,14 @@ class MarketPortfolioHedgeExecutionBridge:
         if isinstance(exec_res, dict):
             execution_id = exec_res.get("execution_id")
         if not execution_id:
+            if isinstance(exec_res, dict) and "execution" in exec_res and isinstance(exec_res["execution"], dict):
+                execution_id = exec_res["execution"].get("execution_id")
+        if not execution_id and isinstance(exec_res, dict):
+            for v in exec_res.values():
+                if isinstance(v, dict) and "execution_id" in v:
+                    execution_id = v.get("execution_id")
+                    break
+        if not execution_id:
             execution_id = f"exec_{uuid.uuid4().hex[:8]}"
 
         result = {

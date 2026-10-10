@@ -31,13 +31,13 @@ class PredictiveVarHedgeSynthesizer:
             self.auto_hedge_sync = auto_hedge_sync
         else:
             self.auto_hedge_sync = MarketPortfolioStressAutoHedgeSync(
-                db_storage=db_storage,
-                monitor=monitor,
-                evaluator=evaluator,
-                rebalancer=rebalancer,
-                storage_file=effective_storage,
-                advisor=advisor,
-                pipeline=pipeline
+                db_storage,
+                monitor,
+                evaluator,
+                rebalancer,
+                effective_storage,
+                advisor,
+                pipeline
             )
 
     def synthesize_and_execute_hedge(

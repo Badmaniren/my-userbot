@@ -1,3 +1,5 @@
+import os
+import json
 from skills.market_portfolio_backtester import MarketPortfolioBacktester
 from skills.market_portfolio_performance_analytics import PortfolioPerformanceAnalytics
 
@@ -9,8 +11,6 @@ class MarketPortfolioBacktestEvaluatorBridge:
 
     def _ensure_storage_exists(self) -> None:
         if self.storage_file:
-            import os
-            import json
             if not os.path.exists(self.storage_file) or os.path.getsize(self.storage_file) == 0:
                 with open(self.storage_file, "w") as f:
                     json.dump({}, f)

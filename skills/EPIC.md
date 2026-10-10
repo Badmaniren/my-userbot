@@ -4,3 +4,4 @@
 
 - market_portfolio_realtime_stream_ingestor: Старт нового эпика: создание базового модуля ingestor для потокового приема рыночных данных.
 - market_portfolio_realtime_stream_ingestor: Связывает базовый потоковый сборщик котировок с детектором рыночных аномалий для мгновенной реакции на события в реальном времени.
+- market_portfolio_realtime_anomaly_reactor_bridge: Комбинирует realtime_stream_ingestor с детектором аномалий для отработки мгновенной реакции на потоковые данные.

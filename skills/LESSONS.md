@@ -3,7 +3,12 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+actor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_auto_hedge_sync (refactor) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_stress_recovery_coordinator_bridge (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
@@ -283,8 +288,3 @@
 ## market_portfolio_predictive_var_engine (compose) — раундов: 4
 - Последняя ошибка перед фиксом: ----------------------------------------------------------------------
 - Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_predictive_var_stress_bridge (compose) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
-- Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/site-packages/urllib3/connectionpool.py", line 1125, in _validate_conn
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

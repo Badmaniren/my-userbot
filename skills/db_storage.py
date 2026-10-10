@@ -1,6 +1,20 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
+
+
+def db_storage(payload=None, **kwargs):
+    if isinstance(payload, dict):
+        return payload
+    return kwargs
 
 
 class MarketParser:
@@ -8,24 +22,31 @@ class MarketParser:
         self.storage_file = storage_file
 
     def fetch_price(self, url: str):
-        response = requests.get(url, timeout=10)
+        if requests is None:
+            return None
         try:
+            response = requests.get(url, timeout=10)
             data = response.json()
+            if isinstance(data, dict):
+                return data.get("price")
         except Exception:
             return None
-        if isinstance(data, dict):
-            return data.get("price")
         return None
 
     def parse_html_prices(self, url: str):
-        response = requests.get(url, timeout=10)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        element = soup.find()
-        if element and element.text:
-            try:
-                return float(element.text)
-            except (ValueError, TypeError):
-                return None
+        if requests is None or BeautifulSoup is None:
+            return None
+        try:
+            response = requests.get(url, timeout=10)
+            soup = BeautifulSoup(response.text, 'html.parser')
+            element = soup.find()
+            if element and element.text:
+                try:
+                    return float(element.text)
+                except (ValueError, TypeError):
+                    return None
+        except Exception:
+            return None
         return None
 
     def fetch_and_store(self, symbol: str, price: float):

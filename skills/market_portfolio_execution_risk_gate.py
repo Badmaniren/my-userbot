@@ -17,23 +17,23 @@ class MarketPortfolioExecutionRiskGate:
 
     def _call_calculate(self, portfolio_id: str, confidence_level: float):
         """Безопасный вызов метода расчета VaR и ликвидности с поддержкой разных интерфейсов ядра."""
+        for attr in ["calculate_var_and_liquidity", "calculate", "get_var_and_liquidity"]:
+            if hasattr(self.var_liquidity_core, attr):
+                method = getattr(self.var_liquidity_core, attr)
+                return method(portfolio_id, confidence_level, self.storage_file)
+        
+        # Если ни один метод не найден как атрибут модуля, пробуем вызвать calculate_var_and_liquidity напрямую 
+        # (это покроет случаи с MagicMock, когда автомоки создают любые атрибуты «на лету» или когда замокан весь объект целиком)
         if hasattr(self.var_liquidity_core, "calculate_var_and_liquidity"):
             return self.var_liquidity_core.calculate_var_and_liquidity(
                 portfolio_id, confidence_level, self.storage_file
             )
-        elif hasattr(self.var_liquidity_core, "calculate"):
-            return self.var_liquidity_core.calculate(
-                portfolio_id, confidence_level, self.storage_file
-            )
-        elif hasattr(self.var_liquidity_core, "get_var_and_liquidity"):
-            return self.var_liquidity_core.get_var_and_liquidity(
-                portfolio_id, confidence_level, self.storage_file
-            )
-        else:
-            # Fallback для моков в юнит-тестах, если вызывается через spec/MagicMock
-            return self.var_liquidity_core.calculate_var_and_liquidity(
-                portfolio_id, confidence_level, self.storage_file
-            )
+        
+        # Финальный fallback для строго замоканных через @patch('skills.market_portfolio_execution_risk_gate.market_portfolio_var_liquidity_core')
+        # где mock-объект возвращает другой mock для метода.
+        return self.var_liquidity_core.calculate_var_and_liquidity(
+            portfolio_id, confidence_level, self.storage_file
+        )
 
     def validate_and_execute(
         self,

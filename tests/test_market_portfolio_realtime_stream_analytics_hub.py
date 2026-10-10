@@ -1,7 +1,9 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 import uuid
 import random
+import string
+
 from skills.market_portfolio_realtime_stream_analytics_hub import (
     MarketPortfolioRealtimeStreamAnalyticsHub,
     process_realtime_stream_hub
@@ -11,89 +13,115 @@ from skills.market_portfolio_realtime_stream_analytics_hub import (
 class TestMarketPortfolioRealtimeStreamAnalyticsHub(unittest.TestCase):
 
     def setUp(self):
-        self.storage_file = f"storage_{uuid.uuid4().hex}.db"
-        self.stream_source = f"wss://market.stream/{uuid.uuid4().hex}"
-        self.symbol = f"SYM_{random.randint(100, 999)}"
-        self.output_path = f"/var/log/market_{uuid.uuid4().hex}.json"
+        self.storage_file = f"{uuid.uuid4().hex}.db"
+        self.stream_source = f"wss://stream.{uuid.uuid4().hex}.net/feed"
+        self.hub = MarketPortfolioRealtimeStreamAnalyticsHub(
+            storage_file=self.storage_file,
+            stream_source=self.stream_source
+        )
 
-    def test_init_sets_attributes(self):
-        hub = MarketPortfolioRealtimeStreamAnalyticsHub(self.storage_file, self.stream_source)
-        self.assertEqual(hub.storage_file, self.storage_file)
-        self.assertEqual(hub.stream_source, self.stream_source)
-        self.assertIsNotNone(hub.analytics_engine)
+    def test_init_attributes(self):
+        self.assertEqual(self.hub.storage_file, self.storage_file)
+        self.assertEqual(self.hub.stream_source, self.stream_source)
+        self.assertIsNotNone(self.hub.analytics_engine)
 
-    @patch("skills.market_portfolio_realtime_stream_analytics_hub.market_portfolio_realtime_stream_ingestor")
-    def test_process_stream(self, mock_ingestor):
-        expected_result = {"status": "streaming", "id": uuid.uuid4().hex}
-        mock_ingestor.start_new.return_value = expected_result
+    def test_process_stream_success(self):
+        context_key = uuid.uuid4().hex
+        context_value = uuid.uuid4().hex
+        context = {context_key: context_value}
+        
+        expected_result = {uuid.uuid4().hex: uuid.uuid4().hex}
 
-        hub = MarketPortfolioRealtimeStreamAnalyticsHub(self.storage_file, self.stream_source)
-        context = {"session_id": uuid.uuid4().hex}
-        result = hub.process_stream(context)
+        with patch("skills.market_portfolio_realtime_stream_analytics_hub.market_portfolio_realtime_stream_ingestor.start_new", return_value=expected_result) as mock_start:
+            res = self.hub.process_stream(context)
+            mock_start.assert_called_once_with(context, self.stream_source)
+            self.assertEqual(res, expected_result)
 
-        mock_ingestor.start_new.assert_called_once_with(context, self.stream_source)
-        self.assertEqual(result, expected_result)
+    def test_process_stream_exception(self):
+        context = {uuid.uuid4().hex: uuid.uuid4().hex}
+        error_message = f"error_{uuid.uuid4().hex}"
 
-    @patch("skills.market_portfolio_realtime_stream_analytics_hub.market_portfolio_realtime_stream_ingestor")
-    def test_audit_stream_data(self, mock_ingestor):
-        expected_result = {"audited": True, "token": uuid.uuid4().hex}
-        mock_ingestor.market_portfolio_realtime_stream_ingestor.return_value = expected_result
+        with patch("skills.market_portfolio_realtime_stream_analytics_hub.market_portfolio_realtime_stream_ingestor.start_new", side_effect=Exception(error_message)) as mock_start:
+            res = self.hub.process_stream(context)
+            mock_start.assert_called_once_with(context, self.stream_source)
+            self.assertEqual(res["status"], "error")
+            self.assertEqual(res["message"], error_message)
+            self.assertEqual(res["context"], context)
 
-        hub = MarketPortfolioRealtimeStreamAnalyticsHub(self.storage_file, self.stream_source)
-        payload = {"data": uuid.uuid4().hex}
-        result = hub.audit_stream_data(payload, self.output_path)
+    def test_audit_stream_data(self):
+        payload = {uuid.uuid4().hex: random.randint(1, 1000)}
+        output_path = f"/tmp/{uuid.uuid4().hex}.json"
+        expected_audit_result = {uuid.uuid4().hex: uuid.uuid4().hex}
 
-        mock_ingestor.market_portfolio_realtime_stream_ingestor.assert_called_once_with(payload, self.output_path)
-        self.assertEqual(result, expected_result)
+        with patch("skills.market_portfolio_realtime_stream_analytics_hub.market_portfolio_realtime_stream_ingestor.market_portfolio_realtime_stream_ingestor", return_value=expected_audit_result) as mock_audit:
+            res = self.hub.audit_stream_data(payload, output_path)
+            mock_audit.assert_called_once_with(payload, output_path)
+            self.assertEqual(res, expected_audit_result)
 
-    @patch("skills.market_portfolio_realtime_stream_analytics_hub.PortfolioPerformanceAnalytics")
-    def test_get_realtime_metrics(self, mock_analytics_cls):
-        mock_instance = mock_analytics_cls.return_value
-        expected_metrics = {"symbol": self.symbol, "metric": random.random()}
-        mock_instance.calculate_metrics.return_value = expected_metrics
+    def test_get_realtime_metrics(self):
+        symbol = "".join(random.choices(string.ascii_uppercase, k=4))
+        expected_metrics = {uuid.uuid4().hex: random.random()}
 
-        hub = MarketPortfolioRealtimeStreamAnalyticsHub(self.storage_file, self.stream_source)
-        result = hub.get_realtime_metrics(self.symbol)
+        with patch.object(self.hub.analytics_engine, "load_data") as mock_load, \
+             patch.object(self.hub.analytics_engine, "calculate_metrics", return_value=expected_metrics) as mock_calc:
+            
+            res = self.hub.get_realtime_metrics(symbol)
+            
+            mock_load.assert_called_once_with(self.storage_file)
+            mock_calc.assert_called_once_with(symbol)
+            self.assertEqual(res, expected_metrics)
 
-        mock_instance.load_data.assert_called_once_with(self.storage_file)
-        mock_instance.calculate_metrics.assert_called_once_with(self.symbol)
-        self.assertEqual(result, expected_metrics)
+    def test_evaluate_stream_performance(self):
+        symbol = "".join(random.choices(string.ascii_uppercase, k=4))
+        expected_perf = {uuid.uuid4().hex: uuid.uuid4().hex}
 
-    @patch("skills.market_portfolio_realtime_stream_analytics_hub.PortfolioPerformanceAnalytics")
-    def test_evaluate_stream_performance(self, mock_analytics_cls):
-        mock_instance = mock_analytics_cls.return_value
-        expected_eval = {"symbol": self.symbol, "performance": random.choice(["optimal", "suboptimal", "critical"])}
-        mock_instance.evaluate_performance.return_value = expected_eval
+        with patch.object(self.hub.analytics_engine, "load_data") as mock_load, \
+             patch.object(self.hub.analytics_engine, "evaluate_performance", return_value=expected_perf) as mock_eval:
+            
+            res = self.hub.evaluate_stream_performance(symbol)
+            
+            mock_load.assert_called_once_with(self.storage_file)
+            mock_eval.assert_called_once_with(symbol)
+            self.assertEqual(res, expected_perf)
 
-        hub = MarketPortfolioRealtimeStreamAnalyticsHub(self.storage_file, self.stream_source)
-        result = hub.evaluate_stream_performance(self.symbol)
 
-        mock_instance.load_data.assert_called_once_with(self.storage_file)
-        mock_instance.evaluate_performance.assert_called_once_with(self.symbol)
-        self.assertEqual(result, expected_eval)
+class TestProcessRealtimeStreamHub(unittest.TestCase):
 
-    @patch("skills.market_portfolio_realtime_stream_analytics_hub.PortfolioPerformanceAnalytics")
-    def test_process_realtime_stream_hub_success(self, mock_analytics_cls):
-        mock_instance = mock_analytics_cls.return_value
-        expected_metrics = {"symbol": self.symbol, "status": "active", "val": random.randint(1, 100)}
-        mock_instance.calculate_metrics.return_value = expected_metrics
+    def test_process_realtime_stream_hub_success(self):
+        output_path = f"/var/log/{uuid.uuid4().hex}.log"
+        storage_file = f"{uuid.uuid4().hex}.sqlite"
+        symbol = "".join(random.choices(string.ascii_uppercase, k=5))
+        expected_metrics = {uuid.uuid4().hex: random.uniform(10.0, 100.0)}
 
-        res = process_realtime_stream_hub(self.output_path, self.storage_file, self.symbol)
+        with patch("skills.market_portfolio_realtime_stream_analytics_hub.PortfolioPerformanceAnalytics") as mock_analytics_class:
+            mock_analytics_instance = mock_analytics_class.return_value
+            mock_analytics_instance.calculate_metrics.return_value = expected_metrics
 
-        mock_instance.load_data.assert_called_once_with(self.storage_file)
-        mock_instance.calculate_metrics.assert_called_once_with(self.symbol)
-        self.assertEqual(res["output_path"], self.output_path)
-        self.assertEqual(res["storage_file"], self.storage_file)
-        self.assertEqual(res["metrics"], expected_metrics)
+            result = process_realtime_stream_hub(output_path, storage_file, symbol)
 
-    @patch("skills.market_portfolio_realtime_stream_analytics_hub.PortfolioPerformanceAnalytics")
-    def test_process_realtime_stream_hub_exception_fallback(self, mock_analytics_cls):
-        mock_instance = mock_analytics_cls.return_value
-        mock_instance.load_data.side_effect = Exception("Database connection failure")
+            mock_analytics_class.assert_called_once_with(storage_file)
+            mock_analytics_instance.load_data.assert_called_once_with(storage_file)
+            mock_analytics_instance.calculate_metrics.assert_called_once_with(symbol)
 
-        res = process_realtime_stream_hub(self.output_path, self.storage_file, self.symbol)
+            self.assertEqual(result["output_path"], output_path)
+            self.assertEqual(result["storage_file"], storage_file)
+            self.assertEqual(result["metrics"], expected_metrics)
 
-        mock_instance.load_data.assert_called_once_with(self.storage_file)
-        self.assertEqual(res["output_path"], self.output_path)
-        self.assertEqual(res["storage_file"], self.storage_file)
-        self.assertEqual(res["metrics"], {"symbol": self.symbol, "status": "initialized"})
+    def test_process_realtime_stream_hub_exception(self):
+        output_path = f"/var/log/{uuid.uuid4().hex}.log"
+        storage_file = f"{uuid.uuid4().hex}.sqlite"
+        symbol = "".join(random.choices(string.ascii_uppercase, k=5))
+
+        with patch("skills.market_portfolio_realtime_stream_analytics_hub.PortfolioPerformanceAnalytics") as mock_analytics_class:
+            mock_analytics_instance = mock_analytics_class.return_value
+            mock_analytics_instance.load_data.side_effect = Exception(uuid.uuid4().hex)
+
+            result = process_realtime_stream_hub(output_path, storage_file, symbol)
+
+            self.assertEqual(result["output_path"], output_path)
+            self.assertEqual(result["storage_file"], storage_file)
+            self.assertEqual(result["metrics"], {"symbol": symbol, "status": "initialized"})
+
+
+if __name__ == "__main__":
+    unittest.main()

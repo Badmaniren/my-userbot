@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-на эскалацию
-
-## market_portfolio_stress_ml_volatility_forecaster (create) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
+о глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -283,4 +280,7 @@
 
 ## market_portfolio_predictive_var_hedge_synthesizer (refactor) — раундов: 2
 - Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/skills/market_portfolio_stress_scenario_pipeline.py", line 26, in execute
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_predictive_var_hedge_synthesizer (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

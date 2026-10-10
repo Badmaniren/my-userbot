@@ -26,17 +26,18 @@ class PredictiveVarHedgeSynthesizer:
                 market_anomaly_detector
             )
 
+        effective_storage = storage_file or db_storage or "market_data.db"
         if auto_hedge_sync is not None:
             self.auto_hedge_sync = auto_hedge_sync
         else:
             self.auto_hedge_sync = MarketPortfolioStressAutoHedgeSync(
-                db_storage,
-                monitor,
-                evaluator,
-                rebalancer,
-                storage_file,
-                advisor,
-                pipeline
+                db_storage=db_storage,
+                monitor=monitor,
+                evaluator=evaluator,
+                rebalancer=rebalancer,
+                storage_file=effective_storage,
+                advisor=advisor,
+                pipeline=pipeline
             )
 
     def synthesize_and_execute_hedge(

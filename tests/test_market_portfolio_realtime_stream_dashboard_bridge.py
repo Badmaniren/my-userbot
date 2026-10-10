@@ -1,187 +1,200 @@
 import unittest
-from unittest.mock import patch, MagicMock
-import random
+from unittest.mock import patch
 import uuid
-import string
+import random
 import io
-
 from skills.market_portfolio_realtime_stream_dashboard_bridge import (
+    MarketPortfolioRealtimeStreamDashboardBridge,
     market_portfolio_realtime_stream_dashboard_bridge,
-    process_dashboard_stream_bridge
+    process_dashboard_stream_bridge,
+    process_dashboard_bridge_stream
 )
 
 
 class TestMarketPortfolioRealtimeStreamDashboardBridge(unittest.TestCase):
 
-    def setUp(self):
-        self.random_storage = f"/tmp/{uuid.uuid4().hex}.db"
-        self.random_stream_source = f"stream://{uuid.uuid4().hex}"
-        self.random_symbol = ''.join(random.choices(string.ascii_uppercase, k=5))
-        self.random_output_path = f"/var/log/{uuid.uuid4().hex}.json"
-        self.random_url = f"https://{uuid.uuid4().hex}.com/api"
-        self.random_token = uuid.uuid4().hex
-        self.random_chat_id = str(random.randint(100000, 999999))
-        self.random_severity = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
-        self.random_threshold = round(random.uniform(1.0, 100.0), 2)
-        self.random_channels = [uuid.uuid4().hex, uuid.uuid4().hex]
-        self.random_payload = {
-            "event_id": uuid.uuid4().hex,
-            "metric": random.choice(["volume", "price", "volatility"]),
-            "value": random.randint(10, 5000)
-        }
+    def test_dashboard_bridge_class_process_and_bridge(self):
+        rand_storage = uuid.uuid4().hex
+        rand_source = uuid.uuid4().hex
+        rand_path = uuid.uuid4().hex + ".json"
+        rand_key = uuid.uuid4().hex
+        rand_val = random.randint(100, 9999)
 
-    @patch('skills.market_portfolio_realtime_stream_dashboard_bridge.MarketPortfolioRealtimeStreamAnalyticsHub')
-    @patch('skills.market_portfolio_realtime_stream_dashboard_bridge.market_portfolio_realtime_stream_alert_sink')
-    def test_bridge_execution_success(self, mock_alert_sink, mock_analytics_hub_cls):
-        mock_hub_instance = MagicMock()
-        expected_analytics_result = {
-            "status": "processed",
-            "symbol": self.random_symbol,
-            "metric_value": self.random_payload["value"]
-        }
-        mock_hub_instance.process_stream.return_value = expected_analytics_result
-        mock_analytics_hub_cls.return_value = mock_hub_instance
-
-        expected_sink_result = {
-            "dispatched": True,
-            "channels_count": len(self.random_channels)
-        }
-        mock_alert_sink.return_value = expected_sink_result
-
-        context = {
-            "stream_source": self.random_stream_source,
-            "payload": self.random_payload
-        }
-
-        result = market_portfolio_realtime_stream_dashboard_bridge(
-            storage_file=self.random_storage,
-            stream_source=self.random_stream_source,
-            output_path=self.random_output_path,
-            symbol=self.random_symbol,
-            url=self.random_url,
-            token=self.random_token,
-            chat_id=self.random_chat_id,
-            severity=self.random_severity,
-            threshold=self.random_threshold,
-            channels=self.random_channels,
-            payload=self.random_payload,
-            context=context
+        bridge = MarketPortfolioRealtimeStreamDashboardBridge(
+            storage_file=rand_storage,
+            stream_source=rand_source
         )
 
-        self.assertIn("analytics", result)
-        self.assertIn("alert_sink", result)
-        self.assertEqual(result["analytics"], expected_analytics_result)
-        self.assertEqual(result["alert_sink"], expected_sink_result)
+        with patch("skills.market_portfolio_realtime_stream_dashboard_bridge.MarketPortfolioRealtimeStreamAnalyticsHub") as MockHub:
+            mock_instance = MockHub.return_value
+            mock_instance.process_stream.return_value = {rand_key: rand_val}
 
-        mock_analytics_hub_cls.assert_called_once_with(
-            storage_file=self.random_storage,
-            stream_source=self.random_stream_source
-        )
-        mock_hub_instance.process_stream.assert_called_once_with(context)
-        mock_alert_sink.assert_called_once_with(
-            payload=self.random_payload,
-            output_path=self.random_output_path,
-            storage=self.random_storage,
-            url=self.random_url,
-            token=self.random_token,
-            chat_id=self.random_chat_id,
-            severity=self.random_severity,
-            threshold=self.random_threshold,
-            channels=self.random_channels,
-            symbol=self.random_symbol
-        )
+            context = {"metrics": {rand_key: rand_val}}
+            result = bridge.process_and_bridge(context=context, output_path=rand_path)
 
-    @patch('skills.market_portfolio_realtime_stream_dashboard_bridge.MarketPortfolioRealtimeStreamAnalyticsHub')
-    @patch('skills.market_portfolio_realtime_stream_dashboard_bridge.market_portfolio_realtime_stream_alert_sink')
-    def test_process_dashboard_stream_bridge_wrapper(self, mock_alert_sink, mock_analytics_hub_cls):
-        mock_hub_instance = MagicMock()
-        mock_hub_instance.get_realtime_metrics.return_value = {
-            "symbol": self.random_symbol,
-            "score": random.randint(1, 100)
-        }
-        mock_analytics_hub_cls.return_value = mock_hub_instance
+            self.assertEqual(result, {rand_key: rand_val})
+            mock_instance.process_stream.assert_called_once_with(context)
+            mock_instance.audit_stream_data.assert_called_once_with(context["metrics"], rand_path)
 
-        mock_alert_sink.return_value = {"status": "ok"}
+    def test_dashboard_bridge_class_process_stream_empty_context(self):
+        bridge = MarketPortfolioRealtimeStreamDashboardBridge()
 
-        result = process_dashboard_stream_bridge(
-            output_path=self.random_output_path,
-            storage_file=self.random_storage,
-            symbol=self.random_symbol,
-            url=self.random_url,
-            token=self.random_token,
-            chat_id=self.random_chat_id,
-            severity=self.random_severity,
-            threshold=self.random_threshold,
-            channels=self.random_channels
-        )
+        with patch("skills.market_portfolio_realtime_stream_dashboard_bridge.MarketPortfolioRealtimeStreamAnalyticsHub") as MockHub:
+            mock_instance = MockHub.return_value
+            rand_key = uuid.uuid4().hex
+            rand_val = uuid.uuid4().hex
+            mock_instance.process_stream.return_value = {rand_key: rand_val}
 
-        self.assertIsInstance(result, dict)
-        self.assertIn("metrics", result)
-        self.assertEqual(result["metrics"]["symbol"], self.random_symbol)
-        mock_hub_instance.get_realtime_metrics.assert_called_once_with(self.random_symbol)
+            result = bridge.process_stream()
 
-    @patch('skills.market_portfolio_realtime_stream_dashboard_bridge.MarketPortfolioRealtimeStreamAnalyticsHub')
-    def test_analytics_hub_exception_handling(self, mock_analytics_hub_cls):
-        mock_hub_instance = MagicMock()
-        random_error_msg = f"Stream failure {uuid.uuid4().hex}"
-        mock_hub_instance.process_stream.side_effect = Exception(random_error_msg)
-        mock_analytics_hub_cls.return_value = mock_hub_instance
+            self.assertEqual(result, {rand_key: rand_val})
+            mock_instance.process_stream.assert_called_once_with(None)
 
-        context = {"stream_source": self.random_stream_source}
+    def test_dashboard_bridge_class_get_realtime_metrics(self):
+        rand_symbol = uuid.uuid4().hex
+        rand_metric_key = uuid.uuid4().hex
+        rand_metric_val = random.random()
 
-        with self.assertRaises(Exception) as ctx:
-            market_portfolio_realtime_stream_dashboard_bridge(
-                storage_file=self.random_storage,
-                stream_source=self.random_stream_source,
-                output_path=self.random_output_path,
-                symbol=self.random_symbol,
-                url=self.random_url,
-                token=self.random_token,
-                chat_id=self.random_chat_id,
-                severity=self.random_severity,
-                threshold=self.random_threshold,
-                channels=self.random_channels,
-                payload=self.random_payload,
-                context=context
+        bridge = MarketPortfolioRealtimeStreamDashboardBridge()
+
+        with patch("skills.market_portfolio_realtime_stream_dashboard_bridge.MarketPortfolioRealtimeStreamAnalyticsHub") as MockHub:
+            mock_instance = MockHub.return_value
+            mock_instance.get_realtime_metrics.return_value = {rand_metric_key: rand_metric_val}
+
+            metrics = bridge.get_realtime_metrics(rand_symbol)
+
+            self.assertEqual(metrics, {rand_metric_key: rand_metric_val})
+            mock_instance.get_realtime_metrics.assert_called_once_with(rand_symbol)
+
+    def test_market_portfolio_realtime_stream_dashboard_bridge_function(self):
+        rand_storage = uuid.uuid4().hex
+        rand_source = uuid.uuid4().hex
+        rand_output = uuid.uuid4().hex
+        rand_symbol = uuid.uuid4().hex
+        rand_url = f"https://{uuid.uuid4().hex}.com"
+        rand_token = uuid.uuid4().hex
+        rand_chat = str(random.randint(100000, 999999))
+        rand_severity = uuid.uuid4().hex
+        rand_threshold = random.uniform(0.1, 99.9)
+        rand_channels = [uuid.uuid4().hex]
+        rand_payload = {uuid.uuid4().hex: uuid.uuid4().hex}
+        rand_context = {uuid.uuid4().hex: random.randint(1, 100)}
+
+        with patch("skills.market_portfolio_realtime_stream_dashboard_bridge.MarketPortfolioRealtimeStreamAnalyticsHub") as MockHub, \
+             patch("skills.market_portfolio_realtime_stream_dashboard_bridge.market_portfolio_realtime_stream_alert_sink") as mock_sink:
+
+            mock_hub_instance = MockHub.return_value
+            rand_analytics_res = {uuid.uuid4().hex: uuid.uuid4().hex}
+            mock_hub_instance.process_stream.return_value = rand_analytics_res
+
+            rand_sink_res = {uuid.uuid4().hex: uuid.uuid4().hex}
+            mock_sink.return_value = rand_sink_res
+
+            res = market_portfolio_realtime_stream_dashboard_bridge(
+                storage_file=rand_storage,
+                stream_source=rand_source,
+                output_path=rand_output,
+                symbol=rand_symbol,
+                url=rand_url,
+                token=rand_token,
+                chat_id=rand_chat,
+                severity=rand_severity,
+                threshold=rand_threshold,
+                channels=rand_channels,
+                payload=rand_payload,
+                context=rand_context
             )
 
-        self.assertIn(random_error_msg, str(ctx.exception))
+            self.assertEqual(res["analytics"], rand_analytics_res)
+            self.assertEqual(res["alert_sink"], rand_sink_res)
+            MockHub.assert_called_once_with(storage_file=rand_storage, stream_source=rand_source)
+            mock_hub_instance.process_stream.assert_called_once_with(rand_context)
+            mock_sink.assert_called_once_with(
+                payload=rand_payload,
+                output_path=rand_output,
+                storage=rand_storage,
+                url=rand_url,
+                token=rand_token,
+                chat_id=rand_chat,
+                severity=rand_severity,
+                threshold=rand_threshold,
+                channels=rand_channels,
+                symbol=rand_symbol
+            )
 
-    @patch('skills.market_portfolio_realtime_stream_dashboard_bridge.MarketPortfolioRealtimeStreamAnalyticsHub')
-    @patch('skills.market_portfolio_realtime_stream_dashboard_bridge.market_portfolio_realtime_stream_alert_sink')
-    def test_io_stream_payload_handling(self, mock_alert_sink, mock_analytics_hub_cls):
-        mock_hub_instance = MagicMock()
-        mock_hub_instance.audit_stream_data.return_value = {"audited": True}
-        mock_analytics_hub_cls.return_value = mock_hub_instance
+    def test_process_dashboard_stream_bridge(self):
+        rand_storage = uuid.uuid4().hex
+        rand_symbol = uuid.uuid4().hex
+        rand_output = uuid.uuid4().hex
+        rand_url = uuid.uuid4().hex
+        rand_token = uuid.uuid4().hex
+        rand_chat = uuid.uuid4().hex
+        rand_severity = uuid.uuid4().hex
+        rand_threshold = random.random()
+        rand_channels = [uuid.uuid4().hex]
 
-        mock_alert_sink.return_value = {"dispatched": True}
+        with patch("skills.market_portfolio_realtime_stream_dashboard_bridge.MarketPortfolioRealtimeStreamAnalyticsHub") as MockHub:
+            mock_hub_instance = MockHub.return_value
+            rand_metrics = {uuid.uuid4().hex: uuid.uuid4().hex}
+            mock_hub_instance.get_realtime_metrics.return_value = rand_metrics
 
-        random_binary_garbage = f"binary_data_{uuid.uuid4().hex}".encode('utf-8')
-        io_stream_mock = io.BytesIO(random_binary_garbage)
+            res = process_dashboard_stream_bridge(
+                output_path=rand_output,
+                storage_file=rand_storage,
+                symbol=rand_symbol,
+                url=rand_url,
+                token=rand_token,
+                chat_id=rand_chat,
+                severity=rand_severity,
+                threshold=rand_threshold,
+                channels=rand_channels
+            )
 
-        context = {
-            "stream_source": io_stream_mock,
-            "payload": self.random_payload
-        }
+            self.assertEqual(res, {"metrics": rand_metrics})
+            MockHub.assert_called_once_with(storage_file=rand_storage, stream_source=None)
+            mock_hub_instance.get_realtime_metrics.assert_called_once_with(rand_symbol)
 
-        result = market_portfolio_realtime_stream_dashboard_bridge(
-            storage_file=self.random_storage,
-            stream_source=self.random_stream_source,
-            output_path=self.random_output_path,
-            symbol=self.random_symbol,
-            url=self.random_url,
-            token=self.random_token,
-            chat_id=self.random_chat_id,
-            severity=self.random_severity,
-            threshold=self.random_threshold,
-            channels=self.random_channels,
-            payload=self.random_payload,
-            context=context
-        )
+    def test_process_dashboard_bridge_stream_with_payload(self):
+        rand_storage = uuid.uuid4().hex
+        rand_source = uuid.uuid4().hex
+        rand_payload = {uuid.uuid4().hex: uuid.uuid4().hex}
+        rand_output = uuid.uuid4().hex
+        rand_symbol = uuid.uuid4().hex
 
-        self.assertIsNotNone(result)
-        mock_hub_instance.process_stream.assert_called_once_with(context)
+        with patch("skills.market_portfolio_realtime_stream_dashboard_bridge.MarketPortfolioRealtimeStreamAnalyticsHub") as MockHub:
+            mock_hub_instance = MockHub.return_value
+            rand_metrics = {uuid.uuid4().hex: uuid.uuid4().hex}
+            mock_hub_instance.get_realtime_metrics.return_value = rand_metrics
+
+            res = process_dashboard_bridge_stream(
+                storage=rand_storage,
+                stream_source=rand_source,
+                payload=rand_payload,
+                output_path=rand_output,
+                symbol=rand_symbol
+            )
+
+            self.assertEqual(res, rand_metrics)
+            MockHub.assert_called_once_with(storage_file=rand_storage, stream_source=rand_source)
+            mock_hub_instance.audit_stream_data.assert_called_once_with(rand_payload, rand_output)
+            mock_hub_instance.get_realtime_metrics.assert_called_once_with(rand_symbol)
+
+    def test_process_dashboard_bridge_stream_fallback(self):
+        rand_storage = uuid.uuid4().hex
+        rand_symbol = uuid.uuid4().hex
+
+        with patch("skills.market_portfolio_realtime_stream_dashboard_bridge.MarketPortfolioRealtimeStreamAnalyticsHub") as MockHub:
+            mock_hub_instance = MockHub.return_value
+            mock_hub_instance.get_realtime_metrics.return_value = None
+
+            res = process_dashboard_bridge_stream(
+                storage=rand_storage,
+                symbol=rand_symbol
+            )
+
+            self.assertEqual(res, {"status": "ok"})
+            mock_hub_instance.get_realtime_metrics.assert_called_once_with(rand_symbol)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

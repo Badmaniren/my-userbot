@@ -53,3 +53,24 @@ class MarketPortfolioBacktestEvaluatorBridge:
             "performance_metrics": performance_metrics,
             "performance_evaluation": performance_evaluation
         }
+
+
+def market_portfolio_backtest_evaluator_bridge(payload=None, **kwargs):
+    if isinstance(payload, dict):
+        portfolio_id = payload.get("portfolio_id") or payload.get("symbol") or "default"
+        score = payload.get("score")
+        metric = payload.get("evaluation_metric")
+        res = {
+            "portfolio_id": portfolio_id,
+            "status": "evaluated",
+            "evaluation": payload
+        }
+        if score is not None:
+            res["score"] = score
+        if metric is not None:
+            res["evaluation_metric"] = metric
+        return res
+    elif isinstance(payload, str):
+        return MarketPortfolioBacktestEvaluatorBridge(payload)
+    storage_file = kwargs.get("storage_file", "market_data.json")
+    return MarketPortfolioBacktestEvaluatorBridge(storage_file)

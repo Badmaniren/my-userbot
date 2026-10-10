@@ -1,121 +1,99 @@
 import unittest
 from unittest.mock import patch, MagicMock
-import uuid
 import random
-import string
-import io
+import uuid
 import sys
 import types
 
-module_name = "skills.market_portfolio_realtime_websocket_feed"
-mock_module = types.ModuleType(module_name)
-mock_module.start_new = MagicMock()
-sys.modules[module_name] = mock_module
+websockets_mock = types.ModuleType("websockets")
+websockets_sync = types.ModuleType("websockets.sync")
+websockets_client = types.ModuleType("websockets.sync.client")
 
-from skills.market_portfolio_realtime_websocket_feed import start_new
+class DummyConnect:
+    def __init__(self, *args, **kwargs):
+        pass
+    def __enter__(self):
+        return MagicMock()
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+websockets_client.connect = DummyConnect
+websockets_sync.client = websockets_client
+websockets.sync = websockets_sync
+sys.modules["websockets"] = websockets
+sys.modules["websockets.sync"] = websockets_sync
+sys.modules["websockets.sync.client"] = websockets_client
+
+from skills.market_portfolio_realtime_websocket_feed import start_new, market_portfolio_realtime_websocket_feed
+
 
 class TestMarketPortfolioRealtimeWebsocketFeed(unittest.TestCase):
 
-    def setUp(self):
-        self.random_url = f"wss://{uuid.uuid4().hex}.market-stream.io/{random.randint(1000, 9999)}"
-        self.random_token = uuid.uuid4().hex
-        self.random_timeout = random.uniform(1.0, 10.0)
-        self.random_payload_key = ''.join(random.choices(string.ascii_lowercase, k=8))
-        self.random_payload_val = ''.join(random.choices(string.ascii_letters, k=16))
-
     def test_start_new_initialization_and_handshake(self):
-        expected_result_id = uuid.uuid4().hex
+        rand_url = f"wss://{uuid.uuid4().hex}.io/stream"
+        rand_token = uuid.uuid4().hex
+        rand_symbol = uuid.uuid4().hex[:6].upper()
+        rand_response = f"Data for {rand_symbol} received"
+
         mock_websocket_instance = MagicMock()
-        mock_websocket_instance.recv.return_value = f'{{"status": "connected", "session_id": "{expected_result_id}"}}'
+        mock_websocket_instance.recv.return_value = rand_response
 
-        with patch("websockets.sync.client.connect", return_value=mock_websocket_instance) as mock_connect:
-            if callable(start_new):
-                try:
-                    result = start_new(
-                        url=self.random_url,
-                        auth_token=self.random_token,
-                        timeout=self.random_timeout
-                    )
-                except TypeError:
-                    try:
-                        result = start_new(self.random_url)
-                    except Exception:
-                        result = expected_result_id
-            else:
-                result = expected_result_id
-
-            mock_connect.assert_called()
-            self.assertIsNotNone(result)
+        with patch("skills.market_portfolio_realtime_websocket_feed.connect", return_value=mock_websocket_instance) as mock_connect:
+            result = start_new(url=rand_url, auth_token=rand_token, symbol=rand_symbol)
+            mock_connect.assert_called_once_with(rand_url, timeout=5.0)
+            mock_websocket_instance.send.assert_called_once_with(f'{{"auth": "{rand_token}"}}')
+            self.assertEqual(result, {"symbol": rand_symbol})
 
     def test_start_new_stream_data_processing(self):
-        raw_stream_data = f'{{"event": "{self.random_payload_key}", "data": "{self.random_payload_val}"}}'.encode('utf-8')
-        mock_stream = io.BytesIO(raw_stream_data)
-
-        mock_client = MagicMock()
-        mock_client.__enter__.return_value = mock_client
-        mock_client.read_line.side_effect = mock_stream.readline
-
-        with patch("requests.Session", return_value=mock_client):
-            test_identifier = uuid.uuid4().hex
-            
-            if callable(start_new):
-                try:
-                    start_new(feed_source=self.random_url, tracking_id=test_identifier)
-                except TypeError:
-                    try:
-                        start_new()
-                    except Exception:
-                        pass
-
-            self.assertTrue(len(test_identifier) > 0)
+        rand_tracking_id = uuid.uuid4().hex
+        
+        with patch("requests.Session") as mock_session_cls:
+            mock_session = mock_session_cls.return_value
+            result = start_new(tracking_id=rand_tracking_id)
+            mock_session.close.assert_called_once()
+            self.assertEqual(result, {"tracking_id": rand_tracking_id})
 
     def test_start_new_exception_handling_on_failure(self):
-        random_error_message = f"Connection dropped: {uuid.uuid4().hex}"
-        
-        with patch("websockets.sync.client.connect", side_effect=Exception(random_error_message)) as mock_connect:
-            exception_raised = False
-            error_msg_captured = ""
+        rand_url = f"wss://{uuid.uuid4().hex}.net/feed"
+        random_error_message = uuid.uuid4().hex
 
-            try:
-                if callable(start_new):
-                    start_new(endpoint=self.random_url)
-            except Exception as e:
-                exception_raised = True
-                error_msg_captured = str(e)
-
-            mock_connect.assert_called()
-            if exception_raised:
-                self.assertIn(random_error_message, error_msg_captured)
-            else:
-                self.assertTrue(True)
+        with patch("skills.market_portfolio_realtime_websocket_feed.connect", side_effect=Exception(random_error_message)) as mock_connect:
+            with self.assertRaises(Exception) as ctx:
+                start_new(url=rand_url)
+            self.assertIn(random_error_message, str(ctx.exception))
+            mock_connect.assert_called_once_with(rand_url, timeout=5.0)
 
     def test_start_new_payload_validation(self):
-        random_market_symbol = f"SYM_{random.choice(string.ascii_uppercase)}{random.randint(100,999)}"
-        random_price = round(random.uniform(10.0, 1500.0), 4)
+        rand_uuid = uuid.uuid4().hex
+        rand_symbol = uuid.uuid4().hex[:5].upper()
+        rand_price = round(random.uniform(10.0, 1000.0), 2)
+        rand_volume = random.randint(100, 10000)
 
-        mock_payload = {
-            "symbol": random_market_symbol,
-            "price": random_price,
-            "nonce": uuid.uuid4().hex
+        payload = {
+            "feed_uuid": rand_uuid,
+            "symbol": rand_symbol,
+            "price": rand_price,
+            "volume": rand_volume
         }
 
-        mock_ws = MagicMock()
-        mock_ws.recv.return_value = str(mock_payload)
+        result = market_portfolio_realtime_websocket_feed(payload)
+        
+        self.assertEqual(result["status"], "connected")
+        self.assertEqual(result["feed_uuid"], rand_uuid)
+        self.assertEqual(result["symbol"], rand_symbol)
+        self.assertEqual(result["price"], rand_price)
+        self.assertEqual(result["volume"], rand_volume)
 
-        with patch("websockets.connect", return_value=mock_ws):
-            captured_symbol = None
-            try:
-                if callable(start_new):
-                    res = start_new(symbol=random_market_symbol)
-                    if isinstance(res, dict):
-                        captured_symbol = res.get("symbol")
-            except Exception:
-                pass
+    def test_market_portfolio_realtime_websocket_feed_invalid_payload(self):
+        invalid_payloads = [None, uuid.uuid4().hex, random.randint(1, 100), []]
+        for payload in invalid_payloads:
+            result = market_portfolio_realtime_websocket_feed(payload)
+            self.assertEqual(result["status"], "connected")
+            self.assertIsNone(result["feed_uuid"])
+            self.assertIsNone(result["symbol"])
+            self.assertIsNone(result["price"])
+            self.assertIsNone(result["volume"])
 
-            if captured_symbol:
-                self.assertEqual(captured_symbol, random_market_symbol)
-            else:
-                self.assertTrue(random_price > 0.0)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

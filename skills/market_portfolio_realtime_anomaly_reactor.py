@@ -13,8 +13,14 @@ class MarketPortfolioRealtimeAnomalyReactor:
         self.stream_source = stream_source
         self.detector = MarketAnomalyDetector()
 
-    def process_stream_tick(self, context: Dict[str, Any], ticker: str) -> Dict[str, Any]:
-        ingest_result = market_portfolio_realtime_stream_ingestor.start_new(context, self.stream_source)
+    def process_stream_tick(self, context: Any, ticker: str) -> Dict[str, Any]:
+        if isinstance(context, str):
+            ctx = {"session_id": context, "db_storage": None}
+        elif isinstance(context, dict):
+            ctx = context
+        else:
+            ctx = {"session_id": str(context), "db_storage": None}
+        ingest_result = market_portfolio_realtime_stream_ingestor.start_new(ctx, self.stream_source)
         detection = self.detector.detect(ticker)
         
         is_anomaly = detection.get("is_anomaly", False) if isinstance(detection, dict) else False

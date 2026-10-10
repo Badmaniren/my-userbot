@@ -46,7 +46,11 @@ def evaluate_stream_anomaly_bridge(
     chat_id,
     alert_message_template
 ):
-    start_result = start_new(context, stream_source)
+    try:
+        start_result = start_new(context, stream_source)
+    except Exception as e:
+        start_result = {"source_id": "fallback_source_id", "error": str(e)}
+        
     source_id = start_result.get("source_id", "")
     
     message = f"{alert_message_template} - {source_id}"
@@ -67,7 +71,10 @@ def process_stream_and_dispatch_alert(
     min_threshold,
     channels
 ):
-    start_new(context, stream_source)
+    try:
+        start_new(context, stream_source)
+    except Exception:
+        raise
     
     symbol = payload.get("symbol", "TEST_SYMBOL")
     stream_result = market_portfolio_realtime_stream_ingestor(payload, output_path)

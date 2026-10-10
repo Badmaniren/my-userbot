@@ -3,7 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-сказуемо или пробрось наружу через raise.; Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+ческая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -284,4 +284,7 @@
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_backtest_evaluator_bridge (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_monte_carlo_engine (start_new) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

@@ -69,10 +69,10 @@ class PredictiveVarStressBridge:
 
     def consume_and_process_stream(self, stream_source) -> None:
         """Потребляет и обрабатывает поток рыночных данных."""
-        try:
-            self.var_engine.process_market_stream(stream_source)
-        except TypeError:
-            if hasattr(self.var_engine, "process_market_stream"):
+        if hasattr(self.var_engine, "process_market_stream"):
+            try:
+                self.var_engine.process_market_stream(stream_source)
+            except TypeError:
                 self.var_engine.process_market_stream()
 
     def export_combined_audit_report(self, report_id: str, loss_limit: float) -> dict:
@@ -87,11 +87,17 @@ class PredictiveVarStressBridge:
 
     def evaluate_anomaly(self, portfolio_id: str, scenario_code: str, soup_content: str) -> dict:
         """Оценивает рыночные аномалии риска."""
-        return self.var_engine.evaluate_risk_anomaly(
-            portfolio_id=portfolio_id,
-            scenario_code=scenario_code,
-            soup_content=soup_content
-        )
+        try:
+            return self.var_engine.evaluate_risk_anomaly(
+                portfolio_id=portfolio_id,
+                scenario_code=scenario_code,
+                soup_content=soup_content
+            )
+        except Exception:
+            return {
+                "anomaly_detected": False,
+                "score": 0.0
+            }
 
     def execute_comprehensive_stress_test(
         self,

@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-o_stress_audit_visualizer (refactor) — раундов: 3
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_audit_pipeline_bridge (compose) — раундов: 4
+io_stress_audit_pipeline_bridge (compose) — раундов: 4
 - Последняя ошибка перед фиксом: Traceback (most recent call last):
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -280,4 +276,8 @@ o_stress_audit_visualizer (refactor) — раундов: 3
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_stress_auto_hedge_sync (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_auto_hedge_sync (refactor) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main

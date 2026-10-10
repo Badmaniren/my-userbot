@@ -1,117 +1,154 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+import os
+import json
 import uuid
 import random
-import string
 import io
-import sys
-from types import ModuleType
 
-module_name = 'skills.market_portfolio_realtime_anomaly_reactor_bridge'
-if module_name not in sys.modules:
-    dummy_mod = ModuleType(module_name)
-    sys.modules[module_name] = dummy_mod
+from skills.market_portfolio_realtime_anomaly_reactor_bridge import (
+    MarketPortfolioRealtimeAnomalyReactorBridge,
+    market_portfolio_realtime_anomaly_reactor_bridge
+)
+
 
 class TestMarketPortfolioRealtimeAnomalyReactorBridge(unittest.TestCase):
+
     def setUp(self):
-        self.stream_source_val = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
-        self.payload_val = {uuid.uuid4().hex: random.randint(1, 1000)}
-        self.output_path_val = f"/{uuid.uuid4().hex}/{uuid.uuid4().hex}.json"
-        self.ticker_val = ''.join(random.choices(string.ascii_uppercase, k=4))
-        self.exchange_val = ''.join(random.choices(string.ascii_uppercase, k=6))
-        self.expected_reaction_id = uuid.uuid4().hex
+        self.rand_suffix = uuid.uuid4().hex[:8]
+        self.ticker = f"TICK_{self.rand_suffix}"
+        self.output_path = f"test_output_{self.rand_suffix}.json"
+        self.stream_source = f"stream_{self.rand_suffix}"
 
-    def test_bridge_composition_and_reactor_flow(self):
-        mock_stream_ingestor = MagicMock()
-        rand_ingest_result = {uuid.uuid4().hex: random.random()}
-        mock_stream_ingestor.market_portfolio_realtime_stream_ingestor.return_value = rand_ingest_result
-        mock_stream_ingestor.start_new.return_value = {uuid.uuid4().hex: random.randint(10, 50)}
-
-        mock_anomaly_detector = MagicMock()
-        mock_detector_instance = MagicMock()
-        rand_anomaly_score = random.uniform(0.0, 100.0)
-        mock_detector_instance.detect.return_value = {
-            'ticker': self.ticker_val,
-            'anomaly_score': rand_anomaly_score,
-            'reaction_id': self.expected_reaction_id
-        }
-        mock_detector_instance.analyze_stream.return_value = [self.expected_reaction_id]
-        mock_anomaly_detector.MarketAnomalyDetector.return_value = mock_detector_instance
-        mock_anomaly_detector.market_anomaly_detector.return_value = rand_anomaly_score
-
-        modules_to_patch = {
-            'skills.market_portfolio_realtime_stream_ingestor': mock_stream_ingestor,
-            'skills.market_anomaly_detector': mock_anomaly_detector
-        }
-
-        with patch.dict('sys.modules', modules_to_patch):
+    def tearDown(self):
+        if os.path.exists(self.output_path):
             try:
-                import importlib
-                bridge_mod = importlib.import_module(module_name)
-                importlib.reload(bridge_mod)
-                
-                if hasattr(bridge_mod, 'market_portfolio_realtime_anomaly_reactor_bridge'):
-                    res = bridge_mod.market_portfolio_realtime_anomaly_reactor_bridge(
-                        self.payload_val, self.output_path_val, self.ticker_val
-                    )
-                    self.assertIsNotNone(res)
-                elif hasattr(bridge_mod, 'MarketPortfolioRealtimeAnomalyReactorBridge'):
-                    reactor = bridge_mod.MarketPortfolioRealtimeAnomalyReactorBridge(
-                        stream_source=self.stream_source_val
-                    )
-                    if hasattr(reactor, 'process_stream'):
-                        outcome = reactor.process_stream(self.ticker_val)
-                        self.assertIn(self.expected_reaction_id, str(outcome))
-                else:
-                    ingest_res = mock_stream_ingestor.market_portfolio_realtime_stream_ingestor(
-                        self.payload_val, self.output_path_val
-                    )
-                    detector_res = mock_detector_instance.detect(self.ticker_val)
-                    self.assertEqual(detector_res['ticker'], self.ticker_val)
-                    self.assertEqual(detector_res['reaction_id'], self.expected_reaction_id)
-            except (ImportError, AttributeError):
-                ingest_res = mock_stream_ingestor.market_portfolio_realtime_stream_ingestor(
-                    self.payload_val, self.output_path_val
-                )
-                detector_res = mock_detector_instance.detect(self.ticker_val)
-                self.assertEqual(detector_res['reaction_id'], self.expected_reaction_id)
-
-    def test_stream_ingestion_failure_handling(self):
-        mock_stream_ingestor = MagicMock()
-        mock_stream_ingestor.market_portfolio_realtime_stream_ingestor.side_effect = ValueError(uuid.uuid4().hex)
-        mock_anomaly_detector = MagicMock()
-
-        modules_to_patch = {
-            'skills.market_portfolio_realtime_stream_ingestor': mock_stream_ingestor,
-            'skills.market_anomaly_detector': mock_anomaly_detector
-        }
-
-        with patch.dict('sys.modules', modules_to_patch):
-            with self.assertRaises((ValueError, Exception)):
-                mock_stream_ingestor.market_portfolio_realtime_stream_ingestor(
-                    self.payload_val, self.output_path_val
-                )
-
-    def test_anomaly_detector_integration_stream(self):
-        mock_stream_ingestor = MagicMock()
-        mock_anomaly_detector = MagicMock()
+                os.remove(self.output_path)
+            except OSError:
+                pass
         
-        mock_detector_instance = MagicMock()
-        rand_result_list = [uuid.uuid4().hex, uuid.uuid4().hex]
-        mock_detector_instance.analyze_stream.return_value = rand_result_list
-        mock_anomaly_detector.MarketAnomalyDetector.return_value = mock_detector_instance
+        dir_name = os.path.dirname(os.path.abspath(self.output_path))
+        if dir_name and os.path.exists(dir_name) and dir_name != os.getcwd():
+            try:
+                os.rmdir(dir_name)
+            except OSError:
+                pass
 
-        modules_to_patch = {
-            'skills.market_portfolio_realtime_stream_ingestor': mock_stream_ingestor,
-            'skills.market_anomaly_detector': mock_anomaly_detector
+    def test_class_process_stream(self):
+        reactor = MarketPortfolioRealtimeAnomalyReactorBridge(stream_source=self.stream_source)
+        self.assertEqual(reactor.stream_source, self.stream_source)
+
+        mock_reaction_id = uuid.uuid4().hex
+        with patch("skills.market_anomaly_detector.MarketAnomalyDetector.detect") as mock_detect:
+            mock_detect.return_value = {"reaction_id": mock_reaction_id}
+            result = reactor.process_stream(self.ticker)
+            self.assertEqual(result, mock_reaction_id)
+            mock_detect.assert_called_once_with(self.ticker)
+
+    @patch("skills.market_portfolio_realtime_anomaly_reactor_bridge.market_portfolio_realtime_stream_ingestor")
+    @patch("skills.market_anomaly_detector.MarketAnomalyDetector.detect")
+    def test_bridge_function_with_ticker(self, mock_detect, mock_ingestor):
+        ingested_val = f"ingested_{uuid.uuid4().hex}"
+        detection_val = f"detection_{uuid.uuid4().hex}"
+        
+        mock_ingestor.return_value = {"data": ingested_val}
+        mock_detect.return_value = {"result": detection_val}
+
+        payload = {"payload_key": uuid.uuid4().hex}
+        result = market_portfolio_realtime_anomaly_reactor_bridge(
+            payload_or_context=payload,
+            output_path=self.output_path,
+            ticker=self.ticker
+        )
+
+        self.assertIn("ingested_data", result)
+        self.assertIn("detection_result", result)
+        self.assertEqual(result["status"], "reacted")
+        self.assertEqual(result["detection_result"]["result"], detection_val)
+
+        self.assertTrue(os.path.exists(self.output_path))
+        with open(self.output_path, "r", encoding="utf-8") as f:
+            file_data = json.load(f)
+            self.assertEqual(file_data["status"], "reacted")
+            self.assertEqual(file_data["detection_result"]["result"], detection_val)
+
+    @patch("skills.market_anomaly_detector.MarketAnomalyDetector.detect")
+    def test_bridge_function_payload_with_ticker(self, mock_detect):
+        detection_val = random.randint(1000, 9999)
+        mock_detect.return_value = {"code": detection_val}
+
+        payload = {
+            "ticker": self.ticker,
+            "extra": uuid.uuid4().hex
         }
 
-        with patch.dict('sys.modules', modules_to_patch):
-            detector = mock_anomaly_detector.MarketAnomalyDetector()
-            analysis = detector.analyze_stream(self.exchange_val)
-            self.assertEqual(analysis, rand_result_list)
-            mock_anomaly_detector.MarketAnomalyDetector.assert_called_once()
-            mock_detector_instance.analyze_stream.assert_called_once_with(self.exchange_val)
+        result = market_portfolio_realtime_anomaly_reactor_bridge(
+            payload_or_context=payload,
+            output_path=self.output_path
+        )
 
-if __name__ == '__main__':
-    unittest.main()
+        self.assertEqual(result["status"], "reacted")
+        self.assertEqual(result["detection_result"]["code"], detection_val)
+        mock_detect.assert_called_once_with(self.ticker)
+
+    @patch("skills.market_anomaly_detector.MarketAnomalyDetector.detect")
+    def test_bridge_function_payload_with_detection_meta(self, mock_detect):
+        detection_val = uuid.uuid4().hex
+        mock_detect.return_value = {"id": detection_val}
+
+        payload = {
+            "detection_meta": {
+                "ticker": self.ticker
+            }
+        }
+
+        result = market_portfolio_realtime_anomaly_reactor_bridge(
+            payload_or_context=payload,
+            output_path=self.output_path
+        )
+
+        self.assertEqual(result["status"], "reacted")
+        mock_detect.assert_called_once_with(self.ticker)
+
+    @patch("skills.market_anomaly_detector.MarketAnomalyDetector.detect")
+    def test_bridge_function_payload_unknown_ticker(self, mock_detect):
+        mock_detect.return_value = {"status": "ok"}
+
+        payload = {"random_field": uuid.uuid4().hex}
+
+        result = market_portfolio_realtime_anomaly_reactor_bridge(
+            payload_or_context=payload,
+            output_path=self.output_path
+        )
+
+        self.assertEqual(result["status"], "reacted")
+        mock_detect.assert_called_once_with("UNKNOWN")
+
+    @patch("skills.market_portfolio_realtime_anomaly_reactor_bridge.market_portfolio_realtime_stream_ingestor")
+    @patch("skills.market_anomaly_detector.MarketAnomalyDetector.detect")
+    def test_bridge_function_ingestor_exception_fallback(self, mock_detect, mock_ingestor):
+        mock_ingestor.side_effect = Exception("Ingestor failed")
+        mock_detect.return_value = {"alert": True}
+
+        payload = uuid.uuid4().hex
+        result = market_portfolio_realtime_anomaly_reactor_bridge(
+            payload_or_context=payload,
+            output_path=self.output_path,
+            ticker=self.ticker
+        )
+
+        self.assertEqual(result["ingested_data"], {"payload": payload})
+        self.assertEqual(result["status"], "reacted")
+
+    @patch("skills.market_anomaly_detector.MarketAnomalyDetector.detect")
+    def test_bridge_directory_creation_failure_fallback(self, mock_detect):
+        mock_detect.return_value = {"checked": True}
+        
+        invalid_dir_path = f"/invalid_restricted_path_{uuid.uuid4().hex}/output.json"
+        
+        with patch("os.makedirs", side_effect=OSError("Permission denied")):
+            result = market_portfolio_realtime_anomaly_reactor_bridge(
+                payload_or_context={"ticker": self.ticker},
+                output_path=invalid_dir_path
+            )
+            self.assertEqual(result["status"], "reacted")

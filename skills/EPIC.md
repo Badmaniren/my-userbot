@@ -7,3 +7,4 @@
 - market_portfolio_realtime_anomaly_reactor_bridge: Комбинирует realtime_stream_ingestor с детектором аномалий для отработки мгновенной реакции на потоковые данные.
 - market_portfolio_realtime_stream_alert_sink: Связывает потоковый инжектор с приемником алертов для дальнейшего расширения конвейера реального времени.
 - market_portfolio_realtime_stream_analytics_hub: Добавляет аналитический конвейер в систему потоковой обработки реального времени.
+- market_portfolio_realtime_stream_dashboard_bridge: Связывает аналитический потоковый хаб с приемником алертов для формирования единой информационной панели в конвейере реального времени.

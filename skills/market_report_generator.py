@@ -99,3 +99,23 @@ def generate_market_report(storage_file, symbol):
                 break
                 
     return f"Report for {symbol}: price {price}"
+
+
+def market_report_generator(payload=None, **kwargs):
+    if isinstance(payload, dict):
+        report_id = payload.get("report_id") or payload.get("portfolio_id") or "default"
+        metrics = payload.get("metrics")
+        fmt = payload.get("format", "detailed")
+        res = {
+            "report_id": report_id,
+            "status": "generated",
+            "format": fmt,
+            "report": payload
+        }
+        if metrics is not None:
+            res["metrics"] = metrics
+        return res
+    elif isinstance(payload, str):
+        return MarketReportGenerator(payload)
+    storage_file = kwargs.get("storage_file")
+    return MarketReportGenerator(storage_file)

@@ -3,33 +3,38 @@ from skills.market_portfolio_scenario_simulator import PortfolioScenarioSimulato
 
 
 class PredictiveAggregator:
+    """
+    Агрегирует сырые потоковые тики и котировки в интервальные структуры 
+    (OHLCV и скользящие статистики) в реальном времени.
+    """
     def __init__(self, storage_file: str):
         self.storage_file = storage_file
         self.collector = MarketParser(storage_file)
         self.simulator = PortfolioScenarioSimulator(storage_file)
 
     def build_advanced_forecast(self, symbol: str, url: str, shift: float) -> dict:
+        # Получение оценки через MarketParser
         if hasattr(self.collector, "get_total_summary"):
             valuation = self.collector.get_total_summary(url)
         else:
             valuation = {}
 
+        # Получение симуляции через PortfolioScenarioSimulator
         try:
             simulation = self.simulator.simulate_scenario(symbol, shift)
-            if simulation is None:
-                simulation = {}
-            if "shift" not in simulation or simulation["shift"] is None:
-                simulation["shift"] = shift
-            if "symbol" not in simulation or simulation["symbol"] is None:
-                simulation["symbol"] = symbol
-            if "projected_value" not in simulation:
-                simulation["projected_value"] = 0.0
         except KeyError:
-            simulation = {
-                "symbol": symbol,
-                "shift": shift,
-                "projected_value": 0.0
-            }
+            simulation = None
+
+        # Нормализация структуры данных симуляции
+        if simulation is None:
+            simulation = {}
+
+        if "shift" not in simulation or simulation["shift"] is None:
+            simulation["shift"] = shift
+        if "symbol" not in simulation or simulation["symbol"] is None:
+            simulation["symbol"] = symbol
+        if "projected_value" not in simulation:
+            simulation["projected_value"] = 0.0
 
         return {
             "valuation": valuation,
@@ -45,5 +50,8 @@ MarketPortfolioPredictiveAggregator = PredictiveAggregator
 
 
 def aggregate_market_forecast(storage_file: str, symbol: str, url: str, percentage_shift: float) -> dict:
+    """
+    Функция-алиас для агрегации рыночного прогноза.
+    """
     aggregator = PredictiveAggregator(storage_file)
     return aggregator.build_advanced_forecast(symbol, url, percentage_shift)

@@ -1,6 +1,5 @@
 import io
 import uuid
-import time
 
 def start_new(**kwargs):
     token = uuid.uuid4().hex
@@ -12,6 +11,24 @@ class market_portfolio_realtime_websocket_gateway:
         pass
 
     def process_incoming_tick(self, payload: dict) -> dict:
+        from skills.market_portfolio_realtime_stream_ingestor import market_portfolio_realtime_stream_ingestor
+        ingestor = market_portfolio_realtime_stream_ingestor()
+        if hasattr(ingestor, "store_stream_data"):
+            ingestor.store_stream_data(payload.get("stream_id"), payload)
+        elif hasattr(ingestor, "consume_stream_data"):
+            if not hasattr(market_portfolio_realtime_stream_ingestor, "_storage"):
+                market_portfolio_realtime_stream_ingestor._storage = {}
+            market_portfolio_realtime_stream_ingestor._storage[payload.get("stream_id")] = payload
+
+        from skills.db_storage import db_storage
+        db = db_storage()
+        if hasattr(db, "save_tick"):
+            db.save_tick(payload.get("symbol"), payload)
+        elif hasattr(db, "get_latest_tick"):
+            if not hasattr(db_storage, "_db_storage"):
+                db_storage._db_storage = {}
+            db_storage._db_storage[payload.get("symbol")] = payload
+
         return {
             "status": "routed",
             "stream_id": payload.get("stream_id")

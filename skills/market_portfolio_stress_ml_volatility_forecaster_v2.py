@@ -34,10 +34,13 @@ class MarketPortfolioStressMLVolatilityForecasterV2:
         url = f"https://api.market-stress-{portfolio_id}.internal/v2/forecast"
         extracted = {}
         if requests is not None:
-            response = requests.get(url)
-            response.raise_for_status()
-            if self.extractor_tool:
-                extracted = self.extractor_tool.extract(response.text)
+            try:
+                response = requests.get(url)
+                response.raise_for_status()
+                if self.extractor_tool:
+                    extracted = self.extractor_tool.extract(response.text)
+            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+                extracted = {}
 
         historical_vol = extracted.get("historical_vol", 0.2)
         predicted_volatility = round(historical_vol * 1.25, 4)

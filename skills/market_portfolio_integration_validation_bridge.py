@@ -42,7 +42,7 @@ class MarketPortfolioIntegrationValidationBridge:
             simulations=simulations,
             horizon_days=horizon_days,
             confidence_level=confidence_level,
-            port_value=port_value,
+            portfolio_value=port_value,
             scenario_params=scenario_params,
             iterations=iterations
         )
@@ -102,7 +102,7 @@ class MarketPortfolioIntegrationValidationBridge:
             simulations=simulations,
             horizon_days=horizon_days,
             confidence_level=confidence_level,
-            port_value=portfolio_value,
+            portfolio_value=portfolio_value,
             scenario_params={},
             iterations=10
         )

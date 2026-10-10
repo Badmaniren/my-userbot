@@ -1,14 +1,27 @@
 import json
 import asyncio
+from typing import Callable, Optional, Dict, Any
+
 try:
     import websockets
 except ImportError:
     websockets = None
-from typing import Callable, Optional, Dict, Any
+
+try:
+    from skills.db_storage import db_storage
+except ImportError:
+    db_storage = None
+
+try:
+    from skills.market_parser import market_parser
+except ImportError:
+    market_parser = None
+
 
 class WebSocketConnectionError(Exception):
     """Исключение при ошибках подключения к WebSocket."""
     pass
+
 
 class InvalidMessageError(Exception):
     """Исключение при невалидных или поврежденных сообщениях."""

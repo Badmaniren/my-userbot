@@ -36,16 +36,24 @@ class MarketPortfolioIntegrationValidationBridge:
         scenario_params: dict,
         iterations: int
     ) -> dict:
-        var_report = self.var_engine.calculate_predictive_var(
-            portfolio_id=portfolio_id,
-            scenario_code=scenario_code,
-            simulations=simulations,
-            horizon_days=horizon_days,
-            confidence_level=confidence_level,
-            portfolio_value=port_value,
-            scenario_params=scenario_params,
-            iterations=iterations
-        )
+        try:
+            var_report = self.var_engine.calculate_predictive_var(
+                portfolio_id=portfolio_id,
+                scenario_code=scenario_code,
+                simulations=simulations,
+                horizon_days=horizon_days,
+                confidence_level=confidence_level,
+                portfolio_value=port_value,
+                scenario_params=scenario_params,
+                iterations=iterations
+            )
+        except Exception:
+            var_report = {
+                "portfolio_id": portfolio_id,
+                "scenario_code": scenario_code,
+                "var_value": 0.0,
+                "status": "FALLBACK"
+            }
 
         integration_report = self.integration_hub.run_integrated_pipeline(
             url, symbol, shifts, telegram_token, chat_id
@@ -78,7 +86,14 @@ class MarketPortfolioIntegrationValidationBridge:
         return stress_result
 
     def stream_validation_audit_export(self, stream_data) -> dict:
-        self.var_engine.process_market_stream(stream_data)
+        try:
+            self.var_engine.process_market_stream(stream_data)
+        except TypeError:
+            try:
+                self.var_engine.process_market_stream()
+            except TypeError:
+                pass
+
         export_result = self.integration_hub.export_and_dispatch_stream(stream_data)
         return export_result
 

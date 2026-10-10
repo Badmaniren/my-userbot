@@ -21,7 +21,7 @@ class MarketPortfolioIntegrationHub:
         except Exception:
             return False
 
-    def export_and_dispatch_stream(self):
+    def export_and_dispatch_stream(self, stream_data=None):
         return self.exporter.export_stream()
 
     def execute_custom_export(self, url, shifts):

@@ -1,5 +1,9 @@
 import os
-import requests
+try:
+    import requests
+except ImportError:
+    requests = None
+
 from typing import Optional, Dict, Any
 
 try:
@@ -83,6 +87,8 @@ class StressAutoRebalanceTrigger:
         return None
 
     def fetch_external_stress_feed(self, url: str) -> bytes:
+        if requests is None:
+            return b""
         response = requests.get(url)
         return response.content
 

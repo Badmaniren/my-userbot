@@ -39,6 +39,19 @@ class PredictiveVarHedgeSynthesizer:
                 pipeline
             )
 
+    def _normalize_percentage(self, percentage):
+        if percentage is None:
+            return 0.0
+        try:
+            val = float(percentage)
+            if val < 0.0:
+                return 0.0
+            if val > 100.0:
+                return 100.0
+            return val
+        except (TypeError, ValueError):
+            return 0.0
+
     def synthesize_and_execute_hedge(
         self,
         portfolio_id,
@@ -54,6 +67,8 @@ class PredictiveVarHedgeSynthesizer:
         percentage,
         shifts
     ):
+        normalized_percentage = self._normalize_percentage(percentage)
+
         var_metrics = self.var_engine.calculate_predictive_var(
             portfolio_id=portfolio_id,
             scenario_code=scenario_code,
@@ -69,7 +84,7 @@ class PredictiveVarHedgeSynthesizer:
             portfolio_id=portfolio_id,
             request_id=request_id,
             symbol=symbol,
-            percentage=percentage,
+            percentage=normalized_percentage,
             shifts=shifts
         )
 
@@ -92,6 +107,8 @@ class PredictiveVarHedgeSynthesizer:
         percentage,
         shifts
     ):
+        normalized_percentage = self._normalize_percentage(percentage)
+
         stress_var_metrics = self.var_engine.calculate_predictive_stress_var(
             portfolio_id=portfolio_id,
             portfolio_value=portfolio_value,
@@ -105,7 +122,7 @@ class PredictiveVarHedgeSynthesizer:
             portfolio_id=portfolio_id,
             request_id=request_id,
             symbol=symbol,
-            percentage=percentage,
+            percentage=normalized_percentage,
             shifts=shifts
         )
 
@@ -124,13 +141,15 @@ class PredictiveVarHedgeSynthesizer:
         percentage,
         shifts
     ):
+        normalized_percentage = self._normalize_percentage(percentage)
+
         stream_response = self.var_engine.process_market_stream(stream_mock)
 
         hedge_result = self.auto_hedge_sync.synchronize(
             portfolio_id=portfolio_id,
             request_id=request_id,
             symbol=symbol,
-            percentage=percentage,
+            percentage=normalized_percentage,
             shifts=shifts
         )
 
@@ -155,6 +174,8 @@ class PredictiveVarHedgeSynthesizer:
         iterations,
         shifts
     ):
+        normalized_percentage = self._normalize_percentage(percentage)
+
         try:
             var_metrics = self.var_engine.calculate_predictive_var(
                 portfolio_id=portfolio_id,
@@ -178,7 +199,7 @@ class PredictiveVarHedgeSynthesizer:
             portfolio_id=portfolio_id,
             request_id=request_id,
             symbol=symbol,
-            percentage=percentage,
+            percentage=normalized_percentage,
             shifts=shifts
         )
 

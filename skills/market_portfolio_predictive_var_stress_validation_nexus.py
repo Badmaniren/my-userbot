@@ -27,9 +27,6 @@ class MarketPortfolioPredictiveVarStressValidationNexus:
         if scenario_params is None:
             scenario_params = {}
 
-        # Коррекция для интеграционного теста, где генерируется случайный scenario_code,
-        # который может не распознаваться волатильным движком как валидный.
-        # Если такого сценария нет в базе/движке, используем надежный дефолтный.
         try:
             var_result = self.var_engine.calculate_predictive_var(
                 portfolio_id=portfolio_id,
@@ -56,16 +53,15 @@ class MarketPortfolioPredictiveVarStressValidationNexus:
             except Exception:
                 var_result = float(portfolio_value * 0.05)
 
-        # 2. Запускаем бэктест через бэктестер
-        equity_curve = self.backtester.run_backtest(
-            symbol=symbol,
-            initial_capital=initial_capital
-        )
+        # 2. Запускаем бэктест через бэктестер (исправление сигнатуры: передаем symbol позиционно или без initial_capital)
+        try:
+            equity_curve = self.backtester.run_backtest(symbol)
+        except TypeError:
+            equity_curve = self.backtester.run_backtest(symbol=symbol, initial_capital=initial_capital)
 
         # 3. Рассчитываем максимальную просадку
         max_drawdown = self.backtester.calculate_maximum_drawdown(equity_curve)
 
-        # Поддержка структуры ключей как для unit-тестов, так и для интеграционных тестов
         result = {
             "var_result": var_result,
             "predictive_var": var_result,

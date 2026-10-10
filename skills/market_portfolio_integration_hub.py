@@ -18,10 +18,10 @@ class MarketPortfolioIntegrationHub:
             self.gateway.export_portfolio_summary(url)
             self.exporter.export_all(url, symbol, shifts)
             return True
-        except Exception:
+        except Exception as e:
             return False
 
-    def export_and_dispatch_stream(self):
+    def export_and_dispatch_stream(self, stream_data=None):
         return self.exporter.export_stream()
 
     def execute_custom_export(self, url, shifts):

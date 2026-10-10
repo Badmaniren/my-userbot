@@ -50,6 +50,22 @@ class MarketPortfolioStressAutoHedgeSync:
         percentage,
         shifts
     ):
+        if not isinstance(shifts, (list, tuple)):
+            return {
+                "status": "error",
+                "portfolio_id": portfolio_id,
+                "request_id": request_id,
+                "error": "Invalid shifts format: must be a list or tuple"
+            }
+
+        if not isinstance(percentage, (int, float)) or percentage <= 0 or percentage > 100:
+            return {
+                "status": "error",
+                "portfolio_id": portfolio_id,
+                "request_id": request_id,
+                "error": "Invalid percentage: must be between 0 and 100"
+            }
+
         if getattr(self.advisor, 'monitor', None) is None:
             self.advisor.monitor = self.monitor
 
@@ -58,10 +74,18 @@ class MarketPortfolioStressAutoHedgeSync:
         elif getattr(self.advisor.rebalancer, 'set_trigger_status', None) is None:
             self.advisor.rebalancer = self.rebalancer
 
-        advisor_recommendation = self.advisor.analyze_and_recommend(
-            portfolio_id=portfolio_id,
-            request_id=request_id
-        )
+        try:
+            advisor_recommendation = self.advisor.analyze_and_recommend(
+                portfolio_id=portfolio_id,
+                request_id=request_id
+            )
+        except Exception as e:
+            return {
+                "status": "error",
+                "portfolio_id": portfolio_id,
+                "request_id": request_id,
+                "error": str(e)
+            }
         
         if isinstance(advisor_recommendation, dict) and "portfolio_id" not in advisor_recommendation:
             advisor_recommendation["portfolio_id"] = portfolio_id

@@ -21,9 +21,9 @@ class PredictiveVarHedgeSynthesizer:
             self.var_engine = var_engine
         else:
             self.var_engine = PredictiveVarEngine(
-                db_storage=db_storage,
-                extractor_tool=extractor_tool,
-                market_anomaly_detector=market_anomaly_detector
+                db_storage,
+                extractor_tool,
+                market_anomaly_detector
             )
 
         if auto_hedge_sync is not None:

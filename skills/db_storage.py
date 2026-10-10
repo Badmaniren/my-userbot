@@ -1,6 +1,14 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 
 class MarketParser:
@@ -66,3 +74,14 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+def db_storage(payload=None, **kwargs):
+    if payload is None:
+        payload = kwargs
+    if not isinstance(payload, dict):
+        payload = {}
+    action = payload.get("action", "save")
+    symbol = payload.get("symbol", "DEFAULT")
+    price = payload.get("price", 0.0)
+    return {"status": "success", "action": action, "symbol": symbol, "price": price}

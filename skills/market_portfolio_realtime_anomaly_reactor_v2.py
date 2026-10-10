@@ -37,7 +37,6 @@ class RealtimeAnomalyReactor:
 
 
 def reactor_entry_point(payload: dict, output_path: str) -> dict:
-    reactor = RealtimeAnomalyReactor(stream_source=payload.get("stream_source"))
     ingest_res = market_portfolio_realtime_stream_ingestor(payload, output_path)
     detector = MarketAnomalyDetector()
     if hasattr(detector, "detect"):
@@ -53,7 +52,6 @@ def reactor_entry_point(payload: dict, output_path: str) -> dict:
 
 
 def market_portfolio_realtime_anomaly_reactor_v2(payload: dict, output_path: str) -> dict:
-    reactor = RealtimeAnomalyReactor(stream_source=payload.get("stream_source"))
     ingest_res = market_portfolio_realtime_stream_ingestor(payload, output_path)
     detector = MarketAnomalyDetector()
     if hasattr(detector, "detect"):

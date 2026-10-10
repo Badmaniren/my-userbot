@@ -1,11 +1,7 @@
 import json
 import asyncio
 from typing import Callable, Optional, Dict, Any
-
-try:
-    import websockets
-except ImportError:
-    websockets = None
+import websockets
 
 try:
     from skills.db_storage import db_storage

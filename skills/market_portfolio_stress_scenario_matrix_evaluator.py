@@ -1,5 +1,12 @@
-import requests
-import bs4
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    import bs4
+except ImportError:
+    bs4 = None
 
 class MarketPortfolioStressScenarioMatrixEvaluator:
     def __init__(self, db_storage, extractor_tool_1790087207, extractor_tool_1790102839=None, extractor_tool_102839=None):

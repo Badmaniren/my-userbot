@@ -1,6 +1,13 @@
 import io
-import requests
-from bs4 import BeautifulSoup
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 
 class MarketPortfolioStressAuditVisualizer:
@@ -11,8 +18,20 @@ class MarketPortfolioStressAuditVisualizer:
     def visualize(self, payload):
         return market_portfolio_stress_audit_visualizer(payload)
 
+    def generate_audit_chart_payload(self, risk_metrics=None, monte_carlo_results=None):
+        return {
+            "status": "success",
+            "risk_metrics": risk_metrics,
+            "monte_carlo_results": monte_carlo_results,
+            "chart_type": "stress_audit_summary"
+        }
 
-def market_portfolio_stress_audit_visualizer(payload):
+
+def market_portfolio_stress_audit_visualizer(payload=None, **kwargs):
+    if payload is None and not kwargs:
+        return MarketPortfolioStressAuditVisualizer()
+    if payload is None and kwargs:
+        return MarketPortfolioStressAuditVisualizer(**kwargs)
     if not isinstance(payload, dict):
         return str(payload)
 

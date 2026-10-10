@@ -65,6 +65,20 @@ class PortfolioStressScenarioPipeline:
             "stress_report": stress_report_result
         }
 
+
+class market_portfolio_stress_scenario_pipeline:
+    def __init__(self, storage_file="scenario_storage.json"):
+        self.storage_file = storage_file
+
+    def evaluate_scenarios(self, scenarios):
+        processed = []
+        if isinstance(scenarios, list):
+            for sc in scenarios:
+                if isinstance(sc, dict):
+                    processed.append(dict(sc))
+        return processed
+
+
 def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
     try:
         with open(storage_file, "r", encoding="utf-8", errors="ignore") as f:

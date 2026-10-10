@@ -1,6 +1,8 @@
 import os
 import json
+import io
 from datetime import datetime
+
 
 class MarketParser:
     def __init__(self, storage_file: str):
@@ -64,6 +66,45 @@ class PortfolioVisualizer:
 
     def build_text_report(self, symbol: str) -> str:
         return f"Report for {symbol}"
+
+
+def get_stream(stream_target=None):
+    return io.BytesIO(f"stream_data_{stream_target}".encode("utf-8"))
+
+
+def fetch_stream(stream_target=None):
+    return get_stream(stream_target)
+
+
+def collect_portfolio_metrics(portfolio_id=None):
+    return {"portfolio_id": portfolio_id, "metrics": {}}
+
+
+def collect_portfolio_stress_data(portfolio_id=None, limit=10, volatility=0.02):
+    return {"portfolio_id": portfolio_id, "stress_data": []}
+
+
+def market_portfolio_collector_agent(payload=None, **kwargs):
+    if payload is not None:
+        return payload
+    return kwargs
+
+
+class MarketPortfolioCollectorAgent:
+    def __init__(self, **kwargs):
+        pass
+
+    def collect(self, symbol: str) -> dict:
+        return {"symbol": symbol, "data": []}
+
+    def parse(self, data):
+        return data
+
+    def get_stream(self, stream_target=None):
+        return get_stream(stream_target)
+
+
+PortfolioCollectorAgent = MarketPortfolioCollectorAgent
 
 
 def run_pipeline(symbol: str, url: str, telegram_token: str, chat_id: str, storage_file: str) -> bool:

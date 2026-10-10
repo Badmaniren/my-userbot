@@ -1,78 +1,89 @@
 import unittest
+import tempfile
+import os
 import uuid
 import random
-import os
-import tempfile
-from typing import Dict, Any
-
-from skills.market_portfolio_realtime_stream_ingestor import market_portfolio_realtime_stream_ingestor, start_new
-from skills.market_anomaly_detector import MarketAnomalyDetector, market_anomaly_detector
-from skills.market_portfolio_realtime_anomaly_reactor import reactor_main_pipeline, process_realtime_anomaly_event
-
+from skills.market_portfolio_realtime_anomaly_reactor import (
+    MarketPortfolioRealtimeAnomalyReactor,
+    process_realtime_anomaly_event,
+    reactor_main_pipeline
+)
 
 class TestMarketPortfolioRealtimeAnomalyReactorIntegration(unittest.TestCase):
-
+    
     def setUp(self):
         self.test_dir = tempfile.TemporaryDirectory()
-        self.ticker = f"TICK_{uuid.uuid4().hex[:6].upper()}"
-        self.exchange = f"EXCH_{uuid.uuid4().hex[:6].upper()}"
-        self.random_price = round(random.uniform(10.0, 1500.0), 2)
-        self.random_volume = random.randint(100, 50000)
-        self.output_file = os.path.join(self.test_dir.name, f"anomaly_report_{uuid.uuid4().hex}.json")
+        self.session_id = f"sess_{uuid.uuid4().hex[:8]}"
+        self.ticker = f"TICK_{random.randint(1000, 9999)}"
+        self.exchange = f"EXCH_{uuid.uuid4().hex[:4].upper()}"
+        self.price = round(random.uniform(10.0, 1500.0), 2)
+        self.output_path = os.path.join(self.test_dir.name, f"audit_{uuid.uuid4().hex[:6]}.json")
 
     def tearDown(self):
         self.test_dir.cleanup()
 
-    def test_realtime_anomaly_reactor_composition(self):
-        context_id = str(uuid.uuid4())
-        stream_payload = {
-            "context_id": context_id,
+    def test_process_stream_tick_integration(self):
+        reactor = MarketPortfolioRealtimeAnomalyReactor(stream_source=self.exchange)
+        context = {"session_id": self.session_id, "db_storage": None, "random_salt": uuid.uuid4().hex}
+        
+        result = reactor.process_stream_tick(context, self.ticker)
+        
+        self.assertIsInstance(result, dict)
+        self.assertIn("anomaly_detected", result)
+        self.assertEqual(result["ticker"], self.ticker)
+        self.assertIn("ingest_result", result)
+        self.assertIn("detection", result)
+
+    def test_evaluate_exchange_feed_integration(self):
+        reactor = MarketPortfolioRealtimeAnomalyReactor()
+        payload = {
             "ticker": self.ticker,
             "exchange": self.exchange,
-            "price": self.random_price,
-            "volume": self.random_volume,
-            "timestamp": uuid.uuid4().int
+            "price": self.price,
+            "nonce": uuid.uuid4().int
         }
-
-        ingestor_result = market_portfolio_realtime_stream_ingestor(stream_payload, self.output_file)
-        self.assertIsInstance(ingestor_result, dict)
-        self.assertTrue(os.path.exists(self.output_file))
-
-        detector_instance = MarketAnomalyDetector()
-        detection_result = detector_instance.detect(self.ticker)
         
-        if detection_result is None:
-            detection_result = detector_instance.analyze_stream(self.exchange)
+        result = reactor.evaluate_exchange_feed(payload, self.output_path, self.exchange)
+        
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["exchange"], self.exchange)
+        self.assertIn("anomalies", result)
+        self.assertIn("ingest_audit", result)
 
+    def test_process_realtime_anomaly_event_integration(self):
+        payload = {
+            "ticker": self.ticker,
+            "exchange": self.exchange,
+            "price": self.price,
+            "event_id": str(uuid.uuid4())
+        }
+        
+        result = process_realtime_anomaly_event(payload, self.output_path)
+        
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["ticker"], self.ticker)
+        self.assertIn("anomaly_detected", result)
+        self.assertIn("ingest_result", result)
+        self.assertIn("detection", result)
+
+    def test_reactor_main_pipeline_integration(self):
         stream_source = {
             "ticker": self.ticker,
             "exchange": self.exchange,
-            "price": self.random_price
+            "price": self.price,
+            "batch_id": random.randint(100, 999)
         }
-        stream_start = start_new(context_id, stream_source)
-        self.assertIsInstance(stream_start, dict)
-
-        detector_func_result = market_anomaly_detector(stream_payload)
-        self.assertIsNotNone(detector_func_result)
-
-        reactor_output = process_realtime_anomaly_event(
-            payload=stream_payload,
-            output_path=self.output_file
-        )
-        self.assertIsInstance(reactor_output, dict)
-        self.assertIn("status", reactor_output)
-
-        pipeline_result = reactor_main_pipeline(
-            stream_source=stream_source,
-            output_path=self.output_file
-        )
-        self.assertIsInstance(pipeline_result, dict)
-        self.assertTrue(os.path.exists(self.output_file))
-
-        with open(self.output_file, "r", encoding="utf-8") as f:
-            file_content = f.read()
-            self.assertTrue(len(file_content) > 0)
-
+        
+        result = reactor_main_pipeline(stream_source, self.output_path)
+        
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["status"], "pipeline_completed")
+        self.assertIn("ingest", result)
+        self.assertIn("anomalies", result)
+        
+        self.assertTrue(os.path.exists(self.output_path))
+        self.assertGreater(os.path.getsize(self.output_path), 0)
 
 if __name__ == "__main__":
     unittest.main()

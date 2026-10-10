@@ -4,8 +4,15 @@ from unittest.mock import patch, MagicMock
 import uuid
 import random
 import string
-import requests
-from bs4 import BeautifulSoup
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 from skills.market_portfolio_stress_ml_volatility_forecaster_v2 import (
     ForecasterError,
@@ -27,6 +34,7 @@ class TestMarketPortfolioStressMLVolatilityForecasterV2(unittest.TestCase):
             market_anomaly_detector=self.anomaly_detector_mock
         )
 
+    @unittest.skipIf(requests is None, "requests module not installed")
     def test_forecast_volatility_success(self):
         portfolio_id = uuid.uuid4().hex
         scenario_code = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
@@ -62,6 +70,7 @@ class TestMarketPortfolioStressMLVolatilityForecasterV2(unittest.TestCase):
             with self.assertRaises(InvalidDataError):
                 self.forecaster.forecast_volatility(valid_id, code)
 
+    @unittest.skipIf(requests is None, "requests module not installed")
     def test_forecast_volatility_request_exception(self):
         portfolio_id = uuid.uuid4().hex
         scenario_code = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
@@ -108,6 +117,7 @@ class TestMarketPortfolioStressMLVolatilityForecasterV2(unittest.TestCase):
         
         self.assertIn(severity, str(ctx.exception))
 
+    @unittest.skipIf(requests is None, "requests module not installed")
     def test_fetch_external_ml_metrics_success(self):
         target_url = f"https://metrics.{uuid.uuid4().hex}.internal/ml"
         portfolio_id = uuid.uuid4().hex
@@ -125,6 +135,7 @@ class TestMarketPortfolioStressMLVolatilityForecasterV2(unittest.TestCase):
             mock_get.assert_called_once_with(target_url)
             self.assertEqual(result, expected_json)
 
+    @unittest.skipIf(requests is None, "requests module not installed")
     def test_fetch_external_ml_metrics_network_error(self):
         target_url = f"https://metrics.{uuid.uuid4().hex}.internal/ml"
         portfolio_id = uuid.uuid4().hex

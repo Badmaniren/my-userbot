@@ -34,17 +34,10 @@ class MarketPortfolioStressMLVolatilityForecasterV2:
         url = f"https://api.market-stress-{portfolio_id}.internal/v2/forecast"
         extracted = {}
         if requests is not None:
-            try:
-                response = requests.get(url, timeout=5)
-                if response.status_code == 200 and self.extractor_tool:
-                    extracted = self.extractor_tool.extract(response.text)
-            except Exception:
-                extracted = {}
-        if not extracted and self.extractor_tool and hasattr(self.extractor_tool, "extract"):
-            try:
-                extracted = self.extractor_tool.extract("") or {}
-            except Exception:
-                extracted = {}
+            response = requests.get(url)
+            response.raise_for_status()
+            if self.extractor_tool:
+                extracted = self.extractor_tool.extract(response.text)
 
         historical_vol = extracted.get("historical_vol", 0.2)
         predicted_volatility = round(historical_vol * 1.25, 4)
@@ -64,11 +57,12 @@ class MarketPortfolioStressMLVolatilityForecasterV2:
         return result
 
     def evaluate_stress_anomaly(self, portfolio_id: str, scenario_code: str, soup_content: str) -> dict:
-        if BeautifulSoup is None:
-            raise ForecasterError("BeautifulSoup module is not available")
-        soup = BeautifulSoup(soup_content, 'html.parser')
-        div = soup.find(id=portfolio_id)
-        if not div:
+        if BeautifulSoup is not None:
+            soup = BeautifulSoup(soup_content, 'html.parser')
+            div = soup.find(id=portfolio_id)
+            if not div:
+                raise ForecasterError("Portfolio anomaly element not found")
+        elif f"id='{portfolio_id}'" not in soup_content and f'id="{portfolio_id}"' not in soup_content:
             raise ForecasterError("Portfolio anomaly element not found")
 
         analysis = {}
@@ -84,10 +78,10 @@ class MarketPortfolioStressMLVolatilityForecasterV2:
         if requests is None:
             raise ForecasterError("requests module is not available")
         try:
-            response = requests.get(target_url, timeout=5)
+            response = requests.get(target_url)
             response.raise_for_status()
             return response.json()
-        except Exception as e:
+        except requests.exceptions.RequestException as e:
             raise ForecasterError(f"Network error during external ML metrics fetch: {e}")
 
     def run_monte_carlo_simulation(self, base_volatility: float, matrix_data: list) -> dict:

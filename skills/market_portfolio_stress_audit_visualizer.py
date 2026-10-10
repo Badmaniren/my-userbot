@@ -1,6 +1,8 @@
 import io
 import requests
 from bs4 import BeautifulSoup
+from skills.market_portfolio_backtest_evaluator_bridge import market_portfolio_backtest_evaluator_bridge
+from skills.market_report_generator import market_report_generator
 
 
 class MarketPortfolioStressAuditVisualizer:

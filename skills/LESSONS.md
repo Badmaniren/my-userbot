@@ -3,15 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ацию
-
-## market_portfolio_stress_auto_hedge_sync (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_auto_hedge_sync (refactor) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 1)
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+тус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_stress_auto_hedge_sync (refactor) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (failures=1)
@@ -284,4 +276,9 @@
 
 ## market_portfolio_predictive_var_stress_bridge_v3 (compose) — раундов: 4
 - Последняя ошибка перед фиксом: ERROR: test_execute_combined_predictive_stress_integration (tests.test_market_portfolio_predictive_var_stress_bridge_v3_integration.TestPredictiveVarStressBridgeIntegration.test_execute_combined_predictive_stress_integration)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_predictive_var_stress_bridge_v4 (compose) — раундов: 4
+- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
+- Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/tests/test_market_portfolio_predictive_var_stress_bridge_v4.py", line 57, in test_run_comprehensive_stress_pipeline_success
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

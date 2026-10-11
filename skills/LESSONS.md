@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-иксом: FAILED (errors=1, skipped=3)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_backtest_evaluator_bridge (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
+о прошёл тесты и влит в main
 
 ## market_portfolio_stress_backtest_aggregator_v2 (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
@@ -303,3 +299,7 @@
 
 ## market_portfolio_slippage_model (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_transaction_cost_analyzer (start_new) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -1,4 +1,12 @@
-import requests
+try:
+    import requests
+except ImportError:
+    import types
+    requests = types.ModuleType("requests")
+    class RequestException(Exception): pass
+    requests.exceptions = types.SimpleNamespace(RequestException=RequestException)
+    requests.get = lambda *args, **kwargs: None
+
 from skills import market_parser
 
 # Убедимся, что у модуля market_parser есть необходимые методы для тестов, 

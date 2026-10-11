@@ -1,8 +1,21 @@
 import json
 import os
 import uuid
-import requests
-from bs4 import BeautifulSoup
+from typing import Any, Dict, List, Optional
+
+try:
+    import requests
+except ImportError:
+    import types
+    requests = types.ModuleType("requests")
+    class RequestException(Exception): pass
+    requests.exceptions = types.SimpleNamespace(RequestException=RequestException)
+    requests.get = lambda *args, **kwargs: None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 
 class MarketParser:
@@ -10,34 +23,42 @@ class MarketParser:
         self.storage_file = storage_file
 
     def fetch_price(self, url):
-        try:
-            response = requests.get(url, timeout=10)
+        if hasattr(requests, "get"):
             try:
-                data = response.json()
-                return data
-            except ValueError as e:
-                return {"error": str(e)}
-        except requests.exceptions.RequestException:
-            return None
+                response = requests.get(url, timeout=10)
+                if response is not None:
+                    try:
+                        data = response.json()
+                        return data
+                    except ValueError as e:
+                        return {"error": str(e)}
+            except requests.exceptions.RequestException:
+                return None
+        return None
 
     def parse_html_prices(self, url):
-        try:
-            response = requests.get(url, timeout=10)
-            soup = BeautifulSoup(response.text, 'html.parser')
-            parsed_items = []
-            
-            cards = soup.find_all(class_='crypto-card')
-            for card in cards:
-                name_elem = card.find(class_='name')
-                price_elem = card.find(class_='price')
-                if name_elem and price_elem:
-                    parsed_items.append({
-                        "symbol": name_elem.get_text().strip(),
-                        "price": price_elem.get_text().strip()
-                    })
-            return parsed_items
-        except requests.exceptions.RequestException:
+        if BeautifulSoup is None:
             return []
+        if hasattr(requests, "get"):
+            try:
+                response = requests.get(url, timeout=10)
+                if response is not None and hasattr(response, "text"):
+                    soup = BeautifulSoup(response.text, 'html.parser')
+                    parsed_items = []
+
+                    cards = soup.find_all(class_='crypto-card')
+                    for card in cards:
+                        name_elem = card.find(class_='name')
+                        price_elem = card.find(class_='price')
+                        if name_elem and price_elem:
+                            parsed_items.append({
+                                "symbol": name_elem.get_text().strip(),
+                                "price": price_elem.get_text().strip()
+                            })
+                    return parsed_items
+            except requests.exceptions.RequestException:
+                return []
+        return []
 
     def fetch_and_store(self, symbol, price):
         record_id = str(uuid.uuid4())

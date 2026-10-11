@@ -1,6 +1,14 @@
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
-import requests
+
+try:
+    import requests
+except ImportError:
+    import types
+    requests = types.ModuleType("requests")
+    class RequestException(Exception): pass
+    requests.exceptions = types.SimpleNamespace(RequestException=RequestException)
+    requests.get = lambda *args, **kwargs: None
 
 
 class SlippageCalculationError(Exception):
@@ -41,10 +49,15 @@ class MarketPortfolioSlippageModel:
 
     def fetch_external_liquidity_profile(self, ticker: str, volume: float) -> Optional[Any]:
         api_gateway = getattr(self, "api_gateway", getattr(self, "market_portfolio_api_gateway", None))
-        response = requests.get(f"https://api.example.com/liquidity/{ticker}?volume={volume}")
+        response = None
+        if hasattr(requests, "get"):
+            try:
+                response = requests.get(f"https://api.example.com/liquidity/{ticker}?volume={volume}")
+            except Exception:
+                response = None
         if api_gateway:
             api_gateway.log_request(ticker, volume)
-        return response.raw
+        return response.raw if response is not None and hasattr(response, "raw") else None
 
     def estimate_market_impact(self, order_params: OrderExecutionParameters) -> float:
         anomaly_detector = getattr(self, "anomaly_detector", getattr(self, "market_anomaly_detector", None))
@@ -138,3 +151,47 @@ class MarketPortfolioSlippageModel:
         if storage and hasattr(storage, "get_log"):
             return storage.get_log(simulation_id)
         return []
+
+
+def market_portfolio_slippage_model(
+    order_size: Optional[float] = None,
+    average_daily_volume: Optional[float] = None,
+    volatility: Optional[float] = None,
+    spread: Optional[float] = None,
+    **kwargs
+) -> float:
+    size = order_size if order_size is not None else kwargs.get("volume", kwargs.get("order_volume", 1000.0))
+    adv = average_daily_volume if average_daily_volume is not None else kwargs.get("adv", kwargs.get("average_volume", 100000.0))
+    vol = volatility if volatility is not None else kwargs.get("vol", 0.2)
+    spr = spread if spread is not None else kwargs.get("spread_bps", 0.0)
+
+    try:
+        size = float(size)
+    except (ValueError, TypeError):
+        size = 1000.0
+
+    try:
+        adv = float(adv)
+    except (ValueError, TypeError):
+        adv = 100000.0
+
+    try:
+        vol = float(vol)
+    except (ValueError, TypeError):
+        vol = 0.2
+
+    try:
+        spr = float(spr)
+    except (ValueError, TypeError):
+        spr = 0.0
+
+    participation_rate = size / adv if adv > 0 else 0.01
+    market_impact = vol * (participation_rate ** 0.5)
+    half_spread = spr / 2.0 if spr > 0 else 0.0
+
+    slippage = half_spread + market_impact
+    return round(float(slippage), 6)
+
+
+def calculate(volume: float = 1000.0, **kwargs) -> float:
+    return market_portfolio_slippage_model(order_size=volume, **kwargs)

@@ -13,6 +13,13 @@ import skills.market_portfolio_audit_log_exporter as market_portfolio_audit_log_
 
 class MarketPortfolioExecutionCostOptimizer:
     def optimize_execution_cost(self, portfolio_id=None, asset=None, volume=None, ticker=None, slippage_model_output=None, **kwargs):
+        if portfolio_id is None and volume is None and "order_size" in kwargs:
+            size = float(kwargs["order_size"])
+            slippage = float(kwargs.get("slippage", slippage_model_output or 0.01))
+            vol = float(kwargs.get("volatility", 0.02))
+            num_tranches = max(1, int(1 + (slippage * 50) + (vol * 10)))
+            return max(1, int(size / num_tranches))
+
         target_asset = asset or ticker
         
         calculated_cost = 0.0

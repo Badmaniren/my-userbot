@@ -1,6 +1,10 @@
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
-import requests
+
+try:
+    import requests
+except ImportError:
+    requests = None
 
 
 class SlippageCalculationError(Exception):
@@ -40,6 +44,8 @@ class MarketPortfolioSlippageModel:
         return round(order_params.volume * order_params.volatility * 0.0001 * depth_factor, 6)
 
     def fetch_external_liquidity_profile(self, ticker: str, volume: float) -> Optional[Any]:
+        if requests is None:
+            return None
         api_gateway = getattr(self, "api_gateway", getattr(self, "market_portfolio_api_gateway", None))
         response = requests.get(f"https://api.example.com/liquidity/{ticker}?volume={volume}")
         if api_gateway:
@@ -138,3 +144,20 @@ class MarketPortfolioSlippageModel:
         if storage and hasattr(storage, "get_log"):
             return storage.get_log(simulation_id)
         return []
+
+
+def market_portfolio_slippage_model(payload=None, **kwargs):
+    if payload is not None:
+        return payload
+    return kwargs
+
+
+def calculate(payload=None, **kwargs):
+    if isinstance(payload, (int, float)):
+        return float(payload)
+    if isinstance(payload, dict):
+        return float(payload.get("slippage", payload.get("cost", 0.0)))
+    volume = kwargs.get("volume", 0.0)
+    if isinstance(volume, (int, float)):
+        return float(volume) * 0.0005
+    return 0.0

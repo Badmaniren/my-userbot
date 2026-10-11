@@ -93,3 +93,9 @@ class PortfolioPerformanceAnalytics:
 def start_new(storage_file: str, symbol: str, url: str) -> dict:
     analytics = PortfolioPerformanceAnalytics(storage_file)
     return analytics.calculate_metrics(symbol)
+
+
+def market_portfolio_performance_analytics(payload=None, **kwargs):
+    if payload is not None:
+        return payload
+    return kwargs

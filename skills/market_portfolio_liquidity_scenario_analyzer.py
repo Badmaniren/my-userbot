@@ -124,6 +124,9 @@ class MarketPortfolioLiquidityScenarioAnalyzer:
         }
 
 
+market_portfolio_liquidity_scenario_analyzer = analyze_liquidity_stress_scenarios
+
+
 if not hasattr(market_portfolio_var_liquidity_core, "calculate_var_and_liquidity"):
     def _mock_calculate_var_and_liquidity(portfolio_id, confidence_level=None, export_target=None):
         data = {"var": 0.0, "portfolio_id": portfolio_id}

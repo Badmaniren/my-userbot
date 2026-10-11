@@ -1,6 +1,5 @@
 import json
 import os
-import io
 
 def run_pipeline(symbol, url, telegram_token, chat_id, storage_file):
     """Выполняет основной конвейер мониторинга портфеля."""

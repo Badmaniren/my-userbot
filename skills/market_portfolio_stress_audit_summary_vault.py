@@ -54,6 +54,9 @@ def start_new(**kwargs):
     logger.info("Payload successfully saved.")
     return {"status": "success", "save_result": save_res, "payload": payload}
 
+# Алиас для удовлетворения юнит-тестов (импортирующих start_neos)
+start_neos = start_new
+
 
 def market_portfolio_stress_audit_summary_vault_process(storage_target, audit_data):
     """

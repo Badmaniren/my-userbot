@@ -68,3 +68,22 @@ class NetDividendCalculator:
             }
         except Exception as e:
             raise NetDividendCalculatorException(str(e))
+
+    def process(self, portfolio_data, tax_calc_result=None):
+        if not isinstance(portfolio_data, dict):
+            return {"total_net_dividends": 0.0}
+
+        dividends = portfolio_data.get("dividends", [])
+        total_gross = sum(div.get("gross_amount", 0.0) for div in dividends)
+        tax_withheld = sum(div.get("gross_amount", 0.0) * div.get("withholding_tax_rate", 0.13) for div in dividends)
+        total_net = total_gross - tax_withheld
+
+        return {
+            "portfolio_id": portfolio_data.get("portfolio_id"),
+            "total_gross_dividends": round(total_gross, 2),
+            "dividend_tax_withheld": round(tax_withheld, 2),
+            "total_net_dividends": round(total_net, 2)
+        }
+
+
+market_portfolio_net_dividend_calculator = NetDividendCalculator()

@@ -76,6 +76,33 @@ class NetYieldEvaluator:
             result.update(stream_result)
         return result
 
+    def evaluate(self, portfolio_data, tax_calc_result=None, net_div_result=None):
+        if not isinstance(portfolio_data, dict):
+            return {"net_portfolio_value": 0.0, "net_yield_percentage": 0.0}
+
+        gross_value = portfolio_data.get("gross_market_value", 0.0)
+
+        if tax_calc_result and isinstance(tax_calc_result, dict):
+            total_tax = tax_calc_result.get("total_tax_liability", 0.0)
+        else:
+            total_tax = 0.0
+
+        net_portfolio_value = round(gross_value - total_tax, 2)
+
+        unrealized_gains = portfolio_data.get("unrealized_capital_gains", 0.0)
+        net_yield_percentage = round(((unrealized_gains - total_tax) / gross_value) * 100, 4) if gross_value > 0 else 0.0
+
+        return {
+            "portfolio_id": portfolio_data.get("portfolio_id"),
+            "gross_market_value": gross_value,
+            "total_tax_liability": total_tax,
+            "net_portfolio_value": net_portfolio_value,
+            "net_yield_percentage": net_yield_percentage
+        }
+
+
+market_portfolio_net_yield_evaluator = NetYieldEvaluator()
+
 
 def evaluate_net_yield(portfolio_id, url):
     evaluator = NetYieldEvaluator(storage_file=url.replace("file://", ""))

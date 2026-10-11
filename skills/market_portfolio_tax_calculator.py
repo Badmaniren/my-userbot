@@ -19,6 +19,43 @@ class MarketPortfolioTaxCalculator:
                 return parsed["stream_id"]
         return None
 
+    def calculate(self, portfolio_data):
+        if not isinstance(portfolio_data, dict):
+            return {"total_tax_liability": 0.0}
+
+        cg_tax_rate = portfolio_data.get("capital_gains_tax_rate", 0.13)
+
+        if "unrealized_capital_gains" in portfolio_data:
+            unrealized_gains = float(portfolio_data["unrealized_capital_gains"])
+        else:
+            unrealized_gains = 0.0
+            for lot in portfolio_data.get("lots", []):
+                purch = lot.get("purchase_price", 0.0)
+                curr = lot.get("current_price", purch)
+                qty = lot.get("quantity", 0)
+                unrealized_gains += (curr - purch) * qty
+
+        cg_tax = max(0.0, unrealized_gains * cg_tax_rate)
+
+        div_tax = 0.0
+        for div in portfolio_data.get("dividends", []):
+            gross = div.get("gross_amount", 0.0)
+            rate = div.get("withholding_tax_rate", 0.13)
+            div_tax += gross * rate
+
+        total_tax_liability = round(cg_tax + div_tax, 2)
+
+        return {
+            "portfolio_id": portfolio_data.get("portfolio_id"),
+            "unrealized_capital_gains": round(unrealized_gains, 2),
+            "capital_gains_tax": round(cg_tax, 2),
+            "dividend_tax": round(div_tax, 2),
+            "total_tax_liability": total_tax_liability
+        }
+
+
+market_portfolio_tax_calculator = MarketPortfolioTaxCalculator()
+
 
 def calculate_portfolio_taxes(portfolio_id, user_id, deals, holding_period, dividends):
     total_profit = 0.0

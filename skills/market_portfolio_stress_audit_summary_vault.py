@@ -54,8 +54,9 @@ def start_new(**kwargs):
     logger.info("Payload successfully saved.")
     return {"status": "success", "save_result": save_res, "payload": payload}
 
-# Алиас для удовлетворения юнит-тестов (импортирующих start_neos)
+# Алиасы для удовлетворения юнит-тестов (импортирующих start_neos или старые имена)
 start_neos = start_new
+market_portfolio_stress_audit_summary_vault_start = start_new
 
 
 def market_portfolio_stress_audit_summary_vault_process(storage_target, audit_data):
@@ -91,7 +92,6 @@ def market_portfolio_stress_audit_summary_vault_validate(storage_target, expecte
         logger.warning(f"Storage target not found during validation: {storage_target}")
         return False
     
-    # Чтение файла с корректной обработкой битого JSON (тесты ожидают False при ошибке парсинга)
     try:
         with open(storage_target, "r", encoding="utf-8") as f:
             data = json.load(f)

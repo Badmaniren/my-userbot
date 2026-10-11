@@ -25,6 +25,13 @@ class PortfolioStressScenarioPipeline:
     def execute(self, symbol, percentage, shifts):
         self._load_or_create_storage()
 
+        if isinstance(shifts, (int, float, str)):
+            shifts_list = [shifts]
+        elif isinstance(shifts, (list, tuple, set)):
+            shifts_list = list(shifts)
+        else:
+            shifts_list = [shifts]
+
         try:
             sim_result = self.simulator.simulate_scenario(symbol, percentage)
         except (KeyError, RuntimeError, AttributeError):
@@ -37,7 +44,7 @@ class PortfolioStressScenarioPipeline:
                 sim_result["percentage"] = percentage
 
         try:
-            stress_test_result = self.simulator.run_stress_test(symbol, shifts)
+            stress_test_result = self.simulator.run_stress_test(symbol, shifts_list)
             if isinstance(stress_test_result, list):
                 stress_test_result = {"symbol": symbol, "shifts": shifts, "results": stress_test_result}
         except (KeyError, RuntimeError, AttributeError):
@@ -52,7 +59,7 @@ class PortfolioStressScenarioPipeline:
                 stress_test_result["results"] = []
 
         try:
-            stress_report_result = self.reporter.run_stress_report(symbol, shifts)
+            stress_report_result = self.reporter.run_stress_report(symbol, shifts_list)
         except (KeyError, RuntimeError, AttributeError):
             stress_report_result = {"symbol": symbol, "status": "default", "impact_score": 0}
 
@@ -76,6 +83,13 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
         with open(storage_file, "w", encoding="utf-8") as f:
             f.write("{}")
 
+    if isinstance(shifts, (int, float, str)):
+        shifts_list = [shifts]
+    elif isinstance(shifts, (list, tuple, set)):
+        shifts_list = list(shifts)
+    else:
+        shifts_list = [shifts]
+
     simulator = PortfolioScenarioSimulator(storage_file)
     try:
         sim_result = simulator.simulate_scenario(symbol, percentage)
@@ -89,7 +103,7 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
             sim_result["percentage"] = percentage
 
     try:
-        stress_test_result = simulator.run_stress_test(symbol, shifts)
+        stress_test_result = simulator.run_stress_test(symbol, shifts_list)
         if isinstance(stress_test_result, list):
             stress_test_result = {"symbol": symbol, "shifts": shifts, "results": stress_test_result}
     except (KeyError, RuntimeError, AttributeError):
@@ -105,7 +119,7 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
 
     reporter = StressReporter(storage_file)
     try:
-        stress_report_result = reporter.run_stress_reporting(symbol, shifts)
+        stress_report_result = reporter.run_stress_reporting(symbol, shifts_list)
     except (KeyError, RuntimeError, AttributeError):
         stress_report_result = {"symbol": symbol, "status": "default", "impact_score": 0}
 

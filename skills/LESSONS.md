@@ -3,7 +3,11 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-яя ошибка перед фиксом: FAILED (errors=2)
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_ml_var_estimator_v3 (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_stress_ml_anomaly_scoring_engine (create) — раундов: 4
@@ -281,8 +285,4 @@
 
 ## market_portfolio_integration_validation_bridge (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: INFO:PortfolioScenarioSimulator:Found target for TEST_1EB6CA: price=206.8000, quantity=188.0000
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_stress_backtest_runner (compose) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

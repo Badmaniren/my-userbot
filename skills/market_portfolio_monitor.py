@@ -55,8 +55,8 @@ class MarketParser:
         if hasattr(content, "decode"):
             try:
                 content = content.decode("utf-8")
-            except (AttributeError, UnicodeDecodeError):
-                pass
+            except UnicodeDecodeError:
+                content = content.decode("latin-1")
         if not isinstance(content, str):
             content = str(content)
         return content
@@ -73,7 +73,7 @@ class MarketParser:
                         else:
                             try:
                                 data = json.loads(content)
-                            except (json.JSONDecodeError, TypeError):
+                            except json.JSONDecodeError:
                                 data = {}
         
         if not isinstance(data, dict):
@@ -99,11 +99,11 @@ class MarketParser:
             
             try:
                 res = json.loads(content)
-                if not isinstance(res, dict):
-                    return {}
-                return res
-            except (json.JSONDecodeError, TypeError, AttributeError):
+            except json.JSONDecodeError:
                 return {}
+            if not isinstance(res, dict):
+                return {}
+            return res
 
 
 class MarketReportGenerator:
@@ -128,8 +128,8 @@ class MarketReportGenerator:
                 if hasattr(content, "decode"):
                     try:
                         return content.decode("utf-8")
-                    except (AttributeError, UnicodeDecodeError):
-                        pass
+                    except UnicodeDecodeError:
+                        return content.decode("latin-1")
                 return str(content)
         return "{}"
 
@@ -163,8 +163,8 @@ def export_audit_logs(storage_file=None):
             if hasattr(content, "decode"):
                 try:
                     content = content.decode("utf-8")
-                except (AttributeError, UnicodeDecodeError):
-                    pass
+                except UnicodeDecodeError:
+                    content = content.decode("latin-1")
             if not isinstance(content, str):
                 content = str(content)
             if not content.strip():
@@ -173,9 +173,9 @@ def export_audit_logs(storage_file=None):
                 return True
             try:
                 parsed = json.loads(content)
-                if isinstance(parsed, dict):
-                    return True
+            except json.JSONDecodeError:
                 return False
-            except (json.JSONDecodeError, TypeError):
+            if isinstance(parsed, dict):
                 return True
+            return False
     return False

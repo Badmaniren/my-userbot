@@ -3,7 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-АРУЖЕНО: Объявлен фиктивный 'market_portfolio_scenario_simulator'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.market_portfolio_scenario_simulator import ...'
+й честный импорт: 'from skills.market_portfolio_scenario_simulator import ...'
 - Последняя ошибка перед фиксом: FAILED (errors=1, skipped=3)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -294,6 +294,9 @@
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_monitor (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_slippage_model (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_slippage_model (refactor) — раундов: 1

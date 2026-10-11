@@ -1,32 +1,53 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 
 class MarketParser:
     def __init__(self, storage_file: str = "market_data.db"):
         self.storage_file = storage_file
+        self._portfolios = {}
+
+    def get_portfolio(self, portfolio_id: str):
+        return self._portfolios.get(portfolio_id)
+
+    def set_portfolio(self, portfolio_id: str, data: dict):
+        self._portfolios[portfolio_id] = data
 
     def fetch_price(self, url: str):
-        response = requests.get(url, timeout=10)
+        if not requests:
+            return None
         try:
+            response = requests.get(url, timeout=10)
             data = response.json()
+            if isinstance(data, dict):
+                return data.get("price")
+            return None
         except Exception:
             return None
-        if isinstance(data, dict):
-            return data.get("price")
-        return None
 
     def parse_html_prices(self, url: str):
-        response = requests.get(url, timeout=10)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        element = soup.find()
-        if element and element.text:
-            try:
-                return float(element.text)
-            except (ValueError, TypeError):
-                return None
-        return None
+        if not requests or not BeautifulSoup:
+            return None
+        try:
+            response = requests.get(url, timeout=10)
+            soup = BeautifulSoup(response.text, 'html.parser')
+            element = soup.find()
+            if element and element.text:
+                try:
+                    return float(element.text)
+                except (ValueError, TypeError):
+                    return None
+            return None
+        except Exception:
+            return None
 
     def fetch_and_store(self, symbol: str, price: float):
         if not isinstance(symbol, str) or not isinstance(price, (int, float)) or isinstance(price, bool):
@@ -66,3 +87,6 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+db_storage = MarketParser()

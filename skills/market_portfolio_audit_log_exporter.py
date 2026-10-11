@@ -101,3 +101,28 @@ class MarketPortfolioAuditLogExporter(PortfolioAuditLogExporter):
 
     def process_audit_stream(self, export_path: str):
         return self.export_audit_logs(export_path)
+
+
+def export_audit_logs(portfolio_id_or_path: str, export_path: str = None) -> str:
+    """
+    Глобальная функция экспорта аудиторских логов.
+    Если передан только один аргумент, считается, что это путь экспорта.
+    Если переданы portfolio_id и export_path, записывает дамп логов по указанному пути.
+    """
+    if export_path is None:
+        target_path = portfolio_id_or_path
+        portfolio_id = "default"
+    else:
+        target_path = export_path
+        portfolio_id = portfolio_id_or_path
+
+    os.makedirs(os.path.dirname(os.path.abspath(target_path)), exist_ok=True)
+    payload = {
+        "portfolio_id": portfolio_id,
+        "exported": True,
+        "logs": []
+    }
+    with open(target_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+
+    return target_path

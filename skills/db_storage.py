@@ -1,6 +1,35 @@
+import json
+import os
 import sqlite3
 import requests
 from bs4 import BeautifulSoup
+from typing import Dict, Any, Optional
+
+_AUDIT_MEMORY_STORAGE: Dict[str, Dict[str, Any]] = {}
+
+
+def save_audit_record(audit_id: str, record: Dict[str, Any]) -> bool:
+    """
+    Сохраняет запись аудита по audit_id.
+    """
+    if not isinstance(audit_id, str) or not audit_id:
+        return False
+    _AUDIT_MEMORY_STORAGE[audit_id] = record
+    return True
+
+
+def fetch_audit_record(audit_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Получает запись аудита по audit_id.
+    """
+    return _AUDIT_MEMORY_STORAGE.get(audit_id)
+
+
+def get_audit_record(audit_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Алиас для fetch_audit_record.
+    """
+    return fetch_audit_record(audit_id)
 
 
 class MarketParser:

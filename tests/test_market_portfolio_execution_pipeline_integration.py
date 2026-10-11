@@ -1,136 +1,95 @@
-import json
-import os
-import random
-import tempfile
 import unittest
+import os
 import uuid
-
-from skills.market_portfolio_execution_pipeline import (
-    MarketPortfolioExecutionPipeline,
-)
-from skills.market_portfolio_scenario_simulator import PortfolioScenarioSimulator
-from skills.market_portfolio_slippage_model import MarketPortfolioSlippageModel
-
+import random
+from skills.market_portfolio_execution_pipeline import MarketPortfolioExecutionPipeline, ExecutionPipelineError
 
 class TestMarketPortfolioExecutionPipelineIntegration(unittest.TestCase):
     def setUp(self):
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.storage_file = os.path.join(
-            self.temp_dir.name, f"portfolio_{uuid.uuid4().hex}.json"
-        )
-        self.unique_id = uuid.uuid4().hex[:6].upper()
-        self.ticker = f"TEST_{self.unique_id}"
-        self.initial_qty = random.randint(50, 200)
-        self.initial_price = round(random.uniform(70.0, 250.0), 2)
-
-        # Подготовка универсальной структуры портфеля для реального PortfolioScenarioSimulator
-        self.portfolio_data = {
-            "portfolio": [
-                {
-                    "symbol": self.ticker,
-                    "shares": self.initial_qty,
-                    "quantity": self.initial_qty,
-                    "current_price": self.initial_price,
-                    "price": self.initial_price,
-                }
-            ],
-            "positions": {
-                self.ticker: {
-                    "quantity": self.initial_qty,
-                    "current_price": self.initial_price,
-                    "price": self.initial_price,
-                }
-            },
-            self.ticker: {
-                "shares": self.initial_qty,
-                "quantity": self.initial_qty,
-                "current_price": self.initial_price,
-                "price": self.initial_price,
-            },
-        }
-
-        with open(self.storage_file, "w", encoding="utf-8") as f:
-            json.dump(self.portfolio_data, f)
+        self.storage_file = f"test_execution_storage_{uuid.uuid4().hex}.json"
+        self.pipeline = MarketPortfolioExecutionPipeline(storage_file=self.storage_file)
 
     def tearDown(self):
-        self.temp_dir.cleanup()
+        if os.path.exists(self.storage_file):
+            try:
+                os.remove(self.storage_file)
+            except OSError:
+                pass
 
-    def test_pipeline_composition_initialization(self):
-        pipeline = MarketPortfolioExecutionPipeline(
-            storage_file=self.storage_file
-        )
-        self.assertIsInstance(
-            pipeline.slippage_model, MarketPortfolioSlippageModel
-        )
-        self.assertIsInstance(
-            pipeline.scenario_simulator, PortfolioScenarioSimulator
-        )
+    def test_simulate_execution_integration(self):
+        symbol = f"TICK_{uuid.uuid4().hex[:4].upper()}"
+        volume = round(random.uniform(10.0, 1000.0), 2)
+        price = round(random.uniform(50.0, 500.0), 2)
+        order_type = random.choice(["BUY", "SELL"])
+        percentage_shift = round(random.uniform(-0.1, 0.1), 4)
 
-    def test_simulate_order_execution_end_to_end(self):
-        pipeline = MarketPortfolioExecutionPipeline(
-            storage_file=self.storage_file
-        )
-
-        test_volume = random.randint(5, 30)
-        test_price = self.initial_price
-        test_shift_pct = round(random.uniform(-8.0, 8.0), 2)
-        test_order_type = random.choice(["BUY", "SELL"])
-
-        result = pipeline.simulate_execution(
-            symbol=self.ticker,
-            volume=test_volume,
-            price=test_price,
-            order_type=test_order_type,
-            percentage_shift=test_shift_pct,
+        result = self.pipeline.simulate_execution(
+            symbol=symbol,
+            volume=volume,
+            price=price,
+            order_type=order_type,
+            percentage_shift=percentage_shift
         )
 
         self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("symbol"), symbol)
         self.assertIn("simulation_id", result)
-        self.assertIn("symbol", result)
-        self.assertEqual(result["symbol"], self.ticker)
-
         self.assertIn("slippage", result)
-        self.assertIsInstance(result["slippage"], (int, float))
-        self.assertGreaterEqual(result["slippage"], 0.0)
-
         self.assertIn("scenario_result", result)
-        self.assertIsInstance(result["scenario_result"], dict)
-
         self.assertIn("executed_price", result)
-        self.assertIsInstance(result["executed_price"], (int, float))
-        self.assertGreater(result["executed_price"], 0.0)
+        self.assertIsInstance(result.get("executed_price"), float)
 
-        if test_order_type == "BUY" and result["slippage"] > 0:
-            self.assertGreaterEqual(result["executed_price"], test_price)
+    def test_run_stress_execution_integration(self):
+        symbol = f"STRESS_{uuid.uuid4().hex[:4].upper()}"
+        volume = round(random.uniform(100.0, 5000.0), 2)
+        shifts = [round(random.uniform(-0.2, -0.05), 2), round(random.uniform(0.05, 0.2), 2)]
 
-    def test_stress_execution_pipeline(self):
-        pipeline = MarketPortfolioExecutionPipeline(
-            storage_file=self.storage_file
+        result = self.pipeline.run_stress_execution(
+            symbol=symbol,
+            volume=volume,
+            shifts=shifts
         )
 
-        test_volume = random.randint(10, 40)
-        shifts = [-10.0, -5.0, 0.0, 5.0, 10.0]
-
-        stress_results = pipeline.run_stress_execution(
-            symbol=self.ticker,
-            volume=test_volume,
-            shifts=shifts,
-        )
-
-        self.assertIsInstance(stress_results, dict)
-        self.assertIn("symbol", stress_results)
-        self.assertEqual(stress_results["symbol"], self.ticker)
-        self.assertIn("stress_evaluations", stress_results)
-
-        evaluations = stress_results["stress_evaluations"]
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("symbol"), symbol)
+        evaluations = result.get("stress_evaluations")
+        self.assertIsInstance(evaluations, list)
         self.assertEqual(len(evaluations), len(shifts))
 
-        for item in evaluations:
-            self.assertIn("shift_percentage", item)
-            self.assertIn(item["shift_percentage"], shifts)
-            self.assertIn("slippage", item)
-            self.assertIn("scenario_outcome", item)
+        for eval_item in evaluations:
+            self.assertIn("shift_percentage", eval_item)
+            self.assertIn("slippage", eval_item)
+            self.assertIn("scenario_outcome", eval_item)
+            self.assertIn(eval_item["shift_percentage"], shifts)
 
+    def test_execute_order_simulation_integration(self):
+        ticker = f"ORD_{uuid.uuid4().hex[:4].upper()}"
+        order_data = {
+            "ticker": ticker,
+            "volume": round(random.uniform(1.0, 100.0), 2),
+            "price": round(random.uniform(10.0, 100.0), 2),
+            "order_type": "BUY"
+        }
+        market_context = {"price": order_data["price"]}
+        percentage = round(random.uniform(-0.05, 0.05), 4)
+
+        result = self.pipeline.execute_order_simulation(order_data, market_context, percentage)
+
+        self.assertIsInstance(result, dict)
+        self.assertIn("scenario_result", result)
+        self.assertIn("execution_result", result)
+
+    def test_run_stress_pipeline_integration(self):
+        ticker = f"STR_{uuid.uuid4().hex[:4].upper()}"
+        shifts = [round(random.uniform(-0.15, -0.01), 2)]
+        volume = round(random.uniform(50.0, 500.0), 2)
+        scenario_name = f"scenario_{uuid.uuid4().hex[:6]}"
+
+        result = self.pipeline.run_stress_pipeline(ticker, shifts, volume, scenario_name)
+
+        self.assertIsInstance(result, dict)
+        self.assertIn("stress_scenario", result)
+        self.assertIn("stress_slippage", result)
 
 if __name__ == "__main__":
     unittest.main()

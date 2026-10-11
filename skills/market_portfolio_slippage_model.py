@@ -125,7 +125,21 @@ class MarketPortfolioSlippageModel:
             results.append(res)
         return results
 
-    def persist_execution_logs(self, simulation_id: str, executions: List[Dict[str, Any]], storage: Any) -> bool:
+    def persist_execution_logs(self, *args, **kwargs) -> bool:
+        if len(args) == 3:
+            simulation_id, executions, storage = args
+        elif len(args) == 2:
+            executions, storage = args
+            simulation_id = "default"
+        elif len(args) == 1:
+            storage = args[0]
+            executions = []
+            simulation_id = "default"
+        else:
+            simulation_id = kwargs.get("simulation_id", "default")
+            executions = kwargs.get("executions", [])
+            storage = kwargs.get("storage", None)
+
         self._execution_logs[simulation_id] = executions
         if storage and hasattr(storage, "save_logs"):
             storage.save_logs(simulation_id, executions)

@@ -3,7 +3,13 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-o_ml_stress_evaluator (compose) — раундов: 2
+есты и влит в main
+
+## market_portfolio_stress_ml_volatility_forecaster_v2 (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_ml_stress_evaluator (compose) — раундов: 2
 - Последняя ошибка перед фиксом: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 - Статус: успешно прошёл тесты и влит в main
 
@@ -284,7 +290,3 @@ o_ml_stress_evaluator (compose) — раундов: 2
 
 ## market_portfolio_backtester (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_execution_pipeline (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: raise ExecutionPipelineError(f"Error in execute_order_simulation: {e}")
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

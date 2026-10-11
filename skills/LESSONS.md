@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_realtime_anomaly_reactor_v2 (compose) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
+следняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_predictive_aggregator (refactor) — раундов: 4
@@ -305,4 +301,8 @@
 ## market_portfolio_stress_audit_compliance_bridge (create) — раундов: 4
 - Античит поймал: ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'market_portfolio_audit_compliance_hub'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.market_portfolio_audit_compliance_hub import ...'
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_audit_compliance_bridge (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

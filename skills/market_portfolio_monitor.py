@@ -53,10 +53,7 @@ class MarketParser:
         if hasattr(content, "read"):
             content = content.read()
         if hasattr(content, "decode"):
-            try:
-                content = content.decode("utf-8")
-            except (AttributeError, UnicodeDecodeError):
-                pass
+            content = content.decode("utf-8")
         if not isinstance(content, str):
             content = str(content)
         return content
@@ -71,10 +68,7 @@ class MarketParser:
                         if content.strip().startswith("{") and not content.strip().endswith("}"):
                             data = {}
                         else:
-                            try:
-                                data = json.loads(content)
-                            except (json.JSONDecodeError, TypeError):
-                                data = {}
+                            data = json.loads(content)
         
         if not isinstance(data, dict):
             data = {}
@@ -97,13 +91,10 @@ class MarketParser:
             if content.strip().startswith("{") and not content.strip().endswith("}"):
                 return {}
             
-            try:
-                res = json.loads(content)
-                if not isinstance(res, dict):
-                    return {}
-                return res
-            except (json.JSONDecodeError, TypeError, AttributeError):
+            res = json.loads(content)
+            if not isinstance(res, dict):
                 return {}
+            return res
 
 
 class MarketReportGenerator:
@@ -126,10 +117,7 @@ class MarketReportGenerator:
                 if hasattr(content, "read"):
                     content = content.read()
                 if hasattr(content, "decode"):
-                    try:
-                        return content.decode("utf-8")
-                    except (AttributeError, UnicodeDecodeError):
-                        pass
+                    return content.decode("utf-8")
                 return str(content)
         return "{}"
 
@@ -161,21 +149,15 @@ def export_audit_logs(storage_file=None):
             if hasattr(content, "read"):
                 content = content.read()
             if hasattr(content, "decode"):
-                try:
-                    content = content.decode("utf-8")
-                except (AttributeError, UnicodeDecodeError):
-                    pass
+                content = content.decode("utf-8")
             if not isinstance(content, str):
                 content = str(content)
             if not content.strip():
                 return False
             if content.strip().startswith("{") and not content.strip().endswith("}"):
                 return True
-            try:
-                parsed = json.loads(content)
-                if isinstance(parsed, dict):
-                    return True
-                return False
-            except (json.JSONDecodeError, TypeError):
+            parsed = json.loads(content)
+            if isinstance(parsed, dict):
                 return True
+            return False
     return False

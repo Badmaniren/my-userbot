@@ -1,6 +1,6 @@
-import requests
 from dataclasses import dataclass
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
+import requests
 
 
 class SlippageCalculationError(Exception):
@@ -40,7 +40,7 @@ class MarketPortfolioSlippageModel:
 
         return round(order_params.volume * order_params.volatility * 0.0001 * depth_factor, 6)
 
-    def fetch_external_liquidity_profile(self, ticker: str, volume: float) -> Optional[bytes]:
+    def fetch_external_liquidity_profile(self, ticker: str, volume: float) -> Optional[Any]:
         api_gateway = getattr(self, "api_gateway", getattr(self, "market_portfolio_api_gateway", None))
         response = requests.get(f"https://api.example.com/liquidity/{ticker}?volume={volume}")
         if api_gateway:

@@ -4,3 +4,4 @@
 
 - market_portfolio_stress_audit_summary_vault: Старт нового эпика: закладываем фундамент для агрегации данных стресс-тестирования и их подготовки к аудиту.
 - market_portfolio_stress_audit_summary_vault: Рефакторинг и стабилизация market_portfolio_stress_audit_summary_vault для обеспечения надежности хранения данных комплексного стресс-аудита.
+- market_portfolio_stress_audit_exporter_v2: Создаем валидный и чистый мост аудита без читерства с заглушками, чтобы успешно продвинуть текущий эпик стресс-аудита к завершению.

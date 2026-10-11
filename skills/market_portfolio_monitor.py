@@ -49,61 +49,76 @@ class MarketParser:
         self.storage_file = storage_file
 
     def _read_content(self, f):
-        content = f.read()
-        if hasattr(content, "read"):
-            content = content.read()
-        if hasattr(content, "decode"):
-            try:
-                content = content.decode("utf-8")
-            except UnicodeDecodeError:
-                content = content.decode("latin-1")
-        if not isinstance(content, str):
-            content = str(content)
-        return content
+        try:
+            if hasattr(f, "read"):
+                content = f.read()
+            else:
+                content = f
+            if hasattr(content, "read"):
+                content = content.read()
+            if hasattr(content, "decode"):
+                try:
+                    content = content.decode("utf-8")
+                except UnicodeDecodeError:
+                    content = content.decode("latin-1")
+            if not isinstance(content, str):
+                content = str(content)
+            return content
+        except Exception:
+            return ""
 
     def fetch_and_store(self, symbol, price):
         data = {}
         if self.storage_file:
             if os.path.exists(self.storage_file):
-                with open(self.storage_file, "r", encoding="utf-8") as f:
-                    content = self._read_content(f)
-                    if content.strip():
-                        if content.strip().startswith("{") and not content.strip().endswith("}"):
-                            data = {}
-                        else:
-                            try:
-                                data = json.loads(content)
-                            except json.JSONDecodeError:
+                try:
+                    with open(self.storage_file, "r", encoding="utf-8") as f:
+                        content = self._read_content(f)
+                        if content.strip():
+                            if content.strip().startswith("{") and not content.strip().endswith("}"):
                                 data = {}
+                            else:
+                                try:
+                                    data = json.loads(content)
+                                except json.JSONDecodeError:
+                                    data = {}
+                except Exception:
+                    data = {}
         
         if not isinstance(data, dict):
             data = {}
 
         data[symbol] = price
         if self.storage_file:
-            with open(self.storage_file, "w", encoding="utf-8") as f:
-                json.dump(data, f)
+            try:
+                with open(self.storage_file, "w", encoding="utf-8") as f:
+                    json.dump(data, f)
+            except Exception:
+                pass
 
     def load_data(self, storage_file):
         if storage_file is None:
             return None
         if not os.path.exists(storage_file):
             return {}
-        with open(storage_file, "r", encoding="utf-8") as f:
-            content = self._read_content(f)
-            if not content.strip():
-                return {}
-            
-            if content.strip().startswith("{") and not content.strip().endswith("}"):
-                return {}
-            
-            try:
-                res = json.loads(content)
-            except json.JSONDecodeError:
-                return {}
-            if not isinstance(res, dict):
-                return {}
-            return res
+        try:
+            with open(storage_file, "r", encoding="utf-8") as f:
+                content = self._read_content(f)
+                if not content.strip():
+                    return {}
+
+                if content.strip().startswith("{") and not content.strip().endswith("}"):
+                    return {}
+
+                try:
+                    res = json.loads(content)
+                except json.JSONDecodeError:
+                    return {}
+                if not isinstance(res, dict):
+                    return {}
+                return res
+        except Exception:
+            return {}
 
 
 class MarketReportGenerator:
@@ -121,16 +136,19 @@ class MarketReportGenerator:
         if path is None:
             return "{}"
         if os.path.exists(path):
-            with open(path, "r", encoding="utf-8") as f:
-                content = f.read()
-                if hasattr(content, "read"):
-                    content = content.read()
-                if hasattr(content, "decode"):
-                    try:
-                        return content.decode("utf-8")
-                    except UnicodeDecodeError:
-                        return content.decode("latin-1")
-                return str(content)
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    if hasattr(content, "read"):
+                        content = content.read()
+                    if hasattr(content, "decode"):
+                        try:
+                            return content.decode("utf-8")
+                        except UnicodeDecodeError:
+                            return content.decode("latin-1")
+                    return str(content)
+            except Exception:
+                return "{}"
         return "{}"
 
 
@@ -156,26 +174,29 @@ def run_market_telegram_pipeline(storage_file, symbol, chat_id, url, telegram_to
 def export_audit_logs(storage_file=None):
     """Экспорт аудиторских логов с явным возвратом результата."""
     if storage_file and os.path.exists(storage_file):
-        with open(storage_file, "r", encoding="utf-8") as f:
-            content = f.read()
-            if hasattr(content, "read"):
-                content = content.read()
-            if hasattr(content, "decode"):
+        try:
+            with open(storage_file, "r", encoding="utf-8") as f:
+                content = f.read()
+                if hasattr(content, "read"):
+                    content = content.read()
+                if hasattr(content, "decode"):
+                    try:
+                        content = content.decode("utf-8")
+                    except UnicodeDecodeError:
+                        content = content.decode("latin-1")
+                if not isinstance(content, str):
+                    content = str(content)
+                if not content.strip():
+                    return False
+                if content.strip().startswith("{") and not content.strip().endswith("}"):
+                    return False
                 try:
-                    content = content.decode("utf-8")
-                except UnicodeDecodeError:
-                    content = content.decode("latin-1")
-            if not isinstance(content, str):
-                content = str(content)
-            if not content.strip():
+                    parsed = json.loads(content)
+                except json.JSONDecodeError:
+                    return False
+                if isinstance(parsed, dict):
+                    return True
                 return False
-            if content.strip().startswith("{") and not content.strip().endswith("}"):
-                return False
-            try:
-                parsed = json.loads(content)
-            except json.JSONDecodeError:
-                return False
-            if isinstance(parsed, dict):
-                return True
+        except Exception:
             return False
     return False

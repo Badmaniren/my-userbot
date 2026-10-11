@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-атус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_auto_hedge_sync (refactor) — раундов: 1
+раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_auto_hedge_sync (refactor) — раундов: 1
@@ -289,4 +287,7 @@
 
 ## market_portfolio_monitor (refactor) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_monitor (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

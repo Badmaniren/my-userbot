@@ -1,31 +1,54 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+import json
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 
 class MarketParser:
     def __init__(self, storage_file: str = "market_data.db"):
         self.storage_file = storage_file
+        self.portfolios = {}
+
+    def get_portfolio(self, portfolio_id):
+        portfolios = getattr(self, "portfolios", {})
+        if isinstance(portfolios, dict):
+            return portfolios.get(portfolio_id)
+        return None
 
     def fetch_price(self, url: str):
-        response = requests.get(url, timeout=10)
+        if not requests:
+            return None
         try:
+            response = requests.get(url, timeout=10)
             data = response.json()
+            if isinstance(data, dict):
+                return data.get("price")
         except Exception:
             return None
-        if isinstance(data, dict):
-            return data.get("price")
         return None
 
     def parse_html_prices(self, url: str):
-        response = requests.get(url, timeout=10)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        element = soup.find()
-        if element and element.text:
-            try:
-                return float(element.text)
-            except (ValueError, TypeError):
-                return None
+        if not requests or not BeautifulSoup:
+            return None
+        try:
+            response = requests.get(url, timeout=10)
+            soup = BeautifulSoup(response.text, 'html.parser')
+            element = soup.find()
+            if element and element.text:
+                try:
+                    return float(element.text)
+                except (ValueError, TypeError):
+                    return None
+        except Exception:
+            return None
         return None
 
     def fetch_and_store(self, symbol: str, price: float):
@@ -66,3 +89,27 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+    def parse_stream(self, stream):
+        if isinstance(stream, dict):
+            return stream
+        if hasattr(stream, "read"):
+            try:
+                content = stream.read()
+                if isinstance(content, bytes):
+                    content = content.decode("utf-8")
+                return json.loads(content)
+            except Exception:
+                return {}
+        if isinstance(stream, (str, bytes)):
+            try:
+                if isinstance(stream, bytes):
+                    stream = stream.decode("utf-8")
+                return json.loads(stream)
+            except Exception:
+                return {}
+        return {}
+
+
+DbStorage = MarketParser
+db_storage = MarketParser()

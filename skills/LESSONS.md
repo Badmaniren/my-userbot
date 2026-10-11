@@ -3,7 +3,12 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ream_ingestor (refactor) — раундов: 1
+эскалацию
+
+## market_portfolio_realtime_stream_ingestor (start_new) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_realtime_stream_ingestor (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_realtime_anomaly_reactor (compose) — раундов: 4
@@ -297,8 +302,4 @@ ream_ingestor (refactor) — раундов: 1
 
 ## market_portfolio_tax_return_analyzer (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAIL: test_evaluate_tax_efficiency_with_portfolio_taxes_method (tests.test_market_portfolio_tax_return_analyzer.TestMarketPortfolioTaxReturnAnalyzer.test_evaluate_tax_efficiency_with_portfolio_taxes_method)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_tax_calculator (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

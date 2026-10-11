@@ -17,7 +17,7 @@ class MarketPortfolioBacktester:
                 if not content.strip():
                     return {}
                 return json.loads(content)
-        except Exception:
+        except (json.JSONDecodeError, OSError, TypeError):
             return {}
 
     def run_backtest(self, symbol, initial_capital_or_shifts, strategy_params=None):

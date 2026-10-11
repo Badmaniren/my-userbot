@@ -170,7 +170,7 @@ def export_audit_logs(storage_file=None):
             if not content.strip():
                 return False
             if content.strip().startswith("{") and not content.strip().endswith("}"):
-                return True
+                return False
             try:
                 parsed = json.loads(content)
             except json.JSONDecodeError:

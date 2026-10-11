@@ -1,3 +1,5 @@
+import json
+import os
 from skills.market_parser import MarketParser
 from skills import db_storage
 
@@ -99,3 +101,11 @@ def generate_market_report(storage_file, symbol):
                 break
                 
     return f"Report for {symbol}: price {price}"
+
+
+def market_report_generator(target_id=None, payload=None, output_path=None, **kwargs):
+    content = f"Report for {target_id}: {payload}"
+    if output_path:
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(content)
+    return content

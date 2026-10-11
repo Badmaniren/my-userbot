@@ -97,3 +97,9 @@ def start_new(symbol: str, url: str, telegram_token: str, chat_id: str, storage_
         chat_id,
         storage_file
     )
+
+
+def market_portfolio_collector_agent(*args, **kwargs):
+    run_id = kwargs.get("run_id") or (args[0] if args else "default")
+    metric = kwargs.get("metric", 0.0)
+    return {"run_id": run_id, "metric": metric, "status": "collected"}

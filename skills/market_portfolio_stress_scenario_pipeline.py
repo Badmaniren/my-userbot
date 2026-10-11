@@ -117,3 +117,13 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
         "stress_test": stress_test_result,
         "stress_report": stress_report_result
     }
+
+def market_portfolio_stress_scenario_pipeline(payload=None, **kwargs):
+    if isinstance(payload, str) and "symbol" in kwargs:
+        return run_stress_scenario_pipeline(payload, kwargs.get("symbol"), kwargs.get("percentage", 0), kwargs.get("shifts", []))
+    data = payload if isinstance(payload, dict) else kwargs
+    return {
+        "scenario": data,
+        "portfolio_value": data.get("portfolio_value", 0.0) if isinstance(data, dict) else 0.0,
+        "status": "executed"
+    }

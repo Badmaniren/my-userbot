@@ -53,7 +53,10 @@ class MarketParser:
         if hasattr(content, "read"):
             content = content.read()
         if hasattr(content, "decode"):
-            content = content.decode("utf-8")
+            try:
+                content = content.decode("utf-8")
+            except UnicodeDecodeError:
+                content = content.decode("latin-1")
         if not isinstance(content, str):
             content = str(content)
         return content
@@ -68,7 +71,10 @@ class MarketParser:
                         if content.strip().startswith("{") and not content.strip().endswith("}"):
                             data = {}
                         else:
-                            data = json.loads(content)
+                            try:
+                                data = json.loads(content)
+                            except json.JSONDecodeError:
+                                data = {}
         
         if not isinstance(data, dict):
             data = {}
@@ -91,7 +97,10 @@ class MarketParser:
             if content.strip().startswith("{") and not content.strip().endswith("}"):
                 return {}
             
-            res = json.loads(content)
+            try:
+                res = json.loads(content)
+            except json.JSONDecodeError:
+                return {}
             if not isinstance(res, dict):
                 return {}
             return res
@@ -117,7 +126,10 @@ class MarketReportGenerator:
                 if hasattr(content, "read"):
                     content = content.read()
                 if hasattr(content, "decode"):
-                    return content.decode("utf-8")
+                    try:
+                        return content.decode("utf-8")
+                    except UnicodeDecodeError:
+                        return content.decode("latin-1")
                 return str(content)
         return "{}"
 
@@ -149,14 +161,20 @@ def export_audit_logs(storage_file=None):
             if hasattr(content, "read"):
                 content = content.read()
             if hasattr(content, "decode"):
-                content = content.decode("utf-8")
+                try:
+                    content = content.decode("utf-8")
+                except UnicodeDecodeError:
+                    content = content.decode("latin-1")
             if not isinstance(content, str):
                 content = str(content)
             if not content.strip():
                 return False
             if content.strip().startswith("{") and not content.strip().endswith("}"):
                 return True
-            parsed = json.loads(content)
+            try:
+                parsed = json.loads(content)
+            except json.JSONDecodeError:
+                return False
             if isinstance(parsed, dict):
                 return True
             return False

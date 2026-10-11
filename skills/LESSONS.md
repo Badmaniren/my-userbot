@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-_scenario_pipeline (refactor) — раундов: 3
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: успешно прошёл тесты и влит в main
+атус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_scenario_executor_bridge (compose) — раундов: 2
 - Последняя ошибка перед фиксом: Traceback (most recent call last):
@@ -281,6 +279,9 @@ _scenario_pipeline (refactor) — раундов: 3
 
 ## market_portfolio_monitor (refactor) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_monitor (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_monitor (refactor) — раундов: 1

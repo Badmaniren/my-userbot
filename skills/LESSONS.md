@@ -3,7 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 65); Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 1)
+er '«' (U+00AB) (<unknown>, line 65); Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 1)
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -306,3 +306,6 @@
 ## market_portfolio_stress_audit_compliance_validator (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_audit_exporter_v2 (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

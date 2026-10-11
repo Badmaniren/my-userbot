@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ерез raise.
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+ацию
 
 ## market_portfolio_realtime_stream_ingestor (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
@@ -307,4 +305,7 @@
 
 ## market_portfolio_stress_audit_summary_vault (start_new) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=4)
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_audit_summary_vault (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

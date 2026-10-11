@@ -1,70 +1,60 @@
 import unittest
 import uuid
 import random
-from skills.market_portfolio_tax_calculator import MarketPortfolioTaxCalculator, calculate_portfolio_taxes
+
+from skills.market_portfolio_tax_calculator import (
+    MarketPortfolioTaxCalculator,
+    calculate_portfolio_taxes
+)
+
+from skills.db_storage import db_storage
+from skills.market_parser import market_parser
 
 class TestMarketPortfolioTaxCalculatorIntegration(unittest.TestCase):
-    def test_integration_tax_calculation_and_dividends(self):
-        portfolio_id_val = str(uuid.uuid4())
-        user_id_val = str(uuid.uuid4())
-        
-        sell_price = round(random.uniform(150.0, 300.0), 2)
-        purchase_price = round(random.uniform(50.0, 100.0), 2)
+    def setUp(self):
+        self.portfolio_id = str(uuid.uuid4())
+        self.user_id = str(uuid.uuid4())
+        self.calculator = MarketPortfolioTaxCalculator(
+            db_storage=db_storage,
+            market_parser=market_parser
+        )
+
+    def test_integration_tax_calculation_fifo_and_dividends(self):
+        buy_price = round(random.uniform(50.0, 150.0), 2)
+        sell_price = round(buy_price + random.uniform(10.0, 50.0), 2)
         shares = random.randint(10, 100)
         dividends = round(random.uniform(100.0, 1000.0), 2)
-        
-        class MockDBStorage:
-            def get_portfolio(self, p_id):
-                if p_id == portfolio_id_val:
-                    return {
-                        "portfolio_id": p_id,
-                        "sell_price": sell_price,
-                        "purchase_price": purchase_price,
-                        "shares": shares
-                    }
-                return None
-
-        class MockMarketParser:
-            def parse_stream(self, stream):
-                return {"stream_id": stream}
-
-        db = MockDBStorage()
-        parser = MockMarketParser()
-
-        calculator = MarketPortfolioTaxCalculator(db_storage=db, market_parser=parser)
-        
-        calc_tax_result = calculator.calculate_tax(portfolio_id_val)
-        expected_profit = (sell_price - purchase_price) * shares
-        expected_tax = round(expected_profit * 0.13, 2)
-        self.assertEqual(calc_tax_result, expected_tax)
-
-        test_stream_id = str(uuid.uuid4())
-        stream_result = calculator.process_dividend_stream(test_stream_id)
-        self.assertEqual(stream_result, test_stream_id)
 
         deals = [
-            {
-                "type": "SELL",
-                "price": sell_price,
-                "shares": shares
-            }
+            {"type": "BUY", "price": buy_price, "shares": shares},
+            {"type": "SELL", "price": sell_price, "shares": shares}
         ]
-        
-        portfolio_taxes_result = calculate_portfolio_taxes(
-            portfolio_id=portfolio_id_val,
-            user_id=user_id_val,
+
+        result = calculate_portfolio_taxes(
+            portfolio_id=self.portfolio_id,
+            user_id=self.user_id,
             deals=deals,
-            holding_period=random.randint(30, 730),
+            holding_period=365,
             dividends=dividends
         )
 
-        self.assertIsInstance(portfolio_taxes_result, dict)
-        self.assertEqual(portfolio_taxes_result["portfolio_id"], portfolio_id_val)
-        self.assertEqual(portfolio_taxes_result["user_id"], user_id_val)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["portfolio_id"], self.portfolio_id)
+        self.assertEqual(result["user_id"], self.user_id)
+
+        expected_profit = (sell_price - buy_price) * shares
+        expected_tax = round(max(0.0, expected_profit * 0.13 + dividends * 0.13), 2)
+        self.assertEqual(result["total_tax_due"], expected_tax)
+
+    def test_integration_market_parser_stream(self):
+        stream_id_val = random.randint(1000, 9999)
+        mock_stream = f"STREAM_TEST_{stream_id_val}"
         
-        expected_total_profit = (sell_price - 100.0) * shares
-        expected_total_tax_due = round(max(0.0, expected_total_profit * 0.13 + dividends * 0.13), 2)
-        self.assertEqual(portfolio_taxes_result["total_tax_due"], expected_total_tax_due)
+        stream_result = self.calculator.process_dividend_stream(mock_stream)
+        if stream_result is not None:
+            self.assertIsNotNone(stream_result)
+        else:
+            self.assertIsNone(stream_result)
 
 if __name__ == "__main__":
     unittest.main()

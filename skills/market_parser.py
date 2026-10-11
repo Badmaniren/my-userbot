@@ -1,15 +1,48 @@
 import json
 import os
 import uuid
-import requests
-from bs4 import BeautifulSoup
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 
 class MarketParser:
     def __init__(self, storage_file=None):
         self.storage_file = storage_file
 
+    def parse_stream(self, stream):
+        if isinstance(stream, dict):
+            return stream
+        if isinstance(stream, str):
+            try:
+                data = json.loads(stream)
+                if isinstance(data, dict):
+                    return data
+            except Exception:
+                pass
+            return {"stream_id": stream}
+        if hasattr(stream, "read"):
+            try:
+                raw = stream.read()
+                if isinstance(raw, bytes):
+                    raw = raw.decode("utf-8", errors="ignore")
+                data = json.loads(raw)
+                if isinstance(data, dict):
+                    return data
+                return {"stream_id": str(raw)}
+            except Exception:
+                return {"stream_id": "stream_default"}
+        return None
+
     def fetch_price(self, url):
+        if not requests:
+            return None
         try:
             response = requests.get(url, timeout=10)
             try:
@@ -17,10 +50,12 @@ class MarketParser:
                 return data
             except ValueError as e:
                 return {"error": str(e)}
-        except requests.exceptions.RequestException:
+        except Exception:
             return None
 
     def parse_html_prices(self, url):
+        if not requests or not BeautifulSoup:
+            return []
         try:
             response = requests.get(url, timeout=10)
             soup = BeautifulSoup(response.text, 'html.parser')
@@ -36,7 +71,7 @@ class MarketParser:
                         "price": price_elem.get_text().strip()
                     })
             return parsed_items
-        except requests.exceptions.RequestException:
+        except Exception:
             return []
 
     def fetch_and_store(self, symbol, price):
@@ -66,3 +101,6 @@ class MarketParser:
             with open(filename, 'r', encoding='utf-8') as f:
                 return json.load(f)
         return {}
+
+
+market_parser = MarketParser()

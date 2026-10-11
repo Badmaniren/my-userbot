@@ -1,5 +1,5 @@
 from skills.market_portfolio_valuation import PortfolioValuation
-from skills.market_portfolio_tax_calculator import MarketPortfolioTaxCalculator
+from skills.market_portfolio_tax_calculator import MarketPortfolioTaxCalculator, calculate_portfolio_taxes
 
 
 class NetYieldEvaluator:

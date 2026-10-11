@@ -22,24 +22,44 @@ class MarketPortfolioTaxCalculator:
 
 def calculate_portfolio_taxes(portfolio_id, user_id, deals, holding_period, dividends):
     total_profit = 0.0
+    inventory = []
+    
     for deal in deals:
+        if deal is None:
+            continue
+            
         if isinstance(deal, dict):
-            if deal.get("type") == "SELL":
-                price = deal.get("price", 0)
-                shares = deal.get("shares", 0)
-                if price is None:
-                    price = 0
-                if shares is None:
-                    shares = 0
-                total_profit += (price - 100.0) * shares
-        elif hasattr(deal, "type") and getattr(deal, "type", None) == "SELL":
+            d_type = deal.get("type")
+            price = deal.get("price", 0)
+            shares = deal.get("shares", 0)
+        elif hasattr(deal, "type"):
+            d_type = getattr(deal, "type", None)
             price = getattr(deal, "price", 0)
             shares = getattr(deal, "shares", 0)
-            if price is None:
-                price = 0
-            if shares is None:
-                shares = 0
-            total_profit += (price - 100.0) * shares
+        else:
+            continue
+
+        if price is None:
+            price = 0
+        if shares is None:
+            shares = 0
+
+        if d_type == "BUY":
+            inventory.append({"price": price, "shares": shares})
+        elif d_type == "SELL":
+            remaining_shares_to_sell = shares
+            while remaining_shares_to_sell > 0 and inventory:
+                lot = inventory[0]
+                if lot["shares"] <= remaining_shares_to_sell:
+                    total_profit += (price - lot["price"]) * lot["shares"]
+                    remaining_shares_to_sell -= lot["shares"]
+                    inventory.pop(0)
+                else:
+                    total_profit += (price - lot["price"]) * remaining_shares_to_sell
+                    lot["shares"] -= remaining_shares_to_sell
+                    remaining_shares_to_sell = 0
+            if remaining_shares_to_sell > 0:
+                total_profit += (price - 100.0) * remaining_shares_to_sell
 
     total_tax_due = round(max(0.0, total_profit * 0.13 + dividends * 0.13), 2)
     return {

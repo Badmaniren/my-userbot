@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-pose) — раундов: 2
-- Последняя ошибка перед фиксом: Traceback (most recent call last):
-- Статус: успешно прошёл тесты и влит в main
+спешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_ml_volatility_forecaster_v2 (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
@@ -277,6 +275,9 @@ pose) — раундов: 2
 
 ## market_portfolio_monitor (refactor) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_monitor (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_monitor (refactor) — раундов: 1

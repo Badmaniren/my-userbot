@@ -25,9 +25,21 @@ def calculate_portfolio_taxes(portfolio_id, user_id, deals, holding_period, divi
     for deal in deals:
         if isinstance(deal, dict):
             if deal.get("type") == "SELL":
-                total_profit += (deal.get("price", 0) - 100.0) * deal.get("shares", 0)
+                price = deal.get("price", 0)
+                shares = deal.get("shares", 0)
+                if price is None:
+                    price = 0
+                if shares is None:
+                    shares = 0
+                total_profit += (price - 100.0) * shares
         elif hasattr(deal, "type") and getattr(deal, "type", None) == "SELL":
-            total_profit += (getattr(deal, "price", 0) - 100.0) * getattr(deal, "shares", 0)
+            price = getattr(deal, "price", 0)
+            shares = getattr(deal, "shares", 0)
+            if price is None:
+                price = 0
+            if shares is None:
+                shares = 0
+            total_profit += (price - 100.0) * shares
 
     total_tax_due = round(max(0.0, total_profit * 0.13 + dividends * 0.13), 2)
     return {

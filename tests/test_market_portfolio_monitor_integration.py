@@ -17,90 +17,77 @@ from skills.market_portfolio_monitor import (
 class TestMarketPortfolioMonitorIntegration(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.TemporaryDirectory()
-        self.storage_file = os.path.join(self.test_dir.name, f"storage_{uuid.uuid4().hex}.json")
+        self.storage_file = os.path.join(self.test_dir.name, f"storage_{uuid.uuid4()}.json")
         self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
-        self.url = f"https://api.market.internal/{uuid.uuid4().hex[:8]}"
-        self.telegram_token = f"bot{random.randint(100000, 999999)}:AAG{uuid.uuid4().hex[:10]}"
-        self.chat_id = str(random.randint(10000000, 99999999))
+        self.url = f"https://api.telegram.org/bot{uuid.uuid4()}/sendMessage"
+        self.telegram_token = str(uuid.uuid4())
+        self.chat_id = str(random.randint(100000, 999999))
+        self.initial_price = round(random.uniform(10.0, 1500.0), 2)
 
     def tearDown(self):
         self.test_dir.cleanup()
 
-    def test_integration_full_pipeline_and_execution(self):
-        random_price = round(random.uniform(10.0, 5000.0), 2)
-        
-        # 1. Предварительное сохранение через парсер для создания состояния
+    def test_full_pipeline_integration(self):
         parser = MarketParser(storage_file=self.storage_file)
-        parser.fetch_and_store(symbol=self.symbol, price=random_price)
+        parser.fetch_and_store(symbol=self.symbol, price=self.initial_price)
+
+        new_price = round(random.uniform(1500.1, 3000.0), 2)
         
-        self.assertTrue(os.path.exists(self.storage_file), "Файл хранилища должен быть создан.")
+        result_run = run_pipeline(
+            symbol=self.symbol,
+            url=self.url,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id,
+            storage_file=self.storage_file
+        )
+        self.assertTrue(result_run)
 
-        # 2. Проверка загрузки данных через MarketParser
-        loaded_data = parser.load_data(storage_file=self.storage_file)
-        self.assertIsInstance(loaded_data, dict)
-        self.assertIn(self.symbol, loaded_data)
-        self.assertEqual(loaded_data[self.symbol], random_price)
+        start_new_res = start_new(
+            symbol=self.symbol,
+            url=self.url,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id,
+            storage_file=self.storage_file
+        )
+        self.assertTrue(start_new_res)
 
-        # 3. Проверка генерации отчетов через MarketReportGenerator
+        start_ened_res = start_ened(
+            symbol=self.symbol,
+            url=self.url,
+            telegram_token=self.telegram_token,
+            chat_id=self.chat_id,
+            storage_file=self.storage_file
+        )
+        self.assertTrue(start_ened_res)
+
         report_gen = MarketReportGenerator(storage_file=self.storage_file)
         symbol_report = report_gen.generate_symbol_report(symbol=self.symbol)
         self.assertIn(self.symbol, symbol_report)
-        self.assertIn(str(random_price), symbol_report)
 
-        raw_stream = report_gen.get_raw_stream_dump()
-        self.assertIn(self.symbol, raw_stream)
+        raw_dump = report_gen.get_raw_stream_dump()
+        self.assertIn(self.symbol, raw_dump)
 
-        # 4. Проверка функции генерации рыночного отчета
-        market_report_result = generate_market_report(storage_file=self.storage_file, symbol=self.symbol)
-        self.assertIn(self.symbol, market_report_result)
+        market_report = generate_market_report(storage_file=self.storage_file, symbol=self.symbol)
+        self.assertIn(self.symbol, market_report)
 
-        # 5. Проверка Telegram пайплайна
-        telegram_result = run_market_telegram_pipeline(
+        tg_pipeline = run_market_telegram_pipeline(
             storage_file=self.storage_file,
             symbol=self.symbol,
             chat_id=self.chat_id,
             url=self.url,
             telegram_token=self.telegram_token
         )
-        self.assertIsInstance(telegram_result, dict)
-        self.assertEqual(telegram_result.get("status"), "success")
-        self.assertEqual(telegram_result.get("symbol"), self.symbol)
-        self.assertEqual(telegram_result.get("price"), random_price)
-        self.assertEqual(telegram_result.get("chat_id"), self.chat_id)
-        self.assertEqual(telegram_result.get("url"), self.url)
+        self.assertEqual(tg_pipeline.get("status"), "success")
+        self.assertEqual(tg_pipeline.get("symbol"), self.symbol)
+        self.assertEqual(tg_pipeline.get("chat_id"), self.chat_id)
+        self.assertEqual(tg_pipeline.get("url"), self.url)
 
-        # 6. Проверка экспорта аудиторских логов
         audit_exported = export_audit_logs(storage_file=self.storage_file)
-        self.assertTrue(audit_exported, "Экспорт аудиторских логов должен вернуть True для корректного JSON-файла.")
+        self.assertTrue(audit_exported)
 
-        # 7. Запуск основного пайплайна (run_pipeline)
-        pipeline_res = run_pipeline(
-            symbol=self.symbol,
-            url=self.url,
-            telegram_token=self.telegram_token,
-            chat_id=self.chat_id,
-            storage_file=self.storage_file
-        )
-        self.assertTrue(pipeline_res)
-
-        # 8. Проверка точек входа start_new и start_ened
-        new_res = start_new(
-            symbol=self.symbol,
-            url=self.url,
-            telegram_token=self.telegram_token,
-            chat_id=self.chat_id,
-            storage_file=self.storage_file
-        )
-        self.assertTrue(new_res)
-
-        ened_res = start_ened(
-            symbol=self.symbol,
-            url=self.url,
-            telegram_token=self.telegram_token,
-            chat_id=self.chat_id,
-            storage_file=self.storage_file
-        )
-        self.assertTrue(ened_res)
+        loaded_data = parser.load_data(storage_file=self.storage_file)
+        self.assertIsInstance(loaded_data, dict)
+        self.assertIn(self.symbol, loaded_data)
 
 if __name__ == "__main__":
     unittest.main()

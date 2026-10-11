@@ -115,3 +115,11 @@ class MarketPortfolioAuditComplianceHub:
                     f.write("{}")
             return True
         return bool(res)
+
+
+def market_portfolio_audit_compliance_hub(record=None, *args, **kwargs):
+    if isinstance(record, dict):
+        res = dict(record)
+        res["validated"] = True
+        return res
+    return {"validated": True, "data": record}

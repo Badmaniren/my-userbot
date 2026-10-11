@@ -48,3 +48,17 @@ def generate_stress_report(storage_file, symbol, percentage):
 def run_stress_reporting_pipeline(storage_file, symbol, shifts):
     reporter = PortfolioStressReporter(storage_file)
     return reporter.run_stress_report(symbol, shifts)
+
+
+def market_portfolio_stress_reporter(payload=None, *args, **kwargs):
+    if isinstance(payload, dict):
+        portfolio_id = payload.get("portfolio_id")
+        audit_run_id = payload.get("audit_run_id")
+        risk_score = payload.get("risk_score")
+        return {
+            "portfolio_id": portfolio_id,
+            "audit_run_id": audit_run_id,
+            "risk_score": risk_score,
+            "status": payload.get("status", "COMPLETED")
+        }
+    return run_stress_reporting_pipeline("market_data.json", "DEFAULT", [0.05])

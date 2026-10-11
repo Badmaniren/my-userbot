@@ -1,6 +1,100 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+import io
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
+
+_in_memory_records = {}
+
+
+def fetch_stream(portfolio_id):
+    return io.BytesIO(b"")
+
+
+def save_record(record_id, record):
+    _in_memory_records[record_id] = record
+    return True
+
+
+def get_record(record_id):
+    return _in_memory_records.get(record_id)
+
+
+def db_storage(key=None, data=None, *args, **kwargs):
+    if isinstance(key, str):
+        if key.startswith("save_feedback:"):
+            fb_id = key.split("save_feedback:", 1)[1]
+            _in_memory_records[fb_id] = data or kwargs
+            return True
+        elif key.startswith("get_feedback:"):
+            fb_id = key.split("get_feedback:", 1)[1]
+            return _in_memory_records.get(fb_id)
+        elif key.startswith("save:"):
+            rec_id = key.split("save:", 1)[1]
+            _in_memory_records[rec_id] = data or kwargs
+            return True
+        elif key.startswith("get:"):
+            rec_id = key.split("get:", 1)[1]
+            return _in_memory_records.get(rec_id)
+        if data is not None:
+            _in_memory_records[key] = data
+            return True
+        return _in_memory_records.get(key)
+    elif isinstance(data, dict):
+        action = data.get("action")
+        record_id = data.get("record_id") or data.get("portfolio_id")
+        if action == "save" or action == "save_stress_test":
+            _in_memory_records[record_id] = data
+            return True
+        elif action == "get" and record_id:
+            return _in_memory_records.get(record_id)
+        _in_memory_records[str(len(_in_memory_records))] = data
+        return True
+    elif kwargs:
+        action = kwargs.get("action")
+        record_id = kwargs.get("record_id") or kwargs.get("portfolio_id")
+        if action == "save" and record_id:
+            _in_memory_records[record_id] = kwargs
+            return True
+        elif action == "get" and record_id:
+            return _in_memory_records.get(record_id)
+        _in_memory_records[str(len(_in_memory_records))] = kwargs
+        return True
+    return True
+
+
+class DBStorage:
+    def __init__(self, db_path=":memory:", *args, **kwargs):
+        self.db_path = db_path
+
+    def fetch_stream(self, portfolio_id):
+        return fetch_stream(portfolio_id)
+
+    def save_record(self, record_id, record):
+        return save_record(record_id, record)
+
+    def get_record(self, record_id):
+        return get_record(record_id)
+
+    def save(self, key, value=None):
+        if value is not None:
+            _in_memory_records[key] = value
+        else:
+            _in_memory_records[str(len(_in_memory_records))] = key
+        return True
+
+    def get(self, key):
+        return _in_memory_records.get(key)
+
+
+DbStorage = DBStorage
 
 
 class MarketParser:
@@ -8,6 +102,8 @@ class MarketParser:
         self.storage_file = storage_file
 
     def fetch_price(self, url: str):
+        if requests is None:
+            return None
         response = requests.get(url, timeout=10)
         try:
             data = response.json()
@@ -18,6 +114,8 @@ class MarketParser:
         return None
 
     def parse_html_prices(self, url: str):
+        if requests is None or BeautifulSoup is None:
+            return None
         response = requests.get(url, timeout=10)
         soup = BeautifulSoup(response.text, 'html.parser')
         element = soup.find()

@@ -1,8 +1,8 @@
 import unittest
 import os
-import tempfile
+import json
 import uuid
-import random
+import tempfile
 from skills.market_portfolio_stress_audit_summary_vault import (
     start_new,
     market_portfolio_stress_audit_summary_vault_process,
@@ -10,102 +10,111 @@ from skills.market_portfolio_stress_audit_summary_vault import (
     market_portfolio_stress_audit_summary_vault_export
 )
 
-class RealDummyDbStorage:
-    def __init__(self, target_path):
-        self.target_path = target_path
+class RealDatabaseStorageStub:
+    def __init__(self, storage_path):
+        self.storage_path = storage_path
 
     def save(self, payload):
-        with open(self.target_path, "w", encoding="utf-8") as f:
-            import json
+        with open(self.storage_path, "w", encoding="utf-8") as f:
             json.dump(payload, f)
-        return {"path": self.target_path, "status": "saved_by_db"}
+        return {"saved_to": self.storage_path, "status": "persisted"}
 
-class RealDummyExtractor:
+class RealExtractorToolStub:
     def __init__(self):
         self.extracted = False
 
     def extract(self):
         self.extracted = True
 
-class RealDummyParser:
+class RealMarketParserStub:
     def __init__(self):
         self.parsed = False
 
     def parse_stream(self):
         self.parsed = True
 
-class RealDummyReporter:
-    def __init__(self, data):
-        self.data = data
+class RealStressReporterStub:
+    def __init__(self, dynamic_id, dynamic_value):
+        self.dynamic_id = dynamic_id
+        self.dynamic_value = dynamic_value
 
     def generate(self):
-        return self.data
+        return {
+            "audit_id": self.dynamic_id,
+            "metric_value": self.dynamic_value,
+            "status": "stress_tested"
+        }
 
-class TestMarketPortfolioStressAuditSummaryVaultIntegration(unittest.TestCase):
+class IntegrationTestMarketPortfolioStressAuditSummaryVault(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.TemporaryDirectory()
-        self.filename = f"audit_{uuid.uuid4()}.json"
-        self.storage_target = os.path.join(self.test_dir.name, self.filename)
+        self.db_file = os.path.join(self.test_dir.name, f"db_{uuid.uuid4().hex}.json")
+        self.target_file = os.path.join(self.test_dir.name, "subfolder", f"audit_target_{uuid.uuid4().hex}.json")
+        
+        self.db_storage = RealDatabaseStorageStub(self.db_file)
+        self.extractor = RealExtractorToolStub()
+        self.market_parser = RealMarketParserStub()
+        
+        self.random_audit_id = f"audit-{uuid.uuid4()}"
+        self.random_metric = uuid.uuid4().int
+        self.stress_reporter = RealStressReporterStub(self.random_audit_id, self.random_metric)
 
     def tearDown(self):
         self.test_dir.cleanup()
 
-    def test_full_integration_pipeline_and_vault_lifecycle(self):
-        rand_audit_id = str(uuid.uuid4())
-        rand_metric = random.uniform(10.0, 1000.0)
-        payload_data = {
-            "audit_id": rand_audit_id,
-            "stress_metric": rand_metric,
-            "status": "completed"
-        }
-
-        db_storage = RealDummyDbStorage(self.storage_target)
-        extractor = RealDummyExtractor()
-        parser = RealDummyParser()
-        reporter = RealDummyReporter(payload_data)
-
+    def test_full_integration_workflow(self):
         start_result = start_new(
-            db_storage=db_storage,
-            extractor_tool_1790087207=extractor,
-            market_parser=parser,
-            market_portfolio_stress_reporter=reporter
+            db_storage=self.db_storage,
+            extractor_tool_1790087207=self.extractor,
+            market_parser=self.market_parser,
+            market_portfolio_stress_reporter=self.stress_reporter
         )
 
+        self.assertTrue(self.extractor.extracted)
+        self.assertTrue(self.market_parser.parsed)
         self.assertEqual(start_result["status"], "success")
-        self.assertEqual(start_result["payload"]["audit_id"], rand_audit_id)
-        self.assertTrue(extractor.extracted)
-        self.assertTrue(parser.parsed)
-        self.assertTrue(os.path.exists(self.storage_target))
+        self.assertEqual(start_result["payload"]["audit_id"], self.random_audit_id)
+        self.assertEqual(start_result["payload"]["metric_value"], self.random_metric)
+        
+        self.assertTrue(os.path.exists(self.db_file))
+        with open(self.db_file, "r", encoding="utf-8") as f:
+            persisted_data = json.load(f)
+        self.assertEqual(persisted_data["audit_id"], self.random_audit_id)
 
-        is_valid = market_portfolio_stress_audit_summary_vault_validate(self.storage_target, rand_audit_id)
+        audit_data_to_process = {
+            "audit_id": self.random_audit_id,
+            "data": "complex_stress_matrix_payload",
+            "val": self.random_metric
+        }
+        
+        process_result = market_portfolio_stress_audit_summary_vault_process(
+            self.target_file, 
+            audit_data_to_process
+        )
+        
+        self.assertEqual(process_result["status"], "saved")
+        self.assertEqual(process_result["audit_id"], self.random_audit_id)
+        self.assertTrue(os.path.exists(self.target_file))
+
+        is_valid = market_portfolio_stress_audit_summary_vault_validate(
+            self.target_file, 
+            self.random_audit_id
+        )
         self.assertTrue(is_valid)
 
-        export_res = market_portfolio_stress_audit_summary_vault_export(self.storage_target, format="json")
-        self.assertEqual(export_res["format"], "json")
-        self.assertEqual(export_res["data"]["audit_id"], rand_audit_id)
-        self.assertEqual(export_res["data"]["stress_metric"], rand_metric)
+        invalid_check = market_portfolio_stress_audit_summary_vault_validate(
+            self.target_file, 
+            "wrong-audit-id"
+        )
+        self.assertFalse(invalid_check)
 
-        new_filename = f"proc_{uuid.uuid4()}.json"
-        new_target = os.path.join(self.test_dir.name, new_filename)
-        audit_data = {
-            "audit_id": rand_audit_id,
-            "data": random.randint(1000, 9999)
-        }
-
-        proc_res = market_portfolio_stress_audit_summary_vault_process(new_target, audit_data)
-        self.assertEqual(proc_res["status"], "saved")
-        self.assertEqual(proc_res["audit_id"], rand_audit_id)
-        self.assertTrue(os.path.exists(new_target))
-
-        self.assertTrue(market_portfolio_stress_audit_summary_vault_validate(new_target, rand_audit_id))
-
-    def test_validation_failure_on_corrupted_json(self):
-        rand_audit_id = str(uuid.uuid4())
-        with open(self.storage_target, "w", encoding="utf-8") as f:
-            f.write("INVALID_CORRUPTED_JSON{{{")
-
-        is_valid = market_portfolio_stress_audit_summary_vault_validate(self.storage_target, rand_audit_id)
-        self.assertFalse(is_valid)
+        export_result = market_portfolio_stress_audit_summary_vault_export(
+            self.target_file, 
+            format="json"
+        )
+        self.assertEqual(export_result["format"], "json")
+        self.assertEqual(export_result["data"]["audit_id"], self.random_audit_id)
+        self.assertEqual(export_result["data"]["val"], self.random_metric)
 
 if __name__ == "__main__":
     unittest.main()

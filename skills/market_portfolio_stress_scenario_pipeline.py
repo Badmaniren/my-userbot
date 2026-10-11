@@ -1,9 +1,6 @@
-import builtins
 import json
 from skills.market_portfolio_scenario_simulator import PortfolioScenarioSimulator
 from skills.market_portfolio_stress_reporter import StressReporter, PortfolioStressReporter
-
-builtins.json = json
 
 class PortfolioStressScenarioPipeline:
     def __init__(self, storage_file):
@@ -17,8 +14,8 @@ class PortfolioStressScenarioPipeline:
                 content = f.read()
             data = json.loads(content)
             if not isinstance(data, dict):
-                raise ValueError("Invalid storage data format")
-        except (FileNotFoundError, json.JSONDecodeError, ValueError, TypeError):
+                raise ValueError("Not a dict")
+        except (FileNotFoundError, json.JSONDecodeError, TypeError, ValueError):
             with open(self.storage_file, "w", encoding="utf-8") as f:
                 f.write("{}")
 
@@ -71,8 +68,8 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
             content = f.read()
         data = json.loads(content)
         if not isinstance(data, dict):
-            raise ValueError("Invalid storage data format")
-    except (FileNotFoundError, json.JSONDecodeError, ValueError, TypeError):
+            raise ValueError("Not a dict")
+    except (FileNotFoundError, json.JSONDecodeError, TypeError, ValueError):
         with open(storage_file, "w", encoding="utf-8") as f:
             f.write("{}")
 

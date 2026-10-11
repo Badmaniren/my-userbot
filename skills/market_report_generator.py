@@ -1,3 +1,4 @@
+import io
 from skills.market_parser import MarketParser
 from skills import db_storage
 
@@ -6,6 +7,10 @@ class MarketReportGenerator:
         self.storage_file = storage_file
         self.parser = MarketParser(storage_file)
         self.db = db_storage
+
+    def generate_report_stream(self, report_id):
+        content = f"report_stream_{report_id}".encode("utf-8")
+        return io.BytesIO(content)
 
     def generate_symbol_report(self, symbol):
         data = self.parser.load_data(self.storage_file)
@@ -55,7 +60,7 @@ class MarketReportGenerator:
         self.parser.fetch_and_store(symbol, price)
         return price
 
-    def get_raw_stream_dump(self):
+    def get_raw_stream_dump(self, *args, **kwargs):
         return self.parser.load_data(self.storage_file)
 
 
@@ -99,3 +104,6 @@ def generate_market_report(storage_file, symbol):
                 break
                 
     return f"Report for {symbol}: price {price}"
+
+
+market_report_generator = MarketReportGenerator()

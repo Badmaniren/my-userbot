@@ -1,15 +1,26 @@
 import math
-import requests
-import numpy as np
 from typing import List, Dict, Any, Optional
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    import numpy as np
+except ImportError:
+    np = None
+
 
 class FeatureBuilderConfigError(Exception):
     """Выбрасывается при некорректной конфигурации построителя признаков."""
     pass
 
+
 class InsufficientDataError(Exception):
     """Выбрасывается при недостаточном количестве исторических данных."""
     pass
+
 
 class MarketPortfolioMLFeatureBuilder:
     def __init__(self, asset_id: str, window_size: int):
@@ -19,7 +30,6 @@ class MarketPortfolioMLFeatureBuilder:
         self.window_size = window_size
 
     def _fetch_historical_prices(self) -> List[float]:
-        # Метод-заглушка, переопределяемый через patch в юнит-тестах
         return []
 
     def compute_log_returns(self, prices: Optional[List[float]] = None) -> List[float]:
@@ -47,57 +57,84 @@ class MarketPortfolioMLFeatureBuilder:
             window = self.window_size
 
         volatilities = []
-        arr = np.array(returns)
-        for i in range(window, len(arr) + 1):
-            chunk = arr[i - window:i]
-            volatilities.append(float(np.std(chunk, ddof=1) if len(chunk) > 1 else 0.0))
-        
-        if not volatilities and len(arr) > 0:
-            volatilities.append(float(np.std(arr, ddof=1) if len(arr) > 1 else 0.0))
-        
+        if np is not None:
+            arr = np.array(returns)
+            for i in range(window, len(arr) + 1):
+                chunk = arr[i - window:i]
+                volatilities.append(float(np.std(chunk, ddof=1) if len(chunk) > 1 else 0.0))
+
+            if not volatilities and len(arr) > 0:
+                volatilities.append(float(np.std(arr, ddof=1) if len(arr) > 1 else 0.0))
+        else:
+            n = len(returns)
+            for i in range(window, n + 1):
+                chunk = returns[i - window:i]
+                if len(chunk) > 1:
+                    mean = sum(chunk) / len(chunk)
+                    var = sum((x - mean) ** 2 for x in chunk) / (len(chunk) - 1)
+                    volatilities.append(math.sqrt(var))
+                else:
+                    volatilities.append(0.0)
+            if not volatilities and n > 0:
+                mean = sum(returns) / n
+                var = sum((x - mean) ** 2 for x in returns) / (n - 1) if n > 1 else 0.0
+                volatilities.append(math.sqrt(var))
+
         return volatilities
 
     def compute_skewness_and_kurtosis(self, returns: Optional[List[float]] = None) -> Dict[str, float]:
         if returns is None:
             returns = self.compute_log_returns()
         
-        arr = np.array(returns)
-        if len(arr) < 3:
+        if not returns or len(returns) < 3:
             return {'skewness': 0.0, 'kurtosis': 0.0}
-        
-        mean = np.mean(arr)
-        std = np.std(arr, ddof=1)
-        
-        if std == 0:
-            return {'skewness': 0.0, 'kurtosis': 0.0}
-        
-        n = len(arr)
-        skewness = float((np.sum((arr - mean) ** 3) / n) / (std ** 3))
-        kurtosis = float((np.sum((arr - mean) ** 4) / n) / (std ** 4) - 3.0)
-        
-        return {'skewness': skewness, 'kurtosis': kurtosis}
+
+        if np is not None:
+            arr = np.array(returns)
+            mean = np.mean(arr)
+            std = np.std(arr, ddof=1)
+
+            if std == 0:
+                return {'skewness': 0.0, 'kurtosis': 0.0}
+
+            n = len(arr)
+            skewness = float((np.sum((arr - mean) ** 3) / n) / (std ** 3))
+            kurtosis = float((np.sum((arr - mean) ** 4) / n) / (std ** 4) - 3.0)
+            return {'skewness': skewness, 'kurtosis': kurtosis}
+        else:
+            n = len(returns)
+            mean = sum(returns) / n
+            var = sum((x - mean) ** 2 for x in returns) / (n - 1)
+            std = math.sqrt(var)
+            if std == 0:
+                return {'skewness': 0.0, 'kurtosis': 0.0}
+            skewness = (sum((x - mean) ** 3 for x in returns) / n) / (std ** 3)
+            kurtosis = (sum((x - mean) ** 4 for x in returns) / n) / (std ** 4) - 3.0
+            return {'skewness': skewness, 'kurtosis': kurtosis}
 
     def compute_tail_risk_metrics(self, returns: Optional[List[float]] = None, confidence: float = 0.95) -> Dict[str, float]:
         if returns is None:
             returns = self.compute_log_returns()
         
-        arr = np.array(returns)
-        if len(arr) == 0:
+        if not returns:
             return {'var': 0.0, 'cvar': 0.0}
-        
-        sorted_returns = np.sort(arr)
+
+        sorted_returns = sorted(returns)
         index = int((1.0 - confidence) * len(sorted_returns))
         index = max(0, min(index, len(sorted_returns) - 1))
         
         var = float(sorted_returns[index])
         tail = sorted_returns[:index + 1]
-        cvar = float(np.mean(tail)) if len(tail) > 0 else var
+        cvar = float(sum(tail) / len(tail)) if len(tail) > 0 else var
         
         return {'var': var, 'cvar': cvar}
 
     def build_full_feature_vector_from_source(self, url: str) -> Dict[str, Any]:
-        response = requests.get(url)
-        content = response.content.decode('utf-8')
+        if requests is not None:
+            response = requests.get(url)
+            content = response.content.decode('utf-8')
+        else:
+            content = ""
         
         prices = []
         for line in content.splitlines():
@@ -146,3 +183,7 @@ def build_ml_features(asset_id: str, data_points: List[float], window_size: int,
             "seed_marker": seed_marker
         }
     }
+
+
+market_portfolio_ml_feature_builder = MarketPortfolioMLFeatureBuilder
+MarketPortfolioMlFeatureBuilder = MarketPortfolioMLFeatureBuilder

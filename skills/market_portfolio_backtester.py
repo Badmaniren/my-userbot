@@ -11,14 +11,11 @@ class MarketPortfolioBacktester:
         path = filepath or self.filepath
         if not path or not os.path.exists(path):
             return {}
-        try:
-            with open(path, 'r', encoding='utf-8') as f:
-                content = f.read()
-                if not content.strip():
-                    return {}
-                return json.loads(content)
-        except Exception:
-            return {}
+        with open(path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            if not content.strip():
+                return {}
+            return json.loads(content)
 
     def run_backtest(self, symbol, initial_capital_or_shifts, strategy_params=None):
         if isinstance(initial_capital_or_shifts, list):

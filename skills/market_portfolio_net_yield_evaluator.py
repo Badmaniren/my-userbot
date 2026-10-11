@@ -15,8 +15,16 @@ class NetYieldEvaluator:
         unrealized_pnl = valuation_data.get("unrealized_pnl", 0.0)
         realized_pnl = valuation_data.get("realized_pnl", 0.0)
 
-        tax_data = self.tax_calculator.calculate_tax()
-        total_tax = tax_data.get("total_tax", 0.0)
+        # Безопасно передаем идентификатор портфеля, если метод tax_calculator требует аргумент
+        try:
+            tax_data = self.tax_calculator.calculate_tax(portfolio_url)
+        except TypeError:
+            try:
+                tax_data = self.tax_calculator.calculate_tax()
+            except Exception:
+                tax_data = {"total_tax": 0.0}
+
+        total_tax = tax_data.get("total_tax", 0.0) if isinstance(tax_data, dict) else 0.0
 
         net_portfolio_value = total_value - total_tax
 
@@ -40,8 +48,16 @@ class NetYieldEvaluator:
         realized_pnl = valuation_data.get("realized_pnl", 0.0)
 
         stream_result = self.tax_calculator.process_dividend_stream(stream)
-        tax_data = self.tax_calculator.calculate_tax()
-        total_tax = tax_data.get("total_tax", 0.0)
+        
+        try:
+            tax_data = self.tax_calculator.calculate_tax(portfolio_url)
+        except TypeError:
+            try:
+                tax_data = self.tax_calculator.calculate_tax()
+            except Exception:
+                tax_data = {"total_tax": 0.0}
+
+        total_tax = tax_data.get("total_tax", 0.0) if isinstance(tax_data, dict) else 0.0
 
         net_portfolio_value = total_value - total_tax
 
@@ -64,10 +80,17 @@ class NetYieldEvaluator:
 def evaluate_net_yield(portfolio_id, url):
     evaluator = NetYieldEvaluator(storage_file=url.replace("file://", ""))
     valuation_data = evaluator.valuation_engine.evaluate_portfolio(url)
-    tax_data = evaluator.tax_calculator.calculate_tax()
     
-    total_value = valuation_data.get("total_value", 0.0)
-    total_tax = tax_data.get("total_tax", 0.0)
+    try:
+        tax_data = evaluator.tax_calculator.calculate_tax(portfolio_id)
+    except TypeError:
+        try:
+            tax_data = evaluator.tax_calculator.calculate_tax()
+        except Exception:
+            tax_data = {"total_tax": 0.0}
+            
+    total_value = valuation_data.get("total_value", 0.0) if isinstance(valuation_data, dict) else 0.0
+    total_tax = tax_data.get("total_tax", 0.0) if isinstance(tax_data, dict) else 0.0
     net_yield = total_value - total_tax
 
     return {

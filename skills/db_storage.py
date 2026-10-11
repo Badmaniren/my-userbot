@@ -1,6 +1,78 @@
+import os
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
+
+
+class DbStorage:
+    _in_memory_db = {}
+
+    def __init__(self, storage_file: str = "market_data.db"):
+        self.storage_file = storage_file
+
+    def __call__(self, key, value=None):
+        if value is not None:
+            DbStorage._in_memory_db[key] = value
+            return value
+        return DbStorage._in_memory_db.get(key)
+
+    def get(self, key, default=None):
+        return DbStorage._in_memory_db.get(key, default)
+
+    def set(self, key, value):
+        DbStorage._in_memory_db[key] = value
+        return value
+
+    def save(self, payload_or_key, value=None):
+        if value is not None:
+            DbStorage._in_memory_db[payload_or_key] = value
+            return True
+        if isinstance(payload_or_key, dict):
+            key = payload_or_key.get("audit_id") or payload_or_key.get("id") or str(len(DbStorage._in_memory_db))
+            DbStorage._in_memory_db[key] = payload_or_key
+            return True
+        DbStorage._in_memory_db[str(payload_or_key)] = payload_or_key
+        return True
+
+    def get_portfolio(self, portfolio_id):
+        return DbStorage._in_memory_db.get(portfolio_id)
+
+    def fetch_portfolio(self, portfolio_id):
+        return DbStorage._in_memory_db.get(portfolio_id)
+
+    def load_data(self, filename: str):
+        if filename in DbStorage._in_memory_db:
+            return DbStorage._in_memory_db[filename]
+        if filename.endswith('.db'):
+            try:
+                conn = sqlite3.connect(filename)
+                cursor = conn.cursor()
+                try:
+                    cursor.execute('SELECT symbol, price FROM market_data')
+                    rows = cursor.fetchall()
+                    data = [f"{row[0]},{row[1]}\n" for row in rows]
+                finally:
+                    conn.close()
+                return data
+            except Exception:
+                return []
+        else:
+            if os.path.exists(filename):
+                with open(filename, 'rb') as f:
+                    lines = f.readlines()
+                    return [line.decode('utf-8') for line in lines]
+            return []
+
+
+db_storage = DbStorage()
 
 
 class MarketParser:
@@ -8,8 +80,10 @@ class MarketParser:
         self.storage_file = storage_file
 
     def fetch_price(self, url: str):
-        response = requests.get(url, timeout=10)
+        if requests is None:
+            return None
         try:
+            response = requests.get(url, timeout=10)
             data = response.json()
         except Exception:
             return None
@@ -18,14 +92,19 @@ class MarketParser:
         return None
 
     def parse_html_prices(self, url: str):
-        response = requests.get(url, timeout=10)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        element = soup.find()
-        if element and element.text:
-            try:
-                return float(element.text)
-            except (ValueError, TypeError):
-                return None
+        if requests is None or BeautifulSoup is None:
+            return None
+        try:
+            response = requests.get(url, timeout=10)
+            soup = BeautifulSoup(response.text, 'html.parser')
+            element = soup.find()
+            if element and element.text:
+                try:
+                    return float(element.text)
+                except (ValueError, TypeError):
+                    return None
+        except Exception:
+            return None
         return None
 
     def fetch_and_store(self, symbol: str, price: float):

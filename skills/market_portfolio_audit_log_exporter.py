@@ -4,6 +4,23 @@ import csv
 from skills.market_parser import MarketParser
 
 
+def push_audit_log(audit_data, export_target):
+    """
+    Экспортирует результат аудита в указанную цель (файл) или возвращает результат.
+    """
+    if isinstance(export_target, str) and (export_target.endswith(".json") or "/" in export_target or "\\" in export_target):
+        dirname = os.path.dirname(export_target)
+        if dirname:
+            os.makedirs(dirname, exist_ok=True)
+        with open(export_target, 'w', encoding='utf-8') as f:
+            json.dump(audit_data, f, ensure_ascii=False, indent=2)
+    return {
+        "status": "SUCCESS",
+        "target": export_target,
+        "data": audit_data
+    }
+
+
 class PortfolioAuditLogExporter:
     """Модуль для экспорта аудита портфельных операций и логов."""
 

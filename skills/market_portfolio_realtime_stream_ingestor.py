@@ -4,6 +4,11 @@ import os
 from typing import Any, Dict, Optional
 
 
+def get_stream_reader(stream_token: str):
+    """Возвращает поток байтов с кодированным JSON для данного токена."""
+    return io.BytesIO(json.dumps({"stream_id": stream_token}).encode('utf-8'))
+
+
 def start_new(context: Dict[str, Any], stream_source: Optional[str] = None) -> Dict[str, Any]:
     """Модуль первичного приема и валидации потоковых рыночных данных (юнит-тест конвейер)."""
     db_storage = context.get("db_storage")

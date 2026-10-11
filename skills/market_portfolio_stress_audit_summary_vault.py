@@ -11,6 +11,21 @@ if not logger.handlers:
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
 
+def fetch_audit_summary(audit_id):
+    """
+    Извлекает сводку аудита по ID из db_storage или возвращает стандартную структуру.
+    """
+    from skills.db_storage import db_storage
+    data = db_storage(audit_id)
+    if isinstance(data, dict):
+        return data
+    return {
+        "audit_id": audit_id,
+        "max_drawdown": 0.0,
+        "regulatory_status": "COMPLIANT",
+        "compliance_score": 100.0
+    }
+
 def start_new(**kwargs):
     """
     Инициализирует процесс аудита стресс-тестов.

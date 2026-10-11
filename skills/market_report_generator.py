@@ -99,3 +99,6 @@ def generate_market_report(storage_file, symbol):
                 break
                 
     return f"Report for {symbol}: price {price}"
+
+
+market_report_generator = MarketReportGenerator()

@@ -117,3 +117,21 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
         "stress_test": stress_test_result,
         "stress_report": stress_report_result
     }
+
+def market_portfolio_stress_scenario_pipeline(*args, **kwargs):
+    if len(args) >= 4:
+        return run_stress_scenario_pipeline(args[0], args[1], args[2], args[3])
+    if len(args) == 1 and isinstance(args[0], dict):
+        payload = args[0]
+        storage_file = payload.get("storage_file", "storage.json")
+        symbol = payload.get("symbol", "AAPL")
+        percentage = payload.get("percentage", 0.0)
+        shifts = payload.get("shifts", [])
+        return run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts)
+    if kwargs:
+        storage_file = kwargs.get("storage_file", args[0] if args else "storage.json")
+        symbol = kwargs.get("symbol", "AAPL")
+        percentage = kwargs.get("percentage", 0.0)
+        shifts = kwargs.get("shifts", [])
+        return run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts)
+    return run_stress_scenario_pipeline(args[0] if args else "storage.json", "AAPL", 0.0, [])

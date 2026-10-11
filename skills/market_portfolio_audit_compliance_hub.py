@@ -6,6 +6,30 @@ from skills.market_portfolio_audit_log_exporter import PortfolioAuditLogExporter
 
 logger = logging.getLogger(__name__)
 
+def evaluate_compliance_status(
+    portfolio_id: str,
+    validation_result: Optional[Dict[str, Any]] = None,
+    **kwargs: Any
+) -> Dict[str, Any]:
+    """
+    Оценивает статус соответствия регуляторным требованиям для портфеля.
+    """
+    if validation_result is None:
+        validation_result = kwargs
+
+    status = validation_result.get("status", "COMPLIANT")
+    violations = validation_result.get("violations", [])
+
+    return {
+        "portfolio_id": portfolio_id,
+        "status": status,
+        "violations": violations,
+        "is_compliant": status == "COMPLIANT" and not bool(violations),
+        "total_value": validation_result.get("total_value", 0.0),
+        "details": validation_result
+    }
+
+
 class MarketPortfolioAuditComplianceHub:
     """
     Модуль проверки соответствия аудита нормам портфеля.
@@ -105,6 +129,13 @@ class MarketPortfolioAuditComplianceHub:
         if res is False or res is None:
             return True
         return bool(res)
+
+    def evaluate_compliance_status(
+        self,
+        portfolio_id: str,
+        validation_result: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        return evaluate_compliance_status(portfolio_id, validation_result)
 
     def export_audit_logs(self, export_path: str) -> bool:
         logger.info(f"Вызов export_audit_logs для пути: {export_path}")

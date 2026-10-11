@@ -136,4 +136,6 @@ class MarketPortfolioSlippageModel:
             return self._execution_logs[simulation_id]
         if storage and hasattr(storage, "get_logs"):
             return storage.get_logs(simulation_id)
+        if storage and hasattr(storage, "get_log"):
+            return storage.get_log(simulation_id)
         return []

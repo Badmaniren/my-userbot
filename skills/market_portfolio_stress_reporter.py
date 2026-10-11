@@ -1,3 +1,4 @@
+import uuid
 from skills.market_portfolio_scenario_simulator import PortfolioScenarioSimulator
 from skills.market_report_generator import MarketReportGenerator
 
@@ -39,7 +40,17 @@ class PortfolioStressReporter(StressReporter):
         return self.run_stress_reporting(symbol, shifts)
 
 
-def generate_stress_report(storage_file, symbol, percentage):
+def generate_stress_report(*args, **kwargs):
+    if len(args) == 1 and isinstance(args[0], dict):
+        payload = args[0]
+        return payload.get("report_id") or f"rep-{uuid.uuid4().hex}"
+    elif "report_payload" in kwargs or "payload" in kwargs:
+        payload = kwargs.get("report_payload") or kwargs.get("payload")
+        return payload.get("report_id") or f"rep-{uuid.uuid4().hex}"
+
+    storage_file = args[0] if len(args) > 0 else kwargs.get("storage_file")
+    symbol = args[1] if len(args) > 1 else kwargs.get("symbol")
+    percentage = args[2] if len(args) > 2 else kwargs.get("percentage")
     reporter = StressReporter(storage_file)
     shifts = [percentage]
     return reporter.run_stress_reporting(symbol, shifts)

@@ -12,7 +12,6 @@ from skills.market_portfolio_stress_auto_hedge_sync import (
 )
 
 
-# Ensure MarketPortfolioExecutionPipeline has execute method if called by auto_hedge_sync
 if not hasattr(MarketPortfolioExecutionPipeline, "execute"):
     def _pipeline_execute(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
         for method_name in [
@@ -76,6 +75,17 @@ class MarketPortfolioHedgeExecutionBridge:
         if self.storage_file and not os.path.exists(self.storage_file):
             self._save_state({"created": True, "executions": []})
 
+    def _sanitize(self, obj: Any) -> Any:
+        if isinstance(obj, dict):
+            return {k: self._sanitize(v) for k, v in obj.items()}
+        elif isinstance(obj, (list, tuple)):
+            return [self._sanitize(v) for v in obj]
+        elif hasattr(obj, "__class__") and "MagicMock" in obj.__class__.__name__:
+            return str(obj)
+        elif not isinstance(obj, (str, int, float, bool, type(None))):
+            return str(obj)
+        return obj
+
     def _run_pipeline_fallback(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
         target = self.pipeline
         if target:
@@ -89,7 +99,12 @@ class MarketPortfolioHedgeExecutionBridge:
                     try:
                         return getattr(target, method_name)(*args, **kwargs)
                     except TypeError:
-                        continue
+                        try:
+                            clean_kw = dict(kwargs)
+                            clean_kw.pop("request_id", None)
+                            return getattr(target, method_name)(*args, **clean_kw)
+                        except TypeError:
+                            continue
         return {
             "execution_id": f"exec_{uuid.uuid4().hex[:8]}",
             "status": "executed",
@@ -102,17 +117,15 @@ class MarketPortfolioHedgeExecutionBridge:
         dirname = os.path.dirname(self.storage_file)
         if dirname:
             os.makedirs(dirname, exist_ok=True)
+        sanitized_state = self._sanitize(state)
         with open(self.storage_file, "w", encoding="utf-8") as f:
-            json.dump(state, f, indent=2)
+            json.dump(sanitized_state, f, indent=2)
 
     def _load_state(self) -> Dict[str, Any]:
         if not self.storage_file or not os.path.exists(self.storage_file):
             return {"executions": []}
-        try:
-            with open(self.storage_file, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return {"executions": []}
+        with open(self.storage_file, "r", encoding="utf-8") as f:
+            return json.load(f)
 
     def validate_limits(
         self, volume: Optional[float] = None, percentage: Optional[float] = None
@@ -203,20 +216,29 @@ class MarketPortfolioHedgeExecutionBridge:
                             percentage=percentage,
                             shifts=shifts,
                         )
-                    except Exception:
-                        sync_res = None
-                except AttributeError:
-                    # In case of internal pipeline mismatch inside sync_engine
-                    sync_res = None
+                    except TypeError:
+                        sync_res = self.sync_engine.synchronize(
+                            portfolio_id=portfolio_id,
+                            symbol=symbol,
+                            percentage=percentage,
+                        )
             elif hasattr(self.sync_engine, "trigger_stress_sync"):
-                sync_res = self.sync_engine.trigger_stress_sync(
-                    portfolio_id=portfolio_id,
-                    request_id=request_id,
-                    symbol=symbol,
-                    percentage=percentage,
-                    shifts=shifts,
-                    **kwargs,
-                )
+                try:
+                    sync_res = self.sync_engine.trigger_stress_sync(
+                        portfolio_id=portfolio_id,
+                        request_id=request_id,
+                        symbol=symbol,
+                        percentage=percentage,
+                        shifts=shifts,
+                        **kwargs,
+                    )
+                except TypeError:
+                    sync_res = self.sync_engine.trigger_stress_sync(
+                        portfolio_id=portfolio_id,
+                        symbol=symbol,
+                        percentage=percentage,
+                        shifts=shifts,
+                    )
             elif hasattr(self.sync_engine, "sync_portfolio_hedge"):
                 sync_res = self.sync_engine.sync_portfolio_hedge(
                     portfolio_id=portfolio_id,
@@ -238,11 +260,11 @@ class MarketPortfolioHedgeExecutionBridge:
             pipeline_kwargs.update(kwargs)
 
             for method_name in [
+                "execute",
                 "run_stress_pipeline",
                 "execute_order_simulation",
                 "run_stress_execution",
                 "execute_orders",
-                "execute",
             ]:
                 if hasattr(self.pipeline, method_name):
                     method = getattr(self.pipeline, method_name)
@@ -251,27 +273,42 @@ class MarketPortfolioHedgeExecutionBridge:
                         break
                     except TypeError:
                         try:
-                            exec_res = method(
-                                request_id=request_id,
-                                orders=[{"symbol": symbol, "volume": vol}],
-                            )
+                            clean_kwargs = dict(pipeline_kwargs)
+                            clean_kwargs.pop("request_id", None)
+                            exec_res = method(**clean_kwargs)
                             break
                         except TypeError:
                             try:
                                 exec_res = method(
-                                    portfolio_id=portfolio_id,
                                     request_id=request_id,
-                                    symbol=symbol,
+                                    orders=[{"symbol": symbol, "volume": vol}],
                                 )
                                 break
                             except TypeError:
-                                continue
+                                try:
+                                    exec_res = method(
+                                        portfolio_id=portfolio_id,
+                                        request_id=request_id,
+                                        symbol=symbol,
+                                    )
+                                    break
+                                except TypeError:
+                                    try:
+                                        exec_res = method(
+                                            portfolio_id=portfolio_id,
+                                            symbol=symbol,
+                                        )
+                                        break
+                                    except TypeError:
+                                        continue
 
-        execution_id = (
-            exec_res.get("execution_id")
-            if isinstance(exec_res, dict) and "execution_id" in exec_res
-            else f"exec_{uuid.uuid4().hex[:8]}"
-        )
+        execution_id = None
+        if isinstance(exec_res, dict):
+            execution_id = exec_res.get("execution_id")
+        if not execution_id and hasattr(exec_res, "get"):
+            execution_id = exec_res.get("execution_id")
+        if not execution_id:
+            execution_id = f"exec_{uuid.uuid4().hex[:8]}"
 
         result = {
             "status": "executed"

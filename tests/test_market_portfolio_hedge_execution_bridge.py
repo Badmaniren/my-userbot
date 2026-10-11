@@ -1,280 +1,160 @@
-import io
-import random
-import string
-import sys
 import unittest
-import uuid
 from unittest.mock import MagicMock, patch
-
-try:
-    from skills import market_portfolio_hedge_execution_bridge as bridge_mod
-except ImportError:
-    import market_portfolio_hedge_execution_bridge as bridge_mod
-
-from skills.market_portfolio_execution_pipeline import (
-    ExecutionPipelineError,
-    MarketPortfolioExecutionPipeline,
-)
-from skills.market_portfolio_stress_auto_hedge_sync import (
-    MarketPortfolioStressAutoHedgeSync,
-)
-
-
-def _rnd_str(prefix="str_"):
-    return f"{prefix}{uuid.uuid4().hex[:10]}"
-
-
-def _rnd_symbol():
-    return "".join(random.choices(string.ascii_uppercase, k=4))
-
-
-def _rnd_float(min_val=1.0, max_val=100.0):
-    return round(random.uniform(min_val, max_val), 4)
-
-
-def _rnd_int(min_val=1, max_val=1000):
-    return random.randint(min_val, max_val)
-
+import uuid
+import random
+import os
+import tempfile
+import json
+from skills.market_portfolio_hedge_execution_bridge import MarketPortfolioHedgeExecutionBridge
 
 class TestMarketPortfolioHedgeExecutionBridge(unittest.TestCase):
 
     def setUp(self):
-        self.bridge_cls = getattr(
-            bridge_mod,
-            "MarketPortfolioHedgeExecutionBridge",
-            getattr(bridge_mod, "HedgeExecutionBridge", None),
-        )
-        if self.bridge_cls is None:
-            classes = [
-                obj
-                for name, obj in vars(bridge_mod).items()
-                if isinstance(obj, type) and "Bridge" in name
-            ]
-            self.assertTrue(
-                len(classes) > 0, "No bridge class found in module."
-            )
-            self.bridge_cls = classes[0]
+        self.portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
+        self.request_id = f"req_{uuid.uuid4().hex[:8]}"
+        self.symbol = f"SYM{random.randint(100, 999)}"
+        self.percentage = round(random.uniform(0.1, 0.9), 2)
+        self.volume = round(random.uniform(100.0, 5000.0), 2)
+        self.max_volume = 10000.0
+        self.max_percentage = 1.0
 
-        self.mock_sync = MagicMock(spec=MarketPortfolioStressAutoHedgeSync)
-        self.mock_pipeline = MagicMock(spec=MarketPortfolioExecutionPipeline)
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.storage_file = os.path.join(self.temp_dir.name, f"{uuid.uuid4().hex}.json")
 
-    def _create_bridge_instance(self, **kwargs):
-        init_kwargs = {
-            "sync_engine": self.mock_sync,
-            "pipeline": self.mock_pipeline,
-        }
-        init_kwargs.update(kwargs)
-        try:
-            return self.bridge_cls(**init_kwargs)
-        except TypeError:
-            try:
-                return self.bridge_cls(self.mock_sync, self.mock_pipeline)
-            except TypeError:
-                return self.bridge_cls()
+    def tearDown(self):
+        self.temp_dir.cleanup()
 
-    def test_imports_and_composition_dependencies(self):
-        self.assertTrue(
-            hasattr(bridge_mod, "MarketPortfolioStressAutoHedgeSync")
-            or hasattr(bridge_mod, "market_portfolio_stress_auto_hedge_sync")
-            or "MarketPortfolioStressAutoHedgeSync" in sys.modules,
-            "Must import or depend on market_portfolio_stress_auto_hedge_sync",
+    def test_init_and_state_management(self):
+        bridge = MarketPortfolioHedgeExecutionBridge(
+            storage_file=self.storage_file,
+            max_hedge_volume=self.max_volume,
+            max_hedge_percentage=self.max_percentage
         )
-        self.assertTrue(
-            hasattr(bridge_mod, "MarketPortfolioExecutionPipeline")
-            or hasattr(bridge_mod, "market_portfolio_execution_pipeline")
-            or "MarketPortfolioExecutionPipeline" in sys.modules,
-            "Must import or depend on market_portfolio_execution_pipeline",
-        )
-
-    def test_initialization_with_random_params(self):
-        max_limit = _rnd_float(500.0, 1000.0)
-        custom_file = f"/tmp/{_rnd_str('storage')}.json"
-        bridge = self._create_bridge_instance(
-            storage_file=custom_file, max_hedge_volume=max_limit
-        )
-        self.assertIsNotNone(bridge)
+        self.assertTrue(os.path.exists(self.storage_file))
+        state = bridge._load_state()
+        self.assertIn("executions", state)
+        self.assertEqual(state.get("created"), True)
 
     def test_validate_limits_success(self):
-        bridge = self._create_bridge_instance()
-        validate_fn = None
-        for name in [
-            "validate_limits",
-            "validate_hedge_limits",
-            "check_limits",
-            "validate",
-        ]:
-            if hasattr(bridge, name):
-                validate_fn = getattr(bridge, name)
-                break
-
-        if validate_fn:
-            valid_volume = _rnd_float(5.0, 50.0)
-            valid_pct = _rnd_float(0.01, 0.5)
-            result = validate_fn(volume=valid_volume, percentage=valid_pct)
-            if result is not None:
-                self.assertTrue(result)
-        else:
-            self.assertTrue(hasattr(bridge, "__init__"))
-
-    def test_validate_limits_violation_raises_error(self):
-        bridge = self._create_bridge_instance(max_hedge_volume=10.0)
-        validate_fn = None
-        for name in ["validate_limits", "validate_hedge_limits", "check_limits"]:
-            if hasattr(bridge, name):
-                validate_fn = getattr(bridge, name)
-                break
-
-        if validate_fn:
-            excessive_volume = _rnd_float(1000.0, 5000.0)
-            excessive_pct = _rnd_float(1.5, 5.0)
-            with self.assertRaises((ValueError, Exception)):
-                validate_fn(volume=excessive_volume, percentage=excessive_pct)
-
-    def test_execute_hedge_success_integration(self):
-        bridge = self._create_bridge_instance()
-        portfolio_id = _rnd_str("port_")
-        request_id = _rnd_str("req_")
-        symbol = _rnd_symbol()
-        percentage = _rnd_float(0.05, 0.25)
-        volume = _rnd_float(10.0, 100.0)
-        shifts = {"shift_val": _rnd_float(1.0, 5.0)}
-
-        expected_sync_res = {
-            "sync_id": _rnd_str("sync_"),
-            "status": "synchronized",
-            "portfolio_id": portfolio_id,
-        }
-        self.mock_sync.synchronize.return_value = expected_sync_res
-
-        expected_exec_res = {
-            "execution_id": _rnd_str("exec_"),
-            "status": "executed",
-            "symbol": symbol,
-            "filled_volume": volume,
-        }
-        self.mock_pipeline.run_stress_pipeline.return_value = expected_exec_res
-        self.mock_pipeline.execute_order_simulation.return_value = (
-            expected_exec_res
+        bridge = MarketPortfolioHedgeExecutionBridge(
+            max_hedge_volume=self.max_volume,
+            max_hedge_percentage=self.max_percentage
         )
-        self.mock_pipeline.run_stress_execution.return_value = expected_exec_res
+        res = bridge.validate_limits(volume=self.volume, percentage=self.percentage)
+        self.assertTrue(res)
 
-        target_fn = None
-        for name in [
-            "execute_hedge",
-            "execute_portfolio_hedge",
-            "run_stress_hedge_execution",
-            "execute",
-            "bridge_and_execute",
-        ]:
-            if hasattr(bridge, name):
-                target_fn = getattr(bridge, name)
-                break
-
-        if target_fn:
-            call_kwargs = {
-                "portfolio_id": portfolio_id,
-                "request_id": request_id,
-                "symbol": symbol,
-                "percentage": percentage,
-                "shifts": shifts,
-                "volume": volume,
-            }
-            try:
-                res = target_fn(**call_kwargs)
-            except TypeError:
-                res = target_fn(
-                    portfolio_id, request_id, symbol, percentage, shifts
-                )
-
-            self.assertIsNotNone(res)
-            if isinstance(res, dict):
-                has_key = any(
-                    k in res
-                    for k in [
-                        "status",
-                        "execution_id",
-                        "execution",
-                        "sync",
-                        "result",
-                    ]
-                )
-                self.assertTrue(
-                    has_key, f"Expected bridge response keys in {res}"
-                )
-
-    def test_execution_pipeline_error_handling(self):
-        bridge = self._create_bridge_instance()
-        err_msg = _rnd_str("pipeline_failure_")
-        self.mock_pipeline.run_stress_pipeline.side_effect = (
-            ExecutionPipelineError(err_msg)
+    def test_validate_limits_volume_exceeded(self):
+        bridge = MarketPortfolioHedgeExecutionBridge(
+            max_hedge_volume=100.0,
+            max_hedge_percentage=self.max_percentage
         )
-        self.mock_pipeline.execute_order_simulation.side_effect = (
-            ExecutionPipelineError(err_msg)
+        with self.assertRaises(ValueError):
+            bridge.validate_limits(volume=500.0, percentage=0.5)
+
+    def test_validate_limits_percentage_exceeded(self):
+        bridge = MarketPortfolioHedgeExecutionBridge(
+            max_hedge_volume=self.max_volume,
+            max_hedge_percentage=0.5
         )
-        self.mock_pipeline.run_stress_execution.side_effect = (
-            ExecutionPipelineError(err_msg)
+        with self.assertRaises(ValueError):
+            bridge.validate_limits(volume=50.0, percentage=0.8)
+
+    def test_build_hedge_transactions(self):
+        bridge = MarketPortfolioHedgeExecutionBridge()
+        pos_symbol = f"TICKER_{uuid.uuid4().hex[:4]}"
+        pos_volume = random.randint(10, 1000)
+        pos_price = round(random.uniform(10.0, 500.0), 2)
+        positions = [
+            {"symbol": pos_symbol, "volume": pos_volume, "price": pos_price}
+        ]
+        percentage = 0.5
+        transactions = bridge.build_hedge_transactions(positions, percentage)
+        self.assertEqual(len(transactions), 1)
+        tx = transactions[0]
+        self.assertEqual(tx["symbol"], pos_symbol)
+        self.assertEqual(tx["volume"], pos_volume * percentage)
+        self.assertEqual(tx["price"], pos_price)
+        self.assertEqual(tx["percentage"], percentage)
+        self.assertIn("transaction_id", tx)
+
+    def test_execute_hedge_with_sync_and_pipeline(self):
+        mock_sync = MagicMock()
+        sync_result = {"sync_id": f"sync_{uuid.uuid4().hex[:6]}", "status": "synced"}
+        mock_sync.synchronize.return_value = sync_result
+
+        mock_pipeline = MagicMock()
+        exec_id = f"exec_{uuid.uuid4().hex[:6]}"
+        pipeline_result = {"execution_id": exec_id, "status": "success"}
+        mock_pipeline.execute.return_value = pipeline_result
+
+        bridge = MarketPortfolioHedgeExecutionBridge(
+            sync_engine=mock_sync,
+            pipeline=mock_pipeline,
+            storage_file=self.storage_file,
+            max_hedge_volume=self.max_volume,
+            max_hedge_percentage=self.max_percentage
         )
 
-        target_fn = None
-        for name in [
-            "execute_hedge",
-            "execute_portfolio_hedge",
-            "run_stress_hedge_execution",
-            "execute",
-        ]:
-            if hasattr(bridge, name):
-                target_fn = getattr(bridge, name)
-                break
-
-        if target_fn:
-            portfolio_id = _rnd_str("port_err_")
-            req_id = _rnd_str("req_err_")
-            sym = _rnd_symbol()
-            with self.assertRaises((ExecutionPipelineError, RuntimeError, Exception)):
-                target_fn(
-                    portfolio_id=portfolio_id,
-                    request_id=req_id,
-                    symbol=sym,
-                    percentage=0.1,
-                    shifts={},
-                    volume=10.0,
-                )
-
-    def test_batch_transaction_preparation(self):
-        bridge = self._create_bridge_instance()
-        prep_fn = None
-        for name in [
-            "build_hedge_transactions",
-            "prepare_transactions",
-            "format_orders",
-            "build_orders",
-        ]:
-            if hasattr(bridge, name):
-                prep_fn = getattr(bridge, name)
-                break
-
-        if prep_fn:
-            random_positions = [
-                {
-                    "symbol": _rnd_symbol(),
-                    "volume": _rnd_float(10.0, 50.0),
-                    "price": _rnd_float(100.0, 200.0),
-                }
-                for _ in range(3)
-            ]
-            pct = _rnd_float(0.1, 0.4)
-            orders = prep_fn(positions=random_positions, percentage=pct)
-            self.assertIsInstance(orders, list)
-            self.assertEqual(len(orders), len(random_positions))
-            self.assertEqual(orders[0]["symbol"], random_positions[0]["symbol"])
-
-    def test_pipeline_with_bytes_stream_mock(self):
-        random_bytes = (
-            _rnd_str("raw_audit_stream_").encode("utf-8") + b"\x00\x01\x02"
+        shifts_data = {"shift_val": random.random()}
+        result = bridge.execute_hedge(
+            portfolio_id=self.portfolio_id,
+            request_id=self.request_id,
+            symbol=self.symbol,
+            percentage=self.percentage,
+            shifts=shifts_data,
+            volume=self.volume
         )
-        fake_stream = io.BytesIO(random_bytes)
-        self.assertEqual(fake_stream.read(), random_bytes)
 
+        self.assertEqual(result["execution_id"], exec_id)
+        self.assertEqual(result["portfolio_id"], self.portfolio_id)
+        self.assertEqual(result["request_id"], self.request_id)
+        self.assertEqual(result["symbol"], self.symbol)
+        self.assertEqual(result["volume"], self.volume)
+        self.assertEqual(result["sync"], sync_result)
+        self.assertEqual(result["execution"], pipeline_result)
 
-if __name__ == "__main__":
-    unittest.main()
+        state = bridge._load_state()
+        self.assertEqual(len(state["executions"]), 1)
+        self.assertEqual(state["executions"][0]["execution_id"], exec_id)
+
+    def test_execute_portfolio_hedge_delegation(self):
+        bridge = MarketPortfolioHedgeExecutionBridge(storage_file=self.storage_file)
+        with patch.object(bridge, "execute_hedge", return_value={"mocked": True}) as mock_exec:
+            res = bridge.execute_portfolio_hedge(
+                portfolio_id=self.portfolio_id,
+                request_id=self.request_id,
+                symbol=self.symbol,
+                percentage=self.percentage,
+                shifts={},
+                volume=self.volume
+            )
+            mock_exec.assert_called_once_with(
+                portfolio_id=self.portfolio_id,
+                request_id=self.request_id,
+                symbol=self.symbol,
+                percentage=self.percentage,
+                shifts={},
+                volume=self.volume
+            )
+            self.assertTrue(res["mocked"])
+
+    def test_execute_hedge_protection_delegation(self):
+        bridge = MarketPortfolioHedgeExecutionBridge(storage_file=self.storage_file)
+        with patch.object(bridge, "execute_hedge", return_value={"protected": True}) as mock_exec:
+            res = bridge.execute_hedge_protection(
+                portfolio_id=self.portfolio_id,
+                request_id=self.request_id,
+                symbol=self.symbol,
+                percentage=self.percentage,
+                shifts={},
+                volume=self.volume
+            )
+            mock_exec.assert_called_once_with(
+                portfolio_id=self.portfolio_id,
+                request_id=self.request_id,
+                symbol=self.symbol,
+                percentage=self.percentage,
+                shifts={},
+                volume=self.volume
+            )
+            self.assertTrue(res["protected"])

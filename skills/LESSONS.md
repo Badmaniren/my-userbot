@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-яя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_stress_ml_anomaly_scoring_engine (create) — раундов: 4
+ortfolio_stress_ml_anomaly_scoring_engine (create) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено создавать классы-заглушки внутри `except ImportError:`! Импортируй честно, пусть падает, если модуля нет.
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
@@ -286,3 +283,6 @@
 ## market_portfolio_stress_backtest_runner (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_backtester (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

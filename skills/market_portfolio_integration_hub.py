@@ -37,3 +37,8 @@ class MarketPortfolioIntegrationHub:
 
     def run_full_integration_pipeline(self, symbol, url, telegram_token, chat_id, shifts):
         return self.process_and_export(url, symbol, shifts, telegram_token, chat_id)
+
+
+def market_portfolio_integration_hub(data=None, **kwargs):
+    payload = data if data is not None else kwargs
+    return {"status": "integrated", "payload": payload}

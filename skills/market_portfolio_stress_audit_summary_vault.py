@@ -59,6 +59,20 @@ start_neos = start_new
 market_portfolio_stress_audit_summary_vault_start = start_new
 
 
+def market_portfolio_stress_audit_summary_vault(audit_data=None, storage_target=None, **kwargs):
+    """
+    Основной точку входа / callable модуль для обработки и сохранения данных стресс-аудита.
+    """
+    if audit_data is None:
+        audit_data = kwargs.get("payload") or kwargs.get("audit_data") or {}
+
+    if storage_target is None:
+        run_id = audit_data.get("run_id") or audit_data.get("audit_id") or "default"
+        storage_target = f"/tmp/{run_id}_vault.json"
+
+    return market_portfolio_stress_audit_summary_vault_process(storage_target, audit_data)
+
+
 def market_portfolio_stress_audit_summary_vault_process(storage_target, audit_data):
     """
     Сохраняет данные аудита в целевой файл.

@@ -52,7 +52,7 @@ def market_portfolio_stress_audit_summary_vault_main(payload: dict) -> dict:
     portfolio_id = payload.get("portfolio_id")
     stress_factor = payload.get("stress_factor")
     
-    export_path = f"/tmp/{run_id}.json"
+    export_path = payload.get("destination") or f"/tmp/{run_id}.json"
     
     report_data = {
         "run_id": run_id,
@@ -61,6 +61,10 @@ def market_portfolio_stress_audit_summary_vault_main(payload: dict) -> dict:
         "status": "success"
     }
     
+    dirname = os.path.dirname(export_path)
+    if dirname:
+        os.makedirs(dirname, exist_ok=True)
+
     with open(export_path, "w", encoding="utf-8") as f:
         json.dump(report_data, f)
         
@@ -74,3 +78,6 @@ def market_portfolio_stress_audit_summary_vault_main(payload: dict) -> dict:
 
 def market_portfolio_stress_audit_exporter_v2_main(payload: dict) -> dict:
     return market_portfolio_stress_audit_summary_vault_main(payload)
+
+
+market_portfolio_stress_audit_exporter_v2 = market_portfolio_stress_audit_exporter_v2_main

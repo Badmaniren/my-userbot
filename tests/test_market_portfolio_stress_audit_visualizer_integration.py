@@ -1,49 +1,55 @@
 import unittest
 import uuid
 import random
-from skills.market_portfolio_stress_audit_visualizer import MarketPortfolioStressAuditVisualizer
-
+from skills.market_portfolio_stress_audit_visualizer import MarketPortfolioStressAuditVisualizer, market_portfolio_stress_audit_visualizer
 
 class TestMarketPortfolioStressAuditVisualizerIntegration(unittest.TestCase):
-    def test_visualizer_integration_flow(self):
-        portfolio_id = f"port-{uuid.uuid4()}"
-        adaptive_score = round(random.uniform(10.0, 99.9), 2)
-        tail_risk_metric = round(random.uniform(0.01, 0.99), 4)
+    def setUp(self):
+        self.portfolio_id = str(uuid.uuid4())
+        self.adaptive_risk_score = round(random.uniform(1.0, 100.0), 2)
+        self.visualizer = MarketPortfolioStressAuditVisualizer()
 
-        payload_summary = {
-            "portfolio_id": portfolio_id,
+    def test_visualize_text_summary_integration(self):
+        payload = {
+            "portfolio_id": self.portfolio_id,
             "format": "text_summary",
-            "adaptive_risk_score": adaptive_score,
+            "adaptive_risk_score": self.adaptive_risk_score,
             "export_to_text_report": True
         }
-
-        visualizer = MarketPortfolioStressAuditVisualizer(db_storage=None)
         
-        result_summary = visualizer.visualize(payload_summary)
+        result = self.visualizer.visualize(payload)
         
-        self.assertIsInstance(result_summary, str)
-        self.assertIn(portfolio_id, result_summary)
-        self.assertIn(str(adaptive_score), result_summary)
-        self.assertIn("Exported to text report successfully.", result_summary)
+        self.assertIsInstance(result, str)
+        self.assertIn(self.portfolio_id, result)
+        self.assertIn(str(self.adaptive_risk_score), result)
+        self.assertIn("Exported to text report successfully.", result)
 
-        payload_graphical = {
-            "report_id": portfolio_id,
+    def test_visualize_graphical_format_integration(self):
+        tail_metric_val = random.randint(10, 500)
+        payload = {
+            "report_id": self.portfolio_id,
             "format": "graphical",
-            "adaptive_risk_score": adaptive_score,
-            "tail_risk_metrics": {"var_95": tail_risk_metric},
+            "adaptive_risk_score": self.adaptive_risk_score,
+            "tail_risk_metrics": {"var_95": tail_metric_val},
             "stream_payload": {"active": True}
         }
+        
+        result = market_portfolio_stress_audit_visualizer(payload)
+        
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("portfolio_id"), self.portfolio_id)
+        self.assertEqual(result.get("status"), "success")
+        self.assertEqual(result.get("layout"), "graphical")
+        self.assertEqual(result.get("adaptive_risk_score"), self.adaptive_risk_score)
+        self.assertEqual(result.get("tail_risk_metrics"), {"var_95": tail_metric_val})
+        self.assertEqual(result.get("stream_payload"), {"active": True})
 
-        result_graphical = visualizer.visualize(payload_graphical)
-
-        self.assertIsInstance(result_graphical, dict)
-        self.assertEqual(result_graphical.get("portfolio_id"), portfolio_id)
-        self.assertEqual(result_graphical.get("status"), "success")
-        self.assertEqual(result_graphical.get("layout"), "graphical")
-        self.assertEqual(result_graphical.get("adaptive_risk_score"), adaptive_score)
-        self.assertEqual(result_graphical.get("tail_risk_metrics"), {"var_95": tail_risk_metric})
-        self.assertEqual(result_graphical.get("stream_payload"), {"active": True})
-
+    def test_invalid_payload_handling(self):
+        random_string_payload = f"invalid_payload_{uuid.uuid4()}"
+        result = market_portfolio_stress_audit_visualizer(random_string_payload)
+        
+        self.assertIsInstance(result, str)
+        self.assertEqual(result, random_string_payload)
 
 if __name__ == "__main__":
     unittest.main()

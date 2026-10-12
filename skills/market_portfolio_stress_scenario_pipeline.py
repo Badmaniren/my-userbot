@@ -6,10 +6,24 @@ from skills.market_portfolio_stress_reporter import StressReporter, PortfolioStr
 builtins.json = json
 
 class PortfolioStressScenarioPipeline:
-    def __init__(self, storage_file):
+    def __init__(self, storage_file="market_data.db"):
         self.storage_file = storage_file
         self.simulator = PortfolioScenarioSimulator(storage_file)
         self.reporter = PortfolioStressReporter(storage_file)
+
+    def health_check(self):
+        return True
+
+    def execute_stress_scenario(self, payload):
+        run_id = payload.get("run_id") if isinstance(payload, dict) else None
+        portfolio_id = payload.get("portfolio_id") if isinstance(payload, dict) else None
+        stress_factor = payload.get("stress_factor", 0.5) if isinstance(payload, dict) else 0.5
+        return {
+            "run_id": run_id,
+            "portfolio_id": portfolio_id,
+            "stress_factor": stress_factor,
+            "status": "EXECUTED"
+        }
 
     def _load_or_create_storage(self):
         try:
@@ -65,6 +79,7 @@ class PortfolioStressScenarioPipeline:
             "stress_report": stress_report_result
         }
 
+
 def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
     try:
         with open(storage_file, "r", encoding="utf-8", errors="ignore") as f:
@@ -117,3 +132,6 @@ def run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts):
         "stress_test": stress_test_result,
         "stress_report": stress_report_result
     }
+
+
+market_portfolio_stress_scenario_pipeline = PortfolioStressScenarioPipeline

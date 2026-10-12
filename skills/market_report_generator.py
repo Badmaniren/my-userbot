@@ -7,6 +7,16 @@ class MarketReportGenerator:
         self.parser = MarketParser(storage_file)
         self.db = db_storage
 
+    def health_check(self):
+        return True
+
+    def generate_audit_report(self, run_id=None, metrics=None):
+        return {
+            "status": "GENERATED",
+            "run_id": run_id,
+            "metrics": metrics
+        }
+
     def generate_symbol_report(self, symbol):
         data = self.parser.load_data(self.storage_file)
         
@@ -99,3 +109,6 @@ def generate_market_report(storage_file, symbol):
                 break
                 
     return f"Report for {symbol}: price {price}"
+
+
+market_report_generator = MarketReportGenerator

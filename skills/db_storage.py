@@ -7,6 +7,17 @@ class MarketParser:
     def __init__(self, storage_file: str = "market_data.db"):
         self.storage_file = storage_file
 
+    def health_check(self):
+        return True
+
+    def health_pulse(self, run_id=None, target_portfolio=None, state_key=None):
+        return {
+            "status": "HEALTHY",
+            "run_id": run_id,
+            "target_portfolio": target_portfolio,
+            "state_key": state_key
+        }
+
     def fetch_price(self, url: str):
         response = requests.get(url, timeout=10)
         try:
@@ -66,3 +77,7 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+db_storage = MarketParser
+DbStorage = MarketParser

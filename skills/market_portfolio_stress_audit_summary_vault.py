@@ -19,11 +19,11 @@ def start_new(**kwargs):
     """
     logger.info("Starting new stress audit summary vault process.")
     db_storage = kwargs.get("db_storage")
-    
+
     if db_storage is None:
         logger.error("db_storage is required and cannot be None.")
         raise ValueError("db_storage is required and cannot be None.")
-    
+
     # Выполнение зависимостей без подавления исключений
     for key, val in kwargs.items():
         if hasattr(val, "extract"):
@@ -69,10 +69,48 @@ def market_portfolio_stress_audit_summary_vault_process(storage_target, audit_da
     if not isinstance(audit_data, dict):
         logger.error("audit_data must be a dictionary.")
         raise TypeError("audit_data must be a dictionary")
-    
+
     dirname = os.path.dirname(storage_target)
     if dirname:
         os.makedirs(dirname, exist_ok=True)
-    
+
     with open(storage_target, "w", encoding="utf-8") as f:
-        json.dump
+        json.dump(audit_data, f, indent=2, sort_keys=True)
+
+    audit_id = audit_data.get("audit_id")
+    return {"status": "saved", "audit_id": audit_id}
+
+
+def market_portfolio_stress_audit_summary_vault_validate(file_path, expected_audit_id):
+    """
+    Проверяет валидность JSON-файла и совпадение audit_id.
+    """
+    if not os.path.exists(file_path):
+        return False
+
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError):
+        return False
+
+    if not isinstance(data, dict):
+        return False
+
+    return data.get("audit_id") == expected_audit_id
+
+
+def market_portfolio_stress_audit_summary_vault_export(file_path, format="json"):
+    """
+    Экспортирует данные стресс-аудита из файла.
+    """
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"File not found: {file_path}")
+
+    with open(file_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    return {
+        "format": format,
+        "data": data
+    }

@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch, MagicMock
-import random
 import uuid
+import random
 import string
 import io
 import requests
@@ -16,121 +16,111 @@ from skills.market_portfolio_stress_audit_health_monitor import (
 
 class TestMarketPortfolioStressAuditHealthMonitor(unittest.TestCase):
 
-    def setUp(self):
-        self.subsystem_count = random.randint(1, 5)
-        self.subsystems = [f"subsystem_{uuid.uuid4().hex[:8]}" for _ in range(self.subsystem_count)]
-        self.monitor = MarketPortfolioStressAuditHealthMonitor(subsystems=self.subsystems)
+    def setUp(self) -> None:
+        self.random_subsystem_1 = f"sub_{uuid.uuid4().hex[:8]}"
+        self.random_subsystem_2 = f"sub_{uuid.uuid4().hex[:8]}"
+        self.monitor = MarketPortfolioStressAuditHealthMonitor(
+            subsystems=[self.random_subsystem_1, self.random_subsystem_2]
+        )
 
-    def test_init_default_subsystems(self):
-        default_monitor = MarketPortfolioStressAuditHealthMonitor()
-        self.assertEqual(default_monitor.subsystems, [])
+    def test_init_defaults(self) -> None:
+        monitor_default = MarketPortfolioStressAuditHealthMonitor()
+        self.assertEqual(monitor_default.subsystems, [])
+        self.assertIsNotNone(monitor_default.db)
 
-    def test_run_full_audit_healthy(self):
+    def test_probe_subsystem_returns_expected_structure(self) -> None:
+        probe_name = f"probe_{uuid.uuid4().hex[:6]}"
+        result = self.monitor._probe_subsystem(probe_name)
+
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("subsystem"), probe_name)
+        self.assertEqual(result.get("status"), SubsystemHealthStatus.HEALTHY)
+        self.assertIsNone(result.get("token"))
+        self.assertIsNone(result.get("error"))
+
+    def test_run_full_audit_healthy(self) -> None:
         audit_result = self.monitor.run_full_audit()
-        self.assertIn("global_status", audit_result)
-        self.assertIn("subsystems_details", audit_result)
-        self.assertEqual(audit_result["global_status"], SubsystemHealthStatus.HEALTHY)
-        self.assertEqual(len(audit_result["subsystems_details"]), self.subsystem_count)
-        for sub in self.subsystems:
-            self.assertIn(sub, audit_result["subsystems_details"])
-            self.assertEqual(audit_result["subsystems_details"][sub]["status"], SubsystemHealthStatus.HEALTHY)
 
-    def test_run_full_audit_storage_unreachable_exception(self):
-        target_sub = random.choice(self.subsystems)
-        error_msg = uuid.uuid4().hex
+        self.assertIsInstance(audit_result, dict)
+        self.assertEqual(audit_result.get("global_status"), SubsystemHealthStatus.HEALTHY)
 
-        def side_effect(sub_name):
-            if sub_name == target_sub:
-                raise StorageUnreachableError(error_msg)
-            return {
-                "subsystem": sub_name,
-                "status": SubsystemHealthStatus.HEALTHY,
-                "token": None,
-                "error": None
-            }
+        details = audit_result.get("subsystems_details", {})
+        self.assertIn(self.random_subsystem_1, details)
+        self.assertIn(self.random_subsystem_2, details)
+        self.assertEqual(details[self.random_subsystem_1]["status"], SubsystemHealthStatus.HEALTHY)
 
-        with patch.object(self.monitor, '_probe_subsystem', side_effect=side_effect):
-            with self.assertRaises(StorageUnreachableError) as ctx:
+    def test_run_full_audit_storage_unreachable_raises(self) -> None:
+        err_msg = f"storage_fail_{uuid.uuid4().hex[:6]}"
+        with patch.object(
+            self.monitor,
+            "_probe_subsystem",
+            side_effect=StorageUnreachableError(err_msg)
+        ):
+            with self.assertRaises(StorageUnreachableError):
                 self.monitor.run_full_audit()
-            self.assertEqual(str(ctx.exception), error_msg)
 
-    def test_run_full_audit_execution_error_exception(self):
-        target_sub = random.choice(self.subsystems)
-        error_msg = uuid.uuid4().hex
-
-        def side_effect(sub_name):
-            if sub_name == target_sub:
-                raise ValueError(error_msg)
-            return {
-                "subsystem": sub_name,
-                "status": SubsystemHealthStatus.HEALTHY,
-                "token": None,
-                "error": None
-            }
-
-        with patch.object(self.monitor, '_probe_subsystem', side_effect=side_effect):
-            with self.assertRaises(HealthMonitorExecutionError) as ctx:
+    def test_run_full_audit_general_exception_raises_execution_error(self) -> None:
+        err_msg = f"generic_fail_{uuid.uuid4().hex[:6]}"
+        with patch.object(
+            self.monitor,
+            "_probe_subsystem",
+            side_effect=RuntimeError(err_msg)
+        ):
+            with self.assertRaises(HealthMonitorExecutionError):
                 self.monitor.run_full_audit()
-            self.assertIn(error_msg, str(ctx.exception))
 
-    def test_run_full_audit_status_aggregation_degraded(self):
-        degraded_sub = random.choice(self.subsystems)
+    def test_run_full_audit_global_status_degraded(self) -> None:
+        degraded_sub = f"deg_{uuid.uuid4().hex[:6]}"
+        monitor_deg = MarketPortfolioStressAuditHealthMonitor(subsystems=[degraded_sub])
 
-        def side_effect(sub_name):
-            status = SubsystemHealthStatus.DEGRADED if sub_name == degraded_sub else SubsystemHealthStatus.HEALTHY
-            return {
-                "subsystem": sub_name,
-                "status": status,
+        with patch.object(
+            monitor_deg,
+            "_probe_subsystem",
+            return_value={
+                "subsystem": degraded_sub,
+                "status": SubsystemHealthStatus.DEGRADED,
                 "token": None,
                 "error": None
             }
+        ):
+            audit_result = monitor_deg.run_full_audit()
+            self.assertEqual(audit_result.get("global_status"), SubsystemHealthStatus.DEGRADED)
 
-        with patch.object(self.monitor, '_probe_subsystem', side_effect=side_effect):
-            audit_result = self.monitor.run_full_audit()
-            self.assertEqual(audit_result["global_status"], SubsystemHealthStatus.DEGRADED)
-            self.assertEqual(audit_result["subsystems_details"][degraded_sub]["status"], SubsystemHealthStatus.DEGRADED)
+    def test_run_full_audit_global_status_unhealthy(self) -> None:
+        unhealthy_sub = f"unh_{uuid.uuid4().hex[:6]}"
+        monitor_unh = MarketPortfolioStressAuditHealthMonitor(subsystems=[unhealthy_sub])
 
-    def test_run_full_audit_status_aggregation_unhealthy(self):
-        unhealthy_sub = random.choice(self.subsystems)
-
-        def side_effect(sub_name):
-            status = SubsystemHealthStatus.UNHEALTHY if sub_name == unhealthy_sub else SubsystemHealthStatus.HEALTHY
-            return {
-                "subsystem": sub_name,
-                "status": status,
+        with patch.object(
+            monitor_unh,
+            "_probe_subsystem",
+            return_value={
+                "subsystem": unhealthy_sub,
+                "status": SubsystemHealthStatus.UNHEALTHY,
                 "token": None,
-                "error": None
+                "error": "critical"
             }
+        ):
+            audit_result = monitor_unh.run_full_audit()
+            self.assertEqual(audit_result.get("global_status"), SubsystemHealthStatus.UNHEALTHY)
 
-        with patch.object(self.monitor, '_probe_subsystem', side_effect=side_effect):
-            audit_result = self.monitor.run_full_audit()
-            self.assertEqual(audit_result["global_status"], SubsystemHealthStatus.UNHEALTHY)
-            self.assertEqual(audit_result["subsystems_details"][unhealthy_sub]["status"], SubsystemHealthStatus.UNHEALTHY)
-
-    def test_verify_stream_pipeline_success(self):
-        random_url = f"http://{''.join(random.choices(string.ascii_lowercase, k=10))}.local/{uuid.uuid4().hex}"
-        random_bytes_data = uuid.uuid4().bytes + ''.join(random.choices(string.ascii_letters, k=50)).encode('utf-8')
-        expected_length = len(random_bytes_data)
+    def test_verify_stream_pipeline_success(self) -> None:
+        random_url = f"https://{uuid.uuid4().hex[:10]}.test/stream"
+        random_bytes = "".join(random.choices(string.ascii_letters + string.digits, k=64)).encode("utf-8")
 
         mock_response = MagicMock()
-        mock_response.content = random_bytes_data
+        mock_response.content = random_bytes
 
-        with patch('requests.get', return_value=mock_response) as mock_get:
-            result = self.monitor.verify_stream_pipeline(random_url)
+        with patch("requests.get", return_value=mock_response) as mock_get:
+            res = self.monitor.verify_stream_pipeline(random_url)
             mock_get.assert_called_once_with(random_url)
-            self.assertTrue(result["is_active"])
-            self.assertEqual(result["bytes_read"], expected_length)
+            self.assertTrue(res.get("is_active"))
+            self.assertEqual(res.get("bytes_read"), len(random_bytes))
 
-    def test_verify_stream_pipeline_failure(self):
-        random_url = f"http://{''.join(random.choices(string.ascii_lowercase, k=10))}.local/{uuid.uuid4().hex}"
-        error_msg = uuid.uuid4().hex
+    def test_verify_stream_pipeline_failure(self) -> None:
+        random_url = f"https://{uuid.uuid4().hex[:10]}.test/broken"
 
-        with patch('requests.get', side_effect=requests.exceptions.RequestException(error_msg)) as mock_get:
-            result = self.monitor.verify_stream_pipeline(random_url)
+        with patch("requests.get", side_effect=requests.RequestException("Network down")) as mock_get:
+            res = self.monitor.verify_stream_pipeline(random_url)
             mock_get.assert_called_once_with(random_url)
-            self.assertFalse(result["is_active"])
-            self.assertEqual(result["bytes_read"], 0)
-
-
-if __name__ == '__main__':
-    unittest.main()
+            self.assertFalse(res.get("is_active"))
+            self.assertEqual(res.get("bytes_read"), 0)

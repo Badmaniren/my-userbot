@@ -3,129 +3,66 @@ import uuid
 import random
 import os
 from skills.market_portfolio_stress_audit_health_monitor import (
+    MarketPortfolioStressAuditHealthMonitor,
+    SubsystemHealthStatus,
+    HealthMonitorExecutionError,
     db_storage,
-    extractor_tool_1790087207,
-    extractor_tool_1790102839,
-    extractor_tool_1790262909,
-    extractor_tool_1790621808,
-    market_anomaly_detector,
-    market_insider_activity_tracker,
-    market_insider_alert_pipeline,
-    market_insider_anomaly_analyzer,
-    market_insider_anomaly_report_bridge,
-    market_news_sentiment_analyzer,
-    market_parser,
-    market_portfolio_alert_dispatcher,
-    market_portfolio_alert_event_sink,
-    market_portfolio_alert_filter_router,
-    market_portfolio_api_gateway,
-    market_portfolio_audit_alert_notifier,
-    market_portfolio_audit_compliance_hub,
-    market_portfolio_audit_log_exporter,
-    market_portfolio_autonomous_sentinel,
-    market_portfolio_backtest_evaluator_bridge,
-    market_portfolio_backtester,
-    market_portfolio_collector_agent,
-    market_portfolio_data_exporter,
-    market_portfolio_digest,
-    market_portfolio_dividend_tracker,
-    market_portfolio_event_intelligence_hub,
-    market_portfolio_execution_cost_optimizer,
-    market_portfolio_execution_pipeline,
-    market_portfolio_hedge_execution_bridge,
-    market_portfolio_integration_hub,
-    market_portfolio_integration_validation_bridge,
-    market_portfolio_liquidity_scenario_analyzer,
-    market_portfolio_ml_feature_builder,
-    market_portfolio_ml_stress_adaptive_allocator,
-    market_portfolio_ml_stress_evaluator,
     market_portfolio_monitor,
-    market_portfolio_net_dividend_calculator,
-    market_portfolio_net_yield_evaluator,
-    market_portfolio_performance_analytics,
-    market_portfolio_predictive_aggregator,
-    market_portfolio_predictive_var_engine,
-    market_portfolio_predictive_var_hedge_synthesizer,
-    market_portfolio_realtime_anomaly_reactor_bridge,
-    market_portfolio_realtime_stream_alert_sink,
-    market_portfolio_realtime_stream_analytics_hub,
-    market_portfolio_realtime_stream_dashboard_bridge,
-    market_portfolio_realtime_stream_ingestor,
-    market_portfolio_scenario_simulator,
-    market_portfolio_slippage_model,
-    market_portfolio_strategy_optimizer,
-    market_portfolio_stress_alert_dashboard_bridge,
-    market_portfolio_stress_alert_emitter,
-    market_portfolio_stress_audit_exporter_v2,
-    market_portfolio_stress_audit_realtime_streamer,
-    market_portfolio_stress_audit_scheduler_hub,
-    market_portfolio_stress_audit_summary_vault,
-    market_portfolio_stress_audit_visualizer,
-    market_portfolio_stress_auto_hedge_sync,
-    market_portfolio_stress_auto_rebalance_trigger,
-    market_portfolio_stress_hedge_advisor,
-    market_portfolio_stress_ml_volatility_forecaster_v2,
-    market_portfolio_stress_monte_carlo_engine,
-    market_portfolio_stress_recovery_coordinator_bridge,
-    market_portfolio_stress_reporter,
-    market_portfolio_stress_scenario_executor_bridge,
-    market_portfolio_stress_scenario_matrix_evaluator,
-    market_portfolio_stress_scenario_pipeline,
-    market_portfolio_tax_calculator,
-    market_portfolio_telegram_command_center,
-    market_portfolio_telegram_notifier,
-    market_portfolio_valuation,
-    market_portfolio_var_liquidity_core,
-    market_portfolio_visualizer_v2,
-    market_portfolio_webhook_event_logger,
-    market_portfolio_webhook_sync,
-    market_report_generator,
-    market_sentiment_digest,
-    market_sentiment_risk_alert_bridge,
-    market_sentiment_risk_hub,
-    market_sentiment_telegram_publisher,
-    market_telegram_pipeline
+    market_portfolio_stress_scenario_pipeline
 )
 
 class TestMarketPortfolioStressAuditHealthMonitorIntegration(unittest.TestCase):
 
-    def test_end_to_end_health_monitor_pipeline(self):
-        unique_audit_id = str(uuid.uuid4())
-        random_threshold = random.uniform(0.01, 0.99)
-        test_payload = {
-            "audit_id": unique_audit_id,
-            "threshold": random_threshold,
-            "subsystems": [
-                "db_storage", 
-                "market_portfolio_monitor", 
-                "market_portfolio_stress_monte_carlo_engine"
-            ]
-        }
+    def setUp(self):
+        self.test_subsystems = [
+            f"db_storage_{uuid.uuid4().hex[:8]}",
+            f"market_portfolio_monitor_{uuid.uuid4().hex[:8]}",
+            f"market_portfolio_stress_scenario_pipeline_{uuid.uuid4().hex[:8]}"
+        ]
+        self.monitor = MarketPortfolioStressAuditHealthMonitor(subsystems=self.test_subsystems)
 
-        db_init_res = db_storage(test_payload)
-        self.assertIsNotNone(db_init_res)
-
-        monitor_res = market_portfolio_monitor(test_payload)
-        self.assertIsNotNone(monitor_res)
-
-        monte_carlo_res = market_portfolio_stress_monte_carlo_engine(test_payload)
-        self.assertIsNotNone(monte_carlo_res)
-
-        vault_res = market_portfolio_stress_audit_summary_vault(test_payload)
-        self.assertIsNotNone(vault_res)
-
-        exporter_res = market_portfolio_stress_audit_exporter_v2(test_payload)
-        self.assertIsNotNone(exporter_res)
-
-        if isinstance(exporter_res, dict) and "file_path" in exporter_res:
-            self.assertTrue(os.path.exists(exporter_res["file_path"]))
-
-        visualizer_res = market_portfolio_stress_audit_visualizer(test_payload)
-        self.assertIsNotNone(visualizer_res)
-
-        alert_res = market_portfolio_stress_alert_ emitter(test_payload) if hasattr(market_portfolio_stress_alert_emitter, '__call__') else None
+    def test_run_full_audit_real_execution(self):
+        audit_result = self.monitor.run_full_audit()
         
-        self.assertTrue(True)
+        self.assertIn("global_status", audit_result)
+        self.assertIn("subsystems_details", audit_result)
+        
+        self.assertEqual(audit_result["global_status"], SubsystemHealthStatus.HEALTHY)
+        
+        details = audit_result["subsystems_details"]
+        for sub in self.test_subsystems:
+            self.assertIn(sub, details)
+            self.assertEqual(details[sub]["subsystem"], sub)
+            self.assertEqual(details[sub]["status"], SubsystemHealthStatus.HEALTHY)
+
+    def test_dynamic_module_attributes_integration(self):
+        random_payload = {
+            "test_id": str(uuid.uuid4()),
+            "metric_value": random.uniform(10.0, 1000.0)
+        }
+        
+        db_result = db_storage(random_payload)
+        self.assertEqual(db_result["status"], "ok")
+        self.assertEqual(db_result["payload"]["test_id"], random_payload["test_id"])
+        self.assertEqual(db_result["payload"]["metric_value"], random_payload["metric_value"])
+
+        monitor_result = market_portfolio_monitor(random_payload)
+        self.assertEqual(monitor_result["status"], "ok")
+        self.assertEqual(monitor_result["payload"], random_payload)
+
+        pipeline_result = market_portfolio_stress_scenario_pipeline(random_payload)
+        self.assertEqual(pipeline_result["status"], "ok")
+
+    def test_verify_stream_pipeline_invalid_target(self):
+        random_port = random.randint(10000, 65535)
+        invalid_target = f"http://localhost:{random_port}/{uuid.uuid4().hex}"
+        
+        stream_status = self.monitor.verify_stream_pipeline(invalid_target)
+        
+        self.assertIn("is_active", stream_status)
+        self.assertIn("bytes_read", stream_status)
+        self.assertFalse(stream_status["is_active"])
+        self.assertEqual(stream_status["bytes_read"], 0)
 
 if __name__ == "__main__":
     unittest.main()

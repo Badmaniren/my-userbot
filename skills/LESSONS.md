@@ -3,8 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-1.17/x64/lib/python3.11/site-packages/urllib3/connectionpool.py", line 1125, in _validate_conn
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+й, передан на эскалацию
 
 ## market_portfolio_predictive_var_stress_bridge_v2 (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
@@ -300,3 +299,6 @@
 ## market_portfolio_stress_audit_health_monitor (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_audit_health_monitor (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

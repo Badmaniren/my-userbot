@@ -3,7 +3,15 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-userbot/skills/market_portfolio_stress_scenario_pipeline.py", line 26, in execute
+1)
+- Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_predictive_var_stress_execution_nexus (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_predictive_var_hedge_synthesizer (refactor) — раундов: 2
+- Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/skills/market_portfolio_stress_scenario_pipeline.py", line 26, in execute
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_predictive_var_hedge_synthesizer (refactor) — раундов: 1
@@ -300,8 +308,3 @@ userbot/skills/market_portfolio_stress_scenario_pipeline.py", line 26, in execut
 - Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_resilience_optimizer (refactor) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 1)
-- Последняя ошибка перед фиксом: ======================================================================
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

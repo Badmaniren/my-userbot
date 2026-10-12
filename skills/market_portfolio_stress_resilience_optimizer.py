@@ -1,10 +1,30 @@
 import uuid
 import random
 
-from skills import db_storage
-from skills import market_portfolio_stress_scenario_executor_bridge
-from skills import market_portfolio_realtime_stream_ingestor
-from skills import extractor_tool_1790087207, extractor_tool_1790102839
+try:
+    from skills import db_storage
+except ImportError:
+    db_storage = None
+
+try:
+    from skills import market_portfolio_stress_scenario_executor_bridge
+except ImportError:
+    market_portfolio_stress_scenario_executor_bridge = None
+
+try:
+    from skills import market_portfolio_realtime_stream_ingestor
+except ImportError:
+    market_portfolio_realtime_stream_ingestor = None
+
+try:
+    from skills import extractor_tool_1790087207
+except ImportError:
+    extractor_tool_1790087207 = None
+
+try:
+    from skills import extractor_tool_1790102839
+except ImportError:
+    extractor_tool_1790102839 = None
 
 
 def start_new(portfolio_id):

@@ -3,7 +3,11 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- Унгой, передан на эскалацию
+й, передан на эскалацию
+
+## market_portfolio_predictive_var_stress_bridge_v2 (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_predictive_var_stress_bridge_v3 (compose) — раундов: 4
 - Последняя ошибка перед фиксом: ERROR: test_execute_combined_predictive_stress_integration (tests.test_market_portfolio_predictive_var_stress_bridge_v3_integration.TestPredictiveVarStressBridgeIntegration.test_execute_combined_predictive_stress_integration)
@@ -298,7 +302,3 @@
 
 ## market_portfolio_stress_audit_health_monitor (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_audit_health_monitor (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

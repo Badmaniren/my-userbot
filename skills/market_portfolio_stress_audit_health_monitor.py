@@ -1,10 +1,12 @@
-import io
-import os
-import random
-import requests
-import string
-import uuid
 from enum import Enum
+from typing import Any, Dict, List, Optional
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
+from skills.db_storage import DBStorage
 
 
 class SubsystemHealthStatus(Enum):
@@ -23,10 +25,15 @@ class StorageUnreachableError(Exception):
 
 class MarketPortfolioStressAuditHealthMonitor:
 
-    def __init__(self, subsystems=None):
-        self.subsystems = subsystems if subsystems is not None else []
+    def __init__(self, subsystems: Optional[List[str]] = None) -> None:
+        if subsystems is not None and not isinstance(subsystems, list):
+            raise TypeError("subsystems must be a list of strings")
+        self.subsystems: List[str] = list(subsystems) if subsystems is not None else []
+        self.db: DBStorage = DBStorage()
 
-    def _probe_subsystem(self, subsystem_name):
+    def _probe_subsystem(self, subsystem_name: str) -> Dict[str, Any]:
+        if not isinstance(subsystem_name, str):
+            raise TypeError("subsystem_name must be a string")
         return {
             "subsystem": subsystem_name,
             "status": SubsystemHealthStatus.HEALTHY,
@@ -34,8 +41,8 @@ class MarketPortfolioStressAuditHealthMonitor:
             "error": None
         }
 
-    def run_full_audit(self):
-        subsystems_details = {}
+    def run_full_audit(self) -> Dict[str, Any]:
+        subsystems_details: Dict[str, Dict[str, Any]] = {}
         global_status = SubsystemHealthStatus.HEALTHY
 
         for sub in self.subsystems:
@@ -58,7 +65,14 @@ class MarketPortfolioStressAuditHealthMonitor:
             "subsystems_details": subsystems_details
         }
 
-    def verify_stream_pipeline(self, subsystem_target):
+    def verify_stream_pipeline(self, subsystem_target: str) -> Dict[str, Any]:
+        if not isinstance(subsystem_target, str):
+            raise TypeError("subsystem_target must be a string")
+        if requests is None:
+            return {
+                "is_active": False,
+                "bytes_read": 0
+            }
         try:
             response = requests.get(subsystem_target)
             content = response.content
@@ -71,11 +85,3 @@ class MarketPortfolioStressAuditHealthMonitor:
                 "is_active": False,
                 "bytes_read": 0
             }
-
-
-def _dummy_subsystem_func(payload):
-    return {"status": "ok", "payload": payload}
-
-
-def __getattr__(name):
-    return _dummy_subsystem_func

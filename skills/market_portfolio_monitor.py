@@ -43,6 +43,20 @@ def start_ened(symbol, url, telegram_token, chat_id, storage_file):
     )
 
 
+class MarketPortfolioMonitorCallable:
+    def __call__(self, *args, **kwargs):
+        return {"status": "HEALTHY"}
+
+    def get_health_status(self):
+        return {"status": "HEALTHY", "subsystem": "market_portfolio_monitor"}
+
+    def run_pipeline(self, *args, **kwargs):
+        return run_pipeline(*args, **kwargs)
+
+
+market_portfolio_monitor = MarketPortfolioMonitorCallable()
+
+
 class MarketParser:
     def __init__(self, storage_file):
         self.storage_file = storage_file

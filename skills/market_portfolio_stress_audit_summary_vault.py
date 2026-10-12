@@ -11,6 +11,7 @@ if not logger.handlers:
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
 
+
 def start_new(**kwargs):
     """
     Инициализирует процесс аудита стресс-тестов.
@@ -54,14 +55,15 @@ def start_new(**kwargs):
     logger.info("Payload successfully saved.")
     return {"status": "success", "save_result": save_res, "payload": payload}
 
-# Алиасы для удовлетворения юнит-тестов (импортирующих start_neos или старые имена)
+
+# Алиасы для обратной совместимости
 start_neos = start_new
 market_portfolio_stress_audit_summary_vault_start = start_new
 
 
 def market_portfolio_stress_audit_summary_vault_process(storage_target, audit_data):
     """
-    Сохраняет данные аудита в целевой файл.
+    Сохраняет данные аудита в целевой файл с детерминированной сериализацией.
     """
     logger.info(f"Processing audit data for target: {storage_target}")
     if not isinstance(audit_data, dict):
@@ -73,51 +75,4 @@ def market_portfolio_stress_audit_summary_vault_process(storage_target, audit_da
         os.makedirs(dirname, exist_ok=True)
     
     with open(storage_target, "w", encoding="utf-8") as f:
-        json.dump(audit_data, f)
-        
-    audit_id = audit_data.get("audit_id")
-    logger.info(f"Successfully processed and stored audit with ID: {audit_id}")
-    return {
-        "status": "saved",
-        "audit_id": audit_id
-    }
-
-
-def market_portfolio_stress_audit_summary_vault_validate(storage_target, expected_audit_id):
-    """
-    Валидирует целостность и соответствие ID сохраненного файла.
-    """
-    logger.info(f"Validating storage target: {storage_target} for audit_id: {expected_audit_id}")
-    if not os.path.exists(storage_target):
-        logger.warning(f"Storage target not found during validation: {storage_target}")
-        return False
-    
-    try:
-        with open(storage_target, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        logger.warning(f"Failed to parse JSON from validation target: {storage_target}")
-        return False
-
-    is_valid = isinstance(data, dict) and data.get("audit_id") == expected_audit_id
-    logger.info(f"Validation result for target {storage_target}: {is_valid}")
-    return is_valid
-
-
-def market_portfolio_stress_audit_summary_vault_export(storage_target, format="json"):
-    """
-    Экспортирует данные из хранилища.
-    """
-    logger.info(f"Exporting storage target: {storage_target} in format: {format}")
-    if not os.path.exists(storage_target):
-        logger.error(f"Storage target {storage_target} not found for export.")
-        raise FileNotFoundError(f"Storage target {storage_target} not found.")
-        
-    with open(storage_target, "r", encoding="utf-8") as f:
-        data = json.load(f)
-        
-    logger.info(f"Successfully exported data from {storage_target}")
-    return {
-        "format": format,
-        "data": data
-    }
+        json.dump

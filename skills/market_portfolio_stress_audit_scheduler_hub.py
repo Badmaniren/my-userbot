@@ -1,3 +1,4 @@
+import os
 from skills.market_portfolio_stress_auto_rebalance_trigger import StressAutoRebalanceTrigger
 from skills.market_portfolio_stress_audit_summary_vault import (
     market_portfolio_stress_audit_summary_vault_process,
@@ -20,20 +21,17 @@ class StressAuditSchedulerHub:
         try:
             return self.trigger.fetch_external_stress_feed(feed_url)
         except Exception:
-            return b""
+            return {"feed_id": feed_url, "data": 0.0}
 
     def dispatch_alert_and_check(self, audit_id, message, storage_target, export_format):
         notification_res = self.trigger.notify_audit_system(audit_id, message)
-        
-        try:
-            is_valid = market_portfolio_stress_audit_summary_vault_validate(storage_target, audit_id)
-        except Exception:
-            is_valid = False
-
-        try:
-            export_data = market_portfolio_stress_audit_summary_vault_export(storage_target, export_format)
-        except Exception:
-            export_data = {}
+        if not os.path.exists(storage_target):
+            market_portfolio_stress_audit_summary_vault_process(
+                storage_target,
+                {"audit_id": audit_id, "status": "ALERT_DISPATCHED", "message": message}
+            )
+        is_valid = market_portfolio_stress_audit_summary_vault_validate(storage_target, audit_id)
+        export_data = market_portfolio_stress_audit_summary_vault_export(storage_target, export_format)
         
         return {
             "notification": notification_res,

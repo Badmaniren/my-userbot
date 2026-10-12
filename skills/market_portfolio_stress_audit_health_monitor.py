@@ -1,10 +1,7 @@
-import io
-import os
-import random
-import requests
-import string
-import uuid
 from enum import Enum
+import requests
+
+from skills.db_storage import save_audit_result, get_audit_result
 
 
 class SubsystemHealthStatus(Enum):
@@ -24,9 +21,19 @@ class StorageUnreachableError(Exception):
 class MarketPortfolioStressAuditHealthMonitor:
 
     def __init__(self, subsystems=None):
-        self.subsystems = subsystems if subsystems is not None else []
+        if subsystems is not None:
+            if not isinstance(subsystems, (list, tuple, set)):
+                raise TypeError("subsystems must be a list, tuple, or set of subsystem names")
+            for sub in subsystems:
+                if not isinstance(sub, str) or not sub.strip():
+                    raise ValueError("Each subsystem name must be a non-empty string")
+            self.subsystems = list(subsystems)
+        else:
+            self.subsystems = []
 
     def _probe_subsystem(self, subsystem_name):
+        if not isinstance(subsystem_name, str) or not subsystem_name.strip():
+            raise ValueError("subsystem_name must be a non-empty string")
         return {
             "subsystem": subsystem_name,
             "status": SubsystemHealthStatus.HEALTHY,
@@ -59,23 +66,13 @@ class MarketPortfolioStressAuditHealthMonitor:
         }
 
     def verify_stream_pipeline(self, subsystem_target):
-        try:
-            response = requests.get(subsystem_target)
-            content = response.content
-            return {
-                "is_active": True,
-                "bytes_read": len(content)
-            }
-        except Exception:
-            return {
-                "is_active": False,
-                "bytes_read": 0
-            }
+        if not isinstance(subsystem_target, str) or not subsystem_target.strip():
+            raise ValueError("subsystem_target must be a non-empty string URL")
 
-
-def _dummy_subsystem_func(payload):
-    return {"status": "ok", "payload": payload}
-
-
-def __getattr__(name):
-    return _dummy_subsystem_func
+        response = requests.get(subsystem_target)
+        response.raise_for_status()
+        content = response.content
+        return {
+            "is_active": True,
+            "bytes_read": len(content)
+        }

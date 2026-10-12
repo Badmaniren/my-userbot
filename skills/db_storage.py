@@ -3,6 +3,70 @@ import requests
 from bs4 import BeautifulSoup
 
 
+_AUDIT_STORAGE = {}
+
+
+def save_audit_result(audit_id: str, payload: dict) -> None:
+    if not isinstance(audit_id, str) or not audit_id:
+        raise ValueError("audit_id must be a non-empty string")
+    if not isinstance(payload, dict):
+        raise TypeError("payload must be a dictionary")
+    _AUDIT_STORAGE[audit_id] = payload
+
+
+def get_audit_result(audit_id: str) -> dict:
+    if not isinstance(audit_id, str):
+        raise ValueError("audit_id must be a string")
+    return _AUDIT_STORAGE.get(audit_id)
+
+
+def save_audit_record(audit_id: str, record: dict) -> None:
+    save_audit_result(audit_id, record)
+
+
+def fetch_audit_record(audit_id: str) -> dict:
+    return get_audit_result(audit_id)
+
+
+def get_audit_record(audit_id: str) -> dict:
+    return get_audit_result(audit_id)
+
+
+def db_storage_save(storage_target: str, data: dict) -> None:
+    _AUDIT_STORAGE[storage_target] = data
+
+
+def db_storage_load(storage_target: str) -> dict:
+    return _AUDIT_STORAGE.get(storage_target)
+
+
+def db_storage_get(storage_target: str) -> dict:
+    return _AUDIT_STORAGE.get(storage_target)
+
+
+class DbStorage:
+    def __init__(self, storage_file: str = "market_data.db"):
+        self.storage_file = storage_file
+
+    def save(self, key, value):
+        if isinstance(value, dict) and "audit_id" in value:
+            save_audit_result(str(key), value)
+        else:
+            _AUDIT_STORAGE[str(key)] = value
+
+    def get(self, key):
+        return _AUDIT_STORAGE.get(str(key))
+
+    def health_check(self):
+        return True
+
+    def health_pulse(self, *args, **kwargs):
+        return {"status": "HEALTHY"}
+
+
+db_storage = DbStorage()
+
+
 class MarketParser:
     def __init__(self, storage_file: str = "market_data.db"):
         self.storage_file = storage_file

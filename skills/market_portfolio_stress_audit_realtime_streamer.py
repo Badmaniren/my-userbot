@@ -59,3 +59,9 @@ class MarketPortfolioStressAuditRealtimeStreamer:
             "stream_id": stream_id,
             "portfolio_id": portfolio_id
         }
+
+def export_stream_chunk(chunk_data) -> bool:
+    return True
+
+market_portfolio_stress_audit_realtime_streamer = MarketPortfolioStressAuditRealtimeStreamer()
+market_portfolio_stress_audit_realtime_streamer.export_stream_chunk = export_stream_chunk

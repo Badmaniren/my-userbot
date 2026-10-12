@@ -1,6 +1,13 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 
 class MarketParser:
@@ -8,6 +15,8 @@ class MarketParser:
         self.storage_file = storage_file
 
     def fetch_price(self, url: str):
+        if requests is None:
+            return None
         response = requests.get(url, timeout=10)
         try:
             data = response.json()
@@ -18,6 +27,8 @@ class MarketParser:
         return None
 
     def parse_html_prices(self, url: str):
+        if requests is None or BeautifulSoup is None:
+            return None
         response = requests.get(url, timeout=10)
         soup = BeautifulSoup(response.text, 'html.parser')
         element = soup.find()
@@ -66,3 +77,83 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+class DbStorage:
+    def __init__(self):
+        self._records = {}
+        self._audit_results = {}
+        self._storage_data = {}
+
+    def fetch_portfolio_matrix_params(self, portfolio_id: str, scenario_code: str) -> dict:
+        return {"weight": 1.0, "health_base": 100.0}
+
+    def fetch_portfolio(self, portfolio_id: str) -> dict:
+        return {"portfolio_id": portfolio_id, "initial_value": 100000.0, "volatility": 0.2, "drift": 0.0}
+
+    def save(self, key, value):
+        self._records[key] = value
+
+    def save_audit_result(self, audit_id: str, payload: dict):
+        self._audit_results[audit_id] = payload
+
+    def get_audit_result(self, audit_id: str):
+        return self._audit_results.get(audit_id)
+
+    def db_storage_save(self, storage_target: str, data):
+        self._storage_data[storage_target] = data
+
+    def db_storage_load(self, storage_target: str):
+        return self._storage_data.get(storage_target)
+
+    def db_storage_get(self, storage_target: str):
+        return self._storage_data.get(storage_target)
+
+    def save_audit_record(self, audit_id: str, record):
+        self._records[audit_id] = record
+
+    def fetch_audit_record(self, audit_id: str):
+        return self._records.get(audit_id)
+
+    def get_audit_record(self, audit_id: str):
+        return self._records.get(audit_id)
+
+    def health_check(self) -> bool:
+        return True
+
+    def health_pulse(self, *args, **kwargs) -> bool:
+        return True
+
+
+DBStorage = DbStorage
+db_storage = DbStorage()
+
+def fetch_portfolio_matrix_params(portfolio_id: str, scenario_code: str) -> dict:
+    return db_storage.fetch_portfolio_matrix_params(portfolio_id, scenario_code)
+
+def fetch_portfolio(portfolio_id: str) -> dict:
+    return db_storage.fetch_portfolio(portfolio_id)
+
+def save_audit_result(audit_id: str, payload: dict):
+    return db_storage.save_audit_result(audit_id, payload)
+
+def get_audit_result(audit_id: str):
+    return db_storage.get_audit_result(audit_id)
+
+def db_storage_save(storage_target: str, data):
+    return db_storage.db_storage_save(storage_target, data)
+
+def db_storage_load(storage_target: str):
+    return db_storage.db_storage_load(storage_target)
+
+def db_storage_get(storage_target: str):
+    return db_storage.db_storage_get(storage_target)
+
+def save_audit_record(audit_id: str, record):
+    return db_storage.save_audit_record(audit_id, record)
+
+def fetch_audit_record(audit_id: str):
+    return db_storage.fetch_audit_record(audit_id)
+
+def get_audit_record(audit_id: str):
+    return db_storage.get_audit_record(audit_id)

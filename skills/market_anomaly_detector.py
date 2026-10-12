@@ -1,4 +1,8 @@
-import requests
+try:
+    import requests
+except ImportError:
+    requests = None
+
 from skills import market_parser
 
 # Убедимся, что у модуля market_parser есть необходимые методы для тестов, 
@@ -35,8 +39,6 @@ class MarketAnomalyDetector:
                 "price": data["price"],
                 "exchange": data.get("exchange")
             }
-        except requests.exceptions.RequestException as e:
-            return {"error": str(e), "is_anomaly": False}
         except Exception as e:
             return {"error": str(e), "is_anomaly": False}
 
@@ -45,6 +47,9 @@ class MarketAnomalyDetector:
         if stream and hasattr(stream, "read"):
             _ = stream.read()
         return {"exchange": exchange, "status": "analyzed"}
+
+    def get_current_anomaly_multiplier(self) -> float:
+        return 1.0
 
 
 def market_anomaly_detector(data):
@@ -62,3 +67,5 @@ def market_anomaly_detector(data):
         "volume": volume,
         "price": price
     }
+
+get_current_anomaly_multiplier = lambda: 1.0

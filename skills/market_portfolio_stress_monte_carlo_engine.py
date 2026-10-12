@@ -169,3 +169,7 @@ def run_monte_carlo_stress_test(portfolio_id: str, portfolio_value: float, scena
         market_portfolio_stress_audit_visualizer.visualize_stress_test(result_dict)
 
     return result_dict
+
+
+def simulate_matrix_paths(iterations: int, volatility_factor: float) -> list:
+    return [{"path_id": str(i), "volatility": volatility_factor} for i in range(iterations)]

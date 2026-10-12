@@ -178,3 +178,9 @@ def export_audit_logs(storage_file=None):
                 return True
             return False
     return False
+
+class MarketPortfolioMonitor:
+    def run_pipeline(self, symbol, url, telegram_token, chat_id, storage_file):
+        return run_pipeline(symbol, url, telegram_token, chat_id, storage_file)
+
+market_portfolio_monitor = MarketPortfolioMonitor()

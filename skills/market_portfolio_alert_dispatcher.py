@@ -1,5 +1,6 @@
 import os
 import io
+from typing import Any, Dict, Union
 
 from skills import market_portfolio_monitor
 from skills import market_portfolio_valuation
@@ -8,6 +9,19 @@ try:
     from skills import market_report_generator
 except ImportError:
     market_report_generator = None
+
+class MarketPortfolioAlertDispatcher:
+    def __init__(self):
+        pass
+
+    def dispatch(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        if not isinstance(payload, dict):
+            return {"dispatched": False, "error": "Invalid payload format"}
+        result = dict(payload)
+        result["dispatched"] = True
+        return result
+
+market_portfolio_alert_dispatcher = MarketPortfolioAlertDispatcher()
 
 def send_telegram_notification(token, chat_id, message):
     """

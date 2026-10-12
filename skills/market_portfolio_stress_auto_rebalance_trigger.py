@@ -1,31 +1,17 @@
 import os
-import requests
 from typing import Optional, Dict, Any
 
 try:
-    from skills.db_storage import db_storage
+    import requests
 except ImportError:
-    db_storage = None
+    requests = None
 
-try:
-    from skills.market_portfolio_scenario_simulator import market_portfolio_scenario_simulator
-except ImportError:
-    market_portfolio_scenario_simulator = None
+from skills.db_storage import db_storage
+from skills.market_portfolio_scenario_simulator import market_portfolio_scenario_simulator
+from skills.market_portfolio_alert_dispatcher import market_portfolio_alert_dispatcher
+from skills.market_portfolio_strategy_optimizer import market_portfolio_strategy_optimizer
+from skills.market_portfolio_monitor import market_portfolio_monitor
 
-try:
-    from skills.market_portfolio_alert_dispatcher import market_portfolio_alert_dispatcher
-except ImportError:
-    market_portfolio_alert_dispatcher = None
-
-try:
-    from skills.market_portfolio_strategy_optimizer import market_portfolio_strategy_optimizer
-except ImportError:
-    market_portfolio_strategy_optimizer = None
-
-try:
-    from skills.market_portfolio_monitor import market_portfolio_monitor
-except ImportError:
-    market_portfolio_monitor = None
 
 class StressAutoRebalanceTrigger:
     def __init__(self, **kwargs):
@@ -83,8 +69,12 @@ class StressAutoRebalanceTrigger:
         return None
 
     def fetch_external_stress_feed(self, url: str) -> bytes:
-        response = requests.get(url)
-        return response.content
+        if requests is not None:
+            response = requests.get(url)
+            return response.content
+        import urllib.request
+        with urllib.request.urlopen(url) as response:
+            return response.read()
 
     def notify_audit_system(self, alert_id: str, message: str) -> Dict[str, Any]:
         if self.market_portfolio_alert_dispatcher and hasattr(self.market_portfolio_alert_dispatcher, "dispatch"):

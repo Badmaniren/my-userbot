@@ -2,10 +2,19 @@ from skills.market_portfolio_backtester import MarketPortfolioBacktester
 from skills.market_portfolio_scenario_simulator import PortfolioScenarioSimulator
 
 class PortfolioStrategyOptimizer:
-    def __init__(self, storage_file: str):
+    def __init__(self, storage_file: str = "market_data.json"):
         self.storage_file = storage_file
         self.backtester = MarketPortfolioBacktester(storage_file)
         self.simulator = PortfolioScenarioSimulator(storage_file)
+
+    def generate_rebalance_signal(self, sim_result: dict) -> dict:
+        portfolio_id = sim_result.get("portfolio_id", "default")
+        return {
+            "portfolio_id": portfolio_id,
+            "status": "REBALANCE_REQUIRED",
+            "signal": "REBALANCE",
+            "rebalance_signal_id": f"sig_{portfolio_id[:8]}"
+        }
 
     def _validate_allocation(self, allocation: float) -> float:
         """Жесткая валидация весов активов и корректная обработка граничных условий."""
@@ -112,3 +121,5 @@ class PortfolioStrategyOptimizer:
                 "storage": getattr(self, 'storage_file', None)
             }
         }
+
+market_portfolio_strategy_optimizer = PortfolioStrategyOptimizer()

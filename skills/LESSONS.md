@@ -3,13 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-дан на эскалацию
-
-## market_portfolio_stress_monte_carlo_engine (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_monte_carlo_engine (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
+но прошёл тесты и влит в main
 
 ## market_portfolio_stress_monte_carlo_engine (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
@@ -312,3 +306,7 @@
 - Античит поймал: ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'db_storage'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.db_storage import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'market_portfolio_collector_agent'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.market_portfolio_collector_agent import ...'
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_audit_exporter_v2 (refactor) — раундов: 2
+- Последняя ошибка перед фиксом: ======================================================================
+- Статус: успешно прошёл тесты и влит в main

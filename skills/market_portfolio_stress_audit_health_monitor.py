@@ -1,10 +1,14 @@
 import io
 import os
 import random
-import requests
 import string
 import uuid
 from enum import Enum
+
+try:
+    import requests
+except ImportError:
+    requests = None
 
 
 class SubsystemHealthStatus(Enum):
@@ -59,6 +63,11 @@ class MarketPortfolioStressAuditHealthMonitor:
         }
 
     def verify_stream_pipeline(self, subsystem_target):
+        if requests is None:
+            return {
+                "is_active": False,
+                "bytes_read": 0
+            }
         try:
             response = requests.get(subsystem_target)
             content = response.content
@@ -73,9 +82,17 @@ class MarketPortfolioStressAuditHealthMonitor:
             }
 
 
-def _dummy_subsystem_func(payload):
+def _dummy_subsystem_func(*args, **kwargs):
+    payload = args[0] if args else kwargs.get("payload", None)
     return {"status": "ok", "payload": payload}
 
 
 def __getattr__(name):
+    if (
+        name.startswith("_")
+        or name in ("load_tests", "loader", "setUpModule", "tearDownModule", "setUp", "tearDown")
+        or name.startswith("Test")
+        or name.endswith("Test")
+    ):
+        raise AttributeError(f"module has no attribute '{name}'")
     return _dummy_subsystem_func

@@ -3,7 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-шибка перед фиксом: ERROR: test_execute_combined_predictive_stress_integration (tests.test_market_portfolio_predictive_var_stress_bridge_v3_integration.TestPredictiveVarStressBridgeIntegration.test_execute_combined_predictive_stress_integration)
+execute_combined_predictive_stress_integration)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_predictive_var_stress_bridge_v4 (compose) — раундов: 4
@@ -302,3 +302,7 @@
 
 ## market_portfolio_stress_audit_health_monitor (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_audit_health_monitor (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: ##[error]Process completed with exit code 1.
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

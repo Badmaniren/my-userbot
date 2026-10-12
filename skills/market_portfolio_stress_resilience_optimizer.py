@@ -9,7 +9,8 @@ from skills import extractor_tool_1790087207, extractor_tool_1790102839
 
 def start_new(portfolio_id):
     if market_portfolio_realtime_stream_ingestor is not None:
-        market_portfolio_realtime_stream_ingestor.read_stream()
+        if hasattr(market_portfolio_realtime_stream_ingestor, 'read_stream'):
+            market_portfolio_realtime_stream_ingestor.read_stream()
 
     if extractor_tool_1790087207 is not None and hasattr(extractor_tool_1790087207, 'extract'):
         extractor_tool_1790087207.extract()

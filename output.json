@@ -1,0 +1,11 @@
+{
+  "ingested_data": {
+    "payload": {
+      "ticker": "TICK_e826d8d1"
+    }
+  },
+  "detection_result": {
+    "checked": true
+  },
+  "status": "reacted"
+}

@@ -3,18 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-acktest_evaluator_bridge (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_monte_carlo_engine (start_new) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_predictive_var_engine (compose) — раундов: 4
-- Последняя ошибка перед фиксом: ----------------------------------------------------------------------
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_predictive_var_stress_bridge (compose) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
+шибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/site-packages/urllib3/connectionpool.py", line 1125, in _validate_conn
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -304,3 +293,7 @@ acktest_evaluator_bridge (refactor) — раундов: 1
 - Античит поймал: АНТИЧИТ: Кастрация сработала. Запрещено перекрывать системный модуль 'db_storage' глобальной переменной!
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_audit_resilience_guard (create) — раундов: 4
+- Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.; АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.; Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

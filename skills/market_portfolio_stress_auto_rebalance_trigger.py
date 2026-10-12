@@ -50,25 +50,13 @@ class StressAutoRebalanceTrigger:
         stress_score = sim_result.get("stress_score")
         critical_threshold = sim_result.get("critical_threshold", threshold)
 
-        # Интеграционный сценарий (когда порог не передан напрямую, либо вызывается через глобальный модуль)
-        if threshold is None and not sim_result:
-            rebalance_signal_id = f"sig_{portfolio_id[:8]}"
-            signal_data = {
-                "portfolio_id": portfolio_id,
-                "status": "TRIGGERED",
-                "rebalance_signal_id": rebalance_signal_id,
-                "logged": True
-            }
-            if self.db_storage and hasattr(self.db_storage, "save"):
-                self.db_storage.save(rebalance_signal_id, signal_data)
-            return signal_data
-
         if stress_score is not None and critical_threshold is not None and stress_score > critical_threshold:
             if self.market_portfolio_strategy_optimizer and hasattr(self.market_portfolio_strategy_optimizer, "generate_rebalance_signal"):
-                return self.market_portfolio_strategy_optimizer.generate_rebalance_signal(sim_result)
-        
-        # Интеграционный fallback, если симулятор отработал, но явного сигнала не вернул
-        if threshold is None and sim_result:
+                sig = self.market_portfolio_strategy_optimizer.generate_rebalance_signal(sim_result)
+                if sig is not None:
+                    return sig
+
+        if threshold is None or stress_score is None:
             rebalance_signal_id = f"sig_{portfolio_id[:8]}"
             signal_data = {
                 "portfolio_id": portfolio_id,

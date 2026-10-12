@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-rtfolio_stress_auto_hedge_sync (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_auto_hedge_sync (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
+Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_hedge_execution_bridge (compose) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (errors=1)
@@ -307,3 +303,7 @@ rtfolio_stress_auto_hedge_sync (refactor) — раундов: 1
 ## market_portfolio_stress_audit_summary_vault (refactor) — раундов: 2
 - Последняя ошибка перед фиксом: ======================================================================
 - Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_audit_scheduler_hub (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

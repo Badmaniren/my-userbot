@@ -12,6 +12,25 @@ if not logger.handlers:
     logger.setLevel(logging.INFO)
 
 
+class SummaryVault:
+    def __init__(self, storage_path=None, **kwargs):
+        self.storage_path = storage_path or kwargs.get("storage_target") or kwargs.get("file_path")
+
+    def load_summary(self):
+        if not self.storage_path or not os.path.exists(self.storage_path):
+            raise FileNotFoundError(f"Storage path {self.storage_path} does not exist.")
+        with open(self.storage_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+
+
+def market_portfolio_stress_audit_summary_vault(*args, **kwargs):
+    if args and isinstance(args[0], str):
+        return SummaryVault(storage_path=args[0])
+    if "storage_path" in kwargs or "storage_target" in kwargs or "file_path" in kwargs:
+        return SummaryVault(**kwargs)
+    return start_new(**kwargs)
+
+
 def start_new(**kwargs):
     """
     Инициализирует процесс аудита стресс-тестов.

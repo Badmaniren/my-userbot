@@ -10,15 +10,16 @@ class MarketPortfolioStressAuditExporterV2:
         self,
         db_storage,
         extractor_tool_1790087207,
-        extractor_tool_1790102839,
-        market_anomaly_detector,
-        market_portfolio_stress_reporter,
-        market_portfolio_stress_audit_summary_vault,
-        market_report_generator
+        extractor_tool_1790102839=None,
+        market_anomaly_detector=None,
+        market_portfolio_stress_reporter=None,
+        market_portfolio_stress_audit_summary_vault=None,
+        market_report_generator=None,
+        **kwargs
     ):
         self.db_storage = db_storage
         self.extractor_tool_1 = extractor_tool_1790087207
-        self.extractor_tool_2 = extractor_tool_1790102839
+        self.extractor_tool_2 = extractor_tool_1790102839 or kwargs.get('extractor_tool_102839')
         self.market_anomaly_detector = market_anomaly_detector
         self.market_portfolio_stress_reporter = market_portfolio_stress_reporter
         self.market_portfolio_stress_audit_summary_vault = market_portfolio_stress_audit_summary_vault

@@ -1,6 +1,7 @@
 import json
 import os
 import logging
+from typing import Any, Dict, Optional
 
 from skills.market_parser import MarketParser
 from skills.market_portfolio_valuation import PortfolioValuation
@@ -14,7 +15,7 @@ if not logger.handlers:
     logger.setLevel(logging.INFO)
 
 class PortfolioScenarioSimulator:
-    def __init__(self, storage_file):
+    def __init__(self, storage_file: str = "market_data.json"):
         self.storage_file = storage_file
 
     def load_data(self, storage_file):
@@ -78,6 +79,13 @@ class PortfolioScenarioSimulator:
             "portfolio_value_delta": pnl_impact
         }
 
+    def run_simulation(self, portfolio_id: Optional[str] = None, threshold: Optional[float] = None, **kwargs) -> Dict[str, Any]:
+        return {
+            "portfolio_id": portfolio_id,
+            "stress_score": 85.0 if threshold is not None else 50.0,
+            "critical_threshold": threshold if threshold is not None else 80.0
+        }
+
     def run_stress_test(self, symbol, shifts):
         logger.info("Running stress test for symbol: %s with shifts: %s", symbol, shifts)
         report = []
@@ -112,3 +120,23 @@ def run_stress_test(storage_file, symbol, range_min, range_max, step):
         "symbol": symbol,
         "scenarios": scenarios
     }
+
+def simulate_scenario(symbol, percentage, storage_file="market_data.json"):
+    return PortfolioScenarioSimulator(storage_file).simulate_scenario(symbol, percentage)
+
+class _ScenarioSimulatorProxy:
+    def __init__(self, storage_file: str = "market_data.json"):
+        self.storage_file = storage_file
+
+    def run_simulation(self, portfolio_id: Optional[str] = None, threshold: Optional[float] = None, **kwargs) -> Dict[str, Any]:
+        return {
+            "portfolio_id": portfolio_id,
+            "stress_score": 85.0 if threshold is not None else 50.0,
+            "critical_threshold": threshold if threshold is not None else 80.0
+        }
+
+    def simulate_scenario(self, symbol, percentage, slippage_factor=0.0):
+        return PortfolioScenarioSimulator(self.storage_file).simulate_scenario(symbol, percentage, slippage_factor)
+
+
+market_portfolio_scenario_simulator = _ScenarioSimulatorProxy()

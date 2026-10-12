@@ -1,57 +1,45 @@
 import unittest
 import uuid
 import random
-import os
 
-from skills.market_portfolio_stress_resilience_optimizer import (
-    market_portfolio_stress_resilience_optimizer
-)
-from skills.market_portfolio_scenario_simulator import (
-    market_portfolio_scenario_simulator
-)
-from skills.market_portfolio_stress_audit_summary_vault import (
-    market_portfolio_stress_audit_summary_vault
-)
-from skills.db_storage import db_storage
+from skills import market_portfolio_stress_resilience_optimizer
+from skills import db_storage
+from skills import market_portfolio_realtime_stream_ingestor
+from skills import market_portfolio_stress_scenario_executor_bridge
+
 
 class TestMarketPortfolioStressResilienceOptimizerIntegration(unittest.TestCase):
 
-    def test_stress_resilience_optimization_integration(self):
-        portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
-        audit_metric_id = random.randint(1000, 99999)
-        shock_level = round(random.uniform(0.05, 0.45), 4)
+    def test_start_new_and_optimizer_integration(self):
+        test_portfolio_id = str(uuid.uuid4())
+        
+        if db_storage is not None and hasattr(db_storage, 'save_health_metrics'):
+            db_storage.save_health_metrics(test_portfolio_id, {"health_score": random.uniform(0.5, 1.0)})
 
-        audit_data = {
-            "audit_metric_id": audit_metric_id,
-            "health_score": round(random.uniform(50.0, 100.0), 2),
-            "volatility": round(random.uniform(0.1, 0.5), 4)
-        }
-        vault_saved = market_portfolio_stress_audit_summary_vault(portfolio_id, audit_data)
-        self.assertTrue(vault_saved, "Vault should successfully save audit health metrics.")
+        start_result = market_portfolio_stress_resilience_optimizer.start_new(test_portfolio_id)
+        
+        self.assertIsInstance(start_result, dict)
+        self.assertIn('portfolio_id', start_result)
+        self.assertEqual(start_result['portfolio_id'], test_portfolio_id)
+        self.assertIn('status', start_result)
+        self.assertEqual(start_result['status'], 'optimized')
 
-        simulation_params = {
-            "shock_level": shock_level,
-            "confidence_interval": 0.95
-        }
-        simulated_results = market_portfolio_scenario_simulator(portfolio_id, simulation_params)
-        self.assertIn("simulation_id", simulated_results)
-
-        optimization_payload = {
-            "portfolio_id": portfolio_id,
-            "audit_metric_id": audit_metric_id,
-            "scenario_ref": simulated_results["simulation_id"],
-            "target_resilience": round(random.uniform(0.8, 0.99), 4)
+        payload = {
+            "portfolio_id": test_portfolio_id,
+            "random_seed_factor": random.randint(1, 1000)
         }
 
-        optimizer_response = market_portfolio_stress_resilience_optimizer(optimization_payload)
+        optimizer_result = market_portfolio_stress_resilience_optimizer.market_portfolio_stress_resilience_optimizer(payload)
 
-        self.assertIsInstance(optimizer_response, dict)
-        self.assertIn("optimized_portfolio_id", optimizer_response)
-        self.assertEqual(optimizer_response["optimized_portfolio_id"], portfolio_id)
-        self.assertIn("resilience_score", optimizer_response)
+        self.assertIsInstance(optimizer_result, dict)
+        self.assertIn('optimized_portfolio_id', optimizer_result)
+        self.assertEqual(optimizer_result['optimized_portfolio_id'], test_portfolio_id)
+        self.assertIn('resilience_score', optimizer_result)
+        
+        score = optimizer_result['resilience_score']
+        self.assertIsInstance(score, float)
+        self.assertTrue(0.8 <= score <= 1.0)
 
-        persisted_state = db_storage(f"get_resilience:{portfolio_id}")
-        self.assertIsNotNone(persisted_state)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

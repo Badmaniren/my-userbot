@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-execute_combined_predictive_stress_integration)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_predictive_var_stress_bridge_v4 (compose) — раундов: 4
+o_predictive_var_stress_bridge_v4 (compose) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено глушить ошибки через `except Exception: pass`! Обработай ошибку предсказуемо или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/tests/test_market_portfolio_predictive_var_stress_bridge_v4.py", line 57, in test_run_comprehensive_stress_pipeline_success
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
@@ -306,3 +303,6 @@ execute_combined_predictive_stress_integration)
 ## market_portfolio_stress_audit_health_monitor (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: ##[error]Process completed with exit code 1.
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_audit_visualizer (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

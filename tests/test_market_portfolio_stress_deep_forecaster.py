@@ -1,96 +1,78 @@
 import unittest
-from unittest.mock import patch, MagicMock
-import random
+from unittest.mock import patch
 import uuid
-import string
-import io
-import sys
-from skills.market_portfolio_stress_deep_forecaster import start_new
+import random
+
+from skills.market_portfolio_stress_deep_forecaster import start_new, market_portfolio_stress_deep_forecaster
+
 
 class TestMarketPortfolioStressDeepForecaster(unittest.TestCase):
 
-    def setUp(self):
-        self.random_string = uuid.uuid4().hex
-        self.random_portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
-        self.random_scenario_name = f"scenario_{uuid.uuid4().hex[:6]}"
-        self.random_confidence_level = round(random.uniform(0.90, 0.99), 4)
-        self.random_metric_value = random.randint(1000, 1000000)
+    def test_start_new_success_flow(self):
+        rand_portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
+        rand_conf = round(random.uniform(0.8, 0.99), 2)
+        rand_hist_data = [random.randint(100, 500) for _ in range(3)]
+        rand_scenario_res = {f"sc_{uuid.uuid4().hex[:4]}": random.random()}
+        rand_anomaly = {f"an_{uuid.uuid4().hex[:4]}": random.randint(1, 10)}
+        rand_ml_pred = round(random.uniform(0.1, 0.9), 4)
+        rand_audit_id = f"aud_{uuid.uuid4().hex[:8]}"
 
-    def test_start_new_execution_flow(self):
-        mock_db = MagicMock()
-        mock_db.fetch_historical_data.return_value = [
-            {"timestamp": uuid.uuid4().hex, "value": random.uniform(10.0, 500.0)} for _ in range(5)
-        ]
-        
-        mock_scenario_simulator = MagicMock()
-        mock_scenario_simulator.run_matrix.return_value = {
-            "scenario": self.random_scenario_name,
-            "stress_index": random.uniform(1.0, 10.0),
-            "loss_expectation": self.random_metric_value
-        }
+        with patch("skills.market_portfolio_stress_deep_forecaster.db_storage") as mock_db, \
+             patch("skills.market_portfolio_stress_deep_forecaster.market_portfolio_scenario_simulator") as mock_sim, \
+             patch("skills.market_portfolio_stress_deep_forecaster.market_anomaly_detector") as mock_anomaly, \
+             patch("skills.market_portfolio_stress_deep_forecaster.market_portfolio_ml_stress_evaluator") as mock_ml, \
+             patch("skills.market_portfolio_stress_deep_forecaster.market_portfolio_stress_audit_exporter_v2") as mock_audit:
 
-        with patch("skills.market_portfolio_stress_deep_forecaster.db_storage", mock_db), \
-             patch("skills.market_portfolio_stress_deep_forecaster.market_portfolio_scenario_simulator", mock_scenario_simulator):
-            
-            result = start_new(portfolio_id=self.random_portfolio_id, confidence=self.random_confidence_level)
-            
+            mock_db.fetch_historical_data.return_value = rand_hist_data
+            mock_sim.run_matrix.return_value = rand_scenario_res
+            mock_anomaly.evaluate_anomalies.return_value = rand_anomaly
+            mock_ml.predict_stress.return_value = rand_ml_pred
+            mock_audit.export_audit_log.return_value = rand_audit_id
+
+            result = start_new(portfolio_id=rand_portfolio_id, confidence=rand_conf)
+
             self.assertIsInstance(result, dict)
-            self.assertIn("status", result)
-            self.assertEqual(result["portfolio_id"], self.random_portfolio_id)
-            mock_db.fetch_historical_data.assert_called_once()
-            mock_scenario_simulator.run_matrix.assert_called_once()
+            self.assertEqual(result.get("status"), "success")
+            self.assertEqual(result.get("portfolio_id"), rand_portfolio_id)
+            self.assertEqual(result.get("confidence"), rand_conf)
+            self.assertEqual(result.get("historical_data"), rand_hist_data)
+            self.assertEqual(result.get("scenario_result"), rand_scenario_res)
+            self.assertEqual(result.get("ml_stress_prediction"), rand_ml_pred)
+            self.assertEqual(result.get("audit_id"), rand_audit_id)
+            self.assertEqual(result.get("anomaly_analysis"), rand_anomaly)
 
-    def test_start_new_anomaly_detection_integration(self):
-        random_anomaly_score = random.uniform(50.0, 100.0)
-        mock_anomaly_detector = MagicMock()
-        mock_anomaly_detector.evaluate_anomalies.return_value = {
-            "anomaly_detected": True,
-            "severity_score": random_anomaly_score,
-            "signature": self.random_string
-        }
+    def test_start_new_exception_handling(self):
+        rand_portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
+        rand_error_msg = f"err_{uuid.uuid4().hex[:6]}"
 
-        with patch("skills.market_portfolio_stress_deep_forecaster.market_anomaly_detector", mock_anomaly_detector):
-            result = start_new(portfolio_id=self.random_portfolio_id, confidence=self.random_confidence_level)
-            
-            self.assertIn("anomaly_analysis", result)
-            self.assertEqual(result["anomaly_analysis"]["severity_score"], random_anomaly_score)
-            self.assertEqual(result["anomaly_analysis"]["signature"], self.random_string)
-            mock_anomaly_detector.evaluate_anomalies.assert_called_once()
+        with patch("skills.market_portfolio_stress_deep_forecaster.db_storage", side_effect=Exception(rand_error_msg)):
+            result = start_new(portfolio_id=rand_portfolio_id)
 
-    def test_start_new_ml_stress_evaluation(self):
-        random_ml_prediction = random.uniform(-0.5, -0.01)
-        mock_ml_evaluator = MagicMock()
-        mock_ml_evaluator.predict_stress.return_value = random_ml_prediction
-
-        with patch("skills.market_portfolio_stress_deep_forecaster.market_portfolio_ml_stress_evaluator", mock_ml_evaluator):
-            result = start_new(portfolio_id=self.random_portfolio_id, confidence=self.random_confidence_level)
-            
-            self.assertIn("ml_stress_prediction", result)
-            self.assertEqual(result["ml_stress_prediction"], random_ml_prediction)
-            mock_ml_evaluator.predict_stress.assert_called_once()
-
-    def test_start_new_data_export_and_audit(self):
-        random_audit_id = f"audit_{uuid.uuid4().hex}"
-        mock_audit_exporter = MagicMock()
-        mock_audit_exporter.export_audit_log.return_value = random_audit_id
-
-        with patch("skills.market_portfolio_stress_deep_forecaster.market_portfolio_stress_audit_exporter_v2", mock_audit_exporter):
-            result = start_new(portfolio_id=self.random_portfolio_id, confidence=self.random_confidence_level)
-            
-            self.assertIn("audit_id", result)
-            self.assertEqual(result["audit_id"], random_audit_id)
-            mock_audit_exporter.export_audit_log.assert_called_once()
-
-    def test_start_new_exception_handling_and_recovery(self):
-        mock_db = MagicMock()
-        mock_db.fetch_historical_data.side_effect = Exception(self.random_string)
-
-        with patch("skills.market_portfolio_stress_deep_forecaster.db_storage", mock_db):
-            result = start_new(portfolio_id=self.random_portfolio_id, confidence=self.random_confidence_level)
-            
             self.assertIsInstance(result, dict)
             self.assertIn("error", result)
-            self.assertIn(self.random_string, result["error"])
+            self.assertEqual(result["error"], rand_error_msg)
+
+    def test_market_portfolio_stress_deep_forecaster_integration(self):
+        rand_portfolio_id = f"port_int_{uuid.uuid4().hex[:8]}"
+        rand_insights = {f"ins_{uuid.uuid4().hex[:4]}": random.randint(1, 100)}
+        rand_evals = {f"ev_{uuid.uuid4().hex[:4]}": random.random()}
+
+        with patch("skills.market_portfolio_stress_deep_forecaster.db_storage") as mock_db:
+            mock_db.side_effect = lambda **kwargs: kwargs.get("record_id")
+
+            result = market_portfolio_stress_deep_forecaster(
+                portfolio_id=rand_portfolio_id,
+                anomaly_insights=rand_insights,
+                scenario_evaluations=rand_evals
+            )
+
+            self.assertIsInstance(result, dict)
+            self.assertIn("forecast_id", result)
+            self.assertEqual(result.get("portfolio_id"), rand_portfolio_id)
+            self.assertEqual(result.get("anomaly_insights"), rand_insights)
+            self.assertEqual(result.get("scenario_evaluations"), rand_evals)
+            self.assertIsInstance(result.get("stress_probability"), float)
+
 
 if __name__ == "__main__":
     unittest.main()

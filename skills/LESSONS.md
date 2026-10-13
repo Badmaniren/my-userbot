@@ -3,19 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ию
-
-## market_portfolio_monitor (refactor) — раундов: 3
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_monitor (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_slippage_model (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_slippage_model (refactor) — раундов: 1
+ — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_slippage_model (refactor) — раундов: 1
@@ -279,5 +267,10 @@
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_audit_executive_brief (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_audit_executive_brief (create) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

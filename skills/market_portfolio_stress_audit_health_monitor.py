@@ -1,10 +1,25 @@
 import io
 import os
 import random
-import requests
 import string
 import uuid
 from enum import Enum
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
+from skills.market_portfolio_stress_audit_summary_vault import (
+    store_audit_summary,
+    get_audit_summary,
+    save_audit_summary,
+    market_portfolio_stress_audit_summary_vault_process
+)
+from skills.market_portfolio_stress_audit_visualizer import (
+    generate_audit_chart,
+    market_portfolio_stress_audit_visualizer
+)
 
 
 class SubsystemHealthStatus(Enum):
@@ -59,6 +74,11 @@ class MarketPortfolioStressAuditHealthMonitor:
         }
 
     def verify_stream_pipeline(self, subsystem_target):
+        if requests is None:
+            return {
+                "is_active": False,
+                "bytes_read": 0
+            }
         try:
             response = requests.get(subsystem_target)
             content = response.content
@@ -73,9 +93,4 @@ class MarketPortfolioStressAuditHealthMonitor:
             }
 
 
-def _dummy_subsystem_func(payload):
-    return {"status": "ok", "payload": payload}
-
-
-def __getattr__(name):
-    return _dummy_subsystem_func
+market_portfolio_stress_audit_health_monitor = MarketPortfolioStressAuditHealthMonitor

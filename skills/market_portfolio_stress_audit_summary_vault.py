@@ -74,8 +74,13 @@ def market_portfolio_stress_audit_summary_vault_process(storage_target, audit_da
     if dirname:
         os.makedirs(dirname, exist_ok=True)
 
+    def _json_serializer(obj):
+        if hasattr(obj, "value"):
+            return obj.value
+        return str(obj)
+
     with open(storage_target, "w", encoding="utf-8") as f:
-        json.dump(audit_data, f, indent=2, sort_keys=True)
+        json.dump(audit_data, f, indent=2, sort_keys=True, default=_json_serializer)
 
     audit_id = audit_data.get("audit_id")
     return {"status": "saved", "audit_id": audit_id}
@@ -114,3 +119,83 @@ def market_portfolio_stress_audit_summary_vault_export(file_path, format="json")
         "format": format,
         "data": data
     }
+
+
+_SUMMARY_VAULT_STORE = {}
+
+
+def store_audit_summary(summary_data):
+    """
+    Сохраняет сводку аудита в памяти и на диске.
+    """
+    if not isinstance(summary_data, dict):
+        raise TypeError("summary_data must be a dictionary")
+    audit_id = summary_data.get("audit_id")
+    if not audit_id:
+        import uuid
+        audit_id = f"audit_{uuid.uuid4().hex[:8]}"
+        summary_data["audit_id"] = audit_id
+    _SUMMARY_VAULT_STORE[audit_id] = dict(summary_data)
+    storage_target = f"audit_summary_{audit_id}.json"
+    market_portfolio_stress_audit_summary_vault_process(storage_target, summary_data)
+    return audit_id
+
+
+def get_audit_summary(audit_id):
+    """
+    Извлекает сводку аудита по audit_id.
+    """
+    if audit_id in _SUMMARY_VAULT_STORE:
+        return _SUMMARY_VAULT_STORE[audit_id]
+    storage_target = f"audit_summary_{audit_id}.json"
+    if os.path.exists(storage_target):
+        try:
+            with open(storage_target, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return None
+
+
+def save_audit_summary(audit_id, summary_data):
+    if isinstance(summary_data, dict):
+        summary_data["audit_id"] = audit_id
+    _SUMMARY_VAULT_STORE[audit_id] = summary_data
+    storage_target = f"audit_summary_{audit_id}.json"
+    return market_portfolio_stress_audit_summary_vault_process(storage_target, summary_data)
+
+
+def store_audit_data(audit_id, data):
+    return save_audit_summary(audit_id, data)
+
+
+def get_audit_data(audit_id):
+    return get_audit_summary(audit_id)
+
+
+def get_all_statuses():
+    return {k: v.get("global_status") for k, v in _SUMMARY_VAULT_STORE.items()}
+
+
+class MarketPortfolioStressAuditSummaryVault:
+    def save_audit_summary(self, audit_id, summary_data):
+        return save_audit_summary(audit_id, summary_data)
+
+    def get_audit_summary(self, audit_id):
+        return get_audit_summary(audit_id)
+
+    def store_audit_data(self, audit_id, data):
+        return store_audit_data(audit_id, data)
+
+    def get_audit_data(self, audit_id):
+        return get_audit_summary(audit_id)
+
+    def get_all_statuses(self):
+        return get_all_statuses()
+
+
+class SummaryVault(MarketPortfolioStressAuditSummaryVault):
+    pass
+
+
+market_portfolio_stress_audit_summary_vault = MarketPortfolioStressAuditSummaryVault()

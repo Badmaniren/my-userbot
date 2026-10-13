@@ -19,9 +19,8 @@ def start_new(portfolio_id):
         extractor_tool_1790102839.extract()
 
     health_metrics = None
-    if db_storage is not None:
-        if hasattr(db_storage, 'get_health_metrics'):
-            health_metrics = db_storage.get_health_metrics(portfolio_id)
+    if db_storage is not None and hasattr(db_storage, 'get_health_metrics'):
+        health_metrics = db_storage.get_health_metrics(portfolio_id)
 
     scenario_res = None
     if market_portfolio_stress_scenario_executor_bridge is not None:

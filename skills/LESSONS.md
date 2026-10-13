@@ -3,31 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ost_analyzer (start_new) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_tax_calculator (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_tax_calculator (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_net_dividend_calculator (compose) — раундов: 3
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_tax_return_analyzer (compose) — раундов: 4
-- Последняя ошибка перед фиксом: FAIL: test_evaluate_tax_efficiency_with_portfolio_taxes_method (tests.test_market_portfolio_tax_return_analyzer.TestMarketPortfolioTaxReturnAnalyzer.test_evaluate_tax_efficiency_with_portfolio_taxes_method)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_tax_calculator (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_net_yield_evaluator (compose) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=3)
+шибка перед фиксом: FAILED (errors=3)
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_tax_calculator (refactor) — раундов: 1
@@ -272,3 +248,16 @@ ost_analyzer (start_new) — раундов: 4
 ## market_portfolio_stress_audit_summary_vault (create) — раундов: 2
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_audit_health_monitor (refactor) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 1); Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 1); Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## extractor_tool_1791903203 (create) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_audit_health_monitor (refactor) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -37,9 +37,9 @@ class MarketPortfolioStressAuditHealthMonitor:
         self.subsystems = subsystems if subsystems is not None else []
 
     def _probe_subsystem(self, subsystem_name: str) -> Dict[str, Any]:
-        token = uuid.uuid4().hex
         status = SubsystemHealthStatus.HEALTHY
         error_msg = None
+        token = None
 
         if subsystem_name == "db_storage":
             try:
@@ -66,7 +66,7 @@ class MarketPortfolioStressAuditHealthMonitor:
         return {
             "subsystem": subsystem_name,
             "status": status,
-            "token": token if status == SubsystemHealthStatus.HEALTHY else None,
+            "token": token,
             "error": error_msg,
         }
 

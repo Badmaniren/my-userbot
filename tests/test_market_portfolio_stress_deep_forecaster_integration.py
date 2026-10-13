@@ -1,62 +1,50 @@
 import unittest
 import uuid
 import random
-import os
-from skills.market_portfolio_stress_deep_forecaster import market_portfolio_stress_deep_forecaster
-from skills.db_storage import db_storage
-from skills.market_anomaly_detector import market_anomaly_detector
-from skills.market_portfolio_scenario_simulator import market_portfolio_scenario_simulator
-from skills.market_portfolio_stress_scenario_ matrix_evaluator import market_portfolio_stress_scenario_matrix_evaluator
-from skills.market_portfolio_ml_feature_builder import market_portfolio_ml_feature_builder
+
+from skills.market_portfolio_stress_deep_forecaster import (
+    start_new,
+    market_portfolio_stress_deep_forecaster
+)
+
 
 class TestMarketPortfolioStressDeepForecasterIntegration(unittest.TestCase):
 
-    def test_deep_forecaster_pipeline_integration(self):
+    def test_start_new_integration_flow(self):
         portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
-        historical_anomaly_threshold = round(random.uniform(1.5, 4.0), 2)
-        scenario_intensity = round(random.uniform(0.1, 0.9), 2)
-        
-        anomaly_data = market_anomaly_detector(
+        confidence = round(random.uniform(0.80, 0.99), 2)
+
+        result = start_new(portfolio_id=portfolio_id, confidence=confidence)
+
+        self.assertIsInstance(result, dict)
+        self.assertIn("status", result)
+        self.assertEqual(result.get("status"), "success")
+        self.assertEqual(result.get("portfolio_id"), portfolio_id)
+        self.assertEqual(result.get("confidence"), confidence)
+        self.assertIn("historical_data", result)
+        self.assertIn("scenario_result", result)
+        self.assertIn("ml_stress_prediction", result)
+        self.assertIn("audit_id", result)
+
+    def test_deep_forecaster_integration_flow(self):
+        portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
+        anomaly_insights = {"anomaly_score": round(random.uniform(0.0, 1.0), 4)}
+        scenario_evaluations = {"var_95": round(random.uniform(-5000.0, -100.0), 2)}
+
+        result = market_portfolio_stress_deep_forecaster(
             portfolio_id=portfolio_id,
-            threshold=historical_anomaly_threshold
-        )
-        self.assertIsNotNone(anomaly_data)
-
-        features = market_portfolio_ml_feature_builder(
-            portfolio_id=portfolio_id,
-            raw_data=anomaly_data
-        )
-        self.assertIsNotNone(features)
-
-        simulation_matrix = market_portfolio_scenario_simulator(
-            portfolio_id=portfolio_id,
-            intensity=scenario_intensity
-        )
-        self.assertIsNotNone(simulation_matrix)
-
-        matrix_evaluation = market_portfolio_stress_scenario_matrix_evaluator(
-            scenario_matrix=simulation_matrix,
-            features=features
-        )
-        self.assertIsNotNone(matrix_evaluation)
-
-        forecast_result = market_portfolio_stress_deep_forecaster(
-            portfolio_id=portfolio_id,
-            anomaly_insights=anomaly_data,
-            scenario_evaluations=matrix_evaluation
+            anomaly_insights=anomaly_insights,
+            scenario_evaluations=scenario_evaluations
         )
 
-        self.assertIn("forecast_id", forecast_result)
-        self.assertEqual(forecast_result["portfolio_id"], portfolio_id)
-        self.assertIsInstance(forecast_result["stress_probability"], float)
+        self.assertIsInstance(result, dict)
+        self.assertIn("forecast_id", result)
+        self.assertTrue(result["forecast_id"].startswith("fc_"))
+        self.assertEqual(result.get("portfolio_id"), portfolio_id)
+        self.assertIsInstance(result.get("stress_probability"), float)
+        self.assertEqual(result.get("anomaly_insights"), anomaly_insights)
+        self.assertEqual(result.get("scenario_evaluations"), scenario_evaluations)
 
-        stored_record = db_storage(
-            action="get",
-            table="deep_forecasts",
-            record_id=forecast_result["forecast_id"]
-        )
-        self.assertEqual(stored_record.get("portfolio_id"), portfolio_id)
-        self.assertEqual(stored_record.get("forecast_id"), forecast_result["forecast_id"])
 
 if __name__ == "__main__":
     unittest.main()

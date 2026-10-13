@@ -10,17 +10,17 @@ from skills.market_portfolio_stress_recovery_coordinator_bridge import (
 )
 
 class TestStressRecoveryCoordinatorBridgeIntegration(unittest.TestCase):
-    
+
     def setUp(self):
-        self.random_str = str(uuid.uuid4())[:8]
-        self.storage_file = f"test_stress_recovery_{self.random_str}.db"
-        self.symbol = f"TICKER_{self.random_str}"
-        self.url = f"https://api.test-webhook-{self.random_str}.com/hook"
-        self.telegram_token = f"TOKEN_{self.random_str}"
+        self.random_suffix = uuid.uuid4().hex[:8]
+        self.storage_file = f"test_stress_recovery_{self.random_suffix}.db"
+        self.symbol = f"TICKER_{random.randint(1000, 9999)}"
+        self.url = f"https://api.test-gateway-{self.random_suffix}.local/webhook"
+        self.telegram_token = f"TOKEN_{uuid.uuid4().hex[:6]}"
         self.chat_id = str(random.randint(100000, 999999))
         self.percentage = round(random.uniform(5.0, 35.0), 2)
         self.shifts = random.randint(1, 10)
-        self.price = round(random.uniform(10.0, 1000.0), 2)
+        self.price = round(random.uniform(10.0, 500.0), 2)
 
     def tearDown(self):
         if os.path.exists(self.storage_file):
@@ -29,7 +29,7 @@ class TestStressRecoveryCoordinatorBridgeIntegration(unittest.TestCase):
             except OSError:
                 pass
 
-    def test_class_bridge_execution(self):
+    def test_class_execution_workflow_integration(self):
         bridge = StressRecoveryCoordinatorBridge(storage_file=self.storage_file)
         self.assertTrue(os.path.exists(self.storage_file))
 
@@ -48,11 +48,13 @@ class TestStressRecoveryCoordinatorBridgeIntegration(unittest.TestCase):
 
         with open(self.storage_file, "r") as f:
             data = json.load(f)
+        
         self.assertIn(self.symbol, data)
         self.assertEqual(data[self.symbol]["percentage"], self.percentage)
         self.assertEqual(data[self.symbol]["shifts"], self.shifts)
+        self.assertEqual(data[self.symbol]["status"], "workflow_run")
 
-    def test_coordinator_function_execution(self):
+    def test_run_stress_recovery_coordinator_integration(self):
         result = run_stress_recovery_coordinator(
             storage_file=self.storage_file,
             symbol=self.symbol,
@@ -67,12 +69,15 @@ class TestStressRecoveryCoordinatorBridgeIntegration(unittest.TestCase):
         self.assertIn("stress", result)
         self.assertIn("recovery", result)
 
+        self.assertTrue(os.path.exists(self.storage_file))
         with open(self.storage_file, "r") as f:
             data = json.load(f)
+
         self.assertIn(self.symbol, data)
         self.assertEqual(data[self.symbol]["status"], "coordinator_run")
+        self.assertEqual(data[self.symbol]["shifts"], self.shifts)
 
-    def test_coordinator_pipeline_execution(self):
+    def test_run_stress_recovery_coordinator_pipeline_integration(self):
         result = run_stress_recovery_coordinator_pipeline(
             storage_file=self.storage_file,
             symbol=self.symbol,
@@ -88,10 +93,13 @@ class TestStressRecoveryCoordinatorBridgeIntegration(unittest.TestCase):
         self.assertIn("stress", result)
         self.assertIn("recovery", result)
 
+        self.assertTrue(os.path.exists(self.storage_file))
         with open(self.storage_file, "r") as f:
             data = json.load(f)
+
         self.assertIn(self.symbol, data)
         self.assertEqual(data[self.symbol]["price"], self.price)
+        self.assertEqual(data[self.symbol]["percentage"], self.percentage)
         self.assertEqual(data[self.symbol]["status"], "pipeline_run")
 
 if __name__ == "__main__":

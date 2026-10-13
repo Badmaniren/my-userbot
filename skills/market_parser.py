@@ -50,6 +50,18 @@ class MarketParser:
             except (json.JSONDecodeError, OSError):
                 data = {}
 
+        if not isinstance(data, dict):
+            new_data = {}
+            if isinstance(data, list):
+                for item in data:
+                    if isinstance(item, dict) and "symbol" in item:
+                        sym = item["symbol"]
+                        new_data[sym] = {
+                            "price": item.get("price"),
+                            "record_id": item.get("record_id", str(uuid.uuid4()))
+                        }
+            data = new_data
+
         data[symbol] = {
             "price": price,
             "record_id": record_id

@@ -3,3 +3,10 @@ __pycache__/
 .pytest_cache/
 *.pyo
 *.pyd
+storage_*
+test_db_*
+test_market_*
+test_storage_*
+test_vault_*
+:memory:
+output.json

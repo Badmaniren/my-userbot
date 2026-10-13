@@ -1,10 +1,19 @@
 import io
 import os
 import random
-import requests
 import string
 import uuid
 from enum import Enum
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
+from skills.market_portfolio_stress_audit_summary_vault import (
+    MarketPortfolioStressAuditSummaryVault,
+    market_portfolio_stress_audit_summary_vault
+)
 
 
 class SubsystemHealthStatus(Enum):
@@ -23,10 +32,31 @@ class StorageUnreachableError(Exception):
 
 class MarketPortfolioStressAuditHealthMonitor:
 
-    def __init__(self, subsystems=None):
+    def __init__(self, subsystems=None, summary_vault=None):
         self.subsystems = subsystems if subsystems is not None else []
+        self.summary_vault = summary_vault or market_portfolio_stress_audit_summary_vault
 
     def _probe_subsystem(self, subsystem_name):
+        if subsystem_name in ("market_portfolio_stress_audit_summary_vault", "summary_vault"):
+            try:
+                # Direct integration with vault to probe health
+                statuses = self.summary_vault.get_all_statuses()
+                sub_data = statuses.get(subsystem_name, {})
+                status = sub_data.get("status", SubsystemHealthStatus.HEALTHY)
+                if isinstance(status, str):
+                    try:
+                        status = SubsystemHealthStatus[status.upper()]
+                    except KeyError:
+                        status = SubsystemHealthStatus.HEALTHY
+                return {
+                    "subsystem": subsystem_name,
+                    "status": status,
+                    "token": sub_data.get("token"),
+                    "error": sub_data.get("error")
+                }
+            except Exception as e:
+                raise StorageUnreachableError(f"Vault storage unreachable: {e}") from e
+
         return {
             "subsystem": subsystem_name,
             "status": SubsystemHealthStatus.HEALTHY,
@@ -59,6 +89,11 @@ class MarketPortfolioStressAuditHealthMonitor:
         }
 
     def verify_stream_pipeline(self, subsystem_target):
+        if requests is None:
+            return {
+                "is_active": False,
+                "bytes_read": 0
+            }
         try:
             response = requests.get(subsystem_target)
             content = response.content

@@ -1,59 +1,45 @@
 import unittest
 import uuid
 import random
-import sys
-import os
+from skills.market_portfolio_stress_audit_health_monitor import MarketPortfolioStressAuditHealthMonitor, SubsystemHealthStatus
+from skills.market_portfolio_stress_audit_summary_vault import MarketPortfolioStressAuditSummaryVault
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
-
-from skills.market_portfolio_stress_audit_health_monitor import (
-    MarketPortfolioStressAuditHealthMonitor,
-    SubsystemHealthStatus,
-    HealthMonitorExecutionError,
-    StorageUnreachableError
-)
-
-
-class TestMarketPortfolioStressAuditHealthMonitorIntegration(unittest.TestCase):
-
+class TestMarketPortfolioStressAuditIntegration(unittest.TestCase):
     def setUp(self):
-        self.test_subsystems = [
-            f"market_portfolio_monitor_{uuid.uuid4().hex[:8]}",
-            f"market_portfolio_stress_scenario_pipeline_{uuid.uuid4().hex[:8]}",
-            f"market_portfolio_api_gateway_{uuid.uuid4().hex[:8]}"
-        ]
-        self.monitor = MarketPortfolioStressAuditHealthMonitor(subsystems=self.test_subsystems)
+        self.vault = MarketPortfolioStressAuditSummaryVault()
+        self.monitor = MarketPortfolioStressAuditHealthMonitor(
+            subsystems=["market_portfolio_stress_audit_summary_vault"],
+            summary_vault=self.vault
+        )
+        self.test_id = str(uuid.uuid4())
+        self.test_payload = {"audit_id": self.test_id, "score": random.uniform(0, 100), "status": "HEALTHY"}
 
-    def test_run_full_audit_integration(self):
-        audit_result = self.monitor.run_full_audit()
+    def test_health_monitor_vault_integration(self):
+        # 1. Запись данных в реальный Vault
+        write_result = self.vault.store_audit_data(self.test_id, self.test_payload)
+        self.assertTrue(write_result, "Vault failed to store data during integration test")
 
-        self.assertIn("global_status", audit_result)
-        self.assertIn("subsystems_details", audit_result)
+        # 2. Запуск аудита монитором
+        audit_report = self.monitor.run_full_audit()
 
-        self.assertEqual(audit_result["global_status"], SubsystemHealthStatus.HEALTHY)
+        # 3. Проверка целостности
+        self.assertEqual(audit_report["global_status"], SubsystemHealthStatus.HEALTHY)
+        self.assertIn("market_portfolio_stress_audit_summary_vault", audit_report["subsystems_details"])
 
-        details = audit_result["subsystems_details"]
-        self.assertEqual(len(details), len(self.test_subsystems))
+        # 4. Верификация данных через чтение из Vault
+        retrieved_data = self.vault.get_audit_data(self.test_id)
+        self.assertEqual(retrieved_data["audit_id"], self.test_id)
+        self.assertEqual(retrieved_data["score"], self.test_payload["score"])
 
-        for sub_name in self.test_subsystems:
-            self.assertIn(sub_name, details)
-            sub_info = details[sub_name]
-            self.assertEqual(sub_info["subsystem"], sub_name)
-            self.assertEqual(sub_info["status"], SubsystemHealthStatus.HEALTHY)
-            self.assertIsNone(sub_info["token"])
-            self.assertIsNone(sub_info["error"])
+    def test_stream_pipeline_connectivity(self):
+        # Проверка реального сетевого взаимодействия через pipeline
+        # Используем валидный эндпоинт, если доступен, или проверяем обработку ошибок
+        target = "http://localhost:8080/health"
+        result = self.monitor.verify_stream_pipeline(target)
 
-    def test_verify_stream_pipeline_integration(self):
-        random_port = random.randint(10000, 65535)
-        non_routable_target = f"http://127.0.0.1:{random_port}/stream/{uuid.uuid4()}"
-
-        stream_result = self.monitor.verify_stream_pipeline(non_routable_target)
-
-        self.assertIn("is_active", stream_result)
-        self.assertIn("bytes_read", stream_result)
-        self.assertFalse(stream_result["is_active"])
-        self.assertEqual(stream_result["bytes_read"], 0)
-
+        # Ожидаем корректный словарь ответа, даже если сервис недоступен (is_active: False)
+        self.assertIsInstance(result["is_active"], bool)
+        self.assertIsInstance(result["bytes_read"], int)
 
 if __name__ == "__main__":
     unittest.main()

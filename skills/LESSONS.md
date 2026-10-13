@@ -3,13 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-^^^^^^^^^^^^^
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_backtester (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_execution_pipeline (refactor) — раундов: 4
+io_execution_pipeline (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: raise ExecutionPipelineError(f"Error in execute_order_simulation: {e}")
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -299,3 +293,7 @@
 ## market_portfolio_stress_recovery_coordinator_bridge (refactor) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=3)
 - Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_recovery_coordinator_bridge (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=3)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

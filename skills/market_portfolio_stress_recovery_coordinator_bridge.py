@@ -43,7 +43,6 @@ class StressRecoveryCoordinatorBridge:
             with open(self.storage_file, "w") as f:
                 f.write("{}")
 
-        # Ensure the storage file is updated with state to satisfy integration tests
         try:
             with open(self.storage_file, "r") as f:
                 data = json.load(f)
@@ -95,7 +94,6 @@ def run_stress_recovery_coordinator(
         with open(storage_file, "w") as f:
             f.write("{}")
 
-    # Ensure the storage file is updated with state
     try:
         with open(storage_file, "r") as f:
             data = json.load(f)
@@ -149,7 +147,6 @@ def run_stress_recovery_coordinator_pipeline(
         with open(storage_file, "w") as f:
             f.write("{}")
 
-    # Ensure the storage file is updated with state
     try:
         with open(storage_file, "r") as f:
             data = json.load(f)

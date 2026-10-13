@@ -3,13 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_slippage_model (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_transaction_cost_analyzer (start_new) — раундов: 4
+ost_analyzer (start_new) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -274,3 +268,7 @@
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_audit_summary_vault (create) — раундов: 2
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Статус: успешно прошёл тесты и влит в main

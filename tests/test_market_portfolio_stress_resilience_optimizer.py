@@ -1,46 +1,53 @@
 import unittest
-from unittest.mock import patch
-import uuid
+from unittest.mock import patch, MagicMock
 import random
+import uuid
+import sys
+import types
 
-from skills import market_portfolio_stress_resilience_optimizer as optimizer
+if 'skills' not in sys.modules:
+    skills_mock = types.ModuleType('skills')
+    sys.modules['skills'] = skills_mock
 
+from skills.market_portfolio_stress_resilience_optimizer import start_new, market_portfolio_stress_resilience_optimizer
 
 class TestMarketPortfolioStressResilienceOptimizer(unittest.TestCase):
 
-    def test_start_new_success_execution(self):
-        portfolio_id = str(uuid.uuid4())
-        mock_health_metrics = {'health_score': round(random.uniform(0.5, 1.0), 2)}
-        mock_scenario_res = {'scenario_impact': round(random.uniform(-0.5, 0.0), 2)}
+    def test_start_new_full_workflow(self):
+        rand_portfolio_id = uuid.uuid4().hex
+        rand_health_key = uuid.uuid4().hex
+        rand_health_val = uuid.uuid4().hex
+        rand_scenario_key = uuid.uuid4().hex
+        rand_scenario_val = uuid.uuid4().hex
 
-        with patch('skills.market_portfolio_stress_resilience_optimizer.market_portfolio_realtime_stream_ingestor') as mock_ingestor, \
+        with patch('skills.market_portfolio_stress_resilience_optimizer.market_portfolio_realtime_stream_ingestor') as mock_stream, \
              patch('skills.market_portfolio_stress_resilience_optimizer.extractor_tool_1790087207') as mock_ext1, \
              patch('skills.market_portfolio_stress_resilience_optimizer.extractor_tool_1790102839') as mock_ext2, \
              patch('skills.market_portfolio_stress_resilience_optimizer.db_storage') as mock_db, \
-             patch('skills.market_portfolio_stress_resilience_optimizer.market_portfolio_stress_scenario_executor_bridge') as mock_bridge:
+             patch('skills.market_portfolio_stress_resilience_optimizer.market_portfolio_stress_scenario_executor_bridge') as mock_scenario:
 
-            mock_ingestor.read_stream.return_value = None
-            mock_ext1.extract.return_value = None
-            mock_ext2.extract.return_value = None
-            mock_db.get_health_metrics.return_value = mock_health_metrics
-            mock_bridge.run_simulation.return_value = mock_scenario_res
+            mock_stream.read_stream = MagicMock()
+            mock_ext1.extract = MagicMock()
+            mock_ext2.extract = MagicMock()
+            mock_db.get_health_metrics.return_value = {rand_health_key: rand_health_val}
+            mock_scenario.run_simulation.return_value = {rand_scenario_key: rand_scenario_val}
 
-            result = optimizer.start_new(portfolio_id)
+            result = start_new(rand_portfolio_id)
 
             self.assertIsInstance(result, dict)
-            self.assertEqual(result.get('portfolio_id'), portfolio_id)
+            self.assertEqual(result.get('portfolio_id'), rand_portfolio_id)
             self.assertEqual(result.get('status'), 'optimized')
-            self.assertEqual(result.get('health_score'), mock_health_metrics['health_score'])
-            self.assertEqual(result.get('scenario_impact'), mock_scenario_res['scenario_impact'])
+            self.assertEqual(result.get(rand_health_key), rand_health_val)
+            self.assertEqual(result.get(rand_scenario_key), rand_scenario_val)
 
-            mock_ingestor.read_stream.assert_called_once()
+            mock_stream.read_stream.assert_called_once()
             mock_ext1.extract.assert_called_once()
             mock_ext2.extract.assert_called_once()
-            mock_db.get_health_metrics.assert_called_once_with(portfolio_id)
-            mock_bridge.run_simulation.assert_called_once_with(portfolio_id)
+            mock_db.get_health_metrics.assert_called_once_with(rand_portfolio_id)
+            mock_scenario.run_simulation.assert_called_once_with(rand_portfolio_id)
 
     def test_start_new_missing_dependencies(self):
-        portfolio_id = str(uuid.uuid4())
+        rand_portfolio_id = uuid.uuid4().hex
 
         with patch('skills.market_portfolio_stress_resilience_optimizer.market_portfolio_realtime_stream_ingestor', None), \
              patch('skills.market_portfolio_stress_resilience_optimizer.extractor_tool_1790087207', None), \
@@ -48,45 +55,44 @@ class TestMarketPortfolioStressResilienceOptimizer(unittest.TestCase):
              patch('skills.market_portfolio_stress_resilience_optimizer.db_storage', None), \
              patch('skills.market_portfolio_stress_resilience_optimizer.market_portfolio_stress_scenario_executor_bridge', None):
 
-            result = optimizer.start_new(portfolio_id)
+            result = start_new(rand_portfolio_id)
 
             self.assertIsInstance(result, dict)
-            self.assertEqual(result.get('portfolio_id'), portfolio_id)
+            self.assertEqual(result.get('portfolio_id'), rand_portfolio_id)
             self.assertEqual(result.get('status'), 'optimized')
 
-    def tf_market_portfolio_stress_resilience_optimizer_payload(self):
-        pass
-
     def test_market_portfolio_stress_resilience_optimizer_execution(self):
-        portfolio_id = str(uuid.uuid4())
-        payload = {"portfolio_id": portfolio_id}
+        rand_portfolio_id = uuid.uuid4().hex
+        payload = {"portfolio_id": rand_portfolio_id}
+        
+        mock_db_callable = MagicMock()
 
-        with patch('skills.market_portfolio_stress_resilience_optimizer.db_storage') as mock_db:
-            mock_db.return_value = None
-
-            response = optimizer.market_portfolio_stress_resilience_optimizer(payload)
+        with patch('skills.market_portfolio_stress_resilience_optimizer.db_storage', mock_db_callable):
+            response = market_portfolio_stress_resilience_optimizer(payload)
 
             self.assertIsInstance(response, dict)
-            self.assertEqual(response.get("optimized_portfolio_id"), portfolio_id)
+            self.assertEqual(response.get("optimized_portfolio_id"), rand_portfolio_id)
             self.assertIn("resilience_score", response)
-            self.assertIsInstance(response.get("resilience_score"), float)
-            self.assertTrue(0.8 <= response.get("resilience_score") <= 1.0)
+            
+            score = response.get("resilience_score")
+            self.assertIsInstance(score, float)
+            self.assertTrue(0.8 <= score <= 1.0)
 
-            self.assertEqual(mock_db.call_count, 2)
-            mock_db.assert_any_call(f"save_resilience:{portfolio_id}")
-            mock_db.assert_any_call(f"get_resilience:{portfolio_id}")
+            mock_db_callable.assert_any_call(f"save_resilience:{rand_portfolio_id}")
+            mock_db_callable.assert_any_call(f"get_resilience:{rand_portfolio_id}")
+            self.assertEqual(mock_db_callable.call_count, 2)
 
     def test_market_portfolio_stress_resilience_optimizer_no_db(self):
-        portfolio_id = str(uuid.uuid4())
-        payload = {"portfolio_id": portfolio_id}
+        rand_portfolio_id = uuid.uuid4().hex
+        payload = {"portfolio_id": rand_portfolio_id}
 
         with patch('skills.market_portfolio_stress_resilience_optimizer.db_storage', None):
-            response = optimizer.market_portfolio_stress_resilience_optimizer(payload)
+            response = market_portfolio_stress_resilience_optimizer(payload)
 
             self.assertIsInstance(response, dict)
-            self.assertEqual(response.get("optimized_portfolio_id"), portfolio_id)
+            self.assertEqual(response.get("optimized_portfolio_id"), rand_portfolio_id)
             self.assertIn("resilience_score", response)
-
+            self.assertTrue(0.8 <= response.get("resilience_score") <= 1.0)
 
 if __name__ == '__main__':
     unittest.main()

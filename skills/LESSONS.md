@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-т в main
-
-## market_portfolio_predictive_var_hedge_synthesizer (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
+и влит в main
 
 ## market_portfolio_integration_hub (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
@@ -304,6 +301,9 @@
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 1)
 - Последняя ошибка перед фиксом: ======================================================================
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_resilience_optimizer (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_stress_resilience_optimizer (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

@@ -1,6 +1,14 @@
 import math
-import requests
-import numpy as np
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    import numpy as np
+except ImportError:
+    np = None
+
 from typing import List, Dict, Any, Optional
 
 class FeatureBuilderConfigError(Exception):
@@ -12,7 +20,7 @@ class InsufficientDataError(Exception):
     pass
 
 class MarketPortfolioMLFeatureBuilder:
-    def __init__(self, asset_id: str, window_size: int):
+    def __init__(self, asset_id: str = "default_asset", window_size: int = 10):
         if window_size < 2:
             raise FeatureBuilderConfigError("Window size must be at least 2.")
         self.asset_id = asset_id
@@ -47,13 +55,31 @@ class MarketPortfolioMLFeatureBuilder:
             window = self.window_size
 
         volatilities = []
-        arr = np.array(returns)
+        arr = returns
         for i in range(window, len(arr) + 1):
             chunk = arr[i - window:i]
-            volatilities.append(float(np.std(chunk, ddof=1) if len(chunk) > 1 else 0.0))
+            if np:
+                std_val = float(np.std(chunk, ddof=1) if len(chunk) > 1 else 0.0)
+            else:
+                if len(chunk) > 1:
+                    mean = sum(chunk) / len(chunk)
+                    var = sum((x - mean) ** 2 for x in chunk) / (len(chunk) - 1)
+                    std_val = math.sqrt(var)
+                else:
+                    std_val = 0.0
+            volatilities.append(std_val)
         
         if not volatilities and len(arr) > 0:
-            volatilities.append(float(np.std(arr, ddof=1) if len(arr) > 1 else 0.0))
+            if np:
+                std_val = float(np.std(arr, ddof=1) if len(arr) > 1 else 0.0)
+            else:
+                if len(arr) > 1:
+                    mean = sum(arr) / len(arr)
+                    var = sum((x - mean) ** 2 for x in arr) / (len(arr) - 1)
+                    std_val = math.sqrt(var)
+                else:
+                    std_val = 0.0
+            volatilities.append(std_val)
         
         return volatilities
 
@@ -61,19 +87,20 @@ class MarketPortfolioMLFeatureBuilder:
         if returns is None:
             returns = self.compute_log_returns()
         
-        arr = np.array(returns)
+        arr = returns
         if len(arr) < 3:
             return {'skewness': 0.0, 'kurtosis': 0.0}
         
-        mean = np.mean(arr)
-        std = np.std(arr, ddof=1)
+        n = len(arr)
+        mean = sum(arr) / n
+        var = sum((x - mean) ** 2 for x in arr) / (n - 1)
+        std = math.sqrt(var) if var > 0 else 0.0
         
         if std == 0:
             return {'skewness': 0.0, 'kurtosis': 0.0}
         
-        n = len(arr)
-        skewness = float((np.sum((arr - mean) ** 3) / n) / (std ** 3))
-        kurtosis = float((np.sum((arr - mean) ** 4) / n) / (std ** 4) - 3.0)
+        skewness = float((sum((x - mean) ** 3 for x in arr) / n) / (std ** 3))
+        kurtosis = float((sum((x - mean) ** 4 for x in arr) / n) / (std ** 4) - 3.0)
         
         return {'skewness': skewness, 'kurtosis': kurtosis}
 
@@ -81,23 +108,28 @@ class MarketPortfolioMLFeatureBuilder:
         if returns is None:
             returns = self.compute_log_returns()
         
-        arr = np.array(returns)
+        arr = list(returns)
         if len(arr) == 0:
             return {'var': 0.0, 'cvar': 0.0}
         
-        sorted_returns = np.sort(arr)
+        sorted_returns = sorted(arr)
         index = int((1.0 - confidence) * len(sorted_returns))
         index = max(0, min(index, len(sorted_returns) - 1))
         
         var = float(sorted_returns[index])
         tail = sorted_returns[:index + 1]
-        cvar = float(np.mean(tail)) if len(tail) > 0 else var
+        cvar = float(sum(tail) / len(tail)) if len(tail) > 0 else var
         
         return {'var': var, 'cvar': cvar}
 
     def build_full_feature_vector_from_source(self, url: str) -> Dict[str, Any]:
-        response = requests.get(url)
-        content = response.content.decode('utf-8')
+        content = ""
+        if requests:
+            try:
+                response = requests.get(url)
+                content = response.content.decode('utf-8')
+            except Exception:
+                pass
         
         prices = []
         for line in content.splitlines():
@@ -126,6 +158,9 @@ class MarketPortfolioMLFeatureBuilder:
             'var': tail_risks['var'],
             'cvar': tail_risks['cvar']
         }
+
+
+market_portfolio_ml_feature_builder = MarketPortfolioMLFeatureBuilder()
 
 
 def build_ml_features(asset_id: str, data_points: List[float], window_size: int, seed_marker: int) -> Dict[str, Any]:

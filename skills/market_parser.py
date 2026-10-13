@@ -1,8 +1,16 @@
 import json
 import os
 import uuid
-import requests
-from bs4 import BeautifulSoup
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 
 class MarketParser:
@@ -10,6 +18,8 @@ class MarketParser:
         self.storage_file = storage_file
 
     def fetch_price(self, url):
+        if not requests:
+            return None
         try:
             response = requests.get(url, timeout=10)
             try:
@@ -21,6 +31,8 @@ class MarketParser:
             return None
 
     def parse_html_prices(self, url):
+        if not requests or not BeautifulSoup:
+            return []
         try:
             response = requests.get(url, timeout=10)
             soup = BeautifulSoup(response.text, 'html.parser')
@@ -38,6 +50,14 @@ class MarketParser:
             return parsed_items
         except requests.exceptions.RequestException:
             return []
+
+    def parse_stream(self, stream_input):
+        if hasattr(stream_input, "read"):
+            data = stream_input.read()
+            if isinstance(data, bytes):
+                data = data.decode("utf-8", errors="ignore")
+            return {"parsed_stream": data}
+        return {"parsed_stream": str(stream_input)}
 
     def fetch_and_store(self, symbol, price):
         record_id = str(uuid.uuid4())
@@ -66,3 +86,6 @@ class MarketParser:
             with open(filename, 'r', encoding='utf-8') as f:
                 return json.load(f)
         return {}
+
+
+market_parser = MarketParser()

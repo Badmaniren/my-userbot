@@ -3,14 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-r in execute_order_simulation: {e}")
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_monitor (refactor) — раундов: 2
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_monitor (refactor) — раундов: 1
+r (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_monitor (refactor) — раундов: 2
@@ -299,3 +292,7 @@ r in execute_order_simulation: {e}")
 
 ## market_portfolio_stress_audit_visualizer (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## market_portfolio_stress_audit_visualizer (refactor) — раундов: 1
+- Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/unittest/loader.py", line 419, in _find_test_path
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

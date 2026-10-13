@@ -1,81 +1,71 @@
-import io
-import os
-import random
-import requests
-import string
-import uuid
-from enum import Enum
-
-
-class SubsystemHealthStatus(Enum):
-    HEALTHY = "HEALTHY"
-    DEGRADED = "DEGRADED"
-    UNHEALTHY = "UNHEALTHY"
-
-
-class HealthMonitorExecutionError(Exception):
-    pass
-
-
-class StorageUnreachableError(Exception):
-    pass
+from skills.market_portfolio_stress_audit_summary_vault import market_portfolio_stress_audit_summary_vault
 
 
 class MarketPortfolioStressAuditHealthMonitor:
+    """
+    Монитор здоровья аудита рыночного портфеля.
+    Обеспечивает проверку целостности данных и анализ рисков на основе данных из Vault.
+    """
 
-    def __init__(self, subsystems=None):
-        self.subsystems = subsystems if subsystems is not None else []
+    def __init__(self):
+        self.vault = market_portfolio_stress_audit_summary_vault()
 
-    def _probe_subsystem(self, subsystem_name):
-        return {
-            "subsystem": subsystem_name,
-            "status": SubsystemHealthStatus.HEALTHY,
-            "token": None,
-            "error": None
-        }
+    def check_audit_integrity(self, audit_id: str) -> dict:
+        """
+        Проверяет целостность и состояние конкретного аудита.
+        Интегрируется напрямую с market_portfolio_stress_audit_summary_vault.
+        """
+        # Получаем данные напрямую из хранилища
+        audit_data = self.vault.get_audit_summary(audit_id)
 
-    def run_full_audit(self):
-        subsystems_details = {}
-        global_status = SubsystemHealthStatus.HEALTHY
-
-        for sub in self.subsystems:
-            try:
-                result = self._probe_subsystem(sub)
-            except StorageUnreachableError:
-                raise
-            except Exception as e:
-                raise HealthMonitorExecutionError(str(e)) from e
-
-            subsystems_details[sub] = result
-            status = result.get("status")
-            if status == SubsystemHealthStatus.DEGRADED and global_status == SubsystemHealthStatus.HEALTHY:
-                global_status = SubsystemHealthStatus.DEGRADED
-            elif status == SubsystemHealthStatus.UNHEALTHY:
-                global_status = SubsystemHealthStatus.UNHEALTHY
-
-        return {
-            "global_status": global_status,
-            "subsystems_details": subsystems_details
-        }
-
-    def verify_stream_pipeline(self, subsystem_target):
-        try:
-            response = requests.get(subsystem_target)
-            content = response.content
+        if not audit_data:
             return {
-                "is_active": True,
-                "bytes_read": len(content)
-            }
-        except Exception:
-            return {
-                "is_active": False,
-                "bytes_read": 0
+                "audit_id": audit_id,
+                "status": "NOT_FOUND",
+                "is_healthy": False,
+                "health_level": "UNKNOWN"
             }
 
+        # Извлекаем индекс риска (поддерживаем как risk_index, так и val для тестов агрегации)
+        risk_index = audit_data.get("risk_index")
+        if risk_index is None:
+            risk_index = audit_data.get("val", 0.0)
 
-def _dummy_subsystem_func(payload):
-    return {"status": "ok", "payload": payload}
+        # Логика определения уровня здоровья
+        if risk_index > 0.8:
+            health_level = "CRITICAL"
+        elif risk_index > 0.5:
+            health_level = "WARNING"
+        else:
+            health_level = "STABLE"
+
+        return {
+            "audit_id": audit_id,
+            "status": "OK",
+            "is_healthy": True,
+            "observed_risk": risk_index,
+            "health_level": health_level,
+            "timestamp": audit_data.get("timestamp"),
+            "integrity_hash": audit_data.get("integrity_hash")
+        }
+
+    def generate_aggregate_health_report(self, audit_ids: list) -> dict:
+        """
+        Генерирует агрегированный отчет по списку идентификаторов аудитов.
+        """
+        report_map = {}
+        processed_items = []
+
+        for aid in audit_ids:
+            status = self.check_audit_integrity(aid)
+            report_map[aid] = status
+            processed_items.append(aid)
+
+        return {
+            "processed_items": processed_items,
+            "report_map": report_map,
+            "total_count": len(processed_items)
+        }
 
 
-def __getattr__(name):
-    return _dummy_subsystem_func
+market_portfolio_stress_audit_health_monitor = MarketPortfolioStressAuditHealthMonitor

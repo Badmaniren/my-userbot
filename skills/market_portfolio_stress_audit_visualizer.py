@@ -1,6 +1,14 @@
 import io
-import requests
-from bs4 import BeautifulSoup
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    import bs4
+except ImportError:
+    bs4 = None
 
 
 class MarketPortfolioStressAuditVisualizer:
@@ -10,6 +18,30 @@ class MarketPortfolioStressAuditVisualizer:
 
     def visualize(self, payload):
         return market_portfolio_stress_audit_visualizer(payload)
+
+    def aggregate_and_render(self, raw_telemetry_data):
+        if not isinstance(raw_telemetry_data, dict):
+            return {"status": "error", "message": "Invalid telemetry data type"}
+
+        recovery_curve = raw_telemetry_data.get("recovery_curve", [])
+        aggregated_steps = len(recovery_curve)
+        avg_recovery = sum(recovery_curve) / aggregated_steps if aggregated_steps > 0 else 0.0
+
+        return {
+            "status": "rendered",
+            "portfolio_id": raw_telemetry_data.get("portfolio_id"),
+            "aggregated_steps": aggregated_steps,
+            "average_recovery_rate": round(avg_recovery, 4),
+            "rendered_chart_type": "line_recovery_chart"
+        }
+
+    def verify_loop_closure(self, raw_telemetry_data):
+        if not isinstance(raw_telemetry_data, dict):
+            return False
+
+        recovery_status = raw_telemetry_data.get("status")
+        residual_stress = raw_telemetry_data.get("residual_stress", 1.0)
+        return recovery_status == "closed" or residual_stress <= 0.05
 
 
 def market_portfolio_stress_audit_visualizer(payload):

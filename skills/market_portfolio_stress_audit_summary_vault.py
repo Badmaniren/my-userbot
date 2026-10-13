@@ -12,6 +12,37 @@ if not logger.handlers:
     logger.setLevel(logging.INFO)
 
 
+class MarketPortfolioStressAuditSummaryVault:
+    _instance_storage = {}
+
+    def __init__(self, storage_path=None):
+        self.storage_path = storage_path or "stress_audit_summary_vault.json"
+        self._audit_records = {}
+
+    def store_audit_data(self, audit_id, data):
+        logger.info(f"Storing audit data for id: {audit_id}")
+        if not isinstance(data, dict):
+            raise TypeError("data must be a dictionary")
+        self._audit_records[audit_id] = data
+        MarketPortfolioStressAuditSummaryVault._instance_storage[audit_id] = data
+        return True
+
+    def get_audit_data(self, audit_id):
+        logger.info(f"Retrieving audit data for id: {audit_id}")
+        return self._audit_records.get(audit_id) or MarketPortfolioStressAuditSummaryVault._instance_storage.get(audit_id)
+
+    def get_all_statuses(self):
+        statuses = {}
+        for audit_id, record in {**MarketPortfolioStressAuditSummaryVault._instance_storage, **self._audit_records}.items():
+            if isinstance(record, dict) and "status" in record:
+                statuses[audit_id] = record
+        return statuses
+
+
+# Singleton / top-level instance alias for direct module usage
+market_portfolio_stress_audit_summary_vault = MarketPortfolioStressAuditSummaryVault()
+
+
 def start_new(**kwargs):
     """
     Инициализирует процесс аудита стресс-тестов.
@@ -78,6 +109,8 @@ def market_portfolio_stress_audit_summary_vault_process(storage_target, audit_da
         json.dump(audit_data, f, indent=2, sort_keys=True)
 
     audit_id = audit_data.get("audit_id")
+    if audit_id:
+        market_portfolio_stress_audit_summary_vault.store_audit_data(audit_id, audit_data)
     return {"status": "saved", "audit_id": audit_id}
 
 

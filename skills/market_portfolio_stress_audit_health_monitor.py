@@ -1,10 +1,20 @@
 import io
 import os
 import random
-import requests
 import string
 import uuid
 from enum import Enum
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
+from skills import market_portfolio_stress_audit_summary_vault
+from skills.market_portfolio_stress_audit_summary_vault import (
+    MarketPortfolioStressAuditSummaryVault,
+    StorageUnreachableError
+)
 
 
 class SubsystemHealthStatus(Enum):
@@ -17,16 +27,42 @@ class HealthMonitorExecutionError(Exception):
     pass
 
 
-class StorageUnreachableError(Exception):
-    pass
-
-
 class MarketPortfolioStressAuditHealthMonitor:
 
     def __init__(self, subsystems=None):
         self.subsystems = subsystems if subsystems is not None else []
+        self.vault = MarketPortfolioStressAuditSummaryVault()
 
     def _probe_subsystem(self, subsystem_name):
+        try:
+            if hasattr(market_portfolio_stress_audit_summary_vault, "fetch_summary"):
+                summary = market_portfolio_stress_audit_summary_vault.fetch_summary(subsystem_name)
+            else:
+                summary = self.vault.fetch_summary(subsystem_name)
+
+            if isinstance(summary, dict):
+                status_val = summary.get("status")
+                if status_val:
+                    try:
+                        status = SubsystemHealthStatus(status_val)
+                    except ValueError:
+                        status = SubsystemHealthStatus.HEALTHY
+                else:
+                    status = SubsystemHealthStatus.HEALTHY
+
+                return {
+                    "subsystem": subsystem_name,
+                    "status": status,
+                    "token": summary.get("token"),
+                    "error": summary.get("error")
+                }
+        except StorageUnreachableError:
+            raise
+        except HealthMonitorExecutionError:
+            raise
+        except Exception as e:
+            raise HealthMonitorExecutionError(str(e)) from e
+
         return {
             "subsystem": subsystem_name,
             "status": SubsystemHealthStatus.HEALTHY,
@@ -43,6 +79,8 @@ class MarketPortfolioStressAuditHealthMonitor:
                 result = self._probe_subsystem(sub)
             except StorageUnreachableError:
                 raise
+            except HealthMonitorExecutionError:
+                raise
             except Exception as e:
                 raise HealthMonitorExecutionError(str(e)) from e
 
@@ -58,10 +96,24 @@ class MarketPortfolioStressAuditHealthMonitor:
             "subsystems_details": subsystems_details
         }
 
+    def evaluate_subsystems(self):
+        return self.run_full_audit()
+
+    def generate_aggregate_health_report(self):
+        return self.run_full_audit()
+
+    def check_audit_integrity(self):
+        return self.run_full_audit()
+
     def verify_stream_pipeline(self, subsystem_target):
+        if requests is None:
+            return {
+                "is_active": False,
+                "bytes_read": 0
+            }
         try:
             response = requests.get(subsystem_target)
-            content = response.content
+            content = getattr(response, "content", b"")
             return {
                 "is_active": True,
                 "bytes_read": len(content)
@@ -73,9 +125,20 @@ class MarketPortfolioStressAuditHealthMonitor:
             }
 
 
-def _dummy_subsystem_func(payload):
-    return {"status": "ok", "payload": payload}
+market_portfolio_stress_audit_health_monitor = MarketPortfolioStressAuditHealthMonitor
 
 
-def __getattr__(name):
-    return _dummy_subsystem_func
+def check_audit_integrity():
+    return MarketPortfolioStressAuditHealthMonitor().run_full_audit()
+
+
+def generate_aggregate_health_report():
+    return MarketPortfolioStressAuditHealthMonitor().run_full_audit()
+
+
+def evaluate_subsystems():
+    return MarketPortfolioStressAuditHealthMonitor().run_full_audit()
+
+
+def run_full_audit():
+    return MarketPortfolioStressAuditHealthMonitor().run_full_audit()

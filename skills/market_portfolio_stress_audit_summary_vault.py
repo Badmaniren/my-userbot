@@ -12,6 +12,90 @@ if not logger.handlers:
     logger.setLevel(logging.INFO)
 
 
+class StorageUnreachableError(Exception):
+    """Исключение, выбрасываемое при недоступности хранилища."""
+    pass
+
+
+class MarketPortfolioStressAuditSummaryVault:
+    """
+    Класс для управления сводными данными аудита стресс-тестов портфеля.
+    Хранит данные в общей памяти класса для корректного взаимодействия между компонентами.
+    """
+    _storage = {}
+
+    def __init__(self, **kwargs):
+        pass
+
+    def save_summary(self, key, data):
+        if not isinstance(key, str):
+            key = str(key)
+        MarketPortfolioStressAuditSummaryVault._storage[key] = data
+        return {"status": "saved", "key": key}
+
+    def get_summary(self, key):
+        if not isinstance(key, str):
+            key = str(key)
+        return MarketPortfolioStressAuditSummaryVault._storage.get(key)
+
+    def fetch_summary(self, key):
+        return self.get_summary(key)
+
+    def load_summary(self, key):
+        return self.get_summary(key)
+
+    def save_audit_summary(self, audit_id, summary_data):
+        return self.save_summary(audit_id, summary_data)
+
+    def get_audit_summary(self, audit_id):
+        return self.get_summary(audit_id)
+
+    def store_audit_data(self, audit_id, data):
+        return self.save_summary(audit_id, data)
+
+    def get_audit_data(self, audit_id):
+        return self.get_summary(audit_id)
+
+    def get_all_statuses(self):
+        statuses = {}
+        for k, v in MarketPortfolioStressAuditSummaryVault._storage.items():
+            if isinstance(v, dict):
+                statuses[k] = v.get("status")
+            else:
+                statuses[k] = str(v)
+        return statuses
+
+
+SummaryVault = MarketPortfolioStressAuditSummaryVault
+
+
+def save_summary(key, summary_data):
+    return MarketPortfolioStressAuditSummaryVault().save_summary(key, summary_data)
+
+
+def get_summary(key):
+    return MarketPortfolioStressAuditSummaryVault().get_summary(key)
+
+
+def fetch_summary(key):
+    return MarketPortfolioStressAuditSummaryVault().fetch_summary(key)
+
+
+def store_audit_summary(summary_data):
+    audit_id = None
+    if isinstance(summary_data, dict):
+        audit_id = summary_data.get("audit_id") or summary_data.get("subsystem")
+    if not audit_id:
+        import uuid
+        audit_id = str(uuid.uuid4())
+    MarketPortfolioStressAuditSummaryVault().save_summary(audit_id, summary_data)
+    return audit_id
+
+
+def get_audit_summary(audit_id):
+    return MarketPortfolioStressAuditSummaryVault().get_audit_summary(audit_id)
+
+
 def start_new(**kwargs):
     """
     Инициализирует процесс аудита стресс-тестов.
@@ -78,6 +162,13 @@ def market_portfolio_stress_audit_summary_vault_process(storage_target, audit_da
         json.dump(audit_data, f, indent=2, sort_keys=True)
 
     audit_id = audit_data.get("audit_id")
+    subsystem = audit_data.get("subsystem")
+    vault = MarketPortfolioStressAuditSummaryVault()
+    if audit_id:
+        vault.save_summary(audit_id, audit_data)
+    if subsystem:
+        vault.save_summary(subsystem, audit_data)
+
     return {"status": "saved", "audit_id": audit_id}
 
 

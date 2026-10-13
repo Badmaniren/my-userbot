@@ -1,6 +1,30 @@
 import sqlite3
+import json
+import os
 import requests
 from bs4 import BeautifulSoup
+
+
+def save_data(filepath: str, data: dict) -> bool:
+    """
+    Saves dictionary data to a JSON file at filepath.
+    Returns True if successfully saved, False otherwise.
+    """
+    try:
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+        return True
+    except Exception:
+        return False
+
+
+def get_data(filepath: str) -> dict:
+    """
+    Reads dictionary data from a JSON file at filepath.
+    Returns dictionary data.
+    """
+    with open(filepath, "r", encoding="utf-8") as f:
+        return json.load(f)
 
 
 class MarketParser:

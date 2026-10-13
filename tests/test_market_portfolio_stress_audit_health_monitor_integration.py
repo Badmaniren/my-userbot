@@ -1,59 +1,82 @@
 import unittest
 import uuid
 import random
-import sys
-import os
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
-
-from skills.market_portfolio_stress_audit_health_monitor import (
-    MarketPortfolioStressAuditHealthMonitor,
-    SubsystemHealthStatus,
-    HealthMonitorExecutionError,
-    StorageUnreachableError
-)
-
+import time
+from skills.market_portfolio_stress_audit_health_monitor import market_portfolio_stress_audit_health_monitor
+from skills.market_portfolio_stress_audit_summary_vault import market_portfolio_stress_audit_summary_vault
 
 class TestMarketPortfolioStressAuditHealthMonitorIntegration(unittest.TestCase):
-
     def setUp(self):
-        self.test_subsystems = [
-            f"market_portfolio_monitor_{uuid.uuid4().hex[:8]}",
-            f"market_portfolio_stress_scenario_pipeline_{uuid.uuid4().hex[:8]}",
-            f"market_portfolio_api_gateway_{uuid.uuid4().hex[:8]}"
-        ]
-        self.monitor = MarketPortfolioStressAuditHealthMonitor(subsystems=self.test_subsystems)
+        self.health_monitor = market_portfolio_stress_audit_health_monitor()
+        self.summary_vault = market_portfolio_stress_audit_summary_vault()
+        self.test_session_id = f"session_{uuid.uuid4().hex[:8]}"
 
-    def test_run_full_audit_integration(self):
-        audit_result = self.monitor.run_full_audit()
+    def test_full_audit_health_lifecycle_integration(self):
+        # Генерируем случайные входные данные для исключения кэширования и заглушек
+        random_audit_id = f"AUDIT-{uuid.uuid4()}"
+        random_risk_value = random.uniform(0.001, 0.999)
+        random_asset_count = random.randint(1, 1000)
 
-        self.assertIn("global_status", audit_result)
-        self.assertIn("subsystems_details", audit_result)
+        # 1. Напрямую записываем данные в хранилище (Vault), с которым должен интегрироваться монитор
+        audit_payload = {
+            "audit_id": random_audit_id,
+            "risk_index": random_risk_value,
+            "assets_processed": random_asset_count,
+            "timestamp": time.time(),
+            "integrity_hash": f"hash-{uuid.uuid4()}"
+        }
 
-        self.assertEqual(audit_result["global_status"], SubsystemHealthStatus.HEALTHY)
+        vault_save_result = self.summary_vault.save_audit_summary(
+            audit_id=random_audit_id,
+            summary_data=audit_payload
+        )
 
-        details = audit_result["subsystems_details"]
-        self.assertEqual(len(details), len(self.test_subsystems))
+        # Проверяем, что vault действительно сохранил данные (возвращает ID или статус)
+        self.assertTrue(vault_save_result)
 
-        for sub_name in self.test_subsystems:
-            self.assertIn(sub_name, details)
-            sub_info = details[sub_name]
-            self.assertEqual(sub_info["subsystem"], sub_name)
-            self.assertEqual(sub_info["status"], SubsystemHealthStatus.HEALTHY)
-            self.assertIsNone(sub_info["token"])
-            self.assertIsNone(sub_info["error"])
+        # 2. Вызываем монитор здоровья, который должен подтянуть данные из vault БЕЗ моков
+        # Ожидаем, что монитор проанализирует целостность данных в vault
+        health_status = self.health_monitor.check_audit_integrity(random_audit_id)
 
-    def test_verify_stream_pipeline_integration(self):
-        random_port = random.randint(10000, 65535)
-        non_routable_target = f"http://127.0.0.1:{random_port}/stream/{uuid.uuid4()}"
+        # 3. Проверки реальности интеграции
+        self.assertIsNotNone(health_status, "Монитор должен вернуть объект статуса")
+        self.assertEqual(health_status.get("audit_id"), random_audit_id, "Монитор вернул некорректный ID аудита")
 
-        stream_result = self.monitor.verify_stream_pipeline(non_routable_target)
+        # Проверяем, что монитор "увидел" именно те случайные данные, что мы положили в Vault
+        self.assertEqual(
+            health_status.get("observed_risk"),
+            random_risk_value,
+            "Монитор не смог считать актуальные данные из summary_vault"
+        )
 
-        self.assertIn("is_active", stream_result)
-        self.assertIn("bytes_read", stream_result)
-        self.assertFalse(stream_result["is_active"])
-        self.assertEqual(stream_result["bytes_read"], 0)
+        # 4. Проверка логики принятия решений монитором на основе данных из vault
+        if random_risk_value > 0.8:
+            self.assertEqual(health_status.get("health_level"), "CRITICAL")
+        else:
+            self.assertIn(health_status.get("health_level"), ["STABLE", "WARNING"])
 
+    def test_monitor_sync_with_empty_vault_fails_correctly(self):
+        # Проверка поведения при отсутствии данных (реальный негативный сценарий интеграции)
+        non_existent_id = f"MISSING-{uuid.uuid4()}"
+
+        result = self.health_monitor.check_audit_integrity(non_existent_id)
+
+        # Интеграция должна корректно обработать отсутствие записи в vault
+        self.assertEqual(result.get("status"), "NOT_FOUND")
+        self.assertFalse(result.get("is_healthy"))
+
+    def test_batch_health_aggregation_from_vault(self):
+        # Создаем пачку случайных аудитов
+        audit_ids = [f"BATCH-{uuid.uuid4()}" for _ in range(3)]
+        for aid in audit_ids:
+            self.summary_vault.save_audit_summary(aid, {"val": random.random()})
+
+        # Монитор должен уметь агрегировать данные по списку из хранилища
+        batch_report = self.health_monitor.generate_aggregate_health_report(audit_ids)
+
+        self.assertEqual(len(batch_report.get("processed_items", [])), 3)
+        for aid in audit_ids:
+            self.assertIn(aid, batch_report.get("report_map", {}))
 
 if __name__ == "__main__":
     unittest.main()

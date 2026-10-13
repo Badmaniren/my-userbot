@@ -12,6 +12,36 @@ if not logger.handlers:
     logger.setLevel(logging.INFO)
 
 
+class MarketPortfolioStressAuditSummaryVault:
+    """
+    Хранилище результатов аудита и стресс-тестов.
+    """
+    _store = {}
+
+    def __init__(self):
+        self._vault_store = MarketPortfolioStressAuditSummaryVault._store
+
+    def save_audit_summary(self, audit_id: str, summary_data: dict) -> bool:
+        self._vault_store[audit_id] = summary_data
+        return True
+
+    def get_audit_summary(self, audit_id: str):
+        return self._vault_store.get(audit_id)
+
+    def store_audit_data(self, audit_id: str, data: dict):
+        return self.save_audit_summary(audit_id, data)
+
+    def get_audit_data(self, audit_id: str):
+        return self.get_audit_summary(audit_id)
+
+    def get_all_statuses(self) -> dict:
+        return dict(self._vault_store)
+
+
+SummaryVault = MarketPortfolioStressAuditSummaryVault
+market_portfolio_stress_audit_summary_vault = MarketPortfolioStressAuditSummaryVault
+
+
 def start_new(**kwargs):
     """
     Инициализирует процесс аудита стресс-тестов.

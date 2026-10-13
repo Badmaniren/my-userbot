@@ -85,11 +85,9 @@ class MarketParser:
                 conn.close()
             return data
         else:
-            if os.path.exists(filename):
-                with open(filename, 'rb') as f:
-                    lines = f.readlines()
-                    return [line.decode('utf-8') for line in lines]
-            return []
+            with open(filename, 'rb') as f:
+                lines = f.readlines()
+                return [line.decode('utf-8') for line in lines]
 
     def health_check(self) -> Dict[str, Any]:
         return {"status": "ok", "subsystem": "MarketParser"}

@@ -4,7 +4,8 @@ import os
 import json
 import uuid
 import random
-import string
+import io
+
 from skills.market_portfolio_stress_recovery_coordinator_bridge import (
     StressRecoveryCoordinatorBridge,
     run_stress_recovery_coordinator,
@@ -12,13 +13,13 @@ from skills.market_portfolio_stress_recovery_coordinator_bridge import (
 )
 
 class TestStressRecoveryCoordinatorBridge(unittest.TestCase):
-
+    
     def setUp(self):
-        self.storage_file = f"{uuid.uuid4().hex}.db"
+        self.storage_file = f"test_storage_{uuid.uuid4().hex}.db"
         self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
-        self.url = f"https://{uuid.uuid4().hex[:8]}.com/webhook"
-        self.telegram_token = f"{random.randint(100000, 999999)}:{uuid.uuid4().hex[:16]}"
-        self.chat_id = f"-{random.randint(100000000, 999999999)}"
+        self.url = f"https://example.com/api/{uuid.uuid4().hex}"
+        self.telegram_token = f"token_{uuid.uuid4().hex}"
+        self.chat_id = str(random.randint(100000, 999999))
         self.percentage = round(random.uniform(1.0, 50.0), 2)
         self.shifts = random.randint(1, 10)
         self.price = round(random.uniform(10.0, 1000.0), 2)
@@ -30,28 +31,30 @@ class TestStressRecoveryCoordinatorBridge(unittest.TestCase):
             except OSError:
                 pass
 
-    def test_bridge_initialization_creates_file(self):
-        with patch('skills.market_portfolio_stress_recovery_coordinator_bridge.PortfolioStressScenarioPipeline') as mock_pipeline:
+    def test_bridge_initialization_creates_storage(self):
+        self.assertFalse(os.path.exists(self.storage_file))
+        with patch("skills.market_portfolio_stress_recovery_coordinator_bridge.PortfolioStressScenarioPipeline") as mock_pipeline:
             bridge = StressRecoveryCoordinatorBridge(storage_file=self.storage_file)
-            self.assertTrue(os.path.exists(self.storage_file))
-            with open(self.storage_file, "r") as f:
-                content = json.load(f)
-            self.assertEqual(content, {})
             mock_pipeline.assert_called_once_with(self.storage_file)
+        
+        self.assertTrue(os.path.exists(self.storage_file))
+        with open(self.storage_file, "r") as f:
+            content = json.load(f)
+        self.assertEqual(content, {})
 
     def test_execute_recovery_workflow_success(self):
-        mock_stress_output = {"status": "executed", "details": uuid.uuid4().hex}
-        mock_recovery_output = {"status": "recovered", "token": uuid.uuid4().hex}
+        mock_stress_res = {"status": "ok", "detail": uuid.uuid4().hex}
+        mock_recovery_res = {"status": "active", "id": uuid.uuid4().hex}
 
-        with patch('skills.market_portfolio_stress_recovery_coordinator_bridge.PortfolioStressScenarioPipeline') as MockPipelineClass, \
-             patch('skills.market_portfolio_stress_recovery_coordinator_bridge.run_pipeline') as mock_run_pipeline:
+        with patch("skills.market_portfolio_stress_recovery_coordinator_bridge.PortfolioStressScenarioPipeline") as mock_pipeline_cls, \
+             patch("skills.market_portfolio_stress_recovery_coordinator_bridge.run_pipeline") as mock_run_pipeline:
             
-            instance = MockPipelineClass.return_value
-            instance.execute.return_value = mock_stress_output
-            mock_run_pipeline.return_value = mock_recovery_output
+            instance_mock = mock_pipeline_cls.return_value
+            instance_mock.execute.return_value = mock_stress_res
+            mock_run_pipeline.return_value = mock_recovery_res
 
             bridge = StressRecoveryCoordinatorBridge(storage_file=self.storage_file)
-            res = bridge.execute_recovery_workflow(
+            result = bridge.execute_recovery_workflow(
                 symbol=self.symbol,
                 url=self.url,
                 telegram_token=self.telegram_token,
@@ -60,29 +63,29 @@ class TestStressRecoveryCoordinatorBridge(unittest.TestCase):
                 shifts=self.shifts
             )
 
-            self.assertIn("stress_result", res)
-            self.assertIn("recovery_result", res)
-            self.assertEqual(res["stress_result"]["symbol"], self.symbol)
-            self.assertEqual(res["stress_result"]["details"], mock_stress_output["details"])
-            self.assertEqual(res["recovery_result"], mock_recovery_output)
+            self.assertIn("stress_result", result)
+            self.assertIn("recovery_result", result)
+            self.assertEqual(result["stress_result"]["symbol"], self.symbol)
+            self.assertEqual(result["stress_result"]["detail"], mock_stress_res["detail"])
+            self.assertEqual(result["recovery_result"], mock_recovery_res)
 
             with open(self.storage_file, "r") as f:
-                stored_data = json.load(f)
-            self.assertIn(self.symbol, stored_data)
-            self.assertEqual(stored_data[self.symbol]["percentage"], self.percentage)
-            self.assertEqual(stored_data[self.symbol]["shifts"], self.shifts)
-            self.assertEqual(stored_data[self.symbol]["status"], "workflow_run")
+                data = json.load(f)
+            self.assertIn(self.symbol, data)
+            self.assertEqual(data[self.symbol]["percentage"], self.percentage)
+            self.assertEqual(data[self.symbol]["shifts"], self.shifts)
+            self.assertEqual(data[self.symbol]["status"], "workflow_run")
 
     def test_execute_recovery_workflow_exceptions_fallback(self):
-        with patch('skills.market_portfolio_stress_recovery_coordinator_bridge.PortfolioStressScenarioPipeline') as MockPipelineClass, \
-             patch('skills.market_portfolio_stress_recovery_coordinator_bridge.run_pipeline') as mock_run_pipeline:
+        with patch("skills.market_portfolio_stress_recovery_coordinator_bridge.PortfolioStressScenarioPipeline") as mock_pipeline_cls, \
+             patch("skills.market_portfolio_stress_recovery_coordinator_bridge.run_pipeline") as mock_run_pipeline:
             
-            instance = MockPipelineClass.return_value
-            instance.execute.side_effect = Exception(uuid.uuid4().hex)
-            mock_run_pipeline.side_effect = Exception(uuid.uuid4().hex)
+            instance_mock = mock_pipeline_cls.return_value
+            instance_mock.execute.side_effect = Exception("Stress failure")
+            mock_run_pipeline.side_effect = Exception("Recovery failure")
 
             bridge = StressRecoveryCoordinatorBridge(storage_file=self.storage_file)
-            res = bridge.execute_recovery_workflow(
+            result = bridge.execute_recovery_workflow(
                 symbol=self.symbol,
                 url=self.url,
                 telegram_token=self.telegram_token,
@@ -91,23 +94,24 @@ class TestStressRecoveryCoordinatorBridge(unittest.TestCase):
                 shifts=self.shifts
             )
 
-            self.assertEqual(res["stress_result"]["status"], "simulated")
-            self.assertEqual(res["stress_result"]["symbol"], self.symbol)
-            self.assertEqual(res["stress_result"]["percentage"], self.percentage)
-            self.assertEqual(res["recovery_result"]["status"], "failed")
-            self.assertIn("error", res["recovery_result"])
-
-    def test_run_stress_recovery_coordinator(self):
-        mock_stress_output = {"market_metric": uuid.uuid4().hex}
-        mock_monitor_output = {"monitor_status": uuid.uuid4().hex}
-
-        with patch('skills.market_portfolio_stress_recovery_coordinator_bridge.run_stress_scenario_pipeline') as mock_run_stress, \
-             patch('skills.market_portfolio_stress_recovery_coordinator_bridge.start_new') as mock_start_new:
+            self.assertEqual(result["stress_result"]["status"], "simulated")
+            self.assertEqual(result["stress_result"]["symbol"], self.symbol)
+            self.assertEqual(result["stress_result"]["percentage"], self.percentage)
             
-            mock_run_stress.return_value = mock_stress_output
+            self.assertEqual(result["recovery_result"]["status"], "failed")
+            self.assertIn("Recovery failure", result["recovery_result"]["error"])
+
+    def test_run_stress_recovery_coordinator_success(self):
+        mock_stress_output = {"custom_metric": uuid.uuid4().hex}
+        mock_monitor_output = {"monitor_id": uuid.uuid4().hex}
+
+        with patch("skills.market_portfolio_stress_recovery_coordinator_bridge.run_stress_scenario_pipeline") as mock_stress_fn, \
+             patch("skills.market_portfolio_stress_recovery_coordinator_bridge.start_new") as mock_start_new:
+            
+            mock_stress_fn.return_value = mock_stress_output
             mock_start_new.return_value = mock_monitor_output
 
-            res = run_stress_recovery_coordinator(
+            result = run_stress_recovery_coordinator(
                 storage_file=self.storage_file,
                 symbol=self.symbol,
                 url=self.url,
@@ -117,48 +121,27 @@ class TestStressRecoveryCoordinatorBridge(unittest.TestCase):
                 shifts=self.shifts
             )
 
-            self.assertIn("stress", res)
-            self.assertIn("recovery", res)
-            self.assertEqual(res["stress"]["symbol"], self.symbol)
-            self.assertEqual(res["stress"]["market_metric"], mock_stress_output["market_metric"])
-            self.assertEqual(res["recovery"], mock_monitor_output)
+            self.assertIn("stress", result)
+            self.assertIn("recovery", result)
+            self.assertEqual(result["stress"]["symbol"], self.symbol)
+            self.assertEqual(result["stress"]["custom_metric"], mock_stress_output["custom_metric"])
+            self.assertEqual(result["recovery"], mock_monitor_output)
 
             with open(self.storage_file, "r") as f:
-                stored_data = json.load(f)
-            self.assertEqual(stored_data[self.symbol]["status"], "coordinator_run")
+                data = json.load(f)
+            self.assertEqual(data[self.symbol]["status"], "coordinator_run")
 
-    def test_run_stress_recovery_coordinator_exceptions(self):
-        with patch('skills.market_portfolio_stress_recovery_coordinator_bridge.run_stress_scenario_pipeline') as mock_run_stress, \
-             patch('skills.market_portfolio_stress_recovery_coordinator_bridge.start_new') as mock_start_new:
+    def test_run_stress_recovery_coordinator_pipeline_flow(self):
+        mock_stress_res = uuid.uuid4().hex
+        mock_monitor_res = uuid.uuid4().hex
+
+        with patch("skills.market_portfolio_stress_recovery_coordinator_bridge.run_stress_scenario_pipeline") as mock_stress_fn, \
+             patch("skills.market_portfolio_stress_recovery_coordinator_bridge.start_new") as mock_start_new:
             
-            mock_run_stress.side_effect = RuntimeError(uuid.uuid4().hex)
-            mock_start_new.side_effect = RuntimeError(uuid.uuid4().hex)
+            mock_stress_fn.return_value = mock_stress_res
+            mock_start_new.return_value = mock_monitor_res
 
-            res = run_stress_recovery_coordinator(
-                storage_file=self.storage_file,
-                symbol=self.symbol,
-                url=self.url,
-                telegram_token=self.telegram_token,
-                chat_id=self.chat_id,
-                percentage=self.percentage,
-                shifts=self.shifts
-            )
-
-            self.assertEqual(res["stress"]["status"], "simulated")
-            self.assertEqual(res["stress"]["symbol"], self.symbol)
-            self.assertEqual(res["recovery"]["status"], "failed")
-
-    def test_run_stress_recovery_coordinator_pipeline(self):
-        mock_stress_output = {"pipeline_code": uuid.uuid4().hex}
-        mock_recovery_output = "raw_string_result"
-
-        with patch('skills.market_portfolio_stress_recovery_coordinator_bridge.run_stress_scenario_pipeline') as mock_run_stress, \
-             patch('skills.market_portfolio_stress_recovery_coordinator_bridge.start_new') as mock_start_new:
-            
-            mock_run_stress.return_value = mock_stress_output
-            mock_start_new.return_value = mock_recovery_output
-
-            res = run_stress_recovery_coordinator_pipeline(
+            result = run_stress_recovery_coordinator_pipeline(
                 storage_file=self.storage_file,
                 symbol=self.symbol,
                 price=self.price,
@@ -169,22 +152,25 @@ class TestStressRecoveryCoordinatorBridge(unittest.TestCase):
                 url=self.url
             )
 
-            self.assertIn("stress", res)
-            self.assertIn("recovery", res)
-            self.assertEqual(res["stress"]["pipeline_code"], mock_stress_output["pipeline_code"])
-            self.assertEqual(res["recovery"], {"status": "success", "result": "raw_string_result"})
+            self.assertEqual(result["stress"]["status"], "success")
+            self.assertEqual(result["stress"]["result"], mock_stress_res)
+            self.assertEqual(result["stress"]["symbol"], self.symbol)
+
+            self.assertEqual(result["recovery"]["status"], "success")
+            self.assertEqual(result["recovery"]["result"], mock_monitor_res)
 
             with open(self.storage_file, "r") as f:
-                stored_data = json.load(f)
-            self.assertEqual(stored_data[self.symbol]["price"], self.price)
-            self.assertEqual(stored_data[self.symbol]["status"], "pipeline_run")
+                data = json.load(f)
+            self.assertEqual(data[self.symbol]["price"], self.price)
+            self.assertEqual(data[self.symbol]["status"], "pipeline_run")
 
-    def test_run_stress_recovery_coordinator_pipeline_with_list_shifts(self):
-        custom_shifts = [random.randint(1, 5), random.randint(6, 10)]
-        with patch('skills.market_portfolio_stress_recovery_coordinator_bridge.run_stress_scenario_pipeline') as mock_run_stress, \
-             patch('skills.market_portfolio_stress_recovery_coordinator_bridge.start_new') as mock_start_new:
+    def test_non_integer_shifts_in_pipeline(self):
+        custom_shifts_list = [random.randint(1, 10), random.randint(11, 20)]
+
+        with patch("skills.market_portfolio_stress_recovery_coordinator_bridge.run_stress_scenario_pipeline") as mock_stress_fn, \
+             patch("skills.market_portfolio_stress_recovery_coordinator_bridge.start_new") as mock_start_new:
             
-            mock_run_stress.return_value = {"status": "ok"}
+            mock_stress_fn.return_value = {"status": "ok", "symbol": self.symbol}
             mock_start_new.return_value = {"status": "ok"}
 
             run_stress_recovery_coordinator_pipeline(
@@ -192,13 +178,15 @@ class TestStressRecoveryCoordinatorBridge(unittest.TestCase):
                 symbol=self.symbol,
                 price=self.price,
                 percentage=self.percentage,
-                shifts=custom_shifts,
+                shifts=custom_shifts_list,
                 telegram_token=self.telegram_token,
                 chat_id=self.chat_id,
                 url=self.url
             )
 
-            mock_run_stress.assert_called_once_with(self.storage_file, self.symbol, self.percentage, custom_shifts)
-
-if __name__ == '__main__':
-    unittest.main()
+            mock_stress_fn.assert_called_once_with(
+                self.storage_file,
+                self.symbol,
+                self.percentage,
+                custom_shifts_list
+            )

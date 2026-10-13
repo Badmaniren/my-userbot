@@ -27,39 +27,35 @@ class MarketPortfolioStressMLVolatilityForecasterV2:
         self.extractor_tool = extractor_tool_1790087207
         self.anomaly_detector = market_anomaly_detector
 
-    def forecast_volatility(self, portfolio_id: str = None, scenario_code: str = None, **kwargs) -> dict:
-        if portfolio_id and not isinstance(portfolio_id, str):
+    def forecast_volatility(self, portfolio_id: str, scenario_code: str) -> dict:
+        if not portfolio_id or not isinstance(portfolio_id, str):
             raise InvalidDataError("Invalid portfolio_id")
+        if not scenario_code or not isinstance(scenario_code, str) or any(c in "!@#$%^&*()_+=-[]{}|;':\",./<>?" for c in scenario_code):
+            raise InvalidDataError("Invalid scenario_code")
 
+        url = f"https://api.market-stress-{portfolio_id}.internal/v2/forecast"
         predicted_volatility = 0.25
-        if requests and portfolio_id and scenario_code:
-            try:
-                url = f"https://api.market-stress-{portfolio_id}.internal/v2/forecast"
-                response = requests.get(url)
-                if response.status_code == 200:
-                    extracted = {}
-                    if self.extractor_tool:
-                        extracted = self.extractor_tool.extract(response.text)
-                    historical_vol = extracted.get("historical_vol", 0.2)
-                    predicted_volatility = round(historical_vol * 1.25, 4)
-            except Exception:
-                pass
+        if requests:
+            response = requests.get(url)
+            response.raise_for_status()
+
+            extracted = {}
+            if self.extractor_tool:
+                extracted = self.extractor_tool.extract(response.text)
+
+            historical_vol = extracted.get("historical_vol", 0.2)
+            predicted_volatility = round(historical_vol * 1.25, 4)
 
         result = {
             "portfolio_id": portfolio_id,
             "scenario_code": scenario_code,
-            "predicted_volatility": predicted_volatility,
-            "stress_score": predicted_volatility
+            "predicted_volatility": predicted_volatility
         }
 
         if self.db_storage and hasattr(self.db_storage, 'save_forecast'):
             self.db_storage.save_forecast(result)
 
         return result
-
-    def predict_volatility(self, portfolio_id: str = None, scenario_code: str = None, **kwargs) -> float:
-        res = self.forecast_volatility(portfolio_id=portfolio_id, scenario_code=scenario_code, **kwargs)
-        return res.get("predicted_volatility", 0.25)
 
     def evaluate_stress_anomaly(self, portfolio_id: str, scenario_code: str, soup_content: str) -> dict:
         if BeautifulSoup:
@@ -69,7 +65,7 @@ class MarketPortfolioStressMLVolatilityForecasterV2:
                 raise ForecasterError("Portfolio anomaly element not found")
 
         analysis = {}
-        if self.anomaly_detector and hasattr(self.anomaly_detector, "analyze"):
+        if self.anomaly_detector:
             analysis = self.anomaly_detector.analyze(soup_content)
 
         if analysis.get("is_anomaly", False):
@@ -83,13 +79,13 @@ class MarketPortfolioStressMLVolatilityForecasterV2:
                 response = requests.get(target_url)
                 response.raise_for_status()
                 return response.json()
-            except Exception as e:
+            except requests.exceptions.RequestException as e:
                 raise ForecasterError(f"Network error during external ML metrics fetch: {e}")
         return {}
 
     def run_monte_carlo_simulation(self, base_volatility: float, matrix_data: list) -> dict:
-        iterations_run = len(matrix_data) if matrix_data else 0
-        shocks = [item.get("shock", 0.0) for item in matrix_data] if matrix_data else []
+        iterations_run = len(matrix_data)
+        shocks = [item.get("shock", 0.0) for item in matrix_data]
         avg_shock = sum(shocks) / iterations_run if iterations_run > 0 else 0.0
         aggregated_risk_score = max(0.0, base_volatility + avg_shock)
 
@@ -101,10 +97,6 @@ class MarketPortfolioStressMLVolatilityForecasterV2:
     def parse_stream_payload(self, binary_stream: io.BytesIO) -> str:
         raw_bytes = binary_stream.read()
         return raw_bytes.decode('utf-8')
-
-
-market_portfolio_stress_ml_volatility_forecaster_v2 = MarketPortfolioStressMLVolatilityForecasterV2()
-forecast_volatility = forecast_portfolio_stress_volatility = lambda *args, **kwargs: {"predicted_volatility": 0.25}
 
 
 def forecast_portfolio_stress_volatility(portfolio_id: str, scenario_data: dict, monte_carlo_metrics: dict, confidence_level: float) -> dict:

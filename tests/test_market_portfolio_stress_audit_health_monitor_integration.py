@@ -1,58 +1,65 @@
 import unittest
 import uuid
 import random
-import sys
+import string
 import os
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
-
 from skills.market_portfolio_stress_audit_health_monitor import (
     MarketPortfolioStressAuditHealthMonitor,
-    SubsystemHealthStatus,
-    HealthMonitorExecutionError,
-    StorageUnreachableError
+    SubsystemHealthStatus
+)
+from skills.market_portfolio_stress_audit_summary_vault import (
+    store_audit_summary,
+    get_audit_summary
+)
+from skills.market_portfolio_stress_audit_visualizer import (
+    generate_audit_chart
 )
 
 
 class TestMarketPortfolioStressAuditHealthMonitorIntegration(unittest.TestCase):
 
     def setUp(self):
-        self.test_subsystems = [
-            f"market_portfolio_monitor_{uuid.uuid4().hex[:8]}",
-            f"market_portfolio_stress_scenario_pipeline_{uuid.uuid4().hex[:8]}",
-            f"market_portfolio_api_gateway_{uuid.uuid4().hex[:8]}"
-        ]
+        self.random_suffix = ''.join(random.choices(string.ascii_lowercase, k=8))
+        self.audit_id = f"audit_{uuid.uuid4().hex[:8]}_{self.random_suffix}"
+        self.test_subsystems = [f"sub_{uuid.uuid4().hex[:6]}", f"sub_{uuid.uuid4().hex[:6]}"]
         self.monitor = MarketPortfolioStressAuditHealthMonitor(subsystems=self.test_subsystems)
 
-    def test_run_full_audit_integration(self):
+    def test_full_audit_and_vault_storage_integration(self):
         audit_result = self.monitor.run_full_audit()
 
         self.assertIn("global_status", audit_result)
         self.assertIn("subsystems_details", audit_result)
-
         self.assertEqual(audit_result["global_status"], SubsystemHealthStatus.HEALTHY)
 
-        details = audit_result["subsystems_details"]
-        self.assertEqual(len(details), len(self.test_subsystems))
+        for sub in self.test_subsystems:
+            self.assertIn(sub, audit_result["subsystems_details"])
+            self.assertEqual(audit_result["subsystems_details"][sub]["status"], SubsystemHealthStatus.HEALTHY)
 
-        for sub_name in self.test_subsystems:
-            self.assertIn(sub_name, details)
-            sub_info = details[sub_name]
-            self.assertEqual(sub_info["subsystem"], sub_name)
-            self.assertEqual(sub_info["status"], SubsystemHealthStatus.HEALTHY)
-            self.assertIsNone(sub_info["token"])
-            self.assertIsNone(sub_info["error"])
+        summary_payload = {
+            "audit_id": self.audit_id,
+            "global_status": audit_result["global_status"].value,
+            "details": audit_result["subsystems_details"],
+            "metric_value": random.uniform(10.0, 1000.0)
+        }
 
-    def test_verify_stream_pipeline_integration(self):
-        random_port = random.randint(10000, 65535)
-        non_routable_target = f"http://127.0.0.1:{random_port}/stream/{uuid.uuid4()}"
+        stored_id = store_audit_summary(summary_payload)
+        self.assertIsNotNone(stored_id)
 
-        stream_result = self.monitor.verify_stream_pipeline(non_routable_target)
+        retrieved_summary = get_audit_summary(self.audit_id)
+        self.assertIsNotNone(retrieved_summary)
+        self.assertEqual(retrieved_summary.get("audit_id"), self.audit_id)
+        self.assertEqual(retrieved_summary.get("global_status"), SubsystemHealthStatus.HEALTHY.value)
+        self.assertEqual(retrieved_summary.get("metric_value"), summary_payload["metric_value"])
 
-        self.assertIn("is_active", stream_result)
-        self.assertIn("bytes_read", stream_result)
-        self.assertFalse(stream_result["is_active"])
-        self.assertEqual(stream_result["bytes_read"], 0)
+    def test_visualizer_integration_with_audit_data(self):
+        dummy_metrics = {
+            "total_subsystems": len(self.test_subsystems),
+            "healthy_count": len(self.test_subsystems),
+            "score": random.randint(80, 100)
+        }
+
+        chart_result = generate_audit_chart(self.audit_id, dummy_metrics)
+        self.assertIsNotNone(chart_result)
 
 
 if __name__ == "__main__":

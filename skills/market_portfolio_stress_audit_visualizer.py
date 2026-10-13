@@ -1,6 +1,13 @@
 import io
-import requests
-from bs4 import BeautifulSoup
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 
 class MarketPortfolioStressAuditVisualizer:
@@ -47,3 +54,12 @@ def market_portfolio_stress_audit_visualizer(payload):
         if stream_payload is not None:
             result["stream_payload"] = stream_payload
         return result
+
+
+def generate_audit_chart(audit_id, metrics=None):
+    payload = {
+        "report_id": audit_id,
+        "format": "graphical",
+        "metrics": metrics or {}
+    }
+    return market_portfolio_stress_audit_visualizer(payload)

@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+from typing import Any, Dict, Optional
 
 # Настройка логирования для модуля
 logger = logging.getLogger("market_portfolio_stress_audit_summary_vault")
@@ -10,6 +11,58 @@ if not logger.handlers:
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
+
+_in_memory_summaries: Dict[str, Any] = {}
+
+
+class SummaryVault:
+    def __init__(self, storage_path: Optional[str] = None):
+        self.storage_path = storage_path
+
+    def store_summary(self, run_id: str, data: Dict[str, Any]) -> bool:
+        _in_memory_summaries[str(run_id)] = data
+        if "audit_id" in data:
+            _in_memory_summaries[str(data["audit_id"])] = data
+        if self.storage_path:
+            market_portfolio_stress_audit_summary_vault_process(self.storage_path, data)
+        return True
+
+    def get_summary(self, run_id: str) -> Optional[Dict[str, Any]]:
+        val = _in_memory_summaries.get(str(run_id))
+        if val is not None:
+            return val
+        if self.storage_path and os.path.exists(self.storage_path):
+            try:
+                with open(self.storage_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        return data
+            except Exception:
+                pass
+        return None
+
+    def load_summary(self, run_id: str = "latest") -> Optional[Dict[str, Any]]:
+        return self.get_summary(run_id)
+
+    def get_stress_metrics(self, run_id: str) -> Optional[Dict[str, Any]]:
+        summary = self.get_summary(run_id)
+        if isinstance(summary, dict):
+            return summary.get("metrics") or summary.get("stress_metrics") or summary
+        return None
+
+    def __call__(self, run_id: Any = None, data: Any = None, **kwargs) -> Any:
+        if isinstance(run_id, dict):
+            data = run_id
+            run_id = data.get("run_id") or data.get("audit_id") or "latest"
+        elif run_id is None:
+            run_id = "latest"
+        if data is not None:
+            self.store_summary(str(run_id), data)
+            return {"status": "success", "run_id": run_id}
+        return self.get_summary(str(run_id))
+
+
+market_portfolio_stress_audit_summary_vault = SummaryVault()
 
 
 def start_new(**kwargs):

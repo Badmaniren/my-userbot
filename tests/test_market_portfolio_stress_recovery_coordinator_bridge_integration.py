@@ -2,6 +2,7 @@ import unittest
 import os
 import json
 import uuid
+import random
 from skills.market_portfolio_stress_recovery_coordinator_bridge import (
     StressRecoveryCoordinatorBridge,
     run_stress_recovery_coordinator,
@@ -9,15 +10,16 @@ from skills.market_portfolio_stress_recovery_coordinator_bridge import (
 )
 
 class TestStressRecoveryCoordinatorBridgeIntegration(unittest.TestCase):
+
     def setUp(self):
         self.storage_file = f"test_stress_recovery_{uuid.uuid4().hex}.db"
-        self.symbol = f"TEST_{uuid.uuid4().hex[:6].upper()}"
+        self.symbol = f"SYM_{uuid.uuid4().hex[:6].upper()}"
         self.url = f"https://api.telegram.org/bot{uuid.uuid4().hex}/sendMessage"
         self.telegram_token = uuid.uuid4().hex
-        self.chat_id = str(uuid.uuid4().int[:8])
-        self.percentage = float(uuid.uuid4().int % 20 + 1)
-        self.shifts = int(uuid.uuid4().int % 5 + 1)
-        self.price = float(uuid.uuid4().int % 1000 + 50)
+        self.chat_id = str(random.randint(100000, 999999))
+        self.percentage = round(random.uniform(5.0, 50.0), 2)
+        self.shifts = random.randint(1, 10)
+        self.price = round(random.uniform(10.0, 1500.0), 2)
 
     def tearDown(self):
         if os.path.exists(self.storage_file):
@@ -28,6 +30,8 @@ class TestStressRecoveryCoordinatorBridgeIntegration(unittest.TestCase):
 
     def test_class_execution_workflow(self):
         bridge = StressRecoveryCoordinatorBridge(storage_file=self.storage_file)
+        self.assertTrue(os.path.exists(self.storage_file))
+
         result = bridge.execute_recovery_workflow(
             symbol=self.symbol,
             url=self.url,
@@ -40,8 +44,7 @@ class TestStressRecoveryCoordinatorBridgeIntegration(unittest.TestCase):
         self.assertIsInstance(result, dict)
         self.assertIn("stress_result", result)
         self.assertIn("recovery_result", result)
-        
-        self.assertTrue(os.path.exists(self.storage_file))
+
         with open(self.storage_file, "r") as f:
             data = json.load(f)
         

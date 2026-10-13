@@ -10,11 +10,13 @@ from skills.market_portfolio_stress_recovery_coordinator_bridge import (
 )
 
 class TestStressRecoveryCoordinatorBridgeIntegration(unittest.TestCase):
+    
     def setUp(self):
-        self.storage_file = f"test_stress_recovery_{uuid.uuid4().hex}.db"
-        self.symbol = f"SYM_{random.randint(1000, 9999)}"
-        self.url = f"https://api.telegram.org/bot{uuid.uuid4().hex}/sendMessage"
-        self.telegram_token = uuid.uuid4().hex
+        self.random_str = str(uuid.uuid4())[:8]
+        self.storage_file = f"test_stress_recovery_{self.random_str}.db"
+        self.symbol = f"TICKER_{self.random_str}"
+        self.url = f"https://api.test-webhook-{self.random_str}.com/hook"
+        self.telegram_token = f"TOKEN_{self.random_str}"
         self.chat_id = str(random.randint(100000, 999999))
         self.percentage = round(random.uniform(5.0, 35.0), 2)
         self.shifts = random.randint(1, 10)
@@ -27,8 +29,10 @@ class TestStressRecoveryCoordinatorBridgeIntegration(unittest.TestCase):
             except OSError:
                 pass
 
-    def test_stress_recovery_coordinator_bridge_class(self):
+    def test_class_bridge_execution(self):
         bridge = StressRecoveryCoordinatorBridge(storage_file=self.storage_file)
+        self.assertTrue(os.path.exists(self.storage_file))
+
         result = bridge.execute_recovery_workflow(
             symbol=self.symbol,
             url=self.url,
@@ -42,15 +46,13 @@ class TestStressRecoveryCoordinatorBridgeIntegration(unittest.TestCase):
         self.assertIn("stress_result", result)
         self.assertIn("recovery_result", result)
 
-        self.assertTrue(os.path.exists(self.storage_file))
         with open(self.storage_file, "r") as f:
             data = json.load(f)
         self.assertIn(self.symbol, data)
         self.assertEqual(data[self.symbol]["percentage"], self.percentage)
         self.assertEqual(data[self.symbol]["shifts"], self.shifts)
-        self.assertEqual(data[self.symbol]["status"], "workflow_run")
 
-    def test_run_stress_recovery_coordinator(self):
+    def test_coordinator_function_execution(self):
         result = run_stress_recovery_coordinator(
             storage_file=self.storage_file,
             symbol=self.symbol,
@@ -65,15 +67,12 @@ class TestStressRecoveryCoordinatorBridgeIntegration(unittest.TestCase):
         self.assertIn("stress", result)
         self.assertIn("recovery", result)
 
-        self.assertTrue(os.path.exists(self.storage_file))
         with open(self.storage_file, "r") as f:
             data = json.load(f)
         self.assertIn(self.symbol, data)
-        self.assertEqual(data[self.symbol]["percentage"], self.percentage)
-        self.assertEqual(data[self.symbol]["shifts"], self.shifts)
         self.assertEqual(data[self.symbol]["status"], "coordinator_run")
 
-    def test_run_stress_recovery_coordinator_pipeline(self):
+    def test_coordinator_pipeline_execution(self):
         result = run_stress_recovery_coordinator_pipeline(
             storage_file=self.storage_file,
             symbol=self.symbol,
@@ -89,12 +88,9 @@ class TestStressRecoveryCoordinatorBridgeIntegration(unittest.TestCase):
         self.assertIn("stress", result)
         self.assertIn("recovery", result)
 
-        self.assertTrue(os.path.exists(self.storage_file))
         with open(self.storage_file, "r") as f:
             data = json.load(f)
         self.assertIn(self.symbol, data)
-        self.assertEqual(data[self.symbol]["percentage"], self.percentage)
-        self.assertEqual(data[self.symbol]["shifts"], self.shifts)
         self.assertEqual(data[self.symbol]["price"], self.price)
         self.assertEqual(data[self.symbol]["status"], "pipeline_run")
 

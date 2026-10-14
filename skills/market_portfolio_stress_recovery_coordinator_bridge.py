@@ -35,7 +35,7 @@ class StressRecoveryCoordinatorBridge:
         telegram_token: str,
         chat_id: str,
         percentage: float,
-        shifts: int
+        shifts
     ) -> dict:
         logger.info(f"Executing recovery workflow for symbol: {symbol}, percentage: {percentage}, shifts: {shifts}")
         if not os.path.exists(self.storage_file):
@@ -49,8 +49,10 @@ class StressRecoveryCoordinatorBridge:
         with open(self.storage_file, "w") as f:
             json.dump(data, f)
 
+        shifts_arg = list(range(shifts)) if isinstance(shifts, int) else shifts
+
         try:
-            stress_result = self.pipeline.execute(symbol, percentage, shifts)
+            stress_result = self.pipeline.execute(symbol, percentage, shifts_arg)
             logger.info(f"Stress scenario pipeline executed successfully for {symbol}")
             if isinstance(stress_result, dict):
                 if "symbol" not in stress_result:
@@ -83,7 +85,7 @@ def run_stress_recovery_coordinator(
     telegram_token: str,
     chat_id: str,
     percentage: float,
-    shifts: int
+    shifts
 ) -> dict:
     logger.info(f"Running stress recovery coordinator for {symbol} using storage {storage_file}")
     if not os.path.exists(storage_file):
@@ -97,8 +99,10 @@ def run_stress_recovery_coordinator(
     with open(storage_file, "w") as f:
         json.dump(data, f)
 
+    shifts_arg = list(range(shifts)) if isinstance(shifts, int) else shifts
+
     try:
-        stress_output = run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts)
+        stress_output = run_stress_scenario_pipeline(storage_file, symbol, percentage, shifts_arg)
         logger.info(f"Stress scenario run successfully for {symbol}")
         if isinstance(stress_output, dict):
             if "symbol" not in stress_output:

@@ -85,7 +85,7 @@ class GitInspector:
             return ""
 
     def get_history(self):
-        return self.get_commit_history()
+        return self.get_commit_history(max_count=1000)
 
     def get_latest_changes(self):
         cmd = [

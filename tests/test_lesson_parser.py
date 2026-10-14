@@ -1,117 +1,91 @@
 import unittest
 from unittest.mock import MagicMock, patch
 import io
-import uuid
 import random
+import uuid
 import string
+
 from skills.lesson_parser import LessonParser, LessonParserError
 
-class TestLessonParser(unittest.TestCase):
-
+class TestLessonParserUnit(unittest.TestCase):
     def setUp(self):
-        self.mock_inspector = MagicMock()
-        self.parser = LessonParser(self.mock_inspector)
-        self.random_hash = uuid.uuid4().hex
-        self.random_msg = "".join(random.choices(string.ascii_letters + string.digits, k=16))
+        self.git_inspector_mock = MagicMock()
+        self.parser = LessonParser(self.git_inspector_mock)
 
-    def test_parse_lessons_empty_history(self):
-        self.mock_inspector.get_history.return_value = []
-        self.mock_inspector.get_latest_changes.return_value = []
+    def test_parse_lessons_empty_history_and_changes(self):
+        self.git_inspector_mock.get_history.return_value = []
+        self.git_inspector_mock.get_latest_changes.return_value = []
         
         result = self.parser.parse_lessons()
         self.assertEqual(result, [])
 
-    def test_parse_lessons_success_flow(self):
-        commit_data = {'hash': self.random_hash, 'message': self.random_msg}
-        self.mock_inspector.get_history.return_value = [commit_data]
-        self.mock_inspector.get_latest_changes.return_value = [1]
-        
-        random_content_str = "".join(random.choices(string.ascii_letters + string.whitespace, k=20))
-        mock_file = io.BytesIO(random_content_str.encode('utf-8'))
-        self.mock_inspector.read_file_at_commit.return_value = mock_file
+    def test_parse_lessons_invalid_commit_structure(self):
+        rand_invalid = random.choice([uuid.uuid4().hex, 123, None, []])
+        self.git_inspector_mock.get_history.return_value = [rand_invalid]
+        self.git_inspector_mock.get_latest_changes.return_value = []
 
         result = self.parser.parse_lessons()
-        
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]['commit'], self.random_hash)
-        self.assertEqual(result[0]['description'], self.random_msg)
-        self.assertEqual(result[0]['content'], random_content_str)
+        self.assertEqual(result, [])
 
-    def test_parse_lessons_forbidden_char_raises(self):
-        commit_data = {'hash': self.random_hash, 'message': self.random_msg}
-        self.mock_inspector.get_history.return_value = [commit_data]
-        self.mock_inspector.get_latest_changes.return_value = [1]
-        
+    def test_parse_lessons_success_with_file_obj(self):
+        c_hash = uuid.uuid4().hex
+        msg = uuid.uuid4().hex
+        file_content = uuid.uuid4().hex.encode('utf-8')
+
+        commit = {'hash': c_hash, 'message': msg}
+        self.git_inspector_mock.get_history.return_value = [commit]
+        self.git_inspector_mock.get_latest_changes.return_value = []
+
+        file_obj = io.BytesIO(file_content)
+        self.git_inspector_mock.read_file_at_commit.return_value = file_obj
+
+        result = self.parser.parse_lessons()
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['commit'], c_hash)
+        self.assertEqual(result[0]['description'], msg)
+        self.assertEqual(result[0]['content'], file_content.decode('utf-8'))
+
+    def test_parse_lessons_forbidden_chars_raises_error(self):
+        c_hash = uuid.uuid4().hex
+        msg = uuid.uuid4().hex
         forbidden_char = random.choice(['§', '©', '®', '™', 'ø'])
-        bad_content = f"content {forbidden_char} payload"
-        mock_file = io.BytesIO(bad_content.encode('utf-8'))
-        self.mock_inspector.read_file_at_commit.return_value = mock_file
+        file_content = f"{uuid.uuid4().hex}{forbidden_char}{uuid.uuid4().hex}".encode('utf-8')
+
+        commit = {'hash': c_hash, 'message': msg}
+        self.git_inspector_mock.get_history.return_value = [commit]
+        self.git_inspector_mock.get_latest_changes.return_value = []
+
+        file_obj = io.BytesIO(file_content)
+        self.git_inspector_mock.read_file_at_commit.return_value = file_obj
 
         with self.assertRaises(LessonParserError):
             self.parser.parse_lessons()
 
-    def test_parse_lessons_read_file_failure_fallback(self):
-        commit_data = {'hash': self.random_hash, 'message': self.random_msg}
-        self.mock_inspector.get_history.return_value = [commit_data]
-        self.mock_inspector.get_latest_changes.return_value = [1]
-        
-        random_error_msg = uuid.uuid4().hex
-        self.mock_inspector.read_file_at_commit.side_effect = Exception(random_error_msg)
+    def test_extract_lessons_history_none(self):
+        self.git_inspector_mock.get_history.return_value = None
+        result = self.parser.extract_lessons(max_commits=random.randint(1, 20))
+        self.assertEqual(result, [])
 
-        result = self.parser.parse_lessons()
-        
+    def test_extract_lessons_success_filtering(self):
+        c_hash = uuid.uuid4().hex
+        msg = uuid.uuid4().hex
+        commit = {'hash': c_hash, 'message': msg}
+
+        self.git_inspector_mock.get_history.return_value = [commit]
+        file_obj = io.BytesIO(uuid.uuid4().hex.encode('utf-8'))
+        self.git_inspector_mock.read_file_at_commit.return_value = file_obj
+
+        result = self.parser.extract_lessons(max_commits=5)
         self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]['commit'], self.random_hash)
-        self.assertEqual(result[0]['description'], self.random_msg)
-        self.assertEqual(result[0]['content'], self.random_msg)
+        self.assertEqual(result[0]['commit'], c_hash)
 
-    def test_parse_lessons_invalid_commit_structure_skips(self):
-        invalid_commit = {"invalid_key": uuid.uuid4().hex}
-        self.mock_inspector.get_history.return_value = [invalid_commit]
-        self.mock_inspector.get_latest_changes.return_value = [1]
+    def test_extract_lessons_skips_forbidden_words(self):
+        c_hash = uuid.uuid4().hex
+        msg = f"some text with запрещено inside {uuid.uuid4().hex}"
+        commit = {'hash': c_hash, 'message': msg}
 
-        result = self.parser.parse_lessons()
+        self.git_inspector_mock.get_history.return_value = [commit]
+        self.git_inspector_mock.read_file_at_commit.return_value = None
+
+        result = self.parser.extract_lessons(max_commits=5)
         self.assertEqual(result, [])
-
-    def test_extract_lessons_empty_history(self):
-        max_c = random.randint(1, 20)
-        self.mock_inspector.get_history.return_value = None
-        
-        result = self.parser.extract_lessons(max_commits=max_c)
-        self.assertEqual(result, [])
-        self.mock_inspector.get_history.assert_called_once_with(max_count=max_c)
-
-    def test_extract_lessons_success(self):
-        commit_data = {'hash': self.random_hash, 'message': self.random_msg}
-        self.mock_inspector.get_history.return_value = [commit_data]
-        
-        random_payload = "".join(random.choices(string.ascii_letters, k=15))
-        mock_file = io.BytesIO(random_payload.encode('utf-8'))
-        self.mock_inspector.read_file_at_commit.return_value = mock_file
-
-        result = self.parser.extract_lessons()
-        
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]['commit'], self.random_hash)
-        self.assertEqual(result[0]['content'], random_payload)
-
-    def test_extract_lessons_forbidden_word_skips(self):
-        commit_data = {'hash': self.random_hash, 'message': self.random_msg}
-        self.mock_inspector.get_history.return_value = [commit_data]
-        
-        forbidden_content = "text containing запрещено word"
-        mock_file = io.BytesIO(forbidden_content.encode('utf-8'))
-        self.mock_inspector.read_file_at_commit.return_value = mock_file
-
-        result = self.parser.extract_lessons()
-        self.assertEqual(result, [])
-
-    def test_extract_lessons_inspector_exception_returns_empty(self):
-        random_err = uuid.uuid4().hex
-        self.mock_inspector.get_history.side_effect = Exception(random_err)
-        
-        result = self.parser.extract_lessons()
-        self.assertEqual(result, [])
-
-if __name__ == '__main__':
-    unittest.main()

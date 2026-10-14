@@ -69,9 +69,10 @@ class GitInspector:
         }
 
     def read_file_at_commit(self, commit_hash, file_path):
+        target = f"{commit_hash}:{file_path}" if file_path else commit_hash
         cmd = [
             'git', '-C', self.repo_path, 'show',
-            f"{commit_hash}:{file_path}"
+            target
         ]
         try:
             result = subprocess.run(
@@ -84,8 +85,8 @@ class GitInspector:
         except subprocess.CalledProcessError:
             return ""
 
-    def get_history(self):
-        return self.get_commit_history(max_count=1000)
+    def get_history(self, max_count=1000):
+        return self.get_commit_history(max_count=max_count)
 
     def get_latest_changes(self):
         cmd = [

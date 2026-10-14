@@ -11,6 +11,24 @@ class LessonParser:
     def __init__(self, git_inspector):
         self.git_inspector = git_inspector
 
+    def _read_content(self, file_obj):
+        if not file_obj:
+            return ""
+        if hasattr(file_obj, "read"):
+            raw = file_obj.read()
+            if isinstance(raw, bytes):
+                try:
+                    return raw.decode("utf-8")
+                except UnicodeDecodeError:
+                    return raw.decode("latin1", errors="ignore")
+            return str(raw)
+        if isinstance(file_obj, bytes):
+            try:
+                return file_obj.decode("utf-8")
+            except UnicodeDecodeError:
+                return file_obj.decode("latin1", errors="ignore")
+        return str(file_obj)
+
     def parse_lessons(self):
         """Парсит историю репозитория и извлекает уроки (ошибки и победы)."""
         forbidden_chars = {'§', '©', '®', '™', 'ø'}
@@ -34,24 +52,17 @@ class LessonParser:
                 # Читаем файл на момент коммита, если поддерживается
                 try:
                     file_obj = self.git_inspector.read_file_at_commit(c_hash, "")
-                    if file_obj:
-                        content_bytes = file_obj.read()
-                        
-                        # Проверка на запрещенные символы
-                        try:
-                            content_str = content_bytes.decode('utf-8')
-                        except UnicodeDecodeError:
-                            content_str = content_bytes.decode('latin1', errors='ignore')
+                    content_str = self._read_content(file_obj) or msg
+
+                    for char in forbidden_chars:
+                        if char in content_str:
+                            raise LessonParserError(f"Найден запрещенный символ: {char}")
                             
-                        for char in forbidden_chars:
-                            if char in content_str:
-                                raise LessonParserError(f"Найден запрещенный символ: {char}")
-                                
-                        lessons.append({
-                            'commit': c_hash,
-                            'description': msg,
-                            'content': content_str
-                        })
+                    lessons.append({
+                        'commit': c_hash,
+                        'description': msg,
+                        'content': content_str
+                    })
                 except LessonParserError:
                     raise
                 except Exception as read_err:
@@ -89,8 +100,9 @@ class LessonParser:
                 content = msg
                 try:
                     file_obj = self.git_inspector.read_file_at_commit(c_hash, "")
-                    if file_obj:
-                        content = file_obj.read().decode('utf-8', errors='ignore')
+                    read_str = self._read_content(file_obj)
+                    if read_str:
+                        content = read_str
                 except Exception as file_err:
                     logger.debug("Не удалось прочитать файл в extract_lessons для коммита %s: %s", c_hash, file_err)
 

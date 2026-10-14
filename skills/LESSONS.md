@@ -50,3 +50,7 @@
 ## lesson_parser (refactor) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (failures=2)
 - Статус: успешно прошёл тесты и влит в main
+
+## hypothesis_generator (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -11,14 +11,20 @@ class LessonParser:
     def __init__(self, git_inspector):
         self.git_inspector = git_inspector
 
-    def parse_lessons(self):
+    def parse_lessons(self, max_commits=10):
         """Парсит историю репозитория и извлекает уроки (ошибки и победы)."""
         forbidden_chars = {'§', '©', '®', '™', 'ø'}
         lessons = []
         
         try:
-            history = self.git_inspector.get_history()
-            changes = self.git_inspector.get_latest_changes()
+            if hasattr(self.git_inspector, "get_commit_history"):
+                history = self.git_inspector.get_commit_history(max_count=max_commits)
+            elif hasattr(self.git_inspector, "get_history"):
+                history = self.git_inspector.get_history()
+            else:
+                history = []
+
+            changes = self.git_inspector.get_latest_changes() if hasattr(self.git_inspector, "get_latest_changes") else ""
             
             if not history and not changes:
                 return []
@@ -33,24 +39,37 @@ class LessonParser:
                 
                 # Читаем файл на момент коммита, если поддерживается
                 try:
-                    file_obj = self.git_inspector.read_file_at_commit(c_hash, "")
+                    file_obj = self.git_inspector.read_file_at_commit(c_hash, "") if hasattr(self.git_inspector, "read_file_at_commit") else ""
+                    content_str = ""
                     if file_obj:
-                        content_bytes = file_obj.read()
-                        
-                        # Проверка на запрещенные символы
-                        try:
-                            content_str = content_bytes.decode('utf-8')
-                        except UnicodeDecodeError:
-                            content_str = content_bytes.decode('latin1', errors='ignore')
+                        if hasattr(file_obj, "read"):
+                            content_bytes = file_obj.read()
+                            if isinstance(content_bytes, bytes):
+                                try:
+                                    content_str = content_bytes.decode('utf-8')
+                                except UnicodeDecodeError:
+                                    content_str = content_bytes.decode('latin1', errors='ignore')
+                            else:
+                                content_str = str(content_bytes)
+                        else:
+                            content_str = str(file_obj)
                             
                         for char in forbidden_chars:
                             if char in content_str:
                                 raise LessonParserError(f"Найден запрещенный символ: {char}")
                                 
                         lessons.append({
+                            'commit_hash': c_hash,
                             'commit': c_hash,
                             'description': msg,
                             'content': content_str
+                        })
+                    else:
+                        lessons.append({
+                            'commit_hash': c_hash,
+                            'commit': c_hash,
+                            'description': msg,
+                            'content': msg
                         })
                 except LessonParserError:
                     raise
@@ -58,6 +77,7 @@ class LessonParser:
                     # Если файл не удалось прочитать, логируем предупреждение и используем сообщение коммита
                     logger.warning("Не удалось прочитать файл для коммита %s: %s", c_hash, read_err)
                     lessons.append({
+                        'commit_hash': c_hash,
                         'commit': c_hash,
                         'description': msg,
                         'content': msg

@@ -4,14 +4,17 @@ import uuid
 import random
 import shutil
 import tempfile
-from git import Repo
+import subprocess
 from skills.lesson_parser import LessonParser
 from skills.git_inspector import GitInspector
 
 class TestLessonParserIntegration(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
-        self.repo = Repo.init(self.test_dir)
+        subprocess.run(['git', '-C', self.test_dir, 'init', '-b', 'main'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        subprocess.run(['git', '-C', self.test_dir, 'config', 'user.name', 'TestUser'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        subprocess.run(['git', '-C', self.test_dir, 'config', 'user.email', 'test@example.com'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+
         self.inspector = GitInspector(self.test_dir)
         self.parser = LessonParser(self.inspector)
 
@@ -22,8 +25,8 @@ class TestLessonParserIntegration(unittest.TestCase):
         with open(self.file_path, "w") as f:
             f.write(self.content)
 
-        self.repo.index.add([self.file_path])
-        self.repo.index.commit("Initial commit")
+        subprocess.run(['git', '-C', self.test_dir, 'add', 'lesson.txt'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        subprocess.run(['git', '-C', self.test_dir, 'commit', '-m', 'Initial commit'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
 
     def tearDown(self):
         shutil.rmtree(self.test_dir)
@@ -35,10 +38,13 @@ class TestLessonParserIntegration(unittest.TestCase):
         with open(self.file_path, "w") as f:
             f.write(new_content)
 
-        self.repo.index.add([self.file_path])
-        commit = self.repo.index.commit("Update lesson content")
+        subprocess.run(['git', '-C', self.test_dir, 'add', 'lesson.txt'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        subprocess.run(['git', '-C', self.test_dir, 'commit', '-m', 'Update lesson content'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
 
-        parsed_data = self.parser.parse_latest_change(commit.hexsha)
+        history = self.inspector.get_commit_history()
+        commit_hash = history[0]['hash']
+
+        parsed_data = self.parser.parse_latest_change(commit_hash)
 
         self.assertIsNotNone(parsed_data)
         self.assertEqual(parsed_data['id'], new_lesson_id)
@@ -49,11 +55,14 @@ class TestLessonParserIntegration(unittest.TestCase):
         with open(invalid_path, "w") as f:
             f.write("INVALID_FORMAT_WITHOUT_ID")
 
-        self.repo.index.add([invalid_path])
-        commit = self.repo.index.commit("Corrupted commit")
+        subprocess.run(['git', '-C', self.test_dir, 'add', 'corrupted.txt'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        subprocess.run(['git', '-C', self.test_dir, 'commit', '-m', 'Corrupted commit'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+
+        history = self.inspector.get_commit_history()
+        commit_hash = history[0]['hash']
 
         with self.assertRaises(ValueError):
-            self.parser.parse_latest_change(commit.hexsha)
+            self.parser.parse_latest_change(commit_hash)
 
     def test_parser_tracks_multiple_changes(self):
         history_ids = []
@@ -61,14 +70,14 @@ class TestLessonParserIntegration(unittest.TestCase):
             uid = str(uuid.uuid4())
             with open(self.file_path, "w") as f:
                 f.write(f"ID: {uid}")
-            self.repo.index.add([self.file_path])
-            self.repo.index.commit(f"Commit {uid}")
+            subprocess.run(['git', '-C', self.test_dir, 'add', 'lesson.txt'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            subprocess.run(['git', '-C', self.test_dir, 'commit', '-m', f'Commit {uid}'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
             history_ids.append(uid)
 
-        latest_changes = list(self.repo.iter_commits())
+        latest_changes = self.inspector.get_commit_history()
         self.assertTrue(len(latest_changes) >= 3)
 
-        parsed = self.parser.parse_latest_change(latest_changes[0].hexsha)
+        parsed = self.parser.parse_latest_change(latest_changes[0]['hash'])
         self.assertEqual(parsed['id'], history_ids[-1])
 
 if __name__ == '__main__':

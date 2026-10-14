@@ -73,7 +73,8 @@ class MarketPortfolioStressAuditHealthMonitor:
             }
 
 
-def _dummy_subsystem_func(payload):
+def _dummy_subsystem_func(*args, **kwargs):
+    payload = args[0] if args else kwargs.get("payload", None)
     return {"status": "ok", "payload": payload}
 
 

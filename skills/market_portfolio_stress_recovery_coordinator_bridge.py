@@ -51,8 +51,10 @@ class StressRecoveryCoordinatorBridge:
 
         shifts_arg = list(range(shifts)) if isinstance(shifts, int) else shifts
 
+        pipeline = PortfolioStressScenarioPipeline(self.storage_file)
+
         try:
-            stress_result = self.pipeline.execute(symbol, percentage, shifts_arg)
+            stress_result = pipeline.execute(symbol, percentage, shifts_arg)
             logger.info(f"Stress scenario pipeline executed successfully for {symbol}")
             if isinstance(stress_result, dict):
                 if "symbol" not in stress_result:

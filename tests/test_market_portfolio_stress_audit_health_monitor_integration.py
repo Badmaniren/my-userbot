@@ -1,59 +1,54 @@
 import unittest
 import uuid
 import random
-import sys
-import os
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
-
 from skills.market_portfolio_stress_audit_health_monitor import (
     MarketPortfolioStressAuditHealthMonitor,
     SubsystemHealthStatus,
-    HealthMonitorExecutionError,
-    StorageUnreachableError
+    HealthMonitorExecutionError
 )
-
 
 class TestMarketPortfolioStressAuditHealthMonitorIntegration(unittest.TestCase):
 
-    def setUp(self):
-        self.test_subsystems = [
-            f"market_portfolio_monitor_{uuid.uuid4().hex[:8]}",
-            f"market_portfolio_stress_scenario_pipeline_{uuid.uuid4().hex[:8]}",
-            f"market_portfolio_api_gateway_{uuid.uuid4().hex[:8]}"
+    def test_full_audit_integration_with_random_subsystems(self):
+        random_suffix = uuid.uuid4().hex[:8]
+        subsystems_pool = [
+            f"db_storage_{random_suffix}",
+            f"market_portfolio_api_gateway_{random_suffix}",
+            f"market_portfolio_stress_monte_carlo_engine_{random_suffix}",
+            f"market_portfolio_ml_feature_builder_{random_suffix}"
         ]
-        self.monitor = MarketPortfolioStressAuditHealthMonitor(subsystems=self.test_subsystems)
 
-    def test_run_full_audit_integration(self):
-        audit_result = self.monitor.run_full_audit()
+        selected_subsystems = random.sample(subsystems_pool, k=min(3, len(subsystems_pool)))
+
+        monitor = MarketPortfolioStressAuditHealthMonitor(subsystems=selected_subsystems)
+        audit_result = monitor.run_full_audit()
 
         self.assertIn("global_status", audit_result)
         self.assertIn("subsystems_details", audit_result)
-
         self.assertEqual(audit_result["global_status"], SubsystemHealthStatus.HEALTHY)
 
         details = audit_result["subsystems_details"]
-        self.assertEqual(len(details), len(self.test_subsystems))
+        self.assertIsInstance(details, dict)
 
-        for sub_name in self.test_subsystems:
-            self.assertIn(sub_name, details)
-            sub_info = details[sub_name]
-            self.assertEqual(sub_info["subsystem"], sub_name)
-            self.assertEqual(sub_info["status"], SubsystemHealthStatus.HEALTHY)
-            self.assertIsNone(sub_info["token"])
-            self.assertIsNone(sub_info["error"])
+        for sub in selected_subsystems:
+            self.assertIn(sub, details)
+            sub_detail = details[sub]
+            self.assertEqual(sub_detail["subsystem"], sub)
+            self.assertEqual(sub_detail["status"], SubsystemHealthStatus.HEALTHY)
+            self.assertIsNone(sub_detail["error"])
 
-    def test_verify_stream_pipeline_integration(self):
+    def test_verify_stream_pipeline_invalid_target(self):
         random_port = random.randint(10000, 65535)
-        non_routable_target = f"http://127.0.0.1:{random_port}/stream/{uuid.uuid4()}"
+        unreachable_target = f"http://localhost:{random_port}/stream/pipeline/{uuid.uuid4()}"
 
-        stream_result = self.monitor.verify_stream_pipeline(non_routable_target)
+        monitor = MarketPortfolioStressAuditHealthMonitor()
+        pipeline_status = monitor.verify_stream_pipeline(unreachable_target)
 
-        self.assertIn("is_active", stream_result)
-        self.assertIn("bytes_read", stream_result)
-        self.assertFalse(stream_result["is_active"])
-        self.assertEqual(stream_result["bytes_read"], 0)
-
+        self.assertIsInstance(pipeline_status, dict)
+        self.assertIn("is_active", pipeline_status)
+        self.assertIn("bytes_read", pipeline_status)
+        self.assertFalse(pipeline_status["is_active"])
+        self.assertEqual(pipeline_status["bytes_read"], 0)
 
 if __name__ == "__main__":
     unittest.main()

@@ -3,14 +3,13 @@ from unittest.mock import patch
 import io
 import random
 import uuid
-import requests
 
 from skills.market_portfolio_stress_audit_health_monitor import (
     SubsystemHealthStatus,
     HealthMonitorExecutionError,
     StorageUnreachableError,
     MarketPortfolioStressAuditHealthMonitor,
-    __getattr__
+    market_portfolio_stress_audit_health_monitor
 )
 
 
@@ -110,32 +109,50 @@ class TestMarketPortfolioStressAuditHealthMonitor(unittest.TestCase):
         rand_url = f"http://{uuid.uuid4().hex}.local/{uuid.uuid4().hex}"
         rand_content = uuid.uuid4().bytes * random.randint(1, 10)
 
-        with patch("requests.get") as mock_get:
-            mock_response = mock_get.return_value
-            mock_response.content = rand_content
+        with patch("skills.market_portfolio_stress_audit_health_monitor.requests") as mock_requests:
+            if mock_requests is not None:
+                mock_get = mock_requests.get
+                mock_response = mock_get.return_value
+                mock_response.content = rand_content
 
-            result = monitor.verify_stream_pipeline(rand_url)
-            mock_get.assert_called_once_with(rand_url)
-            self.assertTrue(result["is_active"])
-            self.assertEqual(result["bytes_read"], len(rand_content))
+                result = monitor.verify_stream_pipeline(rand_url)
+                mock_get.assert_called_once_with(rand_url)
+                self.assertTrue(result["is_active"])
+                self.assertEqual(result["bytes_read"], len(rand_content))
 
     def test_verify_stream_pipeline_failure(self):
         monitor = MarketPortfolioStressAuditHealthMonitor()
         rand_url = f"http://{uuid.uuid4().hex}.local/{uuid.uuid4().hex}"
 
-        with patch("requests.get") as mock_get:
-            mock_get.side_effect = requests.RequestException(uuid.uuid4().hex)
+        with patch("skills.market_portfolio_stress_audit_health_monitor.requests") as mock_requests:
+            if mock_requests is not None:
+                mock_requests.get.side_effect = Exception("network error")
 
-            result = monitor.verify_stream_pipeline(rand_url)
-            self.assertFalse(result["is_active"])
-            self.assertEqual(result["bytes_read"], 0)
+                result = monitor.verify_stream_pipeline(rand_url)
+                self.assertFalse(result["is_active"])
+                self.assertEqual(result["bytes_read"], 0)
 
-    def test_dynamic_getattr_hook(self):
-        rand_attr = uuid.uuid4().hex
-        rand_payload = uuid.uuid4().hex
+    def test_check_audit_integrity(self):
+        monitor = MarketPortfolioStressAuditHealthMonitor(subsystems=["db", "parser"])
+        res = monitor.check_audit_integrity(audit_id="audit-123")
+        self.assertEqual(res["audit_id"], "audit-123")
+        self.assertTrue(res["integrity_ok"])
+        self.assertEqual(res["status"], "HEALTHY")
 
-        dynamic_func = __getattr__(rand_attr)
-        res = dynamic_func(rand_payload)
+    def test_generate_aggregate_health_report(self):
+        monitor = MarketPortfolioStressAuditHealthMonitor(subsystems=["db"])
+        report = monitor.generate_aggregate_health_report()
+        self.assertIn("report_id", report)
+        self.assertEqual(report["global_status"], "HEALTHY")
+        self.assertIn("db", report["subsystems"])
 
-        self.assertEqual(res["status"], "ok")
-        self.assertEqual(res["payload"], rand_payload)
+    def test_evaluate_subsystems(self):
+        monitor = MarketPortfolioStressAuditHealthMonitor()
+        res = monitor.evaluate_subsystems(subsystems=["s1", "s2"])
+        self.assertEqual(res["global_status"], SubsystemHealthStatus.HEALTHY)
+        self.assertIn("s1", res["subsystems_details"])
+
+    def test_callable_entry_point(self):
+        res = market_portfolio_stress_audit_health_monitor({"audit_id": "test_audit"})
+        self.assertEqual(res["audit_id"], "test_audit")
+        self.assertTrue(res["integrity_ok"])

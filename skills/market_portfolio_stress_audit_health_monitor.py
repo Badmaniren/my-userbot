@@ -1,10 +1,14 @@
 import io
 import os
 import random
-import requests
 import string
 import uuid
 from enum import Enum
+
+try:
+    import requests
+except ImportError:
+    requests = None
 
 
 class SubsystemHealthStatus(Enum):
@@ -59,9 +63,14 @@ class MarketPortfolioStressAuditHealthMonitor:
         }
 
     def verify_stream_pipeline(self, subsystem_target):
+        if requests is None:
+            return {
+                "is_active": False,
+                "bytes_read": 0
+            }
         try:
             response = requests.get(subsystem_target)
-            content = response.content
+            content = getattr(response, "content", b"")
             return {
                 "is_active": True,
                 "bytes_read": len(content)
@@ -72,11 +81,37 @@ class MarketPortfolioStressAuditHealthMonitor:
                 "bytes_read": 0
             }
 
+    def check_audit_integrity(self, audit_id=None):
+        full_audit = self.run_full_audit()
+        global_status = full_audit.get("global_status", SubsystemHealthStatus.HEALTHY)
+        status_str = global_status.value if isinstance(global_status, SubsystemHealthStatus) else str(global_status)
+        return {
+            "audit_id": audit_id or str(uuid.uuid4()),
+            "status": status_str,
+            "integrity_ok": global_status != SubsystemHealthStatus.UNHEALTHY,
+            "details": full_audit.get("subsystems_details", {})
+        }
 
-def _dummy_subsystem_func(*args, **kwargs):
-    payload = args[0] if args else kwargs.get("payload", None)
-    return {"status": "ok", "payload": payload}
+    def generate_aggregate_health_report(self):
+        full_audit = self.run_full_audit()
+        global_status = full_audit.get("global_status", SubsystemHealthStatus.HEALTHY)
+        status_str = global_status.value if isinstance(global_status, SubsystemHealthStatus) else str(global_status)
+        return {
+            "report_id": str(uuid.uuid4()),
+            "global_status": status_str,
+            "subsystems": full_audit.get("subsystems_details", {})
+        }
+
+    def evaluate_subsystems(self, subsystems=None):
+        if subsystems is not None:
+            temp_monitor = MarketPortfolioStressAuditHealthMonitor(subsystems=subsystems)
+            return temp_monitor.run_full_audit()
+        return self.run_full_audit()
+
+    def __call__(self, *args, **kwargs):
+        payload = args[0] if args and isinstance(args[0], dict) else kwargs
+        audit_id = payload.get("audit_id") if isinstance(payload, dict) else None
+        return self.check_audit_integrity(audit_id=audit_id)
 
 
-def __getattr__(name):
-    return _dummy_subsystem_func
+market_portfolio_stress_audit_health_monitor = MarketPortfolioStressAuditHealthMonitor()

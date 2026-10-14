@@ -3,7 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-rket_anomaly_detector'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.market_anomaly_detector import ...'
+ичит поймал: ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'db_storage'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.db_storage import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'market_parser'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.market_parser import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'extractor_tool_1790087207'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.extractor_tool_1790087207 import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'market_anomaly_detector'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.market_anomaly_detector import ...'
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_realtime_websocket_feed (start_new) — раундов: 4
@@ -310,9 +310,4 @@ rket_anomaly_detector'! Запрещено создавать заглушки. 
 
 ## market_portfolio_stress_audit_visualizer (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_stress_audit_health_pulse (start_new) — раундов: 4
-- Античит поймал: ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'db_storage'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.db_storage import ...'; ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'market_portfolio_stress_scenario_pipeline'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.market_portfolio_stress_scenario_pipeline imp
-- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

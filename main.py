@@ -10,6 +10,7 @@ import zipfile
 import html
 import requests
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from collections import deque
@@ -30,6 +31,7 @@ if not GITHUB_TOKEN or not GITHUB_REPO or not API_KEYS:
 # Блокировки, синхронизация и глобальное состояние
 STATE_LOCK = threading.Lock()
 GEMINI_LOCK = threading.Lock()
+CACHE_LOCK = threading.Lock()
 WAKE_UP_EVENT = threading.Event()
 
 EVOLUTION_PAUSED = False
@@ -37,6 +39,7 @@ CYCLE_RUNNING = False
 CURRENT_ACTION_DESC = "Ожидание следующего цикла..."
 
 MANUAL_TASK_QUEUE = []
+PROPOSED_IDEAS_CACHE = []
 HANDLED_JULES_COMMENTS = deque(maxlen=2000)
 PINGED_DIRTY_PRS = set()
 PENDING_CLEANUP_PLAN = []
@@ -53,6 +56,7 @@ GH_SESSION.headers.update({
 TG_SESSION = requests.Session()
 GEMINI_SESSION = requests.Session()
 
+
 # 2. СЕРВЕР ЖИЗНИ ДЛЯ RENDER
 class DummyHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
@@ -67,12 +71,15 @@ class DummyHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.end_headers()
 
+
 def run_dummy_server():
     port = int(os.environ.get("PORT", 8080))
     server = HTTPServer(('0.0.0.0', port), DummyHandler)
     server.serve_forever()
 
+
 threading.Thread(target=run_dummy_server, daemon=True).start()
+
 
 # 3. БЕЗОПАСНЫЙ TELEGRAM ДЕМОН (HTML)
 def send_tg(text: str, buttons: list = None, keyboard: bool = False):
@@ -89,7 +96,8 @@ def send_tg(text: str, buttons: list = None, keyboard: bool = False):
         payload["reply_markup"] = json.dumps({
             "keyboard": [
                 ["📊 /status", "⚡️ /step", "🧩 /skills"],
-                ["🔁 /jules", "🧹 /cleanup", "❓ /help"]
+                ["🎲 /propose", "📋 /queue", "🧹 /cleanup"],
+                ["🔁 /jules", "🔎 /audit", "❓ /help"]
             ],
             "resize_keyboard": True,
             "is_persistent": True
@@ -101,8 +109,10 @@ def send_tg(text: str, buttons: list = None, keyboard: bool = False):
     except Exception as e:
         print(f"[!] Ошибка отправки в TG: {e}")
 
+
 def tg_issue_button(issue_url: str) -> list:
     return [[{"text": "🔗 Открыть задачу для Jules", "url": issue_url}]] if issue_url else None
+
 
 def answer_tg_callback(callback_query_id: str, text: str = ""):
     if not TG_TOKEN:
@@ -113,6 +123,7 @@ def answer_tg_callback(callback_query_id: str, text: str = ""):
     except Exception as e:
         print(f"[!] Ошибка answer_tg_callback: {e}")
 
+
 def set_tg_commands():
     if not TG_TOKEN:
         return
@@ -120,6 +131,8 @@ def set_tg_commands():
     commands = [
         {"command": "status", "description": "📊 Текущий статус, очередь и эпик"},
         {"command": "step", "description": "⚡️ Принудительно запустить цикл прямо сейчас"},
+        {"command": "propose", "description": "🎲 Сгенерировать 3 идеи следующего шага на выбор"},
+        {"command": "queue", "description": "📋 Посмотреть и очистить очередь задач"},
         {"command": "pause", "description": "⏸ Поставить эволюцию на паузу / снять с паузы"},
         {"command": "skills", "description": "🧩 Интерактивный список всех навыков и инспектор"},
         {"command": "inspect", "description": "🔬 Детальный разбор навыка: /inspect <имя>"},
@@ -138,14 +151,17 @@ def set_tg_commands():
     except Exception as e:
         print(f"[!] Ошибка set_tg_commands: {e}")
 
+
 HELP_TEXT = (
     "🐒 <b>Пульт управления Питекантропом</b>\n"
     "━━━━━━━━━━━━━━━━━━━\n"
     "📊 <code>/status</code> — что бот делает сейчас, статус паузы и эпик\n"
     "⚡️ <code>/step</code> — разбудить бота и запустить цикл немедленно\n"
+    "🎲 <code>/propose</code> — сгенерировать 3 варианта следующей фичи на выбор\n"
+    "📋 <code>/queue</code> — управление ручной очередью задач\n"
     "⏸ <code>/pause</code> — заморозить / разморозить фоновые циклы\n"
     "🧩 <code>/skills</code> — интерактивная панель всех созданных модулей\n"
-    "🔬 <code>/inspect &lt;имя&gt;</code> — рентген модуля (связи, сигнатуры, рефакторинг)\n"
+    "🔬 <code>/inspect &lt;имя&gt;</code> — рентген модуля (код, связи, удаление, рефакторинг)\n"
     "⚙️ <code>/build &lt;описание&gt;</code> — поставить задачу вручную (сразу будит бота)\n"
     "🔁 <code>/jules</code> — растолкать зависшие Jules-задачи\n"
     "🔀 <code>/prs</code> — подтянуть main во все PR и пнуть Jules на конфликтах\n"
@@ -156,6 +172,7 @@ HELP_TEXT = (
     "☢️ <code>/nuke</code> — стереть память и удалить все навыки с нуля\n"
     "❓ <code>/help</code> — это сообщение"
 )
+
 
 def purge_spam_issues() -> int:
     url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues")
@@ -175,6 +192,7 @@ def purge_spam_issues() -> int:
     except Exception as e:
         print(f"[!] Ошибка очистки тикетов: {e}")
     return closed_count
+
 
 def format_skill_inspection(mod_name: str) -> tuple:
     manifest = get_skills_manifest()
@@ -203,10 +221,15 @@ def format_skill_inspection(mod_name: str) -> tuple:
         f"🧬 <b>Сигнатуры:</b>\n<pre>{sig_block}</pre>"
     )
     buttons = [
+        [
+            {"text": "📖 Показать код", "callback_data": f"viewcode:{mod_name[:40]}"},
+            {"text": "🗑 Удалить модуль", "callback_data": f"delskill:{mod_name[:40]}"}
+        ],
         [{"text": f"🔨 Заказать рефакторинг {mod_name}", "callback_data": f"refact:{mod_name[:40]}"}],
         [{"text": "🔙 К списку навыков", "callback_data": "list_skills:0"}]
     ]
     return text, buttons
+
 
 def build_skills_keyboard(page: int = 0) -> tuple:
     manifest = get_skills_manifest()
@@ -240,6 +263,86 @@ def build_skills_keyboard(page: int = 0) -> tuple:
     )
     return header, rows
 
+
+def send_queue_message():
+    with STATE_LOCK:
+        q_copy = list(MANUAL_TASK_QUEUE)
+
+    if not q_copy:
+        send_tg("📋 <b>Очередь задач пуста.</b>\nДобавь задачу через <code>/build описание</code> или выбери идею через <code>/propose</code>.")
+        return
+
+    lines = [f"<b>{i + 1}.</b> <code>{html.escape(t[:120])}</code>" for i, t in enumerate(q_copy[:15])]
+    if len(q_copy) > 15:
+        lines.append(f"...и ещё {len(q_copy) - 15}")
+
+    send_tg(
+        f"📋 <b>Ручная очередь задач ({len(q_copy)}):</b>\n━━━━━━━━━━━━━━━━━━━\n" + "\n".join(lines),
+        buttons=[
+            [
+                {"text": "⚡️ Запустить верхнюю сейчас", "callback_data": "wake_now"},
+                {"text": "🗑 Очистить очередь", "callback_data": "clear_queue"}
+            ]
+        ]
+    )
+
+
+def generate_and_send_proposals():
+    send_tg("🎲 <b>Стратег мозгует над 3 вариантами развития...</b>\nПодожди пару секунд.")
+    manifest = get_skills_manifest()
+    epic = get_epic_context()
+    lessons = get_lessons_context()
+
+    prompt = (
+        "Ты — Стратег эволюционирующего репозитория. Предложи РОВНО 3 РАЗНЫХ, крутых и практичных варианта "
+        "следующего шага развития системы (создание нового модуля, композиция существующих или глубокий рефакторинг).\n\n"
+        f"СУЩЕСТВУЮЩИЕ МОДУЛИ:\n{manifest_for_prompt(manifest)}\n\n"
+        f"ТЕКУЩИЙ ЭПИК:\n{epic}\n\n"
+        f"УРОКИ:\n{lessons}\n\n"
+        "Верни СТРОГО JSON со списком из 3 объектов в поле 'proposals':\n"
+        "{\n"
+        '  "proposals": [\n'
+        '    {\n'
+        '      "action": "create" | "compose" | "refactor",\n'
+        '      "module_name": "простое_имя_без_py",\n'
+        '      "title": "короткое яркое название идеи",\n'
+        '      "description": "чёткое ТЗ: что делает модуль и какие у него функции/классы"\n'
+        '    }\n'
+        '  ]\n'
+        "}"
+    )
+    raw = ask_gemini(prompt, json_mode=True)
+    data = extract_json_robust(raw)
+    proposals = (data.get("proposals") or [])[:3]
+
+    if not proposals:
+        send_tg("⚠️ Стратег не смог родить внятные идеи с первого раза. Попробуй ещё раз.")
+        return
+
+    with STATE_LOCK:
+        PROPOSED_IDEAS_CACHE.clear()
+        PROPOSED_IDEAS_CACHE.extend(proposals)
+
+    lines = ["🎲 <b>Выбери вектор для следующего цикла:</b>\n━━━━━━━━━━━━━━━━━━━"]
+    btn_row = []
+    for idx, p in enumerate(proposals):
+        act = p.get("action", "create").upper()
+        mod = p.get("module_name", f"skill_{idx}")
+        title = p.get("title", mod)
+        desc = p.get("description", "")
+        lines.append(
+            f"\n<b>{idx + 1}. [{html.escape(act)}] <code>{html.escape(mod)}</code></b> — {html.escape(title)}\n"
+            f"<i>{html.escape(desc[:220])}</i>"
+        )
+        btn_row.append({"text": f"🚀 Вариант #{idx + 1}", "callback_data": f"pick_prop:{idx}"})
+
+    buttons = [
+        btn_row,
+        [{"text": "🔄 Перебросить идеи", "callback_data": "propose_ideas"}]
+    ]
+    send_tg("\n".join(lines), buttons=buttons)
+
+
 def send_status_message():
     global EVOLUTION_PAUSED, CYCLE_RUNNING, CURRENT_ACTION_DESC
     with STATE_LOCK:
@@ -268,7 +371,11 @@ def send_status_message():
             ],
             [
                 {"text": "🧩 Арсенал навыков", "callback_data": "list_skills:0"},
-                {"text": "🧟 Карантин сирот", "callback_data": "run_quarantine"}
+                {"text": "🎲 Идеи шага", "callback_data": "propose_ideas"}
+            ],
+            [
+                {"text": "🧟 Карантин сирот", "callback_data": "run_quarantine"},
+                {"text": "📋 Очередь", "callback_data": "show_queue"}
             ],
             [
                 {"text": "🔁 Пнуть Jules", "callback_data": "rejules"},
@@ -276,6 +383,30 @@ def send_status_message():
             ]
         ]
     )
+
+
+def _run_async_tg_task(fn, *args):
+    threading.Thread(target=fn, args=args, daemon=True).start()
+
+
+def handle_single_skill_delete(mod_target: str, force: bool = False):
+    sources = get_all_skill_sources()
+    dependents = find_skill_dependents(mod_target, sources)
+    if dependents and not force:
+        send_tg(
+            f"⚠️ <b>Осторожно!</b> От модуля <code>{html.escape(mod_target)}</code> зависят другие навыки:\n"
+            f"<code>{', '.join(dependents)}</code>\n\n"
+            "Если удалить его сейчас, цепочка импортов порвётся.",
+            buttons=[
+                [{"text": f"💥 Всё равно снести {mod_target}", "callback_data": f"forcedel:{mod_target[:40]}"}],
+                [{"text": "🔙 Отмена", "callback_data": f"insp:{mod_target[:40]}"}]
+            ]
+        )
+        return
+
+    removed = execute_cleanup_plan([f"{mod_target}.py"])
+    send_tg(f"🗑 Модуль <code>{html.escape(mod_target)}</code> и его тесты вычищены из main (удалено файлов: <b>{removed}</b>).")
+
 
 def run_telegram_listener():
     global EVOLUTION_PAUSED
@@ -324,6 +455,38 @@ def run_telegram_listener():
                             else:
                                 WAKE_UP_EVENT.set()
                                 send_tg("▶️ <b>Эволюция снята с паузы!</b> Запускаю цикл.")
+                        elif cb_data == "show_queue":
+                            answer_tg_callback(callback["id"])
+                            send_queue_message()
+                        elif cb_data == "clear_queue":
+                            with STATE_LOCK:
+                                MANUAL_TASK_QUEUE.clear()
+                            answer_tg_callback(callback["id"], "Очередь очищена")
+                            send_tg("🗑 <b>Очередь задач полностью очищена.</b>")
+                        elif cb_data == "propose_ideas":
+                            answer_tg_callback(callback["id"], "Генерирую идеи...")
+                            _run_async_tg_task(generate_and_send_proposals)
+                        elif cb_data.startswith("pick_prop:"):
+                            idx = int(cb_data.split(":", 1)[1])
+                            with STATE_LOCK:
+                                picked = PROPOSED_IDEAS_CACHE[idx] if 0 <= idx < len(PROPOSED_IDEAS_CACHE) else None
+                            if not picked:
+                                answer_tg_callback(callback["id"], "Идеи устарели, сгенерируй заново")
+                            else:
+                                task_str = (
+                                    f"Действие: {picked.get('action', 'create')}. "
+                                    f"Целевой модуль: {picked.get('module_name')}. "
+                                    f"Задача: {picked.get('description')}"
+                                )
+                                with STATE_LOCK:
+                                    MANUAL_TASK_QUEUE.insert(0, task_str)
+                                    EVOLUTION_PAUSED = False
+                                WAKE_UP_EVENT.set()
+                                answer_tg_callback(callback["id"], "Запускаю выбранный вариант!")
+                                send_tg(
+                                    f"🚀 <b>Выбран вариант:</b> <code>{html.escape(picked.get('module_name', ''))}</code>\n"
+                                    f"Поставлен первым в очередь, цикл запущен!"
+                                )
                         elif cb_data.startswith("list_skills:"):
                             page = int(cb_data.split(":", 1)[1] or 0)
                             answer_tg_callback(callback["id"])
@@ -334,6 +497,26 @@ def run_telegram_listener():
                             answer_tg_callback(callback["id"], f"Инспекция {mod_target}...")
                             text_out, btns = format_skill_inspection(mod_target)
                             send_tg(text_out, buttons=btns)
+                        elif cb_data.startswith("viewcode:"):
+                            mod_target = cb_data.split(":", 1)[1]
+                            answer_tg_callback(callback["id"], "Загружаю исходник...")
+                            code = get_file_content("main", f"skills/{mod_target}.py") or "# Файл пуст или не найден"
+                            snippet = code[:3400]
+                            if len(code) > 3400:
+                                snippet += "\n# ... (код обрезан под лимит Telegram)"
+                            send_tg(
+                                f"📄 <b>Исходный код:</b> <code>skills/{html.escape(mod_target)}.py</code>\n"
+                                f"<pre>{html.escape(snippet)}</pre>",
+                                buttons=[[{"text": "🔙 Назад к инспекции", "callback_data": f"insp:{mod_target[:40]}"}]]
+                            )
+                        elif cb_data.startswith("delskill:"):
+                            mod_target = cb_data.split(":", 1)[1]
+                            answer_tg_callback(callback["id"], "Проверяю зависимости...")
+                            _run_async_tg_task(handle_single_skill_delete, mod_target, False)
+                        elif cb_data.startswith("forcedel:"):
+                            mod_target = cb_data.split(":", 1)[1]
+                            answer_tg_callback(callback["id"], f"Удаляю {mod_target}...")
+                            _run_async_tg_task(handle_single_skill_delete, mod_target, True)
                         elif cb_data.startswith("refact:"):
                             mod_target = cb_data.split(":", 1)[1]
                             task_str = f"Провести глубокий рефакторинг существующего модуля {mod_target}: улучшить обработку краевых случаев, читаемость и производительность без поломки текущих сигнатур."
@@ -345,44 +528,47 @@ def run_telegram_listener():
                             send_tg(f"🔨 <b>Рефакторинг <code>{html.escape(mod_target)}</code> поставлен в очередь!</b>\nЦикл уже запущен.")
                         elif cb_data == "rejules":
                             answer_tg_callback(callback["id"], "Толкаю зависшие задачи...")
-                            count = reactivate_stuck_jules_issues()
-                            if count:
-                                send_tg(f"🔁 Реактивировано Jules-задач: <b>{count}</b>.\nДай ему пару минут забрать их в работу.")
-                            else:
-                                send_tg("ℹ️ Открытых Jules-задач не найдено — реактивировать нечего.")
+                            _run_async_tg_task(
+                                lambda: send_tg(f"🔁 Реактивировано Jules-задач: <b>{reactivate_stuck_jules_issues()}</b>.")
+                            )
                         elif cb_data == "refreshprs":
                             answer_tg_callback(callback["id"], "Обновляю PR от main и пинаю Jules...")
-                            refreshed, dirty_urls, pinged_jules = refresh_stuck_prs()
-                            msg = f"🔀 Обновлено PR (без конфликтов): <b>{refreshed}</b>."
-                            if dirty_urls:
-                                msg += f"\n⚠️ С конфликтами: <b>{len(dirty_urls)}</b>. Отправлено команд Jules на фикс: <b>{pinged_jules}</b>."
-                            send_tg(msg)
+                            def _do_refresh():
+                                refreshed, dirty_urls, pinged_jules = refresh_stuck_prs()
+                                msg = f"🔀 Обновлено PR (без конфликтов): <b>{refreshed}</b>."
+                                if dirty_urls:
+                                    msg += f"\n⚠️ С конфликтами: <b>{len(dirty_urls)}</b>. Отправлено команд Jules на фикс: <b>{pinged_jules}</b>."
+                                send_tg(msg)
+                            _run_async_tg_task(_do_refresh)
                         elif cb_data == "confirm_cleanup":
-                            answer_tg_callback(callback["id"], "Удаляю дубли...")
+                            answer_tg_callback(callback["id"], "Удаляю дубли в фоне...")
                             with STATE_LOCK:
                                 plan_copy = list(PENDING_CLEANUP_PLAN)
                                 PENDING_CLEANUP_PLAN.clear()
                             if plan_copy:
-                                count = execute_cleanup_plan(plan_copy)
-                                send_tg(f"🗑 Удалено файлов: <b>{count}</b>.")
+                                _run_async_tg_task(
+                                    lambda: send_tg(f"🗑 Удалено файлов: <b>{execute_cleanup_plan(plan_copy)}</b>.")
+                                )
                             else:
                                 send_tg("ℹ️ План очистки устарел или пуст — вызови /cleanup заново.")
                         elif cb_data == "run_quarantine":
                             answer_tg_callback(callback["id"], "Чищу тесты-сироты...")
-                            deleted = bulk_quarantine_orphaned_tests()
-                            if deleted:
-                                preview = ", ".join(deleted[:15])
-                                if len(deleted) > 15:
-                                    preview += f" ...и ещё {len(deleted) - 15}"
-                                send_tg(f"🧟 <b>Массовый карантин</b>\n━━━━━━━━━━━━━━━━━━━\nУдалено: <b>{len(deleted)}</b>\n<code>{html.escape(preview)}</code>")
-                            else:
-                                send_tg("✅ Тестов-сирот в <code>tests/</code> не найдено — main чист.")
+                            def _do_quarantine():
+                                deleted = bulk_quarantine_orphaned_tests()
+                                if deleted:
+                                    preview = ", ".join(deleted[:15])
+                                    if len(deleted) > 15:
+                                        preview += f" ...и ещё {len(deleted) - 15}"
+                                    send_tg(f"🧟 <b>Массовый карантин</b>\n━━━━━━━━━━━━━━━━━━━\nУдалено: <b>{len(deleted)}</b>\n<code>{html.escape(preview)}</code>")
+                                else:
+                                    send_tg("✅ Тестов-сирот в <code>tests/</code> не найдено — main чист.")
+                            _run_async_tg_task(_do_quarantine)
                         continue
 
                     msg = update.get("message", {})
                     chat_id = str(msg.get("chat", {}).get("id", ""))
                     text = msg.get("text", "").strip()
-                    text = re.sub(r'^[📊🔁⚙️❓☢️🗑⚡️🧩🧹⏸]\s*', '', text)
+                    text = re.sub(r'^[📊🔁⚙️❓☢️🗑⚡️🧩🧹⏸🎲📋🔎🔬]\s*', '', text)
 
                     if chat_id != TG_ADMIN_ID:
                         continue
@@ -392,12 +578,16 @@ def run_telegram_listener():
                     elif text.startswith("/help"):
                         send_tg(HELP_TEXT)
                     elif text.startswith("/status"):
-                        send_status_message()
+                        _run_async_tg_task(send_status_message)
                     elif text.startswith("/step"):
                         with STATE_LOCK:
                             EVOLUTION_PAUSED = False
                         WAKE_UP_EVENT.set()
                         send_tg("⚡️ <b>Пнул демона!</b> Запускаю внеочередной цикл эволюции.")
+                    elif text.startswith("/propose"):
+                        _run_async_tg_task(generate_and_send_proposals)
+                    elif text.startswith("/queue"):
+                        send_queue_message()
                     elif text.startswith("/pause"):
                         with STATE_LOCK:
                             EVOLUTION_PAUSED = not EVOLUTION_PAUSED
@@ -418,13 +608,16 @@ def run_telegram_listener():
                             text_out, btns = format_skill_inspection(mod_target)
                             send_tg(text_out, buttons=btns)
                     elif text.startswith("/purge"):
-                        send_tg("🗑 <b>Очистка спама Jules</b>\nЗакрываю мертвые тикеты, подожди...")
-                        count = purge_spam_issues()
-                        send_tg(f"✅ Успешно закрыто мусорных тикетов: <b>{count}</b>.")
+                        send_tg("🗑 <b>Очистка спама Jules</b>\nЗакрываю мертвые тикеты в фоне...")
+                        _run_async_tg_task(
+                            lambda: send_tg(f"✅ Успешно закрыто мусорных тикетов: <b>{purge_spam_issues()}</b>.")
+                        )
                     elif text.startswith("/nuke"):
                         send_tg("☢️ <b>ПРОТОКОЛ СУДНОГО ДНЯ ЗАПУЩЕН</b>\nВыжигаю все навыки и тесты, стираю память...")
-                        count = nuke_everything()
-                        send_tg(f"✅ <b>Вайп завершён!</b>\n━━━━━━━━━━━━━━━━━━━\nУдалено файлов: <b>{count}</b>.\nПамять стёрта. Репозиторий девственно чист.")
+                        def _do_nuke():
+                            count = nuke_everything()
+                            send_tg(f"✅ <b>Вайп завершён!</b>\n━━━━━━━━━━━━━━━━━━━\nУдалено файлов: <b>{count}</b>.\nПамять стёрта. Репозиторий девственно чист.")
+                        _run_async_tg_task(_do_nuke)
                     elif text.startswith("/build"):
                         task_desc = text[6:].strip()
                         if task_desc:
@@ -436,45 +629,52 @@ def run_telegram_listener():
                         else:
                             send_tg("⚠️ Укажи описание задачи после команды:\n<code>/build утилита_для_парсинга</code>")
                     elif text.startswith("/jules"):
-                        count = reactivate_stuck_jules_issues()
-                        if count:
-                            send_tg(f"🔁 Реактивировано Jules-задач: <b>{count}</b>.")
-                        else:
-                            send_tg("ℹ️ Открытых Jules-задач не найдено.")
+                        _run_async_tg_task(
+                            lambda: send_tg(f"🔁 Реактивировано Jules-задач: <b>{reactivate_stuck_jules_issues()}</b>.")
+                        )
                     elif text.startswith("/prs"):
-                        refreshed, dirty_urls, pinged_jules = refresh_stuck_prs()
-                        msg = f"🔀 Обновлено PR (без конфликтов): <b>{refreshed}</b>."
-                        if dirty_urls:
-                            msg += f"\n⚠️ С конфликтами: <b>{len(dirty_urls)}</b>. Отправлено команд Jules на фикс: <b>{pinged_jules}</b>."
-                        send_tg(msg)
+                        def _do_prs():
+                            refreshed, dirty_urls, pinged_jules = refresh_stuck_prs()
+                            msg = f"🔀 Обновлено PR (без конфликтов): <b>{refreshed}</b>."
+                            if dirty_urls:
+                                msg += f"\n⚠️ С конфликтами: <b>{len(dirty_urls)}</b>. Отправлено команд Jules на фикс: <b>{pinged_jules}</b>."
+                            send_tg(msg)
+                        _run_async_tg_task(_do_prs)
                     elif text.startswith("/quarantine"):
-                        deleted = bulk_quarantine_orphaned_tests()
-                        if deleted:
-                            preview = ", ".join(deleted[:15])
-                            if len(deleted) > 15:
-                                preview += f" ...и ещё {len(deleted) - 15}"
-                            send_tg(f"🧟 <b>Массовый карантин</b>\n━━━━━━━━━━━━━━━━━━━\nУдалено: <b>{len(deleted)}</b>\n<code>{html.escape(preview)}</code>")
-                        else:
-                            send_tg("✅ Тестов-сирот не найдено — папка <code>tests/</code> чиста.")
+                        def _do_quar():
+                            deleted = bulk_quarantine_orphaned_tests()
+                            if deleted:
+                                preview = ", ".join(deleted[:15])
+                                if len(deleted) > 15:
+                                    preview += f" ...и ещё {len(deleted) - 15}"
+                                send_tg(f"🧟 <b>Массовый карантин</b>\n━━━━━━━━━━━━━━━━━━━\nУдалено: <b>{len(deleted)}</b>\n<code>{html.escape(preview)}</code>")
+                            else:
+                                send_tg("✅ Тестов-сирот не найдено — папка <code>tests/</code> чиста.")
+                        _run_async_tg_task(_do_quar)
                     elif text.startswith("/audit"):
-                        broken = audit_skill_import_graph()
-                        if not broken:
-                            send_tg("✅ Все цепочки импортов целы — реально отсутствующих зависимостей не найдено.")
-                        else:
-                            lines = []
-                            for missing_name, affected in list(broken.items())[:10]:
-                                lines.append(f"❌ <code>skills.{html.escape(missing_name)}</code> отсутствует физически, но нужен: {', '.join(affected[:5])}{'...' if len(affected) > 5 else ''}")
-                            send_tg(
-                                f"🔎 <b>Аудит цепочек импортов</b>\n━━━━━━━━━━━━━━━━━━━\n" + "\n".join(lines) +
-                                (f"\n\n...и ещё {len(broken) - 10} сломанных цепочек" if len(broken) > 10 else "")
-                            )
+                        def _do_audit():
+                            broken = audit_skill_import_graph()
+                            if not broken:
+                                send_tg("✅ Все цепочки импортов целы — реально отсутствующих зависимостей не найдено.")
+                            else:
+                                lines = []
+                                for missing_name, affected in list(broken.items())[:10]:
+                                    lines.append(f"❌ <code>skills.{html.escape(missing_name)}</code> отсутствует физически, но нужен: {', '.join(affected[:5])}{'...' if len(affected) > 5 else ''}")
+                                send_tg(
+                                    f"🔎 <b>Аудит цепочек импортов</b>\n━━━━━━━━━━━━━━━━━━━\n" + "\n".join(lines) +
+                                    (f"\n\n...и ещё {len(broken) - 10} сломанных цепочек" if len(broken) > 10 else "")
+                                )
+                        _run_async_tg_task(_do_audit)
                     elif text.startswith("/cleanup"):
-                        report, plan = build_cleanup_plan()
-                        with STATE_LOCK:
-                            PENDING_CLEANUP_PLAN.clear()
-                            PENDING_CLEANUP_PLAN.extend(plan)
-                        buttons = [[{"text": "⚠️ Подтвердить удаление", "callback_data": "confirm_cleanup"}]] if plan else None
-                        send_tg(report, buttons=buttons)
+                        send_tg("🧹 Сканирую кластеры дублей и граф импортов...")
+                        def _do_cleanup_plan():
+                            report, plan = build_cleanup_plan()
+                            with STATE_LOCK:
+                                PENDING_CLEANUP_PLAN.clear()
+                                PENDING_CLEANUP_PLAN.extend(plan)
+                            buttons = [[{"text": "⚠️ Подтвердить удаление", "callback_data": "confirm_cleanup"}]] if plan else None
+                            send_tg(report, buttons=buttons)
+                        _run_async_tg_task(_do_cleanup_plan)
                     elif text:
                         send_tg("🤷 Не знаю такой команды.\n" + HELP_TEXT)
         except Exception as e:
@@ -482,11 +682,16 @@ def run_telegram_listener():
             time.sleep(5)
         time.sleep(1)
 
+
 threading.Thread(target=run_telegram_listener, daemon=True).start()
+
 
 # 4. СЕТЬ И КЛИЕНТ GEMINI
 def clean_url(url: str) -> str:
-    return re.sub(r'\[.*?\]\(\vert{}\)', '', url).strip()
+    # Очистка от возможных markdown-артефактов вида [url](url) и пробелов
+    cleaned = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'\2', url)
+    return cleaned.strip()
+
 
 API_HOST = "generativelanguage.googleapis.com"
 API_BASE = "https://" + API_HOST + "/v1beta/"
@@ -496,9 +701,11 @@ GITHUB_BASE = "https://" + GITHUB_HOST + "/repos/"
 KEY_INDEX = 0
 MODELS_CACHE = {"models": [], "expires_at": 0, "key": ""}
 
+
 def get_current_key():
     with GEMINI_LOCK:
         return API_KEYS[KEY_INDEX % len(API_KEYS)]
+
 
 def rotate_key():
     global KEY_INDEX, MODELS_CACHE
@@ -507,6 +714,7 @@ def rotate_key():
             KEY_INDEX = (KEY_INDEX + 1) % len(API_KEYS)
             MODELS_CACHE["expires_at"] = 0
             print(f"[!] Ротация ключа Gemini -> #{KEY_INDEX}")
+
 
 def get_viable_models(key: str) -> list:
     global MODELS_CACHE
@@ -528,7 +736,15 @@ def get_viable_models(key: str) -> list:
             for m in candidates:
                 test_url = clean_url(f"{API_BASE}{m}:generateContent?key={key}")
                 try:
-                    res = GEMINI_SESSION.post(test_url, json={"contents": [{"parts": [{"text": "hi"}]}]}, timeout=8)
+                    # maxOutputTokens=1 экономит квоту и ускоряет пинг модели
+                    res = GEMINI_SESSION.post(
+                        test_url,
+                        json={
+                            "contents": [{"parts": [{"text": "1"}]}],
+                            "generationConfig": {"maxOutputTokens": 1}
+                        },
+                        timeout=8
+                    )
                     if res.status_code == 200:
                         viable.append(m)
                         if len(viable) >= 2:
@@ -543,6 +759,7 @@ def get_viable_models(key: str) -> list:
     except Exception as e:
         print(f"[!] Ошибка получения списка моделей: {e}")
     return []
+
 
 def extract_json_robust(raw: str) -> dict:
     if not raw:
@@ -563,9 +780,11 @@ def extract_json_robust(raw: str) -> dict:
         print(f"[!] Непредвиденная ошибка при парсинге: {e}")
     return {}
 
+
 def strip_markdown(text: str) -> str:
     cleaned = re.sub(r'^```[a-zA-Z]*\n', '', text.strip(), flags=re.MULTILINE)
     return re.sub(r'```$', '', cleaned.strip(), flags=re.MULTILINE).strip()
+
 
 def ask_gemini(prompt: str, json_mode: bool = False) -> str:
     payload = {
@@ -585,7 +804,7 @@ def ask_gemini(prompt: str, json_mode: bool = False) -> str:
         for model in models:
             url = clean_url(f"{API_BASE}{model}:generateContent?key={key}")
             try:
-                r = GEMINI_SESSION.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=40)
+                r = GEMINI_SESSION.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=45)
                 if r.status_code == 200:
                     candidates = r.json().get('candidates', [])
                     if candidates:
@@ -599,15 +818,24 @@ def ask_gemini(prompt: str, json_mode: bool = False) -> str:
                 time.sleep(2)
     return ""
 
-# 5. GITHUB ОПЕРАЦИИ И ЭСКАЛАЦИЯ ДЛЯ JULES
+
+# 5. GITHUB ОПЕРАЦИИ И ПАКЕТНЫЕ КОММИТЫ (GIT TREE API)
 def get_main_sha() -> str:
     url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/ref/heads/main")
     r = GH_SESSION.get(url, timeout=10)
     return r.json()["object"]["sha"] if r.status_code == 200 else ""
 
+
+def get_branch_sha(branch: str) -> str:
+    url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/ref/heads/{branch}")
+    r = GH_SESSION.get(url, timeout=10)
+    return r.json()["object"]["sha"] if r.status_code == 200 else ""
+
+
 def get_file_content(branch: str, path: str, known_sha: str = None):
-    if known_sha and known_sha in _BLOB_CACHE:
-        return _BLOB_CACHE[known_sha]
+    with CACHE_LOCK:
+        if known_sha and known_sha in _BLOB_CACHE:
+            return _BLOB_CACHE[known_sha]
 
     url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents/{path}?ref={branch}")
     r = GH_SESSION.get(url, timeout=10)
@@ -616,11 +844,13 @@ def get_file_content(branch: str, path: str, known_sha: str = None):
         sha = data.get("sha")
         content = base64.b64decode(data.get("content", "")).decode("utf-8")
         if sha:
-            if len(_BLOB_CACHE) > 500:
-                _BLOB_CACHE.clear()
-            _BLOB_CACHE[sha] = content
+            with CACHE_LOCK:
+                if len(_BLOB_CACHE) > 800:
+                    _BLOB_CACHE.clear()
+                _BLOB_CACHE[sha] = content
         return content
     return None
+
 
 def prepare_branch(branch: str, base_sha: str) -> bool:
     ref_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{branch}")
@@ -631,6 +861,7 @@ def prepare_branch(branch: str, base_sha: str) -> bool:
     create_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs")
     res = GH_SESSION.post(create_url, json={"ref": f"refs/heads/{branch}", "sha": base_sha}, timeout=10)
     return res.status_code in [200, 201]
+
 
 def commit_file_to_branch(branch: str, path: str, content: str, msg: str) -> str:
     file_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents/{path}?ref={branch}")
@@ -649,6 +880,61 @@ def commit_file_to_branch(branch: str, path: str, content: str, msg: str) -> str
     if put_res.status_code in [200, 201]:
         return put_res.json().get("commit", {}).get("sha", "")
     return ""
+
+
+def commit_multiple_files(branch: str, files_dict: dict, msg: str) -> str:
+    """
+    Атомарный коммит сразу нескольких файлов через Git Data API (экономит время и вызовы API).
+    files_dict: { "path/to/file.py": "content_str", ... }
+    """
+    head_sha = get_branch_sha(branch)
+    if not head_sha:
+        return ""
+
+    try:
+        commit_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/commits/{head_sha}")
+        c_res = GH_SESSION.get(commit_url, timeout=10)
+        if c_res.status_code != 200:
+            raise RuntimeError("Failed to get base commit")
+        base_tree_sha = c_res.json()["tree"]["sha"]
+
+        tree_items = [
+            {
+                "path": path,
+                "mode": "100644",
+                "type": "blob",
+                "content": content
+            }
+            for path, content in files_dict.items()
+        ]
+        tree_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/trees")
+        t_res = GH_SESSION.post(tree_url, json={"base_tree": base_tree_sha, "tree": tree_items}, timeout=15)
+        if t_res.status_code != 201:
+            raise RuntimeError("Failed to create git tree")
+        new_tree_sha = t_res.json()["sha"]
+
+        new_commit_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/commits")
+        nc_res = GH_SESSION.post(
+            new_commit_url,
+            json={"message": msg, "tree": new_tree_sha, "parents": [head_sha]},
+            timeout=10
+        )
+        if nc_res.status_code != 201:
+            raise RuntimeError("Failed to create commit")
+        new_commit_sha = nc_res.json()["sha"]
+
+        ref_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{branch}")
+        r_res = GH_SESSION.patch(ref_url, json={"sha": new_commit_sha}, timeout=10)
+        if r_res.status_code == 200:
+            return new_commit_sha
+    except Exception as e:
+        print(f"[!] Fallback на пофайловый коммит из-за ошибки Tree API: {e}")
+        last_sha = ""
+        for p, c in files_dict.items():
+            last_sha = commit_file_to_branch(branch, p, c, msg)
+        return last_sha
+    return ""
+
 
 def watch_arena_by_sha(expected_sha: str):
     if not expected_sha:
@@ -669,6 +955,7 @@ def watch_arena_by_sha(expected_sha: str):
                     return target_run.get("conclusion") == "success", last_seen_id
         time.sleep(10)
     return False, last_seen_id
+
 
 def extract_clean_test_traceback(run_id: int) -> str:
     if not run_id:
@@ -714,6 +1001,7 @@ def extract_clean_test_traceback(run_id: int) -> str:
     except Exception as e:
         return f"Сбой при извлечении трейсбека: {e}"
 
+
 def ensure_jules_label_exists() -> None:
     url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/labels")
     try:
@@ -727,6 +1015,7 @@ def ensure_jules_label_exists() -> None:
     except Exception as e:
         print(f"[!] Ошибка запроса создания лейбла jules: {e}")
 
+
 def add_jules_label(issue_number: int) -> bool:
     url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues/{issue_number}/labels")
     try:
@@ -738,6 +1027,7 @@ def add_jules_label(issue_number: int) -> bool:
     except Exception as e:
         print(f"[!] Ошибка добавления лейбла jules на #{issue_number}: {e}")
         return False
+
 
 def escalate_to_github_issue(mod_name: str, task_desc: str, last_error: str, branch: str) -> str:
     ensure_jules_label_exists()
@@ -770,6 +1060,7 @@ def escalate_to_github_issue(mod_name: str, task_desc: str, last_error: str, bra
         print(f"[!] Ошибка запроса создания Issue: {e}")
     return ""
 
+
 def reactivate_stuck_jules_issues() -> int:
     url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues")
     try:
@@ -795,6 +1086,7 @@ def reactivate_stuck_jules_issues() -> int:
         if add_jules_label(number):
             reactivated += 1
     return reactivated
+
 
 def run_jules_babysitter():
     print("[+] Демон-нянька для Jules запущен.")
@@ -848,6 +1140,7 @@ def run_jules_babysitter():
 
         except Exception as e:
             print(f"[!] Ошибка няньки Jules: {e}")
+
 
 def refresh_stuck_prs() -> tuple:
     list_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/pulls")
@@ -909,6 +1202,7 @@ def refresh_stuck_prs() -> tuple:
 
     return refreshed, dirty_urls, pinged_jules_count
 
+
 def cleanup_orphan_branches() -> int:
     branches_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/branches")
     prs_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/pulls")
@@ -949,6 +1243,7 @@ def cleanup_orphan_branches() -> int:
             print(f"[!] Сбой при удалении ветки {name}: {e}")
     return deleted
 
+
 def nuke_everything() -> int:
     deleted = 0
     for folder in ["skills", "tests"]:
@@ -971,21 +1266,27 @@ def nuke_everything() -> int:
         except Exception as e:
             print(f"[!] Ошибка при ядерном ударе по {folder}: {e}")
 
-    _BLOB_CACHE.clear()
-    _MANIFEST_CACHE["fingerprint"] = None
+    with CACHE_LOCK:
+        _BLOB_CACHE.clear()
+        _MANIFEST_CACHE["fingerprint"] = None
 
     base_sha = get_main_sha()
     if base_sha:
-        commit_file_to_branch("main", "skills/EPIC.md", EPIC_HEADER, "☢️ NUKE: сброс памяти (Эпик) [skip ci]")
-        commit_file_to_branch("main", "skills/LESSONS.md", LESSONS_HEADER, "☢️ NUKE: сброс памяти (Уроки) [skip ci]")
+        commit_multiple_files(
+            "main",
+            {"skills/EPIC.md": EPIC_HEADER, "skills/LESSONS.md": LESSONS_HEADER},
+            "☢️ NUKE: сброс памяти (Эпик и Уроки) [skip ci]"
+        )
 
     return deleted
+
 
 NOISE_PREFIXES = [
     "resilient_", "secure_", "clean_", "compressed_", "smart_", "global_", "mesh_",
     "orchestrator_", "coordinator_", "manager_", "omega_", "transcendence_", "nexus_",
     "core_", "ultimate_", "advanced_"
 ]
+
 
 def _normalize_skill_name(name: str) -> str:
     n = name
@@ -997,6 +1298,7 @@ def _normalize_skill_name(name: str) -> str:
                 n = n[len(p):]
                 changed = True
     return n
+
 
 def find_duplicate_skill_clusters() -> dict:
     url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents/skills?ref=main")
@@ -1015,6 +1317,7 @@ def find_duplicate_skill_clusters() -> dict:
         clusters.setdefault(core, []).append(fname)
     return {k: v for k, v in clusters.items() if len(v) > 1}
 
+
 def get_all_skill_sources() -> dict:
     url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents/skills?ref=main")
     try:
@@ -1027,20 +1330,48 @@ def get_all_skill_sources() -> dict:
         return {}
 
     sources = {}
-    for f_info in items:
+
+    def _fetch(f_info):
         fname = f_info["name"]
         code = get_file_content("main", f"skills/{fname}", known_sha=f_info.get("sha"))
-        if code:
-            sources[fname[:-3]] = code
+        return fname[:-3], code
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        for mod_key, code in pool.map(_fetch, items):
+            if code:
+                sources[mod_key] = code
     return sources
 
+
 def build_skill_import_graph(sources: dict) -> dict:
+    """Строит точный граф зависимостей между скиллами через AST (включая from skills import X)."""
     graph = {}
     for name, code in sources.items():
-        deps = set(re.findall(r'from\s+skills\.(\w+)\s+import', code))
-        deps |= set(re.findall(r'import\s+skills\.(\w+)\b', code))
+        deps = set()
+        try:
+            tree = ast.parse(code)
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom):
+                    if node.module == "skills":
+                        for alias in node.names:
+                            if alias.name != "*":
+                                deps.add(alias.name)
+                    elif node.module and node.module.startswith("skills."):
+                        sub = node.module.split(".")[1]
+                        deps.add(sub)
+                elif isinstance(node, ast.Import):
+                    for alias in node.names:
+                        if alias.name.startswith("skills."):
+                            sub = alias.name.split(".")[1]
+                            deps.add(sub)
+        except SyntaxError:
+            # Фолбэк на регулярки, если в файле синтаксическая ошибка
+            deps |= set(re.findall(r'from\s+skills\.(\w+)\s+import', code))
+            deps |= set(re.findall(r'import\s+skills\.(\w+)\b', code))
+        deps.discard(name)
         graph[name] = deps
     return graph
+
 
 def find_skill_dependents(target: str, sources: dict) -> list:
     graph = build_skill_import_graph(sources)
@@ -1053,6 +1384,7 @@ def find_skill_dependents(target: str, sources: dict) -> list:
                 dependents.add(mod_name)
                 queue.append(mod_name)
     return sorted(dependents)
+
 
 def audit_skill_import_graph() -> dict:
     manifest = get_skills_manifest()
@@ -1071,6 +1403,7 @@ def audit_skill_import_graph() -> dict:
         if affected:
             result[missing_name] = affected
     return result
+
 
 def build_cleanup_plan() -> tuple:
     clusters = find_duplicate_skill_clusters()
@@ -1125,6 +1458,7 @@ def build_cleanup_plan() -> tuple:
     )
     return report, to_delete
 
+
 def execute_cleanup_plan(files_to_delete: list) -> int:
     deleted = 0
     for fname in files_to_delete:
@@ -1132,8 +1466,10 @@ def execute_cleanup_plan(files_to_delete: list) -> int:
         for path in (f"skills/{fname}", f"tests/test_{base}.py", f"tests/test_{base}_integration.py"):
             if delete_repo_file(path, f"Чистка дублей: удаляю {path} [skip ci]", branch="main"):
                 deleted += 1
-    _MANIFEST_CACHE["fingerprint"] = None
+    with CACHE_LOCK:
+        _MANIFEST_CACHE["fingerprint"] = None
     return deleted
+
 
 # 6. УСИЛЕННЫЙ AST-АНТИЧИТ
 def inspect_code_for_cheating(code: str, existing_skills: list, target_module: str) -> str:
@@ -1143,6 +1479,9 @@ def inspect_code_for_cheating(code: str, existing_skills: list, target_module: s
         return f"Синтаксическая ошибка в коде: {e}"
 
     for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in ("eval", "exec"):
+            return f"АНТИЧИТ: Запрещено использовать '{node.func.id}()' для динамического обхода проверок!"
+
         if isinstance(node, ast.Assign) and getattr(node, 'col_offset', -1) == 0:
             for target in node.targets:
                 if isinstance(target, ast.Name) and target.id in existing_skills and target.id != target_module:
@@ -1161,7 +1500,6 @@ def inspect_code_for_cheating(code: str, existing_skills: list, target_module: s
                 (isinstance(node.type, ast.Name) and node.type.id in ["Exception", "BaseException"])
             )
             if is_broad:
-                # Фильтруем пустые выражения (докстринги/комментарии) и проверяем, не глушится ли ошибка через pass/continue
                 effective_stmts = [
                     s for s in node.body
                     if not (isinstance(s, ast.Expr) and isinstance(getattr(s, "value", None), ast.Constant))
@@ -1182,6 +1520,7 @@ def inspect_code_for_cheating(code: str, existing_skills: list, target_module: s
 
     return ""
 
+
 # 7. МАНИФЕСТ И ПАМЯТЬ
 LESSONS_PATH = "skills/LESSONS.md"
 LESSONS_HEADER = "# Уроки Унги\n\nЭто файл, который бот пишет и читает сам.\n"
@@ -1191,14 +1530,16 @@ MAX_LESSONS_FILE_CHARS = 16000
 EPIC_PATH = "skills/EPIC.md"
 EPIC_HEADER = "# Текущий эпик Унги\n\nЭто многошаговая цель бота, которая живёт дольше одного цикла — тут видно, к чему бот идёт, а не только что он только что сделал.\n\nНет активного эпика — можно предложить новый.\n"
 
+
 def get_epic_context() -> str:
     content = get_file_content("main", EPIC_PATH)
     return content if content else "Нет активного эпика — можно предложить новый."
 
-def update_epic_file(branch: str, decision: dict) -> None:
+
+def build_updated_epic_text(branch: str, decision: dict) -> str:
     status = decision.get("epic_status", "none")
     if status not in ("start_new", "continue", "complete"):
-        return
+        return ""
 
     title = (decision.get("epic_title") or "Без названия").strip()
     step_note = (decision.get("epic_step_note") or "").strip()
@@ -1215,10 +1556,11 @@ def update_epic_file(branch: str, decision: dict) -> None:
         content = existing.rstrip() + "\n" + line + "\n"
         if status == "complete":
             content += "\nНет активного эпика — можно предложить новый.\n"
+    return content
 
-    commit_file_to_branch(branch, EPIC_PATH, content, f"Эпик «{title}»: {status}")
 
-_MANIFEST_CACHE = {"data": {}, "fingerprint": None}
+_MANIFEST_CACHE = {"data": {}, "fingerprint": None, "has_inits": False}
+
 
 def get_skills_manifest(force_refresh: bool = False) -> dict:
     dir_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents/skills?ref=main")
@@ -1234,20 +1576,19 @@ def get_skills_manifest(force_refresh: bool = False) -> dict:
     py_files = [f for f in listing if f["name"].endswith(".py") and f["name"] != "__init__.py"]
     fingerprint = "|".join(sorted(f"{f['name']}:{f.get('sha', '')}" for f in py_files))
 
-    if not force_refresh and fingerprint == _MANIFEST_CACHE["fingerprint"] and _MANIFEST_CACHE["data"]:
-        return _MANIFEST_CACHE["data"]
+    with CACHE_LOCK:
+        if not force_refresh and fingerprint == _MANIFEST_CACHE["fingerprint"] and _MANIFEST_CACHE["data"]:
+            return _MANIFEST_CACHE["data"]
 
-    manifest = {}
-    for f_info in py_files:
+    def _parse_file(f_info):
         f_name = f_info["name"]
         mod_key = f_name[:-3]
         code = get_file_content("main", f"skills/{f_name}", known_sha=f_info.get("sha"))
         if not code:
-            continue
+            return mod_key, None
         signatures = []
         try:
             tree = ast.parse(code)
-            # Итерируемся только по верхнему уровню tree.body, чтобы методы классов не дублировались как функции
             for node in tree.body:
                 if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and not node.name.startswith("_"):
                     args = [a.arg for a in node.args.args]
@@ -1271,13 +1612,22 @@ def get_skills_manifest(force_refresh: bool = False) -> dict:
                     signatures.append(f"class {node.name}{doc_snippet} [методы: {', '.join(methods)}]")
         except Exception:
             pass
-        manifest[mod_key] = signatures if signatures else ["нет сигнатур"]
+        return mod_key, (signatures if signatures else ["нет сигнатур"])
 
-    _MANIFEST_CACHE["data"] = manifest
-    _MANIFEST_CACHE["fingerprint"] = fingerprint
+    manifest = {}
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        for mod_key, sigs in pool.map(_parse_file, py_files):
+            if sigs is not None:
+                manifest[mod_key] = sigs
+
+    with CACHE_LOCK:
+        _MANIFEST_CACHE["data"] = manifest
+        _MANIFEST_CACHE["fingerprint"] = fingerprint
     return manifest
 
+
 MAX_MANIFEST_PROMPT_CHARS = 6000
+
 
 def manifest_for_prompt(manifest: dict, always_full: list = None) -> str:
     always_full = set(always_full or [])
@@ -1293,6 +1643,7 @@ def manifest_for_prompt(manifest: dict, always_full: list = None) -> str:
     names_only = {k: (v if k in always_full else "...") for k, v in manifest.items()}
     return json.dumps(names_only, ensure_ascii=False)
 
+
 def get_lessons_context() -> str:
     content = get_file_content("main", LESSONS_PATH)
     if not content:
@@ -1300,6 +1651,7 @@ def get_lessons_context() -> str:
     if len(content) > MAX_LESSONS_CHARS_IN_PROMPT:
         return "...(старые записи обрезаны)...\n" + content[-MAX_LESSONS_CHARS_IN_PROMPT:]
     return content
+
 
 def _build_lesson_entry(mod_name: str, action: str, rounds: int, cheats_caught: list, last_error: str, status_line: str) -> str:
     entry_lines = [f"\n## {mod_name} ({action}) — раундов: {rounds}"]
@@ -1312,36 +1664,32 @@ def _build_lesson_entry(mod_name: str, action: str, rounds: int, cheats_caught: 
     entry_lines.append(f"- Статус: {status_line}")
     return "\n".join(entry_lines)
 
+
 def _merge_lessons_text(existing: str, entry: str) -> str:
     updated = existing.rstrip() + "\n" + entry + "\n"
     if len(updated) > MAX_LESSONS_FILE_CHARS:
         updated = LESSONS_HEADER + "\n...(старые уроки обрезаны)...\n" + updated[-MAX_LESSONS_FILE_CHARS:]
     return updated
 
-def append_lesson_to_branch(branch: str, mod_name: str, action: str, rounds: int, cheats_caught: list, last_error: str = "") -> None:
-    existing = get_file_content(branch, LESSONS_PATH) or get_file_content("main", LESSONS_PATH) or LESSONS_HEADER
+
+def finalize_memory_on_branch(branch: str, mod_name: str, action: str, rounds: int, cheats_caught: list, last_error: str, decision: dict) -> None:
+    """Одним коммитом с [skip ci] записывает урок и обновляет эпик перед слиянием в main."""
+    existing_lessons = get_file_content(branch, LESSONS_PATH) or get_file_content("main", LESSONS_PATH) or LESSONS_HEADER
     entry = _build_lesson_entry(mod_name, action, rounds, cheats_caught, last_error, "успешно прошёл тесты и влит в main")
-    commit_file_to_branch(branch, LESSONS_PATH, _merge_lessons_text(existing, entry), f"Урок: {mod_name}")
+    files_to_update = {LESSONS_PATH: _merge_lessons_text(existing_lessons, entry)}
+
+    epic_text = build_updated_epic_text(branch, decision)
+    if epic_text:
+        files_to_update[EPIC_PATH] = epic_text
+
+    commit_multiple_files(branch, files_to_update, f"Память и эпик: {mod_name} [skip ci]")
+
 
 def append_failure_lesson_directly(mod_name: str, action: str, rounds: int, cheats_caught: list, last_error: str = "") -> None:
-    base_sha = get_main_sha()
-    if not base_sha:
-        return
-
-    note_branch = f"unga-lesson-{mod_name}-{int(time.time())}"
-    if not prepare_branch(note_branch, base_sha):
-        return
-
     existing = get_file_content("main", LESSONS_PATH) or LESSONS_HEADER
     entry = _build_lesson_entry(mod_name, action, rounds, cheats_caught, last_error, "ПРОВАЛЕН Унгой, передан на эскалацию")
-    commit_file_to_branch(note_branch, LESSONS_PATH, _merge_lessons_text(existing, entry), f"Урок (сбой): {mod_name}")
+    commit_file_to_branch("main", LESSONS_PATH, _merge_lessons_text(existing, entry), f"Урок из сбоя: {mod_name} [skip ci]")
 
-    m_res = GH_SESSION.post(clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/merges"), json={
-        "base": "main", "head": note_branch, "commit_message": f"Урок из сбоя: {mod_name}"
-    }, timeout=10)
-
-    if m_res.status_code in [200, 201, 204]:
-        GH_SESSION.delete(clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{note_branch}"), timeout=10)
 
 # 8. ПЛАНИРОВАНИЕ И ГЕНЕРАЦИЯ
 FILLER_TOKENS = {
@@ -1353,9 +1701,11 @@ FILLER_TOKENS = {
     "manager", "nexus", "transcendence"
 }
 
+
 def _core_tokens(name: str) -> set:
     tokens = re.split(r'[_\d]+', name.lower())
     return {t for t in tokens if t and t not in FILLER_TOKENS}
+
 
 def find_near_duplicate(module_name: str, manifest: dict) -> str:
     new_core = _core_tokens(module_name)
@@ -1371,6 +1721,7 @@ def find_near_duplicate(module_name: str, manifest: dict) -> str:
             best_match, best_overlap = existing_name, overlap
     return best_match if best_overlap >= 0.6 else ""
 
+
 def dream_action(manifest: dict, lessons: str, epic: str, manual_prompt: str = "") -> dict:
     if manual_prompt:
         prompt = (
@@ -1379,7 +1730,7 @@ def dream_action(manifest: dict, lessons: str, epic: str, manual_prompt: str = "
             "Сформируй спецификацию модуля под эту задачу (если просят рефакторинг существующего — укажи action='refactor' и точное имя).\n"
             "Верни СТРОГО JSON:\n"
             "{\n"
-            '  "action": "create" или "refactor",\n'
+            '  "action": "create" или "refactor" или "compose",\n'
             '  "module_name": "латинское_имя_без_py",\n'
             '  "description": "суть модуля",\n'
             '  "class_or_func": "сигнатуры функций/классов",\n'
@@ -1399,7 +1750,7 @@ def dream_action(manifest: dict, lessons: str, epic: str, manual_prompt: str = "
         prompt = (
             "Ты — Стратег-Паразит. Цель — не просто плодить модули, а РЕАЛЬНО развиваться: выстраивать "
             "многошаговые направления, где каждая задача продвигает что-то большее, чем она сама.\n\n"
-            f"УЖЕ СОЗДАННЫЕ МОДУЛЕЙ:\n{manifest_for_prompt(manifest)}\n\n"
+            f"УЖЕ СОЗДАННЫЕ МОДУЛИ:\n{manifest_for_prompt(manifest)}\n\n"
             f"УРОКИ:\n{lessons}\n\n"
             f"ТЕКУЩИЙ ЭПИК (многошаговая цель дольше одного цикла):\n{epic}\n\n"
             "ПРАВИЛО ПРО ЭПИК:\n"
@@ -1493,21 +1844,24 @@ def dream_action(manifest: dict, lessons: str, epic: str, manual_prompt: str = "
             "epic_status": "none"
         }
 
+
 def _compose_context(task: dict) -> str:
     composed_of = task.get("composed_of") or []
     if not composed_of:
         return ""
     return f"\nЭТО КОМПОЗИЦИЯ: модуль ОБЯЗАН импортировать и использовать существующие навыки {composed_of}.\n"
 
-def architect_write_hard_tests(task: dict, manifest: dict, lessons: str, existing_code: str = "", error_log: str = "") -> str:
-    context_code = f"КОД ДО РЕФАКТОРИНГА:\n{existing_code}\n" if existing_code else ""
+
+def architect_write_hard_tests(task: dict, manifest: dict, lessons: str, existing_code: str = "", error_log: str = "", dependents: list = None) -> str:
+    context_code = f"КОД ДО РЕФАКТОРИНГА (сохрани обратную совместимость публичных сигнатур!):\n{existing_code}\n" if existing_code else ""
+    deps_warn = f"ВАЖНО: От этого модуля зависят другие модули ({dependents}), нельзя удалять уже существующие функции/классы!\n" if dependents else ""
     context_stagnation = f"\nПОВТОРЯЮЩАЯСЯ ОШИБКА ТЕСТА:\n{error_log}\n" if error_log else ""
     prompt = (
         "Ты — Архитектор-Инквизитор. Напиши ЮНИТ-тесты unittest.\n"
         f"Задача: {task['action']} модуля skills/{task['module_name']}.py\n"
         f"Описание: {task['description']}\n"
-        f"{context_code}{_compose_context(task)}{context_stagnation}\n"
-        f"СИГНАТУРЫ И ТИПЫ:\n{manifest_for_prompt(manifest, always_full=task.get('composed_of'))}\n\n"
+        f"{deps_warn}{context_code}{_compose_context(task)}{context_stagnation}\n"
+        f"СИГНАТУРЫ И ТИПЫ:\n{manifest_for_prompt(manifest, always_full=(task.get('composed_of') or []) + (dependents or []))}\n\n"
         "СТРОГИЕ ПРАВИЛА (АНТИЧИТ НА ХАРДКОД И ЗАГЛУШКИ):\n"
         "1. Библиотеки: standard lib, unittest, unittest.mock, requests, bs4, random, uuid, string. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕН pytest!\n"
         "2. ХАОС В ДАННЫХ: ВСЕ входные строки, числа, пути к файлам и URL в тестах ДОЛЖНЫ БЫТЬ РАНДОМНЫМИ (используй uuid.uuid4().hex, random.choice, и т.д.). НИКАКИХ статичных строк типа 'error.log' или 'test_data'. Кодер не должен угадать входные данные!\n"
@@ -1517,6 +1871,7 @@ def architect_write_hard_tests(task: dict, manifest: dict, lessons: str, existin
         "6. Верни ТОЛЬКО валидный код тестов Python без markdown."
     )
     return ask_gemini(prompt)
+
 
 def architect_write_integration_test(task: dict, manifest: dict, lessons: str, existing_code: str = "") -> str:
     context_code = f"КОД ДО РЕФАКТОРИНГА:\n{existing_code}\n" if existing_code else ""
@@ -1531,6 +1886,7 @@ def architect_write_integration_test(task: dict, manifest: dict, lessons: str, e
     )
     return ask_gemini(prompt)
 
+
 def unga_implement_hardened(task: dict, unit_test_code: str, integration_test_code: str, manifest: dict, existing_code: str = "", error_log: str = "") -> str:
     context_err = f"ОШИБКА С ПРОШЛОГО РАУНДА:\n{error_log}\n" if error_log else ""
     context_base = f"БАЗОВЫЙ КОД:\n{existing_code}\n" if existing_code else ""
@@ -1543,9 +1899,10 @@ def unga_implement_hardened(task: dict, unit_test_code: str, integration_test_co
         f"ИНТЕГРАЦИОННЫЕ ТЕСТЫ:\n{integration_test_code}\n\n"
         f"{context_err}\n"
         "ПРАВИЛА: Исключения бросай только если в тестах есть assertRaises.\n"
-        "ЗАПРЕТ НА ЧИТЕРСТВО: Тебе КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО использовать конструкции вида `try: from X import Y except ImportError: class Y:...` для создания фейковых классов-заглушек. Если зависимости нет — импортируй честно, пусть падает, либо вообще не трогай этот импорт. Без 'except Exception: pass'. Верни только чистый Python-код."
+        "ЗАПРЕТ НА ЧИТЕРСТВО: Тебе КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО использовать конструкции вида `try: from X import Y except ImportError: class Y:...` для создания фейковых классов-заглушек. Запрещены `eval` и `exec`. Если зависимости нет — импортируй честно, пусть падает, либо вообще не трогай этот импорт. Без 'except Exception: pass'. Верни только чистый Python-код."
     )
     return ask_gemini(prompt)
+
 
 # 9. БОЕВОЙ ЦИКЛ С АВТОЭВРИСТИКОЙ И ЭСКАЛАЦИЕЙ НА JULES
 def write_epic_smoke_test(epic_title: str, epic_body: str, manifest: dict) -> str:
@@ -1565,6 +1922,7 @@ def write_epic_smoke_test(epic_title: str, epic_body: str, manifest: dict) -> st
         "4. Верни ТОЛЬКО валидный Python-код файла без markdown."
     )
     return ask_gemini(prompt)
+
 
 def run_epic_smoke_test(epic_title: str, manifest: dict) -> None:
     epic_body = get_epic_context()
@@ -1612,6 +1970,7 @@ def run_epic_smoke_test(epic_title: str, manifest: dict) -> None:
             buttons=tg_issue_button(issue_url)
         )
 
+
 def delete_repo_file(path: str, message: str, branch: str = "main") -> bool:
     file_url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/contents/{path}?ref={branch}")
     try:
@@ -1629,29 +1988,32 @@ def delete_repo_file(path: str, message: str, branch: str = "main") -> bool:
         print(f"[!] Ошибка удаления файла {path}: {e}")
         return False
 
+
 def find_poisoning_import_error(error_text: str) -> str:
     m = re.search(r"Failed to import test module:\s*(\S+)", error_text or "")
     if m:
         return m.group(1).strip().replace(".", "/")
     return ""
 
+
 def check_main_health() -> tuple:
     url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/actions/runs")
     try:
-        r = GH_SESSION.get(url, params={"branch": "main", "per_page": 1}, timeout=10)
+        r = GH_SESSION.get(url, params={"branch": "main", "per_page": 5}, timeout=10)
         if r.status_code != 200:
             return True, "", None
         runs = r.json().get("workflow_runs", [])
-        if not runs or runs[0].get("status") != "completed" or runs[0].get("conclusion") == "success":
+        completed_runs = [run for run in runs if run.get("status") == "completed"]
+        if not completed_runs or completed_runs[0].get("conclusion") == "success":
             return True, "", None
-        run_id = runs[0].get("id")
+        run_id = completed_runs[0].get("id")
         return False, extract_clean_test_traceback(run_id), run_id
     except Exception as e:
         print(f"[!] Ошибка проверки здоровья main: {e}")
         return True, "", None
 
+
 def bulk_quarantine_orphaned_tests() -> list:
-    # Сканируем и папку tests/, и корень на случай старых артефактов
     candidates = []
     for folder_prefix in ("tests", ""):
         endpoint = f"contents/{folder_prefix}?ref=main" if folder_prefix else "contents?ref=main"
@@ -1680,6 +2042,7 @@ def bulk_quarantine_orphaned_tests() -> list:
                 deleted.append(full_path)
     return deleted
 
+
 def heal_main_if_poisoned() -> bool:
     healthy, error_text, _ = check_main_health()
     if healthy:
@@ -1704,6 +2067,7 @@ def heal_main_if_poisoned() -> bool:
     )
     return False
 
+
 def is_jules_working_on(mod_name: str) -> bool:
     url = clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/issues")
     try:
@@ -1725,10 +2089,12 @@ def is_jules_working_on(mod_name: str) -> bool:
         print(f"[!] Ошибка проверки статуса Jules: {e}")
     return False
 
+
 def set_current_action(desc: str):
     global CURRENT_ACTION_DESC
     with STATE_LOCK:
         CURRENT_ACTION_DESC = desc
+
 
 def run_evolution_cycle():
     global CYCLE_RUNNING
@@ -1794,9 +2160,10 @@ def run_evolution_cycle():
             return
 
         current_code = get_file_content("main", f"skills/{mod_name}.py") or ""
+        dependents = find_skill_dependents(mod_name, get_all_skill_sources()) if current_code else []
 
         set_current_action(f"Архитектор пишет тесты для {mod_name}...")
-        test_code = architect_write_hard_tests(decision, manifest, lessons, existing_code=current_code)
+        test_code = architect_write_hard_tests(decision, manifest, lessons, existing_code=current_code, dependents=dependents)
         integration_test_code = architect_write_integration_test(decision, manifest, lessons, existing_code=current_code)
 
         branch = f"unga-{action}-{mod_name}"
@@ -1808,10 +2175,17 @@ def run_evolution_cycle():
         integration_test_path = f"tests/test_{mod_name}_integration.py"
         skill_path = f"skills/{mod_name}.py"
 
-        commit_file_to_branch(branch, "skills/__init__.py", "# unga package\n", "Init package [skip ci]")
-        commit_file_to_branch(branch, "tests/__init__.py", "# unga tests package\n", "Init tests [skip ci]")
-        commit_file_to_branch(branch, test_path, test_code, f"Юнит-тесты для {mod_name} [skip ci]")
-        commit_file_to_branch(branch, integration_test_path, integration_test_code, f"Интеграционные тесты для {mod_name} [skip ci]")
+        # Пакетный коммит обоих тестов и __init__.py за один раз!
+        initial_files = {
+            test_path: test_code,
+            integration_test_path: integration_test_code
+        }
+        if not _MANIFEST_CACHE.get("has_inits"):
+            initial_files["skills/__init__.py"] = "# unga package\n"
+            initial_files["tests/__init__.py"] = "# unga tests package\n"
+            _MANIFEST_CACHE["has_inits"] = True
+
+        commit_multiple_files(branch, initial_files, f"Тестовый стенд для {mod_name} [skip ci]")
 
         set_current_action(f"Унга пишет код для {mod_name} (раунд 1)...")
         impl_code = unga_implement_hardened(decision, test_code, integration_test_code, manifest, existing_code=current_code)
@@ -1882,10 +2256,13 @@ def run_evolution_cycle():
 
             if stagnant_hits >= 1 and not tests_regenerated and attempts < MAX_ATTEMPTS:
                 set_current_action(f"Перегенерация тестов Архитектором для {mod_name}...")
-                test_code = architect_write_hard_tests(decision, manifest, lessons, existing_code=impl_code, error_log=last_error)
+                test_code = architect_write_hard_tests(decision, manifest, lessons, existing_code=impl_code, error_log=last_error, dependents=dependents)
                 integration_test_code = architect_write_integration_test(decision, manifest, lessons, existing_code=impl_code)
-                commit_file_to_branch(branch, test_path, test_code, "Перегенерация юнит-тестов [skip ci]")
-                commit_file_to_branch(branch, integration_test_path, integration_test_code, "Перегенерация интеграционных тестов [skip ci]")
+                commit_multiple_files(
+                    branch,
+                    {test_path: test_code, integration_test_path: integration_test_code},
+                    "Перегенерация тестов Архитектором [skip ci]"
+                )
                 tests_regenerated = True
                 stagnant_hits = 0
 
@@ -1894,15 +2271,15 @@ def run_evolution_cycle():
             attempts += 1
 
         if passed:
-            append_lesson_to_branch(branch, mod_name, action, rounds_used, cheats_caught, last_error)
-            update_epic_file(branch, decision)
+            finalize_memory_on_branch(branch, mod_name, action, rounds_used, cheats_caught, last_error, decision)
             m_res = GH_SESSION.post(clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/merges"), json={
                 "base": "main", "head": branch, "commit_message": f"ЭВОЛЮЦИЯ: Вливание skills/{mod_name}.py"
             }, timeout=10)
 
             if m_res.status_code in [200, 201, 204]:
                 GH_SESSION.delete(clean_url(f"{GITHUB_BASE}{GITHUB_REPO}/git/refs/heads/{branch}"), timeout=10)
-                _MANIFEST_CACHE["fingerprint"] = None
+                with CACHE_LOCK:
+                    _MANIFEST_CACHE["fingerprint"] = None
                 epic_line = ""
                 if decision.get("epic_status") == "start_new":
                     epic_line = f"\n\n🧭 <b>Новый эпик:</b> {html.escape(decision.get('epic_title', ''))}"
@@ -1916,7 +2293,12 @@ def run_evolution_cycle():
                     f"📝 {html.escape(decision.get('description', ''))}\n"
                     f"🎯 Раундов: {rounds_used}"
                     f"{epic_line}",
-                    buttons=[[{"text": f"🔬 Инспекция {mod_name}", "callback_data": f"insp:{mod_name[:45]}"}]]
+                    buttons=[
+                        [
+                            {"text": f"🔬 Инспекция {mod_name}", "callback_data": f"insp:{mod_name[:40]}"},
+                            {"text": "📖 Код", "callback_data": f"viewcode:{mod_name[:40]}"}
+                        ]
+                    ]
                 )
                 if decision.get("epic_status") == "complete":
                     fresh_manifest = get_skills_manifest(force_refresh=True)
@@ -1952,6 +2334,7 @@ def run_evolution_cycle():
             CYCLE_RUNNING = False
         set_current_action("Сон между циклами (ожидание таймера или /step)")
 
+
 def life_cycle():
     while True:
         with STATE_LOCK:
@@ -1964,9 +2347,9 @@ def life_cycle():
         else:
             set_current_action("Эволюция на паузе (ожидание /pause или /step)")
 
-        # Спим 15 минут ИЛИ просыпаемся мгновенно по сигналу WAKE_UP_EVENT из Telegram
         WAKE_UP_EVENT.wait(timeout=900)
         WAKE_UP_EVENT.clear()
+
 
 if __name__ == "__main__":
     threading.Thread(target=run_jules_babysitter, daemon=True).start()

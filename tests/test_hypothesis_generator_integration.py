@@ -3,7 +3,8 @@ import uuid
 import random
 import os
 import tempfile
-import git
+import shutil
+import subprocess
 from skills.git_inspector import GitInspector
 from skills.lesson_parser import LessonParser
 from skills.hypothesis_generator import HypothesisGenerator
@@ -12,12 +13,12 @@ from skills.hypothesis_generator import HypothesisGenerator
 class TestHypothesisGeneratorIntegration(unittest.TestCase):
 
     def setUp(self):
-        self.test_dir = tempfile.TemporaryDirectory()
-        self.repo_path = self.test_dir.name
-        self.repo = git.Repo.init(self.repo_path)
+        self.test_dir = tempfile.mkdtemp()
+        self.repo_path = self.test_dir
 
-        self.repo.git.config('user.name', 'Architect Test')
-        self.repo.git.config('user.email', 'architect@test.com')
+        subprocess.run(['git', '-C', self.repo_path, 'init', '-b', 'main'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        subprocess.run(['git', '-C', self.repo_path, 'config', 'user.name', 'Architect Test'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        subprocess.run(['git', '-C', self.repo_path, 'config', 'user.email', 'architect@test.com'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
 
         self.random_title = f"Lesson_{uuid.uuid4().hex[:8]}"
         self.random_insight = f"Insight_{uuid.uuid4().hex[:8]}"
@@ -31,16 +32,18 @@ class TestHypothesisGeneratorIntegration(unittest.TestCase):
         with open(self.file_path, "w", encoding="utf-8") as f:
             f.write(file_content)
 
-        self.repo.index.add([self.file_name])
-        self.commit = self.repo.index.commit(f"Add {self.random_title}")
-        self.commit_hash = self.commit.hexsha[:7]
+        subprocess.run(['git', '-C', self.repo_path, 'add', self.file_name], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        subprocess.run(['git', '-C', self.repo_path, 'commit', '-m', f"Add {self.random_title}"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+
+        rev = subprocess.run(['git', '-C', self.repo_path, 'rev-parse', 'HEAD'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        self.commit_hash = rev.stdout.decode('utf-8').strip()[:7]
 
         self.git_inspector = GitInspector(repo_path=self.repo_path)
         self.lesson_parser = LessonParser(git_inspector=self.git_inspector)
         self.generator = HypothesisGenerator(git_inspector=self.git_inspector, lesson_parser=self.lesson_parser)
 
     def tearDown(self):
-        self.test_dir.cleanup()
+        shutil.rmtree(self.test_dir)
 
     def test_integration_generate_hypotheses_and_snapshot(self):
         max_commits = random.randint(1, 15)

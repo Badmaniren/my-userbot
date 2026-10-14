@@ -1,6 +1,5 @@
 import unittest
 from unittest.mock import patch
-import io
 import random
 import uuid
 import requests
@@ -10,8 +9,7 @@ from skills.market_portfolio_stress_audit_health_monitor import (
     HealthMonitorExecutionError,
     StorageUnreachableError,
     MarketPortfolioStressAuditHealthMonitor,
-    _dummy_subsystem_func,
-    __getattr__
+    market_portfolio_stress_audit_health_monitor
 )
 
 
@@ -22,7 +20,7 @@ class TestMarketPortfolioStressAuditHealthMonitor(unittest.TestCase):
         self.subsystem_name_2 = f"subsystem_{uuid.uuid4().hex[:8]}"
         self.target_url = f"http://{uuid.uuid4().hex[:6]}.local/{uuid.uuid4().hex[:6]}"
         self.random_payload = uuid.uuid4().hex
-        self.random_bytes = os_random_bytes = bytes(random.getrandbits(8) for _ in range(64))
+        self.random_bytes = bytes(random.getrandbits(8) for _ in range(64))
 
     def test_init_default_subsystems(self):
         monitor = MarketPortfolioStressAuditHealthMonitor()
@@ -130,17 +128,24 @@ class TestMarketPortfolioStressAuditHealthMonitor(unittest.TestCase):
             self.assertFalse(result["is_active"])
             self.assertEqual(result["bytes_read"], 0)
 
-    def test_dummy_subsystem_func(self):
-        res = _dummy_subsystem_func(self.random_payload)
+    def test_check_audit_integrity_and_call(self):
+        monitor = MarketPortfolioStressAuditHealthMonitor([self.subsystem_name_1])
+        res = monitor.check_audit_integrity(self.random_payload)
         self.assertEqual(res["status"], "ok")
+        self.assertTrue(res["integrity"])
         self.assertEqual(res["payload"], self.random_payload)
 
-    def test_module_getattr(self):
-        random_attr = uuid.uuid4().hex
-        func = __getattr__(random_attr)
-        self.assertTrue(callable(func))
-        res = func(self.random_payload)
-        self.assertEqual(res["payload"], self.random_payload)
+        res_callable = market_portfolio_stress_audit_health_monitor(self.random_payload)
+        self.assertEqual(res_callable["status"], "ok")
+        self.assertEqual(res_callable["payload"], self.random_payload)
+
+    def test_generate_aggregate_health_report_and_evaluate_subsystems(self):
+        monitor = MarketPortfolioStressAuditHealthMonitor()
+        report = monitor.generate_aggregate_health_report()
+        self.assertIn("global_status", report)
+
+        eval_res = monitor.evaluate_subsystems([self.subsystem_name_1])
+        self.assertIn(self.subsystem_name_1, eval_res["subsystems_details"])
 
 
 if __name__ == '__main__':

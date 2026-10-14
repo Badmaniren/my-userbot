@@ -3,7 +3,12 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- перед фиксом: FAILED (failures=1, errors=1)
+on_validation_bridge (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: INFO:PortfolioScenarioSimulator:Found target for TEST_1EB6CA: price=206.8000, quantity=188.0000
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_backtest_runner (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## market_portfolio_backtester (refactor) — раундов: 1
@@ -293,9 +298,4 @@
 
 ## market_portfolio_stress_deep_forecaster (start_new) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## market_portfolio_stress_diagnostic_hub (create) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено создавать классы-заглушки внутри `except ImportError:`! Импортируй честно, пусть падает, если модуля нет.
-- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

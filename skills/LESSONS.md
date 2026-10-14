@@ -3,13 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-porter_v2 (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_reporter (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## market_portfolio_stress_audit_summary_vault (refactor) — раундов: 1
+rtfolio_stress_audit_summary_vault (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## market_portfolio_audit_regulatory_feed (create) — раундов: 4
@@ -258,5 +252,9 @@ porter_v2 (refactor) — раундов: 1
 
 ## market_portfolio_stress_audit_health_monitor (refactor) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Последняя ошибка перед фиксом: ##[error]Process completed with exit code 1.
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## market_portfolio_stress_audit_health_monitor (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: ##[error]Process completed with exit code 1.
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

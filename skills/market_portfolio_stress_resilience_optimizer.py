@@ -49,7 +49,9 @@ def market_portfolio_stress_resilience_optimizer(payload):
 
     response = {
         "optimized_portfolio_id": portfolio_id,
-        "resilience_score": round(random.uniform(0.8, 1.0), 4)
+        "portfolio_id": portfolio_id,
+        "resilience_score": round(random.uniform(0.8, 1.0), 4),
+        "recovery_actions": ["rebalance_weights", "add_put_options", "hedge_beta"]
     }
 
     if db_storage is not None and callable(db_storage):

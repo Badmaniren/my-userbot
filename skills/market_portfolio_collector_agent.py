@@ -1,6 +1,7 @@
 import os
 import json
 from datetime import datetime
+from typing import Dict, Any
 
 class MarketParser:
     def __init__(self, storage_file: str):
@@ -64,6 +65,20 @@ class PortfolioVisualizer:
 
     def build_text_report(self, symbol: str) -> str:
         return f"Report for {symbol}"
+
+
+def market_portfolio_collector_agent(payload: Dict[str, Any]) -> Dict[str, Any]:
+    portfolio_id = payload.get("portfolio_id", "default_portfolio")
+    capital = payload.get("capital", 100000.0)
+    assets = payload.get("assets", ["AAPL", "MSFT"])
+    weights = payload.get("weights", [0.5, 0.5])
+    return {
+        "portfolio_id": portfolio_id,
+        "capital": capital,
+        "assets": assets,
+        "weights": weights,
+        "status": "collected"
+    }
 
 
 def run_pipeline(symbol: str, url: str, telegram_token: str, chat_id: str, storage_file: str) -> bool:

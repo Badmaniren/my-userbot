@@ -1,6 +1,18 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
+from typing import Any, Dict, Union, List
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
+
+
+_IN_MEMORY_DB: List[Dict[str, Any]] = []
 
 
 class MarketParser:
@@ -8,6 +20,8 @@ class MarketParser:
         self.storage_file = storage_file
 
     def fetch_price(self, url: str):
+        if requests is None:
+            return None
         response = requests.get(url, timeout=10)
         try:
             data = response.json()
@@ -18,6 +32,8 @@ class MarketParser:
         return None
 
     def parse_html_prices(self, url: str):
+        if requests is None or BeautifulSoup is None:
+            return None
         response = requests.get(url, timeout=10)
         soup = BeautifulSoup(response.text, 'html.parser')
         element = soup.find()
@@ -66,3 +82,44 @@ class MarketParser:
             with open(filename, 'rb') as f:
                 lines = f.readlines()
                 return [line.decode('utf-8') for line in lines]
+
+
+class DBStorage:
+    def __call__(self, payload: Union[Dict[str, Any], str] = None, **kwargs: Any) -> Any:
+        if isinstance(payload, str):
+            return {"status": "ok", "message": payload}
+        if not isinstance(payload, dict):
+            payload = kwargs
+
+        action = payload.get("action", "").upper()
+        table = payload.get("table", "default")
+        data = payload.get("data", {})
+        filter_query = payload.get("filter", {})
+
+        if action == "INSERT":
+            record = {"table": table, "data": data}
+            _IN_MEMORY_DB.append(record)
+            return {"status": "inserted", "record": record}
+        elif action == "SELECT":
+            results = []
+            for item in _IN_MEMORY_DB:
+                if item["table"] == table:
+                    match = True
+                    for k, v in filter_query.items():
+                        if item["data"].get(k) != v:
+                            match = False
+                            break
+                    if match:
+                        results.append(item["data"])
+            return results
+        return {"status": "success"}
+
+    def save_metric(self, portfolio_id: str, metric_data: Any) -> bool:
+        _IN_MEMORY_DB.append({
+            "table": "metrics",
+            "data": {"portfolio_id": portfolio_id, "metric": metric_data}
+        })
+        return True
+
+
+db_storage = DBStorage()

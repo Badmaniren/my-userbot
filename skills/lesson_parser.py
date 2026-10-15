@@ -42,8 +42,16 @@ class LessonParser:
                     file_obj = self.git_inspector.read_file_at_commit(c_hash, "")
 
                 if file_obj:
-                    content_bytes = file_obj.read()
-                    
+                    if hasattr(file_obj, 'read'):
+                        content_raw = file_obj.read()
+                    else:
+                        content_raw = file_obj
+
+                    if isinstance(content_raw, bytes):
+                        content_bytes = content_raw
+                    else:
+                        content_bytes = str(content_raw).encode('utf-8')
+
                     # Проверка на запрещенные символы
                     try:
                         content_str = content_bytes.decode('utf-8')
@@ -108,7 +116,10 @@ class LessonParser:
                     file_obj = self.git_inspector.read_file_at_commit(c_hash, "")
 
                 if file_obj:
-                    raw_content = file_obj.read()
+                    if hasattr(file_obj, 'read'):
+                        raw_content = file_obj.read()
+                    else:
+                        raw_content = file_obj
                     if isinstance(raw_content, bytes):
                         content = raw_content.decode('utf-8', errors='ignore')
                     else:

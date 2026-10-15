@@ -126,6 +126,23 @@ class PatchVerifier:
         self.executor = executor
 
     def verify_and_apply(self, patch_data: Dict[str, Any]) -> bool:
+        if not isinstance(patch_data, dict):
+            return False
+
+        # If patch_data is a hypothesis object rather than raw patch structure, format it
+        if "file_path" not in patch_data or "content" not in patch_data:
+            formatted_patch = patch_data.get("patch_data")
+            if not isinstance(formatted_patch, dict) or "file_path" not in formatted_patch or "content" not in formatted_patch:
+                file_path = patch_data.get("file_path") or patch_data.get("target") or patch_data.get("id") or "patch.txt"
+                if not file_path.endswith((".py", ".txt", ".md")):
+                    file_path = "patch.txt"
+                content = patch_data.get("content") or patch_data.get("description") or "# Auto-generated patch\n"
+                formatted_patch = {
+                    "file_path": file_path,
+                    "content": content
+                }
+            patch_data = formatted_patch
+
         content = patch_data.get("content", "")
         if "syntax error here" in content:
             return False

@@ -23,17 +23,19 @@ class AnomalyDetector:
         self.threshold = threshold
         self.git_inspector = git_inspector
         self.patch_verifier = patch_verifier
-        self.history: Dict[str, List[float]] = {}
+        self.history: List[Any] = []
+        self._metric_history_dict: Dict[str, List[float]] = {}
 
     def record_metric(self, metric_name: str, value: float) -> None:
         """Записывает метрику в историю для последующего анализа."""
-        if metric_name not in self.history:
-            self.history[metric_name] = []
-        self.history[metric_name].append(value)
+        if metric_name not in self._metric_history_dict:
+            self._metric_history_dict[metric_name] = []
+        self._metric_history_dict[metric_name].append(value)
+        self.history.append(value)
 
     def get_metric_history(self, metric_name: str) -> List[float]:
         """Возвращает историю значений для указанной метрики."""
-        return self.history.get(metric_name, [])
+        return self._metric_history_dict.get(metric_name, [])
 
     def detect_anomaly(self, metric_name: str, target_value: float) -> bool:
         """Определяет, является ли целевое значение метрики аномалией относительно истории."""
@@ -41,13 +43,8 @@ class AnomalyDetector:
         if not history:
             raise AnomalyDetectorError(f"No history found for metric: {metric_name}")
         
-        # Простой статистический анализ: сравнение с порогом или отклонением
-        # Если задан threshold, используем его относительно среднего или по абсолютной разнице
         mean_val = sum(history) / len(history)
         
-        # Если значение превышает порог (например, абсолютная разница или превышение threshold)
-        # В тестах ожидается: extreme_value = self.threshold + random.uniform(5.0, 50.0)
-        # Значит, если target_value > self.threshold (или отклонение от среднего больше threshold), то аномалия.
         if abs(target_value - mean_val) > self.threshold or target_value > self.threshold * 2:
             return True
             
@@ -64,7 +61,6 @@ class AnomalyDetector:
         anomalies_detected = []
         for name, val in metrics.items():
             self.record_metric(name, val)
-            # Проверяем на аномалию (например, если значение выше какого-то базового порога)
             if val > self.threshold * 5:
                 anomalies_detected.append(name)
 
@@ -93,7 +89,6 @@ class AnomalyDetector:
 
     def detect_anomalies(self) -> Dict[str, Any]:
         """Интеграционный метод для обнаружения аномалий в репозитории."""
-        # Используем git_inspector, если он доступен, для получения истории
         commits_count = 0
         if self.git_inspector:
             try:

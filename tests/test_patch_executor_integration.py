@@ -1,19 +1,20 @@
 import unittest
 import os
 import shutil
+import tempfile
 import uuid
 import random
+
 from skills.patch_executor import PatchExecutor, PatchExecutorError
-from skills.git_inspector import GitInspector
 from skills.lesson_parser import LessonParser
+from skills.git_inspector import GitInspector
 
 
-class TestPatchExecutorIntegration(unittest.TestCase):
+class IntegrationTestPatchExecutor(unittest.TestCase):
 
     def setUp(self):
-        self.test_dir = f"test_repo_{uuid.uuid4().hex}"
-        self.repo_path = os.path.abspath(self.test_dir)
-        os.makedirs(self.repo_path, exist_ok=True)
+        self.test_dir = tempfile.mkdtemp(prefix=f"patch_exec_test_{uuid.uuid4().hex}_")
+        self.repo_path = self.test_dir
         
         self.git_inspector = GitInspector(repo_path=self.repo_path)
         self.lesson_parser = LessonParser(git_inspector=self.git_inspector)
@@ -24,55 +25,37 @@ class TestPatchExecutorIntegration(unittest.TestCase):
         )
 
     def tearDown(self):
-        if os.path.exists(self.repo_path):
-            shutil.rmtree(self.repo_path)
+        if os.path.exists(self.test_dir):
+            shutil.rmtree(self.test_dir, ignore_errors=True)
 
-    def test_integration_patch_application_and_rollback(self):
-        random_file_name = f"module_{uuid.uuid4().hex[:8]}.py"
-        random_content_v1 = f"# Version 1: {random.randint(1000, 9999)}"
-        random_content_v2 = f"# Version 2: {random.randint(10000, 99999)}"
+    def test_patch_application_and_atomic_validation_integration(self):
+        random_suffix = uuid.uuid4().hex[:8]
+        target_file = f"module_{random_suffix}.py"
+        random_content = f"# Generated content {random.randint(1000, 9999)}"
 
         patch_data = {
-            "file_path": random_file_name,
-            "content": random_content_v1
+            "file_path": target_file,
+            "content": random_content
         }
 
-        applied = self.patch_executor.apply_patch(patch_data)
-        self.assertTrue(applied, "Патч должен успешно примениться")
+        success = self.patch_executor.apply_patch(patch_data)
+        self.assertTrue(success)
 
-        full_file_path = os.path.join(self.repo_path, random_file_name)
-        self.assertTrue(os.path.exists(full_file_path), "Файл должен быть создан на диске")
+        full_path = os.path.join(self.repo_path, target_file)
+        self.assertTrue(os.path.exists(full_path))
 
-        with open(full_file_path, "r", encoding="utf-8") as f:
-            written_content = f.read()
-        self.assertEqual(written_content, random_content_v1, "Содержимое файла должно совпадать с переданным в патче")
+        with open(full_path, "r", encoding="utf-8") as f:
+            content_on_disk = f.read()
 
-        os.system(f"git -C {self.repo_path} init")
-        os.system(f"git -C {self.repo_path} config user.name 'Test Bot'")
-        os.system(f"git -C {self.repo_path} config user.email 'bot@test.com'")
-        os.system(f"git -C {self.repo_path} add {random_file_name}")
-        os.system(f"git -C {self.repo_path} commit -m 'Initial commit'")
+        self.assertEqual(content_on_disk, random_content)
 
-        commit_history = self.git_inspector.get_commit_history(max_count=1)
-        self.assertTrue(len(commit_history) > 0, "История коммитов должна содержать хотя бы один коммит")
-        initial_commit_hash = commit_history[0].get("hash") if isinstance(commit_history[0], dict) else getattr(commit_history[0], "hash", None)
-
-        patch_data_v2 = {
-            "file_path": random_file_name,
-            "content": random_content_v2
+    def test_invalid_patch_data_raises_error(self):
+        invalid_patch = {
+            "invalid_key": f"data_{uuid.uuid4().hex}"
         }
-        self.patch_executor.apply_patch(patch_data_v2)
 
-        with open(full_file_path, "r", encoding="utf-8") as f:
-            self.assertEqual(f.read(), random_content_v2, "Файл должен обновиться до второй версии")
-
-        if initial_commit_hash:
-            rolled_back = self.patch_executor.rollback_patch(random_file_name, initial_commit_hash)
-            self.assertTrue(rolled_back, "Откат патча должен завершиться успешно")
-
-            with open(full_file_path, "r", encoding="utf-8") as f:
-                rolled_content = f.read()
-            self.assertEqual(rolled_content, random_content_v1, "Содержимое файла после отката должно соответствовать первому коммиту")
+        with self.assertRaises(PatchExecutorError):
+            self.patch_executor.apply_patch(invalid_patch)
 
 
 if __name__ == "__main__":

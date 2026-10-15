@@ -86,7 +86,13 @@ class LessonParser:
         forbidden_words = {"запрещено"}
         lessons = []
         
-        history = self.git_inspector.get_history(max_count=max_commits)
+        try:
+            history = self.git_inspector.get_history(max_count=max_commits)
+        except TypeError:
+            try:
+                history = self.git_inspector.get_history()
+            except TypeError:
+                history = []
         if history is None:
             return []
             

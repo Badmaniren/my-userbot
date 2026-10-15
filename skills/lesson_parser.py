@@ -41,20 +41,27 @@ class LessonParser:
                 if not file_obj:
                     file_obj = self.git_inspector.read_file_at_commit(c_hash, "")
 
-                if file_obj:
-                    content_bytes = file_obj.read()
-                    
+                if file_obj is not None and file_obj != "":
+                    if hasattr(file_obj, 'read'):
+                        raw_data = file_obj.read()
+                    else:
+                        raw_data = file_obj
+
+                    if isinstance(raw_data, bytes):
+                        try:
+                            content_str = raw_data.decode('utf-8')
+                        except UnicodeDecodeError:
+                            content_str = raw_data.decode('latin1', errors='ignore')
+                    else:
+                        content_str = str(raw_data)
+
                     # Проверка на запрещенные символы
-                    try:
-                        content_str = content_bytes.decode('utf-8')
-                    except UnicodeDecodeError:
-                        content_str = content_bytes.decode('latin1', errors='ignore')
-                        
                     for char in forbidden_chars:
                         if char in content_str or char in msg:
                             raise LessonParserError(f"Найден запрещенный символ: {char}")
-                            
+
                     lessons.append({
+                        'id': c_hash,
                         'commit': c_hash,
                         'description': msg,
                         'content': content_str
@@ -65,6 +72,7 @@ class LessonParser:
                             raise LessonParserError(f"Найден запрещенный символ: {char}")
 
                     lessons.append({
+                        'id': c_hash,
                         'commit': c_hash,
                         'description': msg,
                         'content': msg
@@ -107,8 +115,11 @@ class LessonParser:
                 if not file_obj:
                     file_obj = self.git_inspector.read_file_at_commit(c_hash, "")
 
-                if file_obj:
-                    raw_content = file_obj.read()
+                if file_obj is not None and file_obj != "":
+                    if hasattr(file_obj, 'read'):
+                        raw_content = file_obj.read()
+                    else:
+                        raw_content = file_obj
                     if isinstance(raw_content, bytes):
                         content = raw_content.decode('utf-8', errors='ignore')
                     else:

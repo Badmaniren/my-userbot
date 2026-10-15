@@ -1,65 +1,79 @@
 import unittest
-import tempfile
-import shutil
 import os
+import shutil
 import uuid
 import random
-import subprocess
-
+from skills.patch_executor import PatchExecutor, PatchExecutorError
 from skills.git_inspector import GitInspector
 from skills.lesson_parser import LessonParser
-from skills.hypothesis_generator import HypothesisGenerator
-from skills.patch_executor import PatchExecutor
+
 
 class TestPatchExecutorIntegration(unittest.TestCase):
-    
+
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp()
-        self.repo_path = self.test_dir
+        self.test_dir = f"test_repo_{uuid.uuid4().hex}"
+        self.repo_path = os.path.abspath(self.test_dir)
+        os.makedirs(self.repo_path, exist_ok=True)
         
-        subprocess.run(["git", "init"], cwd=self.repo_path, check=True, capture_output=True)
-        subprocess.run(["git", "config", "user.name", "Test User"], cwd=self.repo_path, check=True, capture_output=True)
-        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=self.repo_path, check=True, capture_output=True)
-        
-        self.unique_id = str(uuid.uuid4())
-        self.target_filename = f"lesson_{random.randint(1000, 9999)}.py"
-        self.file_path = os.path.join(self.repo_path, self.target_filename)
-        
-        initial_content = f"# Lesson ID: {self.unique_id}\nprint('Initial code')\n"
-        with open(self.file_path, "w", encoding="utf-8") as f:
-            f.write(initial_content)
-            
-        subprocess.run(["git", "add", self.target_filename], cwd=self.repo_path, check=True, capture_output=True)
-        subprocess.run(["git", "commit", "-m", f"Add lesson {self.unique_id}"], cwd=self.repo_path, check=True, capture_output=True)
+        self.git_inspector = GitInspector(repo_path=self.repo_path)
+        self.lesson_parser = LessonParser(git_inspector=self.git_inspector)
+        self.patch_executor = PatchExecutor(
+            repo_path=self.repo_path,
+            git_inspector=self.git_inspector,
+            lesson_parser=self.lesson_parser
+        )
 
     def tearDown(self):
-        shutil.rmtree(self.test_dir)
+        if os.path.exists(self.repo_path):
+            shutil.rmtree(self.repo_path)
 
-    def test_patch_executor_integration_flow(self):
-        inspector = GitInspector(repo_path=self.repo_path)
-        parser = LessonParser(git_inspector=inspector)
-        generator = HypothesisGenerator(git_inspector=inspector, lesson_parser=parser)
-        executor = PatchExecutor(git_inspector=inspector)
+    def test_integration_patch_application_and_rollback(self):
+        random_file_name = f"module_{uuid.uuid4().hex[:8]}.py"
+        random_content_v1 = f"# Version 1: {random.randint(1000, 9999)}"
+        random_content_v2 = f"# Version 2: {random.randint(10000, 99999)}"
 
-        hypotheses = generator.generate_hypotheses(max_commits=1)
-        prioritized = generator.prioritize_hypotheses(hypotheses)
-
-        new_content_marker = str(uuid.uuid4())
-        
-        patch_payload = {
-            "file_path": self.target_filename,
-            "content": f"# Patched ID: {new_content_marker}\nprint('Updated code')\n",
-            "mode": "overwrite"
+        patch_data = {
+            "file_path": random_file_name,
+            "content": random_content_v1
         }
 
-        execution_result = executor.apply_patch(patch_payload)
+        applied = self.patch_executor.apply_patch(patch_data)
+        self.assertTrue(applied, "Патч должен успешно примениться")
 
-        self.assertTrue(execution_result, "PatchExecutor did not apply the patch successfully.")
+        full_file_path = os.path.join(self.repo_path, random_file_name)
+        self.assertTrue(os.path.exists(full_file_path), "Файл должен быть создан на диске")
 
-        with open(self.file_path, "r", encoding="utf-8") as f:
-            updated_file_content = f.read()
+        with open(full_file_path, "r", encoding="utf-8") as f:
+            written_content = f.read()
+        self.assertEqual(written_content, random_content_v1, "Содержимое файла должно совпадать с переданным в патче")
 
-        self.assertIn(new_content_marker, updated_file_content, "Real changes were not detected in the target file after patch execution.")
+        os.system(f"git -C {self.repo_path} init")
+        os.system(f"git -C {self.repo_path} config user.name 'Test Bot'")
+        os.system(f"git -C {self.repo_path} config user.email 'bot@test.com'")
+        os.system(f"git -C {self.repo_path} add {random_file_name}")
+        os.system(f"git -C {self.repo_path} commit -m 'Initial commit'")
 
-        latest_changes = inspector.get_latest_changes()
-        self.assertIsNotNone(latest_changes, "GitInspector failed to read repository state after patch execution.")
+        commit_history = self.git_inspector.get_commit_history(max_count=1)
+        self.assertTrue(len(commit_history) > 0, "История коммитов должна содержать хотя бы один коммит")
+        initial_commit_hash = commit_history[0].get("hash") if isinstance(commit_history[0], dict) else getattr(commit_history[0], "hash", None)
+
+        patch_data_v2 = {
+            "file_path": random_file_name,
+            "content": random_content_v2
+        }
+        self.patch_executor.apply_patch(patch_data_v2)
+
+        with open(full_file_path, "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), random_content_v2, "Файл должен обновиться до второй версии")
+
+        if initial_commit_hash:
+            rolled_back = self.patch_executor.rollback_patch(random_file_name, initial_commit_hash)
+            self.assertTrue(rolled_back, "Откат патча должен завершиться успешно")
+
+            with open(full_file_path, "r", encoding="utf-8") as f:
+                rolled_content = f.read()
+            self.assertEqual(rolled_content, random_content_v1, "Содержимое файла после отката должно соответствовать первому коммиту")
+
+
+if __name__ == "__main__":
+    unittest.main()

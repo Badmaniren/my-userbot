@@ -68,7 +68,31 @@ class GitInspector:
             'repo_path': self.repo_path
         }
 
-    def read_file_at_commit(self, commit_hash, file_path):
+    def get_changed_files_at_commit(self, commit_hash):
+        cmd = [
+            'git', '-C', self.repo_path, 'show',
+            '--name-only', '--format=', commit_hash
+        ]
+        try:
+            result = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True
+            )
+            files = [line.strip() for line in result.stdout.decode('utf-8').splitlines() if line.strip()]
+            return files
+        except subprocess.CalledProcessError:
+            return []
+
+    def read_file_at_commit(self, commit_hash, file_path=""):
+        if not file_path:
+            changed_files = self.get_changed_files_at_commit(commit_hash)
+            if changed_files:
+                file_path = changed_files[0]
+            else:
+                return ""
+
         cmd = [
             'git', '-C', self.repo_path, 'show',
             f"{commit_hash}:{file_path}"

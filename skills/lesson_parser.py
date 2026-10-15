@@ -42,18 +42,23 @@ class LessonParser:
                     file_obj = self.git_inspector.read_file_at_commit(c_hash, "")
 
                 if file_obj:
-                    content_bytes = file_obj.read()
-                    
-                    # Проверка на запрещенные символы
-                    try:
-                        content_str = content_bytes.decode('utf-8')
-                    except UnicodeDecodeError:
-                        content_str = content_bytes.decode('latin1', errors='ignore')
-                        
+                    if hasattr(file_obj, 'read'):
+                        raw_content = file_obj.read()
+                    else:
+                        raw_content = file_obj
+
+                    if isinstance(raw_content, bytes):
+                        try:
+                            content_str = raw_content.decode('utf-8')
+                        except UnicodeDecodeError:
+                            content_str = raw_content.decode('latin1', errors='ignore')
+                    else:
+                        content_str = str(raw_content)
+
                     for char in forbidden_chars:
                         if char in content_str or char in msg:
                             raise LessonParserError(f"Найден запрещенный символ: {char}")
-                            
+
                     lessons.append({
                         'commit': c_hash,
                         'description': msg,
@@ -108,7 +113,11 @@ class LessonParser:
                     file_obj = self.git_inspector.read_file_at_commit(c_hash, "")
 
                 if file_obj:
-                    raw_content = file_obj.read()
+                    if hasattr(file_obj, 'read'):
+                        raw_content = file_obj.read()
+                    else:
+                        raw_content = file_obj
+
                     if isinstance(raw_content, bytes):
                         content = raw_content.decode('utf-8', errors='ignore')
                     else:

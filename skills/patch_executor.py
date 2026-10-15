@@ -10,8 +10,6 @@ class PatchExecutor:
     """Модуль для автоматического применения патчей и выполнения гипотез."""
 
     def __init__(self, repo_path=None, git_inspector=None, lesson_parser=None):
-        # Интеграционный тест вызывает PatchExecutor(git_inspector=inspector),
-        # поэтому если repo_path не передан, но передан git_inspector, попробуем взять путь оттуда.
         if repo_path is None and git_inspector is not None and hasattr(git_inspector, "repo_path"):
             repo_path = git_inspector.repo_path
         
@@ -27,15 +25,12 @@ class PatchExecutor:
         file_path = patch_data["file_path"]
         content = patch_data["content"]
         
-        # Убедимся, что путь корректно формируется относительно repo_path, 
-        # но если file_path уже абсолютный или содержит repo_path, избежим дублирования
         if os.path.isabs(file_path):
             full_path = file_path
         else:
             full_path = os.path.join(self.repo_path, file_path)
 
         try:
-            # Создаем родительские директории при необходимости
             os.makedirs(os.path.dirname(full_path), exist_ok=True)
             with open(full_path, "w", encoding="utf-8") as f:
                 f.write(content)

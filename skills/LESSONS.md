@@ -115,3 +115,6 @@
 
 ## patch_verifier (create) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## autonomous_engine (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

@@ -18,11 +18,22 @@ class AntipatternVisitor(ast.NodeVisitor):
         self.custom_forbidden_patterns = custom_forbidden_patterns or []
 
     def visit_ExceptHandler(self, node):
-        # Проверка на кромешный except Exception: pass / except: pass / except Exception: continue / etc.
         if node.body and len(node.body) == 1:
             stmt = node.body[0]
             if isinstance(stmt, ast.Pass):
-                self.errors.append("Обнаружен запрещенный антипаттерн: except ...: pass")
+                # Извлекаем имя исключения, если оно есть, для точного сообщения под тесты
+                exc_name = ""
+                if node.type:
+                    if isinstance(node.type, ast.Name):
+                        exc_name = node.type.id
+                    elif isinstance(node.type, ast.Attribute):
+                        # Для случаев типа modules.Error
+                        pass
+                
+                if exc_name:
+                    self.errors.append(f"Обнаружен запрещенный антипаттерн: except {exc_name}: pass")
+                else:
+                    self.errors.append("Обнаружен запрещенный антипаттерн: except ...: pass")
             elif isinstance(stmt, ast.Continue):
                 self.errors.append("Обнаружен запрещенный антипаттерн: except ...: continue")
         self.generic_visit(node)
@@ -54,7 +65,6 @@ class CodeSanitizer:
         visitor.visit(tree)
 
         if visitor.errors:
-            # Выбрасываем специфическое исключение в зависимости от содержимого ошибки
             err_msg = "; ".join(visitor.errors)
             raise CodeAntipatternDetectedError(err_msg)
 

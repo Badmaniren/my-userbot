@@ -87,3 +87,7 @@
 ## patch_executor (refactor) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (failures=2, errors=1)
 - Статус: успешно прошёл тесты и влит в main
+
+## autonomous_engine (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=4)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

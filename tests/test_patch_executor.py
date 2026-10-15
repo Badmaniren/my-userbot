@@ -33,6 +33,14 @@ class TestPatchExecutor(unittest.TestCase):
         with self.assertRaises(PatchExecutorError):
             self.executor.apply_patch(invalid_data)
 
+    def test_apply_patch_invalid_types(self):
+        with self.assertRaises(PatchExecutorError):
+            self.executor.apply_patch("not_a_dict")
+        with self.assertRaises(PatchExecutorError):
+            self.executor.apply_patch({"file_path": 123, "content": "valid"})
+        with self.assertRaises(PatchExecutorError):
+            self.executor.apply_patch({"file_path": "valid", "content": None})
+
     def test_apply_patch_success(self):
         file_path = f"dir_{uuid.uuid4().hex}/{uuid.uuid4().hex}.py"
         content = f"print('{uuid.uuid4().hex}')"
@@ -41,14 +49,17 @@ class TestPatchExecutor(unittest.TestCase):
             "content": content
         }
 
-        with patch("builtins.open", new_callable=unittest.mock.mock_open()) as mock_file:
+        mock_file = unittest.mock.mock_open()
+        with patch("builtins.open", mock_file):
             with patch("os.makedirs") as mock_makedirs:
-                result = self.executor.apply_patch(patch_data)
+                with patch("os.replace") as mock_replace:
+                    result = self.executor.apply_patch(patch_data)
 
-                self.assertTrue(result)
-                mock_makedirs.assert_called_once()
-                mock_file.assert_called_once()
-                mock_file().write.assert_called_once_with(content)
+                    self.assertTrue(result)
+                    mock_makedirs.assert_called_once()
+                    mock_file.assert_called_once()
+                    mock_file.return_value.write.assert_called_once_with(content)
+                    mock_replace.assert_called_once()
 
     def test_apply_patch_io_error(self):
         file_path = f"{uuid.uuid4().hex}.txt"

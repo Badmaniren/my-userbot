@@ -134,6 +134,10 @@ class TestGitInspector(unittest.TestCase):
         self.assertEqual(len(history), 1)
         self.assertEqual(history[0]['hash'], rand_hash)
 
+        rand_max = random.randint(1, 50)
+        history_max = self.inspector.get_history(max_count=rand_max)
+        self.assertEqual(len(history_max), 1)
+
     @patch('subprocess.run')
     def test_get_latest_changes_success(self, mock_subprocess_run):
         rand_output = f"commit {uuid.uuid4().hex}\nAuthor: {uuid.uuid4().hex}\n\n    {uuid.uuid4().hex}"

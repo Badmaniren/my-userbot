@@ -84,8 +84,8 @@ class GitInspector:
         except subprocess.CalledProcessError:
             return ""
 
-    def get_history(self):
-        return self.get_commit_history(max_count=1000)
+    def get_history(self, max_count=1000, **kwargs):
+        return self.get_commit_history(max_count=max_count)
 
     def get_latest_changes(self):
         cmd = [

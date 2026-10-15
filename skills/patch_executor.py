@@ -66,6 +66,24 @@ class PatchExecutor:
 
         try:
             original_content = self.git_inspector.read_file_at_commit(commit_hash, file_path)
+            if original_content is None or original_content == "":
+                if os.path.isabs(file_path):
+                    full_path = file_path
+                else:
+                    full_path = os.path.join(self.repo_path, file_path)
+                if os.path.exists(full_path):
+                    os.remove(full_path)
+                    # Также удаляем пустые родительские директории вплоть до repo_path, если они опустели
+                    current_dir = os.path.dirname(full_path)
+                    abs_repo_path = os.path.abspath(self.repo_path)
+                    while current_dir and os.path.abspath(current_dir).startswith(abs_repo_path) and os.path.abspath(current_dir) != abs_repo_path:
+                        if not os.listdir(current_dir):
+                            os.rmdir(current_dir)
+                            current_dir = os.path.dirname(current_dir)
+                        else:
+                            break
+                return True
+
             patch_data = {
                 "file_path": file_path,
                 "content": original_content,

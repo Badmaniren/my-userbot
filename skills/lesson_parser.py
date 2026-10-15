@@ -42,22 +42,49 @@ class LessonParser:
                     file_obj = self.git_inspector.read_file_at_commit(c_hash, "")
 
                 if file_obj:
-                    content_bytes = file_obj.read()
-                    
-                    # Проверка на запрещенные символы
-                    try:
-                        content_str = content_bytes.decode('utf-8')
-                    except UnicodeDecodeError:
-                        content_str = content_bytes.decode('latin1', errors='ignore')
-                        
+                    if hasattr(file_obj, 'read'):
+                        raw_data = file_obj.read()
+                    else:
+                        raw_data = file_obj
+
+                    if isinstance(raw_data, bytes):
+                        try:
+                            content_str = raw_data.decode('utf-8')
+                        except UnicodeDecodeError:
+                            content_str = raw_data.decode('latin1', errors='ignore')
+                    else:
+                        content_str = str(raw_data)
+
                     for char in forbidden_chars:
                         if char in content_str or char in msg:
                             raise LessonParserError(f"Найден запрещенный символ: {char}")
-                            
+
+                    # Парсинг опциональных метаданных (# Lesson ID: и # file_path:)
+                    parsed_id = c_hash
+                    file_path = None
+                    content_lines = []
+                    for line in content_str.splitlines():
+                        if line.startswith("# Lesson ID:"):
+                            parsed_id = line.split(":", 1)[1].strip()
+                        elif line.startswith("# file_path:"):
+                            file_path = line.split(":", 1)[1].strip()
+                        else:
+                            content_lines.append(line)
+
+                    patches = []
+                    if file_path:
+                        patch_body = "\n".join(content_lines).strip()
+                        patches.append({
+                            "file_path": file_path,
+                            "content": patch_body
+                        })
+
                     lessons.append({
                         'commit': c_hash,
                         'description': msg,
-                        'content': content_str
+                        'content': content_str,
+                        'id': parsed_id,
+                        'patches': patches
                     })
                 else:
                     for char in forbidden_chars:
@@ -67,7 +94,9 @@ class LessonParser:
                     lessons.append({
                         'commit': c_hash,
                         'description': msg,
-                        'content': msg
+                        'content': msg,
+                        'id': c_hash,
+                        'patches': []
                     })
             except LessonParserError:
                 raise
@@ -108,7 +137,10 @@ class LessonParser:
                     file_obj = self.git_inspector.read_file_at_commit(c_hash, "")
 
                 if file_obj:
-                    raw_content = file_obj.read()
+                    if hasattr(file_obj, 'read'):
+                        raw_content = file_obj.read()
+                    else:
+                        raw_content = file_obj
                     if isinstance(raw_content, bytes):
                         content = raw_content.decode('utf-8', errors='ignore')
                     else:

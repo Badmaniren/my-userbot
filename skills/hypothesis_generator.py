@@ -41,6 +41,12 @@ class HypothesisGenerator:
             topic = lesson.get("topic", "")
             insights = lesson.get("insights", [])
             insight_str = ", ".join(str(i) for i in insights) if insights else ""
+            
+            # Интеграционный тест ожидает наличие текста урока (например, insight или topic), 
+    # если они не структурированы стандартно через parser, берём сырые данные или строковое представление.
+            if not topic and not insights:
+                insight_str = str(lesson)
+
             hypotheses.append({
                 "id": uuid.uuid4().hex,
                 "description": f"Address lesson topic {topic} with insights {insight_str}",

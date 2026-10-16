@@ -1,99 +1,94 @@
 import unittest
-from unittest.mock import patch, MagicMock
-import uuid
-import random
-import string
+from unittest.mock import patch, mock_open
 import io
-import sys
-from types import ModuleType
+import os
+import random
+import uuid
+from skills.anomaly_visualizer import start_new, AnomalyVisualizer
 
-# Инквизиторский обход отсутствия реального модуля в окружении тестов
-# Создаем заглушку модуля, чтобы unittest мог импортировать тестируемую функцию
-if 'skills.anomaly_visualizer' not in sys.modules:
-    mod = ModuleType('skills.anomaly_visualizer')
-    
-    def dummy_start_new(*args, **kwargs):
-        raise NotImplementedError("Stub function")
-        
-    mod.start_new = dummy_start_new
-    
-    # Регистрируем в sys.modules
-    sys.modules['skills'] = sys.modules.get('skills', ModuleType('skills'))
-    sys.modules['skills.anomaly_visualizer'] = mod
-
-from skills.anomaly_visualizer import start_new
 
 class TestAnomalyVisualizerStartNew(unittest.TestCase):
-    
+
     def setUp(self):
-        self.rand_str_1 = ''.join(random.choices(string.ascii_letters, k=12))
-        self.rand_str_2 = ''.join(random.choices(string.ascii_letters, k=15))
-        self.rand_uuid = uuid.uuid4().hex
-        self.rand_int = random.randint(100, 9999)
-        self.rand_float = random.uniform(0.1, 99.9)
-
-    def test_start_new_execution_flow(self):
-        target_path = f"/var/log/{uuid.uuid4().hex}/{self.rand_str_1}.log"
-        mock_return_data = {
-            "status": self.rand_str_2,
-            "anomaly_id": self.rand_uuid,
-            "metric": self.rand_float
-        }
-
-        with patch('skills.anomaly_visualizer.start_new') as mock_start:
-            mock_start.return_value = mock_return_data
-            
-            result = start_new(target_path, threshold=self.rand_int)
-            
-            self.assertEqual(result["anomaly_id"], self.rand_uuid)
-            self.assertEqual(result["status"], self.rand_str_2)
-            self.assertEqual(result["metric"], self.rand_float)
+        self.rand_str = uuid.uuid4().hex
+        self.rand_int = random.randint(100, 999)
+        self.token_val = uuid.uuid4().hex
 
     def test_start_new_io_handling(self):
-        stream_data = f"ERROR_CODE_{uuid.uuid4().hex}:{self.rand_int}".encode('utf-8')
-        mock_file_stream = io.BytesIO(stream_data)
-
-        with patch('skills.anomaly_visualizer.start_new') as mock_start:
-            mock_start.return_value = {
-                "processed_bytes": len(stream_data),
-                "token": self.rand_uuid
-            }
-            
-            res = start_new(mock_file_stream)
-            self.assertEqual(res["processed_bytes"], len(stream_data))
-            self.assertEqual(res["token"], self.rand_uuid)
-
-    def test_start_new_exception_resilience(self):
-        err_msg = f"Critical failure in visualizer: {uuid.uuid4().hex}"
+        payload_bytes = self.rand_str.encode('utf-8')
+        mock_file_stream = io.BytesIO(payload_bytes)
         
-        with patch('skills.anomaly_visualizer.start_new', side_effect=Exception(err_msg)) as mock_start:
-            with self.assertRaises(Exception) as context:
-                start_new(config_key=self.rand_str_1)
-            
-            self.assertIn(err_msg, str(context.exception))
+        res = start_new(mock_file_stream, token=self.token_val)
+        
+        self.assertIsInstance(res, dict)
+        self.assertEqual(res.get("processed_bytes"), len(payload_bytes))
+        self.assertEqual(res.get("token"), self.token_val)
+
+    def test_start_new_execution_flow(self):
+        target_path = f"/var/log/{uuid.uuid4().hex}.log"
+        
+        result = start_new(target_path, threshold=self.rand_int)
+        
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("target_path"), target_path)
+        self.assertEqual(result.get("threshold"), self.rand_int)
 
     def test_start_new_randomized_parameters(self):
         dynamic_config = {
-            "param_a": self.rand_uuid,
-            "param_b": self.rand_int,
-            "param_c": self.rand_float
+            f"param_{uuid.uuid4().hex[:6]}": random.randint(1, 1000),
+            f"key_{uuid.uuid4().hex[:6]}": uuid.uuid4().hex
         }
-
-        with patch('skills.anomaly_visualizer.start_new') as mock_start:
-            mock_start.return_value = dynamic_config
-            
-            output = start_new(**dynamic_config)
-            
-            self.assertEqual(output["param_a"], self.rand_uuid)
-            self.assertEqual(output["param_b"], self.rand_int)
-            self.assertEqual(output["param_c"], self.rand_float)
+        
+        output = start_new(**dynamic_config)
+        
+        self.assertEqual(output, dynamic_config)
 
     def test_start_new_empty_payload(self):
-        with patch('skills.anomaly_visualizer.start_new') as mock_start:
-            mock_start.return_value = None
-            
-            res = start_new()
-            self.assertIsNone(res)
+        res = start_new()
+        self.assertIsNone(res)
 
-if __name__ == '__main__':
+
+class TestAnomalyVisualizerClass(unittest.TestCase):
+
+    def setUp(self):
+        self.output_dir = f"./tmp_{uuid.uuid4().hex[:8]}"
+        self.filename = f"report_{uuid.uuid4().hex[:8]}.html"
+        self.visualizer = AnomalyVisualizer(output_dir=self.output_dir)
+
+    def tearDown(self):
+        report_path = os.path.join(self.output_dir, self.filename)
+        if os.path.exists(report_path):
+            os.remove(report_path)
+        if os.path.exists(self.output_dir):
+            os.rmdir(self.output_dir)
+
+    def test_generate_statistical_report(self):
+        data_points = [random.random() for _ in range(random.randint(5, 15))]
+        run_id_val = uuid.uuid4().hex
+        score_val = round(random.uniform(0.1, 99.9), 2)
+        
+        metadata = {
+            "run_id": run_id_val,
+            "score": score_val,
+            "extra_tag": uuid.uuid4().hex
+        }
+
+        report_path = self.visualizer.generate_statistical_report(
+            data=data_points,
+            filename=self.filename,
+            metadata=metadata
+        )
+
+        self.assertTrue(os.path.exists(report_path))
+
+        with open(report_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        self.assertIn(f"Data points: {len(data_points)}", content)
+        self.assertIn(run_id_val, content)
+        self.assertIn(str(score_val), content)
+        self.assertIn(metadata["extra_tag"], content)
+
+
+if __name__ == "__main__":
     unittest.main()

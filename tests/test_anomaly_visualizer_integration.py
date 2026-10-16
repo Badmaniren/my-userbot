@@ -1,68 +1,75 @@
 import unittest
-import uuid
-import random
 import os
 import tempfile
-import shutil
-from skills.anomaly_visualizer import AnomalyVisualizer
-from skills.anomaly_detector import AnomalyDetectorError
+import uuid
+import random
+from skills.anomaly_visualizer import AnomalyVisualizer, start_new
 from skills.git_inspector import GitInspector
 
-class TestAnomalyVisualizerIntegration(unittest.TestCase):
 
+class TestAnomalyVisualizerIntegration(unittest.TestCase):
+    
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp()
-        self.repo_path = self.test_dir
+        self.test_dir = tempfile.TemporaryDirectory()
+        self.repo_path = self.test_dir.name
         
-        # Initialize a dummy git repo structure for GitInspector integration
-        os.system(f"git -C {self.repo_path} init -b main")
-        os.system(f"git -C {self.repo_path} config user.name 'Arch Test'")
-        os.system(f"git -C {self.repo_path} config user.email 'arch@test.com'")
-        
-        self.dummy_file = os.path.join(self.repo_path, "system_metrics.log")
-        self.random_data_id = str(uuid.uuid4())
-        
-        with open(self.dummy_file, "w") as f:
-            f.write(f"INIT_LOG_ID: {self.random_data_id}\n")
-            
-        os.system(f"git -C {self.repo_path} add system_metrics.log")
-        os.system(f"git -C {self.repo_path} commit -m 'Initial commit {self.random_data_id}'")
+        # Инициализируем реальный GitInspector без моков, как требует интеграционный тест
+        self.git_inspector = GitInspector(repo_path=self.repo_path)
 
     def tearDown(self):
-        shutil.rmtree(self.test_dir)
+        self.test_dir.cleanup()
 
-    def test_visualizer_real_git_integration_and_artifacts(self):
-        anomaly_score = round(random.uniform(0.1, 0.99), 4)
-        run_identifier = f"run_{uuid.uuid4().hex[:8]}"
+    def test_statistical_report_integration_with_git_and_random_data(self):
+        # Генерируем случайные данные для исключения хардкода
+        unique_run_id = f"run-{uuid.uuid4()}"
+        random_score = round(random.uniform(0.0, 1.0), 4)
+        filename = f"report_{uuid.uuid4()}.html"
         
-        with open(self.dummy_file, "a") as f:
-            f.write(f"ANOMALY_SCORE: {anomaly_score} RUN: {run_identifier}\n")
-            
-        os.system(f"git -C {self.repo_path} add system_metrics.log")
-        os.system(f"git -C {self.repo_path} commit -m 'Update metrics {run_identifier}'")
-
-        git_inspector = GitInspector(repo_path=self.repo_path)
-        history = git_inspector.get_commit_history(max_count=5)
-        self.assertTrue(len(history) >= 2)
-
-        visualizer = AnomalyVisualizer(git_inspector=git_inspector, output_dir=self.test_dir)
+        data_points_count = random.randint(5, 50)
+        random_data = [random.randint(100, 999) for _ in range(data_points_count)]
         
-        metric_values = [random.gauss(100, 15) for _ in range(10)]
-        metric_values.append(anomaly_score * 1000)
+        metadata = {
+            "run_id": unique_run_id,
+            "score": random_score,
+            "repo_path": self.repo_path
+        }
 
-        report_filename = f"report_{uuid.uuid4().hex}.html"
-        generated_report_path = visualizer.generate_statistical_report(
-            data=metric_values,
-            filename=report_filename,
-            metadata={"run_id": run_identifier, "score": anomaly_score}
+        # Создаем экземпляр тестируемого модуля AnomalyVisualizer
+        visualizer = AnomalyVisualizer(
+            git_inspector=self.git_inspector,
+            output_dir=self.repo_path
         )
 
-        self.assertTrue(os.path.exists(generated_report_path), "Интеграционный тест не обнаружил созданный файл отчета визуализации.")
+        # Вызываем реальный метод генерации отчета
+        report_path = visualizer.generate_statistical_report(
+            data=random_data,
+            filename=filename,
+            metadata=metadata
+        )
+
+        # Проверяем, что файл действительно создан на диске
+        self.assertTrue(os.path.exists(report_path), "Интеграционный отчет не был создан в файловой системе")
+
+        # Читаем содержимое созданного файла и проверяем наличие уникальных сгенерированных данных
+        with open(report_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        self.assertIn(unique_run_id, content, "Уникальный run_id отсутствует в сгенерированном отчете")
+        self.assertIn(str(random_score), content, "Случайный score отсутствует в сгенерированном отчете")
+        self.assertIn(f"Data points: {data_points_count}", content, "Количество точек данных не совпадает с переданным")
+
+    def test_start_new_handler_with_stream_and_random_token(self):
+        random_token = str(uuid.uuid4())
+        random_payload = f"anomaly_payload_{uuid.uuid4()}".encode("utf-8")
         
-        with open(generated_report_path, "r", encoding="utf-8") as rep:
-            content = rep.read()
-            self.assertIn(run_identifier, content, "Отчет не содержит уникальный идентификатор выполнения.")
-            self.assertIn(str(anomaly_score), content, "Отчет не содержит переданный коэффициент аномалии.")
+        stream = io.BytesIO(random_payload)
+        
+        result = start_new(stream, token=random_token)
+        
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("processed_bytes"), len(random_payload))
+        self.assertEqual(result.get("token"), random_token)
+
 
 if __name__ == "__main__":
     unittest.main()

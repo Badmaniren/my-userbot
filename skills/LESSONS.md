@@ -224,3 +224,7 @@
 ## patch_pipeline_runner (compose) — раундов: 4
 - Последняя ошибка перед фиксом: module = self._get_module_from_name(name)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## patch_executor (refactor) — раундов: 2
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: успешно прошёл тесты и влит в main

@@ -9,6 +9,9 @@ def start_new(*args, **kwargs):
     Функция-обработчик для запуска процесса визуализации аномалий.
     Поддерживает передачу путей, файловых потоков и произвольных ключевых аргументов.
     """
+    if not args and not kwargs:
+        return None
+
     if args and isinstance(args[0], io.IOBase):
         stream = args[0]
         content = stream.read()
@@ -59,10 +62,16 @@ class AnomalyVisualizer:
             metadata_str = f"<div>Metadata: {metadata}</div>"
             run_id = metadata.get("run_id", "")
             score = metadata.get("score", "")
+            repo_path = metadata.get("repo_path", "")
+            extra_tag = metadata.get("extra_tag", "")
             if run_id:
                 metadata_str += f"<div>run_id: {run_id}</div>"
             if score:
                 metadata_str += f"<div>score: {score}</div>"
+            if repo_path:
+                metadata_str += f"<div>repo_path: {repo_path}</div>"
+            if extra_tag:
+                metadata_str += f"<div>{extra_tag}</div>"
 
         html_content = f"""<!DOCTYPE html>
 <html>

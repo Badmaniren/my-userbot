@@ -1,5 +1,6 @@
 import io
 import os
+import time
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 
@@ -25,12 +26,16 @@ class AnomalyDetector:
         self.patch_verifier = patch_verifier
         self.history: List[Any] = []
         self._metric_history_dict: Dict[str, List[float]] = {}
+        self._metric_entries_dict: Dict[str, List[Dict[str, Any]]] = {}
 
     def record_metric(self, metric_name: str, value: float) -> None:
         """Записывает метрику в историю для последующего анализа."""
+        ts = time.time()
         if metric_name not in self._metric_history_dict:
             self._metric_history_dict[metric_name] = []
+            self._metric_entries_dict[metric_name] = []
         self._metric_history_dict[metric_name].append(value)
+        self._metric_entries_dict[metric_name].append({"timestamp": ts, "value": value})
         self.history.append(value)
 
     def get_metric_history(self, metric_name: str) -> List[float]:
@@ -97,9 +102,30 @@ class AnomalyDetector:
             except Exception:
                 commits_count = 0
 
-        return {
+        res: Dict[str, Any] = {
             "status": "analyzed",
             "repo_path": self.repo_path,
             "commits_inspected": commits_count,
             "anomalies_found": []
         }
+
+        for metric_name, entries in self._metric_entries_dict.items():
+            if not entries:
+                continue
+            values = [e["value"] for e in entries]
+            mean_val = sum(values) / len(values)
+            metric_anomalies = []
+            for entry in entries:
+                val = entry["value"]
+                # Detect spikes relative to the overall history or baseline mean
+                if (val - mean_val) > self.threshold or val > (mean_val * 2 + self.threshold):
+                    metric_anomalies.append({
+                        "timestamp": entry["timestamp"],
+                        "value": val,
+                        "severity": (val - mean_val) / (self.threshold if self.threshold else 1.0)
+                    })
+            if metric_anomalies:
+                res[metric_name] = metric_anomalies
+                res["anomalies_found"].append(metric_name)
+
+        return res

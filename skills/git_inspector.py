@@ -9,7 +9,7 @@ class GitInspector:
         cmd = [
             'git', '-C', self.repo_path, 'log',
             f'-n', str(max_count),
-            '--pretty=format:%h|%an|%s'
+            '--pretty=format:%H|%an|%s'
         ]
         try:
             result = subprocess.run(

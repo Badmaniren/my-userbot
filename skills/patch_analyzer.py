@@ -33,6 +33,13 @@ class GitInspector:
         self.repo_path = repo_path
 
     def get_latest_changes(self, *args, **kwargs):
+        if self.repo_path:
+            res = subprocess.run(
+                ["git", "-C", self.repo_path, "log", "-1", "-p"],
+                capture_output=True, text=True, check=True
+            )
+            if res.stdout:
+                return io.BytesIO(res.stdout.encode('utf-8'))
         return io.BytesIO(b"")
 
     def get_file_diff(self, commit_hash=None, *args, **kwargs):
@@ -44,11 +51,11 @@ class GitInspector:
                 cmd,
                 capture_output=True, text=True, check=False
             )
-            if res.stdout:
+            if res.returncode == 0 and res.stdout:
                 return res.stdout
             res_init = subprocess.run(
                 ["git", "-C", self.repo_path, "show"],
-                capture_output=True, text=True, check=False
+                capture_output=True, text=True, check=True
             )
             if res_init.stdout:
                 return res_init.stdout

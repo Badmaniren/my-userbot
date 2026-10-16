@@ -43,18 +43,25 @@ class AnomalyLogger:
 
     def get_structured_report(self):
         if not os.path.exists(self.log_path):
-            return []
-        
-        report = []
-        with open(self.log_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    try:
-                        report.append(json.loads(line))
-                    except json.JSONDecodeError:
-                        pass
-        return report
+            anomalies = []
+        else:
+            anomalies = []
+            with open(self.log_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        try:
+                            anomalies.append(json.loads(line))
+                        except json.JSONDecodeError:
+                            pass
+
+        class ReportList(list):
+            def get(self, key, default=None):
+                if key == "total_anomalies":
+                    return len(self)
+                return default
+
+        return ReportList(anomalies)
 
     def get_anomalies(self):
         return self.get_structured_report()

@@ -17,10 +17,16 @@ def start_new(*args, **kwargs):
             "token": kwargs.get("token")
         }
     
-    if kwargs:
+    if args and not kwargs:
+        return {
+            "target_path": args[0],
+            "threshold": kwargs.get("threshold")
+        }
+        
+    if kwargs and not args:
         return kwargs
-    
-    if args:
+
+    if args and kwargs:
         return {
             "target_path": args[0],
             "threshold": kwargs.get("threshold")

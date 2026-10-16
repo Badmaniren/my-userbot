@@ -170,3 +170,7 @@
 ## patch_autocorrector (create) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main
+
+## patch_pipeline (compose) — раундов: 4
+- Последняя ошибка перед фиксом: corrected = self.correct_syntax(malformed_patch)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

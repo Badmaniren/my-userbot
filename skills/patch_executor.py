@@ -25,6 +25,9 @@ class PatchExecutor:
         file_path = patch_data["file_path"]
         content = patch_data["content"]
         
+        if not file_path:
+            raise PatchExecutorError("Invalid file path.")
+
         if os.path.isabs(file_path):
             full_path = file_path
         else:
@@ -64,13 +67,20 @@ class PatchExecutor:
         if not self.git_inspector:
             return False
 
+        if isinstance(commit_hash, dict):
+            commit_hash = commit_hash.get("hash") or commit_hash.get("commit") or ""
+
         try:
             original_content = self.git_inspector.read_file_at_commit(commit_hash, file_path)
-            patch_data = {
-                "file_path": file_path,
-                "content": original_content,
-                "mode": "overwrite"
-            }
-            return self.apply_patch(patch_data)
+
+            if os.path.isabs(file_path):
+                full_path = file_path
+            else:
+                full_path = os.path.join(self.repo_path, file_path)
+
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            with open(full_path, "w", encoding="utf-8") as f:
+                f.write(original_content if original_content is not None else "")
+            return True
         except Exception as e:
             raise PatchExecutorError(f"Failed to rollback patch: {e}")

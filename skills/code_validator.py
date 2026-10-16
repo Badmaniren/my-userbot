@@ -64,10 +64,13 @@ class CodeValidator:
     def validate_patch_ast(self, code: str) -> bool:
         return self.validate_code(code)
 
-    def validate_stream(self, stream: io.IOBase) -> bool:
-        content = stream.read()
-        if isinstance(content, bytes):
-            content = content.decode('utf-8')
+    def validate_stream(self, stream: Union[io.IOBase, str]) -> bool:
+        if isinstance(stream, str):
+            content = stream
+        else:
+            content = stream.read()
+            if isinstance(content, bytes):
+                content = content.decode('utf-8')
         return self.validate_code(content)
 
     def batch_validate(self, patches: Union[Dict[str, str], Dict[str, Any]]) -> Dict[str, Any]:
@@ -87,14 +90,20 @@ class CodeValidator:
         
         passed = []
         failed = []
+        results = {}
         for patch_id, patch_code in patches.items():
             try:
-                self.validate_code(patch_code)
-                passed.append(patch_id)
+                is_valid = self.validate_code(patch_code)
+                if is_valid:
+                    passed.append(patch_id)
+                    results[patch_id] = True
+                else:
+                    failed.append(patch_id)
+                    results[patch_id] = False
             except CodeValidatorError:
                 failed.append(patch_id)
+                results[patch_id] = False
                 
-        return {
-            "passed": passed,
-            "failed": failed
-        }
+        results["passed"] = passed
+        results["failed"] = failed
+        return results

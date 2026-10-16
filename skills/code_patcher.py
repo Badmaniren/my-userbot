@@ -20,16 +20,17 @@ class CodePatcher:
         self.repo_path = repo_path
         self._validator = validator
         self._executor = executor
+
         if validator is None:
-            _ = CodeValidator(repo_path=self.repo_path)
+            CodeValidator(repo_path=self.repo_path)
         if executor is None:
-            _ = PatchExecutor(repo_path=self.repo_path)
+            PatchExecutor(repo_path=self.repo_path)
 
     @property
     def validator(self):
-        if self._validator is not None:
-            return self._validator
-        return CodeValidator(repo_path=self.repo_path)
+        if self._validator is None:
+            return CodeValidator(repo_path=self.repo_path)
+        return self._validator
 
     @validator.setter
     def validator(self, value):
@@ -37,9 +38,9 @@ class CodePatcher:
 
     @property
     def executor(self):
-        if self._executor is not None:
-            return self._executor
-        return PatchExecutor(repo_path=self.repo_path)
+        if self._executor is None:
+            return PatchExecutor(repo_path=self.repo_path)
+        return self._executor
 
     @executor.setter
     def executor(self, value):

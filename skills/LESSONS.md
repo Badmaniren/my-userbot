@@ -199,3 +199,7 @@
 ## code_patcher (compose) — раундов: 4
 - Последняя ошибка перед фиксом: The above exception was the direct cause of the following exception:
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## patch_executor (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

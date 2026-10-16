@@ -264,3 +264,7 @@
 
 ## anomaly_visualizer (create) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## digest_exporter (compose) — раундов: 3
+- Последняя ошибка перед фиксом: skills.anomaly_visualizer.AnomalyVisualizerError: Digest must be a dictionary.
+- Статус: успешно прошёл тесты и влит в main

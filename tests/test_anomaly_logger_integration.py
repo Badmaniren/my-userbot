@@ -1,46 +1,93 @@
 import unittest
+import os
+import json
 import uuid
 import random
-import os
-import tempfile
 from skills.anomaly_logger import AnomalyLogger
 from skills.system_telemetry import SystemTelemetry
 
+
 class TestAnomalyLoggerIntegration(unittest.TestCase):
+
     def setUp(self):
-        self.test_dir = tempfile.TemporaryDirectory()
-        self.log_file = os.path.join(self.test_dir.name, f"anomaly_{uuid.uuid4().hex}.json")
+        self.rand_suffix = uuid.uuid4().hex[:8]
+        self.log_file = f"test_anomalies_{self.rand_suffix}.jsonl"
         self.logger = AnomalyLogger(log_path=self.log_file)
-        self.telemetry = SystemTelemetry()
 
     def tearDown(self):
-        self.test_dir.cleanup()
+        self.logger.clear_logs()
+        if os.path.exists(self.log_file):
+            os.remove(self.log_file)
 
-    def test_anomaly_logger_integration_flow(self):
+    def test_log_anomaly_and_report_integration(self):
+        random_source = f"source_module_{uuid.uuid4().hex[:6]}"
+        random_severity = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
+        random_detail_key = f"key_{uuid.uuid4().hex[:4]}"
+        random_detail_val = random.randint(100, 999)
+        
+        details = {random_detail_key: random_detail_val}
+        telemetry_snapshot = {"cpu_load": random.uniform(0.1, 0.9)}
+
+        self.logger.log_anomaly(
+            source=random_source,
+            severity=random_severity,
+            details=details,
+            telemetry_snapshot=telemetry_snapshot
+        )
+
+        self.assertTrue(os.path.exists(self.log_file))
+
+        report = self.logger.get_structured_report()
+        self.assertIsInstance(report, list)
+        self.assertEqual(len(report), 1)
+
+        logged_entry = report[0]
+        self.assertEqual(logged_entry["source"], random_source)
+        self.assertEqual(logged_entry["severity"], random_severity)
+        self.assertEqual(logged_entry["details"][random_detail_key], random_detail_val)
+        self.assertEqual(logged_entry["telemetry_snapshot"], telemetry_snapshot)
+        self.assertIn("id", logged_entry)
+
+        anomalies = self.logger.get_anomalies()
+        self.assertEqual(len(anomalies), 1)
+        self.assertEqual(anomalies[0]["id"], logged_entry["id"])
+
+    def test_log_anomaly_with_dict_source_integration(self):
         random_id = str(uuid.uuid4())
-        metric_value = random.uniform(100.0, 1000.0)
-        anomaly_payload = {
-            "anomaly_id": random_id,
-            "metric": "cpu_load",
-            "value": metric_value,
-            "severity": random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
+        random_source = f"dict_source_{uuid.uuid4().hex[:6]}"
+        random_severity = random.choice(["INFO", "WARNING", "ERROR"])
+        
+        source_dict = {
+            "id": random_id,
+            "source": random_source,
+            "severity": random_severity,
+            "details": {"test_run": random.randint(1, 50)}
         }
 
-        telemetry_data = self.telemetry.collect_metrics() if hasattr(self.telemetry, "collect_metrics") else {"status": "active"}
+        random_telemetry = {"memory_usage": random.randint(1024, 8192)}
+
+        self.logger.log_anomaly(source=source_dict, telemetry_snapshot=random_telemetry)
+
+        report = self.logger.get_structured_report()
+        self.assertEqual(len(report), 1)
+
+        logged_entry = report[0]
+        self.assertEqual(logged_entry["id"], random_id)
+        self.assertEqual(logged_entry["source"], random_source)
+        self.assertEqual(logged_entry["severity"], random_severity)
+        self.assertEqual(logged_entry["telemetry_snapshot"], random_telemetry)
+
+    def test_clear_logs_integration(self):
+        random_source = f"temp_source_{uuid.uuid4().hex[:6]}"
+        self.logger.log_anomaly(source=random_source, severity="LOW", details={"val": random.random()})
         
-        self.logger.log_anomaly(anomaly_payload, telemetry_snapshot=telemetry_data)
+        self.assertTrue(os.path.exists(self.log_file))
+        self.assertTrue(len(self.logger.get_structured_report()) > 0)
 
-        self.assertTrue(os.path.exists(self.log_file), "Файл лога аномалий не был создан.")
+        self.logger.clear_logs()
+        self.assertFalse(os.path.exists(self.log_file))
+        self.assertEqual(self.logger.get_structured_report(), [])
 
-        stored_anomalies = self.logger.get_anomalies()
-        found = False
-        for anomaly in stored_anomalies:
-            if anomaly.get("anomaly_id") == random_id:
-                found = True
-                self.assertEqual(anomaly["value"], metric_value)
-                self.assertIn("telemetry_snapshot", anomaly)
-
-        self.assertTrue(found, f"Аномалия с ID {random_id} не найдена в хранилище логов.")
 
 if __name__ == "__main__":
     unittest.main()

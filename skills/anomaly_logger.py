@@ -30,7 +30,7 @@ class AnomalyLogger:
                 anomaly_data["telemetry_snapshot"] = telemetry_snapshot
 
         try:
-            telemetry = SystemTelemetry()
+            telemetry = SystemTelemetry(repo_path=".")
             telemetry.send(anomaly_data)
         except SystemTelemetryError:
             pass

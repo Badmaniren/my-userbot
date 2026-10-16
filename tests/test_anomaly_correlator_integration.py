@@ -1,67 +1,69 @@
 import unittest
-import tempfile
-import shutil
 import uuid
 import random
+import tempfile
 import os
-
+from skills.anomaly_correlator import AnomalyCorrelator, AnomalyCorrelatorError
 from skills.anomaly_detector import AnomalyDetector
 from skills.anomaly_logger import AnomalyLogger
-from skills.anomaly_correlator import AnomalyCorrelator
 
 
 class TestAnomalyCorrelatorIntegration(unittest.TestCase):
-
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp()
-        self.log_file = os.path.join(self.test_dir, f"anomalies_{uuid.uuid4().hex}.json")
+        self.temp_log_file = tempfile.NamedTemporaryFile(delete=False, suffix=".json")
+        self.temp_log_file.close()
         
-        self.detector = AnomalyDetector(repo_path=self.test_dir, threshold=0.5)
-        self.logger = AnomalyLogger(log_path=self.log_file)
-        
+        self.threshold = random.uniform(10.0, 50.0)
         self.correlator = AnomalyCorrelator(
-            detector=self.detector,
-            logger=self.logger
+            log_path=self.temp_log_file.name,
+            threshold=self.threshold
         )
 
     def tearDown(self):
-        shutil.rmtree(self.test_dir, ignore_errors=True)
+        if os.path.exists(self.temp_log_file.name):
+            os.unlink(self.temp_log_file.name)
 
-    def test_end_to_end_anomaly_correlation(self):
+    def test_correlate_metric_integration_flow(self):
         metric_name = f"metric_{uuid.uuid4().hex[:8]}"
-        normal_value = round(random.uniform(1.0, 10.0), 2)
-        anomaly_value = round(random.uniform(50.0, 100.0), 2)
+        normal_value = self.threshold / 2.0
+        anomalous_value = self.threshold * 3.0
+
+        is_anomaly_normal = self.correlator.correlate_metric(metric_name, normal_value)
+        self.assertFalse(is_anomaly_normal)
+
+        is_anomaly_high = self.correlator.correlate_metric(metric_name, anomalous_value)
+        self.assertTrue(is_anomaly_high)
+
+        events = self.correlator.correlate_events()
+        self.assertGreaterEqual(events["correlated_count"], 1)
         
-        severity = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
-        source_name = f"source_{uuid.uuid4().hex[:6]}"
-        
-        self.detector.record_metric(metric_name, normal_value)
-        self.detector.record_metric(metric_name, normal_value)
-        
-        is_anomaly = self.detector.detect_anomaly(metric_name, anomaly_value)
-        self.assertTrue(is_anomaly, "Детектор должен зафиксировать аномалию на резко отличающемся значении")
-        
-        telemetry_data = {
-            "uuid": str(uuid.uuid4()),
-            "metric": metric_name,
-            "value": anomaly_value
+        report = events["report"]
+        self.assertIsInstance(report, (dict, list, str))
+
+    def test_analyze_execution_flow_integration(self):
+        execution_id = f"exec_{uuid.uuid4().hex}"
+        random_metric_val = random.uniform(1.0, 100.0)
+        metrics_payload = {
+            f"cpu_load_{uuid.uuid4().hex[:4]}": random_metric_val,
+            f"memory_usage_{uuid.uuid4().hex[:4]}": random_metric_val * 2
         }
-        self.logger.log_anomaly(
-            source=source_name,
-            severity=severity,
-            details={"description": "Test anomaly injection"},
-            telemetry_snapshot=telemetry_data
-        )
+
+        analysis_result = self.correlator.analyze_execution_flow(execution_id, metrics_payload)
+        self.assertIsInstance(analysis_result, dict)
+
+    def test_correlation_report_structure(self):
+        metric_name = f"error_rate_{uuid.uuid4().hex[:6]}"
+        extreme_value = random.uniform(500.0, 1000.0)
+
+        self.correlator.correlate_metric(metric_name, extreme_value)
         
-        correlation_result = self.correlator.correlate_events()
-        
-        self.assertIsNotNone(correlation_result, "Коррелятор должен вернуть результат анализа")
-        
-        logged_anomalies = self.logger.get_anomalies()
-        self.assertGreaterEqual(len(logged_anomalies), 1, "Логгер должен содержать записанную аномалию")
-        
-        report = self.logger.get_structured_report()
-        self.assertIsNotNone(report, "Структурированный отчет от логгера не должен быть пустым")
+        report = self.correlator.get_correlation_report()
+        self.assertIsNotNone(report)
+
+        events_data = self.correlator.correlate_events()
+        self.assertIn("correlated_count", events_data)
+        self.assertIn("report", events_data)
+
 
 if __name__ == "__main__":
     unittest.main()

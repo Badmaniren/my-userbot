@@ -19,7 +19,15 @@ class StabilityDigest:
         """Генерирует дайджест стабильности, объединяя сводку телеметрии и результаты детектирования аномалий."""
         try:
             summary = self.system_telemetry.get_telemetry_summary()
-            anomalies = self.anomaly_detector.detect_anomalies()
+            
+            # Поддержка как реального интерфейса AnomalyCorrelator, так и моков из юнита
+            if hasattr(self.anomaly_detector, "detect_anomalies"):
+                anomalies = self.anomaly_detector.detect_anomalies()
+            elif hasattr(self.anomaly_detector, "analyze_anomalies"):
+                anomalies = self.anomaly_detector.analyze_anomalies()
+            else:
+                anomalies = []
+
             return {
                 "summary": summary,
                 "anomalies": anomalies

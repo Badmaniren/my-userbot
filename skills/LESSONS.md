@@ -208,7 +208,3 @@
 - Античит поймал: Синтаксическая ошибка в коде: invalid character '—' (U+2014) (<unknown>, line 1)
 - Последняя ошибка перед фиксом: ERROR: test_process_patch_valid_integration (tests.test_patch_pipeline_integration.TestPatchPipelineIntegration.test_process_patch_valid_integration)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## patch_integrator (compose) — раундов: 4
-- Последняя ошибка перед фиксом: ======================================================================
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -30,9 +30,12 @@ class PatchAutocorrector:
 
     def transform_stream(self, stream) -> str:
         try:
-            content = stream.read()
-            if isinstance(content, bytes):
-                content = content.decode('utf-8')
+            if isinstance(stream, str):
+                content = stream
+            else:
+                content = stream.read()
+                if isinstance(content, bytes):
+                    content = content.decode('utf-8')
         except Exception as e:
             raise PatchAutocorrectorError(f"Failed to read stream: {e}") from e
         

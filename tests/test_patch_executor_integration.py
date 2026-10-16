@@ -88,7 +88,7 @@ class TestPatchExecutorIntegration(unittest.TestCase):
 
         # Получаем реальный хэш коммита через GitInspector
         history = self.git_inspector.get_commit_history(max_count=1)
-        commit_hash = history[0].get("hash") or history[0].get("commit") if isinstance(history[0], dict) else history[0]
+        commit_hash = history[0].get("commit") if isinstance(history[0], dict) else history[0]
 
         executor = PatchExecutor(
             repo_path=self.repo_path,

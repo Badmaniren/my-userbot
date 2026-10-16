@@ -67,9 +67,6 @@ class PatchExecutor:
         if not self.git_inspector:
             return False
 
-        if isinstance(commit_hash, dict):
-            commit_hash = commit_hash.get("hash") or commit_hash.get("commit") or ""
-
         try:
             original_content = self.git_inspector.read_file_at_commit(commit_hash, file_path)
 

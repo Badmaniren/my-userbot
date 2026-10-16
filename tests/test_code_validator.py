@@ -96,7 +96,7 @@ class TestCodeValidatorInquisition(unittest.TestCase):
         self.validator.add_forbidden_construct(target_name)
 
         code_snippet = f"""
-class Cls_{uuid.uuid4().hex[:8]}:
+class {uuid.uuid4().hex[:8].capitalize()}:
     def run(self):
         {target_name}()
 """

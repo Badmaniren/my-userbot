@@ -8,7 +8,7 @@ class AnomalyLogger:
     def __init__(self, log_path: str):
         self.log_path = log_path
 
-    def log_anomaly(self, source, severity=None, details=None, telemetry_snapshot=None):
+    def log_anomaly(self, source=None, severity=None, details=None, telemetry_snapshot=None):
         if isinstance(source, dict):
             anomaly_data = source.copy()
             if telemetry_snapshot is not None:
@@ -16,7 +16,7 @@ class AnomalyLogger:
             elif "severity" in anomaly_data:
                 severity = anomaly_data["severity"]
         else:
-            if not source or (details is not None and not details and not severity):
+            if not source and (details is None or not details) and not severity:
                 raise ValueError("Source and details cannot be empty")
             if details is None:
                 details = {}

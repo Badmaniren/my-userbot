@@ -41,7 +41,6 @@ class AnomalyCorrelator:
         return self.logger.get_structured_report()
 
     def correlate_events(self):
-        # Метод для прохождения интеграционных тестов
         anomalies = self.logger.get_anomalies()
         report = self.logger.get_structured_report()
         return {

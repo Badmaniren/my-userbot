@@ -1,7 +1,7 @@
 import ast
 import io
 from skills.patch_verifier import PatchVerifier
-from skills.code_sanitizer import CodeSanitizer
+from skills.code_sanitizer import CodeSanitizer, AntipatternRemover
 from skills.code_validator import CodeValidator
 
 class PatchAutocorrectorError(Exception):
@@ -20,9 +20,16 @@ class PatchAutocorrector:
 
     def correct_syntax(self, code: str) -> str:
         try:
-            ast.parse(code)
+            tree = ast.parse(code)
         except SyntaxError as e:
             raise PatchSyntaxError(f"Invalid syntax: {e}") from e
+
+        forbidden = list(getattr(self.sanitizer, "forbidden_patterns", []))
+        remover = AntipatternRemover(custom_forbidden_patterns=forbidden)
+        transformed_tree = remover.visit(tree)
+        if remover.modified:
+            ast.fix_missing_locations(transformed_tree)
+            return ast.unparse(transformed_tree)
         return code
 
     def _apply_transformations(self, code: str) -> str:

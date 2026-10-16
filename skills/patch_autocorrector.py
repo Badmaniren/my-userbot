@@ -25,6 +25,9 @@ class PatchAutocorrector:
             raise PatchSyntaxError(f"Invalid syntax: {e}") from e
         return code
 
+    def correct(self, code: str) -> str:
+        return self.correct_syntax(code)
+
     def _apply_transformations(self, code: str) -> str:
         return code
 

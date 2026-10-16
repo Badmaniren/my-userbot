@@ -1,70 +1,89 @@
 import unittest
 import os
-import tempfile
+import json
 import uuid
 import random
-from skills.digest_exporter import DigestExporter
-from skills.stability_digest import StabilityDigest
+from skills.digest_exporter import DigestExporter, DigestExporterError
 from skills.anomaly_visualizer import AnomalyVisualizer
+from skills.stability_digest import StabilityDigest
 
 class TestDigestExporterIntegration(unittest.TestCase):
+
     def setUp(self):
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.repo_path = self.temp_dir.name
-        self.execution_id = f"exec_{uuid.uuid4().hex[:8]}"
-        self.random_metric_value = random.uniform(10.0, 100.0)
+        self.test_dir = os.path.dirname(os.path.abspath(__file__))
+        self.json_output = os.path.join(self.test_dir, f"test_report_{uuid.uuid4()}.json")
+        self.html_output = os.path.join(self.test_dir, f"test_report_{uuid.uuid4()}.html")
+        self.stream_json_output = os.path.join(self.test_dir, f"test_stream_{uuid.uuid4()}.json")
 
-    def tearDown(self):
-        self.temp_dir.cleanup()
+        self.random_metric_val = random.randint(100, 999)
+        self.mock_digest_data = {
+            "summary": "Integration test digest",
+            "metric": self.random_metric_val,
+            "status": "stable"
+        }
 
-    def test_digest_exporter_integration_workflow(self):
-        # 1. Создаем реальные зависимости без моков
-        stability_digest_instance = StabilityDigest(
-            repo_path=self.repo_path,
-            anomaly_detector=None,
-            system_telemetry=None
+        self.visualizer = AnomalyVisualizer(digest=self.mock_digest_data)
+        self.digest_module = StabilityDigest(repo_path=self.test_dir, anomaly_detector=None, system_telemetry=None)
+        
+        self.exporter = DigestExporter(
+            stability_digest=self.digest_module,
+            anomaly_visualizer=self.visualizer
         )
 
-        # Генерируем реальный дайджест через связанный модуль
-        digest_data = stability_digest_instance.generate_digest(execution_id=self.execution_id)
+    def tearDown(self):
+        for path in [self.json_output, self.html_output, self.stream_json_output]:
+            if os.path.exists(path):
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+
+    def test_export_json_report_integration(self):
+        result_path = self.exporter.export_json_report(self.json_output)
         
-        # Инъецируем случайные данные для проверки сквозной передачи
-        if isinstance(digest_data, dict):
-            digest_data["random_test_metric"] = self.random_metric_value
+        self.assertEqual(result_path, self.json_output)
+        self.assertTrue(os.path.exists(self.json_output))
 
-        # 2. Инициализируем визуализатор (обязательная композиция)
-        visualizer = AnomalyVisualizer(digest=digest_data)
+        with open(self.json_output, 'r', encoding='utf-8') as f:
+            data = json.load(f)
 
-        # 3. Создаем целевой модуль экспорта
-        exporter = DigestExporter(visualizer=visualizer, stability_digest=stability_digest_instance)
+        self.assertIn('text_report', data)
+        self.assertIn('ascii_graph', data)
 
-        # Пути для экспорта отчетов с использованием случайных имен файлов
-        json_filename = f"report_{uuid.uuid4().hex}.json"
-        html_filename = f"report_{uuid.uuid4().hex}.html"
-        json_path = os.path.join(self.repo_path, json_filename)
-        html_path = os.path.join(self.repo_path, html_filename)
+    def test_export_html_report_integration(self):
+        result_path = self.exporter.export_html_report(self.html_output)
+        
+        self.assertEqual(result_path, self.html_output)
+        self.assertTrue(os.path.exists(self.html_output))
 
-        # 4. Выполняем реальный экспорт через тестируемый модуль
-        exported_json = exporter.export_to_json(json_path)
-        exported_html = exporter.export_to_html(html_path)
+        with open(self.html_output, 'r', encoding='utf-8') as f:
+            content = f.read()
 
-        # 5. Проверяем реальные изменения и артефакты на диске
-        self.assertTrue(os.path.exists(json_path), "JSON файл отчета не был создан на диске.")
-        self.assertTrue(os.path.exists(html_path), "HTML файл отчета не был создан на диске.")
+        self.assertIn("<html>", content)
+        self.assertIn("Stability Digest Report", content)
 
-        # Проверяем, что файлы не пустые
-        self.assertGreater(os.path.getsize(json_path), 0, "JSON файл отчета пуст.")
-        self.assertGreater(os.path.getsize(html_path), 0, "HTML файл отчета пуст.")
+    def test_export_to_json_adapter_integration(self):
+        result_path = self.exporter.export_to_json(self.json_output)
+        
+        self.assertEqual(result_path, self.json_output)
+        self.assertTrue(os.path.exists(self.json_output))
 
-        # Проверяем сохранение целостности данных (случайный execution_id и метрика дошли до экспорта)
-        with open(json_path, 'r', encoding='utf-8') as f:
-            file_content = f.read()
-            self.assertIn(str(self.execution_id), file_content, "Случайный execution_id не найден в экспортированном JSON.")
-            self.assertIn(str(self.random_metric_value), file_content, "Случайная метрика не найдена в экспортированном JSON.")
+        with open(self.json_output, 'r', encoding='utf-8') as f:
+            data = json.load(f)
 
-        # Проверяем возвращаемые значения методов экспорта
-        self.assertEqual(exported_json, json_path)
-        self.assertEqual(exported_html, html_path)
+        self.assertEqual(data.get("metric"), self.random_metric_val)
+
+    def test_export_to_html_adapter_integration(self):
+        result_path = self.exporter.export_to_html(self.html_output)
+        
+        self.assertEqual(result_path, self.html_output)
+        self.assertTrue(os.path.exists(self.html_output))
+
+        with open(self.html_output, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        self.assertIn("<html>", content)
+        self.assertIn(str(self.random_metric_val), content)
 
 if __name__ == '__main__':
     unittest.main()

@@ -220,3 +220,7 @@
 ## extractor_tool_1792165051 (create) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main
+
+## patch_pipeline_runner (compose) — раундов: 4
+- Последняя ошибка перед фиксом: module = self._get_module_from_name(name)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

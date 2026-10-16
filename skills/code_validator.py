@@ -64,10 +64,22 @@ class CodeValidator:
     def validate_patch_ast(self, code: str) -> bool:
         return self.validate_code(code)
 
-    def validate_stream(self, stream: io.IOBase) -> bool:
-        content = stream.read()
-        if isinstance(content, bytes):
-            content = content.decode('utf-8')
+    def validate_stream(self, stream) -> bool:
+        if isinstance(stream, str):
+            content = stream
+        elif isinstance(stream, bytes):
+            content = stream.decode('utf-8', errors='ignore')
+        elif hasattr(stream, 'read'):
+            if hasattr(stream, 'seek'):
+                try:
+                    stream.seek(0)
+                except Exception:
+                    pass
+            content = stream.read()
+            if isinstance(content, bytes):
+                content = content.decode('utf-8', errors='ignore')
+        else:
+            raise CodeValidatorError("Invalid stream object")
         return self.validate_code(content)
 
     def batch_validate(self, patches: Union[Dict[str, str], Dict[str, Any]]) -> Dict[str, Any]:

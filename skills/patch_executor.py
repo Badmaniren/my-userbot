@@ -10,6 +10,7 @@ class PatchExecutor:
     """Модуль для автоматического применения патчей и выполнения гипотез."""
 
     def __init__(self, repo_path=None, git_inspector=None, lesson_parser=None):
+        # Если путь не указан явно, пытаемся взять его из git_inspector
         if repo_path is None and git_inspector is not None and hasattr(git_inspector, "repo_path"):
             repo_path = git_inspector.repo_path
         
@@ -18,20 +19,28 @@ class PatchExecutor:
         self.lesson_parser = lesson_parser
 
     def apply_patch(self, patch_data: dict) -> bool:
-        """Применяет один патч к файлу в репозитории."""
+        """
+        Применяет один патч к файлу в репозитории.
+        Выполняет валидацию формата и создание необходимых директорий.
+        """
         if not isinstance(patch_data, dict) or "file_path" not in patch_data or "content" not in patch_data:
             raise PatchExecutorError("Invalid patch data format.")
 
         file_path = patch_data["file_path"]
         content = patch_data["content"]
         
+        # Обработка абсолютных и относительных путей
         if os.path.isabs(file_path):
             full_path = file_path
         else:
             full_path = os.path.join(self.repo_path, file_path)
 
         try:
-            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            # Автоматическое создание директорий (санитизация окружения)
+            directory = os.path.dirname(full_path)
+            if directory:
+                os.makedirs(directory, exist_ok=True)
+            
             with open(full_path, "w", encoding="utf-8") as f:
                 f.write(content)
             return True
@@ -39,7 +48,10 @@ class PatchExecutor:
             raise PatchExecutorError(f"Failed to apply patch: {e}")
 
     def execute_from_lessons(self) -> dict:
-        """Парсит гипотезы из уроков и выполняет их патчи."""
+        """
+        Парсит гипотезы из уроков и выполняет их цепочки патчей.
+        Возвращает словарь с результатами выполнения каждой гипотезы.
+        """
         if not self.lesson_parser:
             return {}
 
@@ -50,22 +62,30 @@ class PatchExecutor:
             hyp_id = hyp.get("id")
             patches = hyp.get("patches", [])
             success = True
-            for patch in patches:
+            
+            for patch_item in patches:
                 try:
-                    self.apply_patch(patch)
+                    self.apply_patch(patch_item)
                 except Exception:
+                    # Если хотя бы один патч в цепочке гипотезы упал, гипотеза считается проваленной
                     success = False
+                    break
+            
             results[hyp_id] = success
 
         return results
 
     def rollback_patch(self, file_path: str, commit_hash: str) -> bool:
-        """Откатывает файл к состоянию на определенный коммит с помощью git_inspector."""
+        """
+        Откатывает файл к состоянию на определенный коммит.
+        Использует git_inspector для получения оригинального контента.
+        """
         if not self.git_inspector:
             return False
 
         try:
             original_content = self.git_inspector.read_file_at_commit(commit_hash, file_path)
+            # Применяем оригинальный контент как патч в режиме перезаписи
             patch_data = {
                 "file_path": file_path,
                 "content": original_content,

@@ -261,3 +261,6 @@
 ## stability_digest (compose) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main
+
+## anomaly_visualizer (create) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

@@ -268,3 +268,7 @@
 ## digest_exporter (compose) — раундов: 3
 - Последняя ошибка перед фиксом: skills.anomaly_visualizer.AnomalyVisualizerError: Digest must be a dictionary.
 - Статус: успешно прошёл тесты и влит в main
+
+## digest_dashboard_aggregator (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

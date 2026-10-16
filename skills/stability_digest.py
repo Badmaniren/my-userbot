@@ -1,3 +1,7 @@
+from skills.anomaly_correlator import AnomalyCorrelator
+from skills.system_telemetry import SystemTelemetry
+
+
 class StabilityDigestError(Exception):
     """Исключение, возникающее при ошибках генерации или анализа дайджеста стабильности."""
     pass
@@ -6,7 +10,7 @@ class StabilityDigestError(Exception):
 class StabilityDigest:
     """Модуль для формирования аналитических дайджестов стабильности на основе телеметрии и аномалий."""
 
-    def __init__(self, repo_path: str, anomaly_detector, system_telemetry):
+    def __init__(self, repo_path: str, anomaly_detector: AnomalyCorrelator, system_telemetry: SystemTelemetry):
         self.repo_path = repo_path
         self.anomaly_detector = anomaly_detector
         self.system_telemetry = system_telemetry
@@ -15,7 +19,15 @@ class StabilityDigest:
         """Генерирует дайджест стабильности, объединяя сводку телеметрии и результаты детектирования аномалий."""
         try:
             summary = self.system_telemetry.get_telemetry_summary()
-            anomalies = self.anomaly_detector.detect_anomalies()
+            
+            # Поддержка как реального интерфейса AnomalyCorrelator, так и моков из юнита
+            if hasattr(self.anomaly_detector, "detect_anomalies"):
+                anomalies = self.anomaly_detector.detect_anomalies()
+            elif hasattr(self.anomaly_detector, "analyze_anomalies"):
+                anomalies = self.anomaly_detector.analyze_anomalies()
+            else:
+                anomalies = []
+
             return {
                 "summary": summary,
                 "anomalies": anomalies

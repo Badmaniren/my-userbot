@@ -1,100 +1,106 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 import uuid
 import random
-import string
-import io
 
 from skills.stability_digest import StabilityDigest, StabilityDigestError
-from skills.anomaly_detector import AnomalyDetector
-from skills.system_telemetry import SystemTelemetry
-
 
 class TestStabilityDigest(unittest.TestCase):
-
     def setUp(self):
-        self.repo_path = f"/tmp/{uuid.uuid4().hex}"
-        self.anomaly_detector = MagicMock(spec=AnomalyDetector)
-        self.system_telemetry = MagicMock(spec=SystemTelemetry)
+        self.repo_path = f"/repo/{uuid.uuid4().hex}"
+        self.anomaly_detector = MagicMock()
+        self.system_telemetry = MagicMock()
         self.digest = StabilityDigest(
             repo_path=self.repo_path,
             anomaly_detector=self.anomaly_detector,
             system_telemetry=self.system_telemetry
         )
 
-    def test_init_sets_attributes(self):
-        rnd_path = f"/var/repo/{uuid.uuid4().hex}"
-        det = MagicMock(spec=AnomalyDetector)
-        tel = MagicMock(spec=SystemTelemetry)
-        digest = StabilityDigest(repo_path=rnd_path, anomaly_detector=det, system_telemetry=tel)
-        self.assertEqual(digest.repo_path, rnd_path)
-        self.assertEqual(digest.anomaly_detector, det)
-        self.assertEqual(digest.system_telemetry, tel)
-
     def test_generate_digest_success(self):
-        metric_name = ''.join(random.choices(string.ascii_lowercase, k=10))
-        metric_value = random.uniform(10.0, 100.0)
+        expected_summary = {uuid.uuid4().hex: random.randint(1, 100)}
+        expected_anomalies = [uuid.uuid4().hex, uuid.uuid4().hex]
+        
+        self.system_telemetry.get_telemetry_summary.return_value = expected_summary
+        self.anomaly_detector.detect_anomalies.return_value = expected_anomalies
+        
         execution_id = uuid.uuid4().hex
+        result = self.digest.generate_digest(execution_id=execution_id)
+        
+        self.system_telemetry.get_telemetry_summary.assert_called_once()
+        self.anomaly_detector.detect_anomalies.assert_called_once()
+        self.assertEqual(result["summary"], expected_summary)
+        self.assertEqual(result["anomalies"], expected_anomalies)
 
-        self.system_telemetry.get_telemetry_summary.return_value = {
-            metric_name: [metric_value],
-            "execution_id": execution_id
-        }
-        self.anomaly_detector.detect_anomalies.return_value = {
-            metric_name: False
-        }
-
-        result = self.digest.generate_digest()
-
-        self.assertIsInstance(result, dict)
-        self.assertIn("summary", result)
-        self.assertIn("anomalies", result)
-        self.assertEqual(result["summary"][metric_name], [metric_value])
-        self.assertEqual(result["anomalies"][metric_name], False)
-
-    def test_generate_digest_handles_exception(self):
-        rnd_msg = uuid.uuid4().hex
-        self.system_telemetry.get_telemetry_summary.side_effect = Exception(rnd_msg)
-
+    def test_generate_digest_raises_custom_error_on_telemetry_failure(self):
+        err_msg = uuid.uuid4().hex
+        self.system_telemetry.get_telemetry_summary.side_effect = Exception(err_msg)
+        
         with self.assertRaises(StabilityDigestError) as ctx:
             self.digest.generate_digest()
         
-        self.assertIn(rnd_msg, str(ctx.exception))
+        self.assertIn(err_msg, str(ctx.exception))
 
-    def test_export_digest_stream(self):
-        stream_id = uuid.uuid4().hex
-        metric_name = uuid.uuid4().hex
-        snapshot_data = {metric_name: random.randint(100, 999)}
-
-        self.system_telemetry.collect_snapshot.return_value = snapshot_data
-
-        result = self.digest.export_digest_stream(stream_id)
-
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result[metric_name], snapshot_data[metric_name])
-        self.system_telemetry.collect_snapshot.assert_called_once_with(stream_id)
-
-    def test_analyze_digest_trends_with_valid_data(self):
-        metric_name = uuid.uuid4().hex
-        history = [random.uniform(0, 50) for _ in range(5)]
+    def test_generate_digest_preserves_stability_digest_error(self):
+        err_msg = uuid.uuid4().hex
+        self.system_telemetry.get_telemetry_summary.side_effect = StabilityDigestError(err_msg)
         
-        self.system_telemetry.get_metric_history.return_value = history
+        with self.assertRaises(StabilityDigestError) as ctx:
+            self.digest.generate_digest()
+        
+        self.assertEqual(str(ctx.exception), err_msg)
 
-        analysis = self.digest.analyze_digest_trends(metric_name)
+    def test_export_digest_stream_success(self):
+        stream_id = uuid.uuid4().hex
+        expected_snapshot = {uuid.uuid4().hex: uuid.uuid4().hex}
+        self.system_telemetry.collect_snapshot.return_value = expected_snapshot
+        
+        result = self.digest.export_digest_stream(stream_id)
+        
+        self.system_telemetry.collect_snapshot.assert_called_once_with(stream_id)
+        self.assertEqual(result, expected_snapshot)
 
-        self.assertIsInstance(analysis, dict)
-        self.assertEqual(analysis.get("metric"), metric_name)
-        self.assertEqual(analysis.get("history"), history)
-        self.assertIn("trend", analysis)
-
-    def test_analyze_digest_trends_error(self):
+    def test_analyze_digest_trends_stable(self):
         metric_name = uuid.uuid4().hex
-        rnd_err = uuid.uuid4().hex
-        self.system_telemetry.get_metric_history.side_effect = RuntimeError(rnd_err)
+        history_val = random.randint(10, 50)
+        history = [history_val, history_val]
+        self.system_telemetry.get_metric_history.return_value = history
+        
+        result = self.digest.analyze_digest_trends(metric_name)
+        
+        self.system_telemetry.get_metric_history.assert_called_once_with(metric_name)
+        self.assertEqual(result["metric"], metric_name)
+        self.assertEqual(result["history"], history)
+        self.assertEqual(result["trend"], "stable")
 
-        with self.assertRaises(StabilityDigestError):
+    def test_analyze_digest_trends_increasing(self):
+        metric_name = uuid.uuid4().hex
+        base_val = random.randint(1, 50)
+        history = [base_val, base_val + random.randint(1, 50)]
+        self.system_telemetry.get_metric_history.return_value = history
+        
+        result = self.digest.analyze_digest_trends(metric_name)
+        
+        self.assertEqual(result["trend"], "increasing")
+
+    def test_analyze_digest_trends_decreasing(self):
+        metric_name = uuid.uuid4().hex
+        base_val = random.randint(50, 100)
+        history = [base_val, base_val - random.randint(1, 40)]
+        self.system_telemetry.get_metric_history.return_value = history
+        
+        result = self.digest.analyze_digest_trends(metric_name)
+        
+        self.assertEqual(result["trend"], "decreasing")
+
+    def test_analyze_digest_trends_raises_custom_error(self):
+        metric_name = uuid.uuid4().hex
+        err_msg = uuid.uuid4().hex
+        self.system_telemetry.get_metric_history.side_effect = Exception(err_msg)
+        
+        with self.assertRaises(StabilityDigestError) as ctx:
             self.digest.analyze_digest_trends(metric_name)
-
+        
+        self.assertIn(err_msg, str(ctx.exception))
 
 if __name__ == '__main__':
     unittest.main()

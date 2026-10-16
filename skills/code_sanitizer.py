@@ -142,8 +142,15 @@ class CodeSanitizer:
 
         return code_content
 
-    def sanitize_stream(self, stream: io.BufferedIOBase) -> str:
-        content = stream.read().decode('utf-8')
+    def sanitize_stream(self, stream) -> str:
+        if isinstance(stream, str):
+            content = stream
+        elif hasattr(stream, 'read'):
+            content = stream.read()
+            if isinstance(content, bytes):
+                content = content.decode('utf-8')
+        else:
+            content = str(stream)
         return self.sanitize_patch(content)
 
     def batch_sanitize(self, patch_batch: dict) -> dict:

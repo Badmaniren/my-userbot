@@ -31,7 +31,10 @@ class AnomalyLogger:
 
         try:
             telemetry = SystemTelemetry(repo_path=".")
-            telemetry.send(anomaly_data)
+            if hasattr(telemetry, "send"):
+                telemetry.send(anomaly_data)
+            elif hasattr(telemetry, "emit"):
+                telemetry.emit(anomaly_data)
         except SystemTelemetryError:
             pass
 

@@ -61,6 +61,12 @@ class CodeValidator:
             raise CodeValidatorASTError(f"Ошибка синтаксиса AST: {e}") from e
         return self._check_ast(tree)
 
+    def validate(self, code: str) -> bool:
+        try:
+            return self.validate_code(code)
+        except CodeValidatorError:
+            return False
+
     def validate_patch_ast(self, code: str) -> bool:
         return self.validate_code(code)
 

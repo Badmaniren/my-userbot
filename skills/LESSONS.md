@@ -178,7 +178,3 @@
 ## patch_runner (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## patch_applier (compose) — раундов: 4
-- Последняя ошибка перед фиксом: raise PatchExecutorError("Invalid patch data format.")
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

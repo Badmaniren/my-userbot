@@ -23,10 +23,12 @@ class PatchAutocorrector:
             ast.parse(code)
         except SyntaxError as e:
             raise PatchSyntaxError(f"Invalid syntax: {e}") from e
-        return code
+        return self._apply_transformations(code)
 
     def _apply_transformations(self, code: str) -> str:
-        return code
+        lines = code.splitlines(keepends=True)
+        filtered = [line for line in lines if "Indentation error" not in line and "syntax error" not in line.lower()]
+        return "".join(filtered)
 
     def transform_stream(self, stream) -> str:
         try:

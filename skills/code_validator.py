@@ -64,10 +64,15 @@ class CodeValidator:
     def validate_patch_ast(self, code: str) -> bool:
         return self.validate_code(code)
 
-    def validate_stream(self, stream: io.IOBase) -> bool:
-        content = stream.read()
-        if isinstance(content, bytes):
-            content = content.decode('utf-8')
+    def validate_stream(self, stream) -> bool:
+        if isinstance(stream, str):
+            content = stream
+        elif hasattr(stream, 'read'):
+            content = stream.read()
+            if isinstance(content, bytes):
+                content = content.decode('utf-8')
+        else:
+            content = str(stream)
         return self.validate_code(content)
 
     def batch_validate(self, patches: Union[Dict[str, str], Dict[str, Any]]) -> Dict[str, Any]:

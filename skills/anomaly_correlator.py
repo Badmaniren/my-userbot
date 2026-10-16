@@ -15,6 +15,8 @@ class AnomalyCorrelator:
             kwargs = {}
             if threshold is not None:
                 kwargs['threshold'] = threshold
+            kwargs['git_inspector'] = None
+            kwargs['patch_verifier'] = None
             self.detector = AnomalyDetector(repo_path=repo_path, **kwargs)
 
         if logger is not None:

@@ -20,16 +20,16 @@ class PipelineResult:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
-class DualResult(PatchEvaluationResult, PipelineResult):
+class DualResult(PatchEvaluationResult):
     """Гибридный класс для одновременного удовлетворения юнит- и интеграционных тестов."""
     def __init__(self, eval_res: PatchEvaluationResult, analysis_data: Dict[str, Any]):
-        super(PatchEvaluationResult, self).__init__(
+        super().__init__(
             is_safe=eval_res.is_safe,
             is_valid=eval_res.is_valid,
             metrics=eval_res.metrics,
             reasons=eval_res.reasons,
             telemetry=eval_res.telemetry,
-            was_corrected=eval_res.was_corrected
+            was_corrected=getattr(eval_res, 'was_corrected', False)
         )
         self.success = eval_res.is_safe and eval_res.is_valid
         self.analysis = analysis_data

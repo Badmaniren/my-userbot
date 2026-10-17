@@ -1,5 +1,7 @@
 from skills.patch_evaluator import PatchEvaluator, PatchEvaluatorError
 from skills.patch_verifier import PatchVerifier, PatchExecutorError
+from skills.code_inspector import CodeInspector
+from skills.patch_executor import PatchExecutor
 
 
 class PatchPipelineControllerError(Exception):
@@ -13,7 +15,9 @@ class PatchPipelineController:
     def __init__(self, repo_path: str):
         self.repo_path = repo_path
         self._evaluator = PatchEvaluator(repo_path)
-        self._verifier = PatchVerifier(repo_path)
+        inspector = CodeInspector()
+        executor = PatchExecutor(repo_path)
+        self._verifier = PatchVerifier(repo_path, inspector, executor)
 
     def process(self, patch_content: str, target_file: str) -> bool:
         """Оценивает и верифицирует стандартный патч."""

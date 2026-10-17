@@ -1,5 +1,6 @@
 from skills.anomaly_detector import AnomalyDetector, AnomalyDetectorError
 from skills.anomaly_logger import AnomalyLogger
+from skills.anomaly_filter import AnomalyFilter
 
 
 class AnomalyCorrelatorError(Exception):
@@ -8,7 +9,13 @@ class AnomalyCorrelatorError(Exception):
 
 
 class AnomalyCorrelator:
-    def __init__(self, repo_path=None, log_path=None, threshold=None, detector=None, logger=None):
+    def __init__(self, repo_path=None, log_path=None, threshold=None, detector=None, logger=None, filter_instance=None, visualizer=None):
+        if filter_instance is not None:
+            self.filter = filter_instance
+        else:
+            self.filter = AnomalyFilter()
+        self.visualizer = visualizer
+
         if detector is not None:
             self.detector = detector
         else:
@@ -22,7 +29,12 @@ class AnomalyCorrelator:
         if logger is not None:
             self.logger = logger
         else:
-            self.logger = AnomalyLogger(log_path=log_path)
+            log_kwargs = {}
+            if log_path is not None:
+                log_kwargs['log_path'] = log_path
+            else:
+                log_kwargs['log_path'] = "anomaly.log"
+            self.logger = AnomalyLogger(**log_kwargs)
 
     def correlate_metric(self, metric_name, value):
         try:
@@ -35,7 +47,12 @@ class AnomalyCorrelator:
             raise AnomalyCorrelatorError(str(e)) from e
 
     def analyze_execution_flow(self, execution_id, metrics_payload):
-        return self.detector.analyze_execution_metrics(execution_id, metrics_payload)
+        # Используем фильтр для обработки/очистки полезной нагрузки метрик перед анализом
+        try:
+            filtered_payload = self.filter.filter(metrics_payload)
+        except Exception:
+            filtered_payload = metrics_payload
+        return self.detector.analyze_execution_metrics(execution_id, filtered_payload)
 
     def get_correlation_report(self):
         return self.logger.get_structured_report()

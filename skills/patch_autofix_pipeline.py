@@ -13,7 +13,7 @@ class PatchAutofixPipeline:
     def __init__(self, repo_path: str):
         self.repo_path = repo_path
         self.evaluator = PatchEvaluator(repo_path)
-        self.autocorrector = PatchAutocorrector()
+        self.autocorrector = PatchAutocorrector(repo_path)
 
     def run(self, patch_content: str, target_file: str = None) -> PatchEvaluationResult:
         """Запускает процесс оценки патча. Если патч некорректен, пытается исправить синтаксис и выполнить оценку повторно."""

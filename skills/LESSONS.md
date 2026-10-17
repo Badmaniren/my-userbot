@@ -280,3 +280,6 @@
 ## digest_dashboard_generator (compose) — раундов: 4
 - Последняя ошибка перед фиксом: skills.digest_exporter.DigestExporterError: 'dict' object has no attribute 'export_digest_stream'
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## digest_dashboard_builder (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

@@ -3,7 +3,10 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-сленно или пробрось наружу через raise.
+атус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## lesson_parser (create) — раундов: 2
+- Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
 - Статус: успешно прошёл тесты и влит в main
 
 ## hypothesis_generator (create) — раундов: 4
@@ -344,8 +347,4 @@
 
 ## patch_applier (create) — раундов: 4
 - Последняя ошибка перед фиксом: During handling of the above exception, another exception occurred:
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## patch_rule_engine (create) — раундов: 4
-- Последняя ошибка перед фиксом: RecursionError: maximum recursion depth exceeded while calling a Python object
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

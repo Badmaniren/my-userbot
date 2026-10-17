@@ -64,6 +64,28 @@ class TestAnomalyCorrelatorIntegration(unittest.TestCase):
         self.assertIn("correlated_count", events_data)
         self.assertIn("report", events_data)
 
+    def test_end_to_end_anomaly_correlation_flow(self):
+        raw_data = {
+            "source": "integration_test_service",
+            "severity": "CRITICAL",
+            "details": "Critical memory threshold exceeded",
+            "telemetry_snapshot": {
+                "memory_usage": 98.5,
+                "swap_usage": 45.2
+            }
+        }
+
+        result = self.correlator.correlate(raw_data)
+
+        self.assertIsInstance(result, dict)
+        self.assertIn("filtered_data", result)
+        self.assertIn("correlated_count", result)
+        self.assertIn("report", result)
+        self.assertIn("visualization", result)
+        self.assertGreaterEqual(result["correlated_count"], 1)
+        self.assertEqual(result["filtered_data"]["source"], "integration_test_service")
+        self.assertEqual(result["filtered_data"]["severity"], "CRITICAL")
+
 
 if __name__ == "__main__":
     unittest.main()

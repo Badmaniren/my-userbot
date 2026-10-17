@@ -118,6 +118,40 @@ class TestAnomalyCorrelatorInquisition(unittest.TestCase):
         self.mock_logger.get_anomalies.assert_called_once()
         self.mock_logger.get_structured_report.assert_called_once()
 
+    def test_correlate_raw_data(self):
+        mock_filter = MagicMock()
+        filtered_payload = {
+            "source": "unit_test_source",
+            "severity": "HIGH",
+            "details": "high cpu load",
+            "telemetry_snapshot": {"cpu_val": 85.0}
+        }
+        mock_filter.filter.return_value = filtered_payload
+
+        mock_vis = MagicMock()
+        mock_vis.visualize_digest.return_value = "Rendered Visualization"
+
+        corr = AnomalyCorrelator(
+            detector=self.mock_detector,
+            logger=self.mock_logger,
+            filter_instance=mock_filter,
+            visualizer=mock_vis
+        )
+
+        raw_input = {"raw": "data"}
+        result = corr.correlate(raw_input)
+
+        mock_filter.filter.assert_called_once_with(raw_input)
+        self.mock_detector.record_metric.assert_called_once_with("cpu_val", 85.0)
+        self.mock_logger.log_anomaly.assert_called_once_with(
+            source="unit_test_source",
+            severity="HIGH",
+            details="high cpu load",
+            telemetry_snapshot={"cpu_val": 85.0}
+        )
+        self.assertEqual(result["filtered_data"], filtered_payload)
+        self.assertIn("visualization", result)
+
 
 if __name__ == '__main__':
     unittest.main()

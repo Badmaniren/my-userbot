@@ -1,6 +1,6 @@
 import os
 import subprocess
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 
 class HypothesisGeneratorError(Exception):
     """Исключение генератора гипотез."""
@@ -84,10 +84,10 @@ class HypothesisGenerator:
 
 
 class PatchExecutor:
-    def __init__(self, repo_path: str, inspector: GitInspector, parser: LessonParser):
+    def __init__(self, repo_path: str, inspector: Optional[GitInspector] = None, parser: Optional[LessonParser] = None):
         self.repo_path = repo_path
-        self.inspector = inspector
-        self.parser = parser
+        self.inspector = inspector if inspector is not None else GitInspector(repo_path)
+        self.parser = parser if parser is not None else LessonParser(self.inspector)
 
     def apply_patch(self, patch_data: Dict[str, Any]) -> bool:
         file_path = patch_data.get("file_path")
@@ -120,13 +120,37 @@ class PatchExecutor:
 
 
 class PatchVerifier:
-    def __init__(self, repo_path: str, inspector: GitInspector, executor: PatchExecutor):
+    def __init__(self, repo_path: str, inspector: Optional[GitInspector] = None, executor: Optional[PatchExecutor] = None):
         self.repo_path = repo_path
-        self.inspector = inspector
+        self.inspector = inspector if inspector is not None else GitInspector(repo_path)
+        if executor is None:
+            parser = LessonParser(self.inspector)
+            executor = PatchExecutor(repo_path, self.inspector, parser)
         self.executor = executor
 
-    def verify_and_apply(self, patch_data: Dict[str, Any]) -> bool:
-        content = patch_data.get("content", "")
-        if "syntax error here" in content:
+    def verify_and_apply(self, patch_data: Any, target_file: Optional[str] = None) -> bool:
+        file_path = None
+        content = ""
+
+        if isinstance(patch_data, dict):
+            file_path = patch_data.get("file_path") or target_file
+            content = patch_data.get("content", "")
+        elif isinstance(patch_data, str):
+            if isinstance(target_file, str) and (target_file.endswith(('.py', '.txt', '.md', '.json', '.sh')) or ('\n' not in target_file and '\n' in patch_data)):
+                file_path = target_file
+                content = patch_data
+            elif isinstance(patch_data, str) and (patch_data.endswith(('.py', '.txt', '.md', '.json', '.sh')) or ('\n' not in patch_data and '\n' in target_file if target_file else False)):
+                file_path = patch_data
+                content = target_file
+            else:
+                content = patch_data
+                file_path = target_file
+
+        if content and "syntax error here" in content:
             return False
-        return self.executor.apply_patch(patch_data)
+
+        if file_path:
+            return self.executor.apply_patch({"file_path": file_path, "content": content})
+        elif isinstance(patch_data, dict):
+            return self.executor.apply_patch(patch_data)
+        return False

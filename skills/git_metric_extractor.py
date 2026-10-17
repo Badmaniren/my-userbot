@@ -45,7 +45,6 @@ class GitMetricExtractor:
             if len(parts) >= 3:
                 adds_str, dels_str, file_path = parts[0], parts[1], parts[2]
                 if adds_str == "-" or dels_str == "-":
-                    # Бинарный файл
                     adds = 0
                     dels = 0
                 else:

@@ -114,7 +114,12 @@ class GitMetricExtractor:
         file_frequencies = {}
         modified_files_set = set()
 
-        for commit_hash in commits:
+        for commit_item in commits:
+            if isinstance(commit_item, dict):
+                commit_hash = commit_item.get("commit_hash") or commit_item.get("hash")
+            else:
+                commit_hash = commit_item
+
             raw_diff = self.inspector.get_file_diff(commit_hash)
             parsed = self.parse_diff_stat(raw_diff)
             total_additions += parsed["additions"]
@@ -152,7 +157,12 @@ class GitMetricExtractor:
         modified_files_set = set()
         commit_metrics = []
 
-        for commit_hash in commits:
+        for commit_item in commits:
+            if isinstance(commit_item, dict):
+                commit_hash = commit_item.get("commit_hash") or commit_item.get("hash")
+            else:
+                commit_hash = commit_item
+
             raw_diff = self.inspector.get_file_diff(commit_hash)
             parsed = self.parse_diff_stat(raw_diff)
             lines_added += parsed["additions"]

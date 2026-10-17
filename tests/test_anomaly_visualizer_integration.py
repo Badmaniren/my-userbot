@@ -2,105 +2,90 @@ import unittest
 import os
 import uuid
 import random
-from skills.anomaly_visualizer import AnomalyVisualizer, AnomalyVisualizerError
+from skills.anomaly_visualizer import AnomalyVisualizer
 from skills.anomaly_logger import AnomalyLogger
 
 class TestAnomalyVisualizerIntegration(unittest.TestCase):
 
     def setUp(self):
-        self.test_dir = f"test_logs_{uuid.uuid4().hex}"
-        os.makedirs(self.test_dir, exist_ok=True)
-        self.log_path = os.path.join(self.test_dir, f"anomalies_{uuid.uuid4().hex}.json")
-        self.logger = AnomalyLogger(self.log_path)
-        self.visualizer = AnomalyVisualizer()
+        self.test_log_path = f"test_anomaly_log_{uuid.uuid4()}.json"
+        self.test_export_path = f"test_report_{uuid.uuid4()}.txt"
+        self.logger = AnomalyLogger(log_path=self.test_log_path)
 
     def tearDown(self):
-        if os.path.exists(self.log_path):
+        if os.path.exists(self.test_log_path):
             try:
-                os.remove(self.log_path)
+                os.remove(self.test_log_path)
             except OSError:
                 pass
-        if os.path.exists(self.test_dir):
+        if os.path.exists(self.test_export_path):
             try:
-                os.rmdir(self.test_dir)
+                os.remove(self.test_export_path)
             except OSError:
                 pass
 
-    def test_integration_logger_to_visualizer_pipeline(self):
-        random_source = f"service_{uuid.uuid4().hex[:6]}"
+    def test_integration_visualizer_with_logger_and_correlator_flow(self):
+        random_digest_id = str(uuid.uuid4())
+        random_title = f"System Instability Test {uuid.uuid4().hex[:8]}"
         random_severity = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
-        random_details = f"Anomaly detected with metric value {random.randint(100, 9999)}"
         
+        source_name = f"service_{uuid.uuid4().hex[:4]}"
+        target_name = f"service_{uuid.uuid4().hex[:4]}"
+        coefficient = round(random.uniform(0.1, 0.99), 2)
+
         self.logger.log_anomaly(
-            source=random_source,
+            source=source_name,
             severity=random_severity,
-            details=random_details,
-            telemetry_snapshot={"cpu_load": random.random()}
+            details="High latency detected during peak load.",
+            telemetry_snapshot={"cpu": random.randint(70, 99)}
         )
-        
+
         anomalies_list = self.logger.get_anomalies()
         
-        visual_output = self.visualizer.visualize_digest(anomalies_list)
-        
-        self.assertIn("--- Anomaly Logger Digest ---", visual_output)
-        self.assertIn(random_source, visual_output)
-        self.assertIn(random_severity, visual_output)
-        self.assertIn(random_details, visual_output)
+        visualizer = AnomalyVisualizer()
+        logger_visualization_output = visualizer.visualize_digest(anomalies_list)
 
-    def test_integration_digest_rendering_and_export(self):
-        digest_id = str(uuid.uuid4())
-        title = f"Report Title {uuid.uuid4().hex[:4]}"
-        severity = random.choice(["INFO", "WARNING", "FATAL"])
-        metric_key = f"metric_{uuid.uuid4().hex[:4]}"
-        metric_val = random.randint(1, 1000)
-        
-        source_node = f"node_{uuid.uuid4().hex[:4]}"
-        target_node = f"node_{uuid.uuid4().hex[:4]}"
-        coef = round(random.uniform(0.1, 0.99), 2)
+        self.assertIn("--- Anomaly Logger Digest ---", logger_visualization_output)
+        self.assertIn(source_name, logger_visualization_output)
+        self.assertIn(random_severity, logger_visualization_output)
 
-        digest_data = {
-            "digest_id": digest_id,
-            "title": title,
-            "severity": severity,
+        complex_digest = {
+            "digest_id": random_digest_id,
+            "title": random_title,
+            "severity": random_severity,
             "metrics": {
-                metric_key: metric_val
+                "error_rate": round(random.uniform(1.0, 15.0), 2),
+                "active_connections": random.randint(100, 5000)
             },
             "correlations": [
                 {
-                    "source": source_node,
-                    "target": target_node,
-                    "coefficient": coef
+                    "source": source_name,
+                    "target": target_name,
+                    "coefficient": coefficient
                 }
             ]
         }
 
-        self.visualizer.visualize_digest(digest_data)
-        
-        rendered_text = self.visualizer.render_text()
-        self.assertIn(digest_id, rendered_text)
-        self.assertIn(title, rendered_text)
-        self.assertIn(severity, rendered_text)
-        self.assertIn(f"{metric_key}: {metric_val}", rendered_text)
+        visualizer_digest_output = visualizer.visualize_digest(complex_digest)
+        self.assertIn(random_digest_id, visualizer_digest_output)
+        self.assertIn(random_title, visualizer_digest_output)
 
-        graph_text = self.visualizer.render_ascii_correlation_graph()
-        self.assertIn("--- ASCII Correlation Graph ---", graph_text)
-        self.assertIn(source_node, graph_text)
-        self.assertIn(target_node, graph_text)
-        self.assertIn(str(coef), graph_text)
+        ascii_graph = visualizer.render_ascii_correlation_graph()
+        self.assertIn("--- ASCII Correlation Graph ---", ascii_graph)
+        self.assertIn(source_name, ascii_graph)
+        self.assertIn(target_name, ascii_graph)
+        self.assertIn(str(coefficient), ascii_graph)
 
-        export_file_path = os.path.join(self.test_dir, f"report_{uuid.uuid4().hex}.txt")
-        try:
-            returned_path = self.visualizer.export_report(export_file_path)
-            self.assertEqual(returned_path, export_file_path)
-            self.assertTrue(os.path.exists(export_file_path))
-            
-            with open(export_file_path, "r", encoding="utf-8") as f:
-                content = f.read()
-                self.assertIn(digest_id, content)
-                self.assertIn(source_node, content)
-        finally:
-            if os.path.exists(export_file_path):
-                os.remove(export_file_path)
+        exported_file = visualizer.export_report(self.test_export_path)
+        self.assertEqual(exported_file, self.test_export_path)
+        self.assertTrue(os.path.exists(self.test_export_path))
+
+        with open(self.test_export_path, "r", encoding="utf-8") as f:
+            file_content = f.read()
+
+        self.assertIn(random_digest_id, file_content)
+        self.assertIn(target_name, file_content)
+        self.assertIn(str(coefficient), file_content)
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,7 +1,6 @@
 from typing import Any, BinaryIO, Optional
 from skills.patch_evaluator import PatchEvaluator
 from skills.patch_verifier import PatchVerifier
-from skills.patch_executor import PatchExecutor
 
 
 class PatchAutoPipelineError(Exception):
@@ -22,8 +21,7 @@ class PatchAutoPipeline:
     def __init__(self, repo_path: Optional[str] = None):
         self.repo_path = repo_path
         self.evaluator = PatchEvaluator(repo_path=repo_path)
-        executor = PatchExecutor(repo_path=repo_path)
-        self.verifier = PatchVerifier(executor=executor, repo_path=repo_path)
+        self.verifier = PatchVerifier(repo_path=repo_path)
 
     def run(
         self,

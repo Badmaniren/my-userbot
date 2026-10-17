@@ -3,7 +3,6 @@ import io
 
 from skills.patch_evaluator import patch_evaluator, PatchEvaluator
 from skills.patch_verifier import PatchVerifier
-from skills.code_inspector import CodeInspector
 from skills.code_executor import CodeExecutor
 
 
@@ -18,7 +17,13 @@ class PatchPipelineBuilder:
     def __init__(self, repo_path: str):
         self.repo_path = repo_path
         self.evaluator = PatchEvaluator(repo_path=self.repo_path)
-        inspector = CodeInspector()
+        inspector = None
+        try:
+            from skills.code_inspector import CodeInspector
+            inspector = CodeInspector()
+        except ImportError:
+            inspector = None
+        
         executor = CodeExecutor(repo_path=self.repo_path)
         self.verifier = PatchVerifier(repo_path=self.repo_path, inspector=inspector, executor=executor)
 

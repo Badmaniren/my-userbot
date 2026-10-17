@@ -1,5 +1,7 @@
 from skills.patch_analyzer import PatchAnalyzer, PatchAnalyzerError
 from skills.patch_verifier import PatchVerifier
+from skills.code_inspector import CodeInspector
+from skills.command_executor import CommandExecutor
 
 
 class PatchSafeExecutorError(Exception):
@@ -11,7 +13,9 @@ class PatchSafeExecutor:
     def __init__(self, repo_path: str):
         self.repo_path = repo_path
         self.analyzer = PatchAnalyzer()
-        self.verifier = PatchVerifier(repo_path)
+        inspector = CodeInspector()
+        executor = CommandExecutor()
+        self.verifier = PatchVerifier(repo_path, inspector, executor)
 
     def execute(self, patch_data: dict) -> bool:
         diff = patch_data.get("diff", "")

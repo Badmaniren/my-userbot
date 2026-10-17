@@ -3,6 +3,12 @@ import io
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple, Union
 
+from skills.code_sanitizer import CodeSanitizer
+from skills.code_validator import CodeValidator
+from skills.patch_verifier import PatchVerifier
+from skills.patch_autocorrector import PatchAutocorrector
+from skills.system_telemetry import SystemTelemetry
+
 class PatchEvaluatorError(Exception):
     """Исключение для ошибок модуля оценки патчей."""
     pass
@@ -24,29 +30,6 @@ class PatchEvaluationResult:
         self.reasons = reasons or []
         self.telemetry = telemetry or {}
         self.was_corrected = was_corrected
-
-class CodeSanitizer:
-    def sanitize(self, patch_content: str) -> Tuple[str, bool]:
-        return patch_content, True
-    
-    def get_reasons(self) -> List[str]:
-        return []
-
-class CodeValidator:
-    def validate(self, patch_content: str) -> Dict[str, Any]:
-        return {"is_valid": True, "metrics": {}}
-
-class PatchVerifier:
-    def verify(self, patch_content: str) -> bool:
-        return True
-
-class PatchAutocorrector:
-    def correct(self, patch_content: str) -> Tuple[str, bool]:
-        return patch_content, True
-
-class SystemTelemetry:
-    def capture(self) -> Dict[str, Any]:
-        return {"snapshot_id": "dummy_snapshot"}
 
 class PatchEvaluator:
     """Модуль для автоматической оценки качества и безопасности патчей."""

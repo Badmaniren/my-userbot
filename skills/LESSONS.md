@@ -283,3 +283,6 @@
 
 ## digest_dashboard_builder (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## patch_evaluator (create) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

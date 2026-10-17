@@ -1,5 +1,6 @@
 from skills.anomaly_detector import AnomalyDetector, AnomalyDetectorError
 from skills.anomaly_logger import AnomalyLogger
+from skills.anomaly_filter import AnomalyFilter
 
 
 class AnomalyCorrelatorError(Exception):
@@ -9,6 +10,8 @@ class AnomalyCorrelatorError(Exception):
 
 class AnomalyCorrelator:
     def __init__(self, repo_path=None, log_path=None, threshold=None, detector=None, logger=None):
+        self.filter = AnomalyFilter()
+        
         if detector is not None:
             self.detector = detector
         else:

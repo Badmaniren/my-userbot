@@ -3,6 +3,8 @@ import os
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 
+from skills.anomaly_filter import start_new
+
 class AnomalyDetectorError(Exception):
     """Кастомное исключение для детектора аномалий."""
     pass
@@ -44,11 +46,7 @@ class AnomalyDetector:
             raise AnomalyDetectorError(f"No history found for metric: {metric_name}")
         
         mean_val = sum(history) / len(history)
-        
-        if abs(target_value - mean_val) > self.threshold or target_value > self.threshold * 2:
-            return True
-            
-        return False
+        return abs(target_value - mean_val) > self.threshold
 
     def _fetch_execution_logs(self, execution_id: str) -> io.BytesIO:
         """Внутренний метод для получения логов выполнения (мокается в тестах)."""

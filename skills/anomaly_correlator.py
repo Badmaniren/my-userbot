@@ -28,6 +28,8 @@ class AnomalyCorrelator:
             log_kwargs = {}
             if log_path is not None:
                 log_kwargs['log_path'] = log_path
+            else:
+                log_kwargs['log_path'] = "anomaly.log"
             self.logger = AnomalyLogger(**log_kwargs)
 
     def correlate_metric(self, metric_name, value):

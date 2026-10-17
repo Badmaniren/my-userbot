@@ -62,13 +62,7 @@ class PatchAnalyzer:
             elif line.startswith("@@"):
                 if current_file is None:
                     current_file = {"target_file": "unknown", "chunks": []}
-                # Парсим заголовок ханка: @@ -old_start,old_count +new_start,new_count @@
                 match = re.search(r"@@\s*-(\d+)(?:,\d+)?\s+\+(\d+)(?:,\d+)?\s*@@", line)
-                old_count = 0
-                new_count = 0
-                if match:
-                    # Подсчитываем строки ханка далее, но здесь зафиксируем базовую структуру
-                    pass
                 current_chunk = {
                     "header": line,
                     "old_count": 0,
@@ -93,6 +87,9 @@ class PatchAnalyzer:
         if not diff_text.strip():
             raise PatchAnalyzerError("Empty diff")
 
+        if not any(line.startswith("--- a/") for line in diff_text.splitlines()) and not any(line.startswith("@@") for line in diff_text.splitlines()):
+            raise PatchAnalyzerError("Not a valid unified diff")
+
         lines = diff_text.splitlines()
         hunk_header_pattern = re.compile(r"^@@\s*-\d+(?:,\d+)?\s+\+\d+(?:,\d+)?\s*@@")
 
@@ -111,7 +108,6 @@ class PatchAnalyzer:
                 if not match:
                     raise PatchAnalyzerError("Corrupted hunk header")
                 
-                # Извлекаем ожидаемые количества
                 parts = line.split("@@")[1].strip().split()
                 old_part = parts[0]
                 new_part = parts[1]
@@ -170,14 +166,12 @@ class PatchAnalyzer:
             if line.startswith("+") and not line.startswith("+++"):
                 content = line[1:]
                 
-                # Проверка конфликтных маркеров
                 if "<<<<<<<" in content or "=======" in content or ">>>>>>>" in content:
                     risks.append({
                         "type": "merge_conflict_marker",
                         "details": f"Merge conflict marker found: {content}"
                     })
 
-                # Проверка опасных вызовов
                 for dangerous in ["eval", "exec", "os.system"]:
                     if dangerous in content:
                         risks.append({
@@ -185,12 +179,9 @@ class PatchAnalyzer:
                             "details": f"Dangerous call '{dangerous}' found in line: {content}"
                         })
 
-                # Проверка несогласованных разделителей (скобок)
-                # Упрощенный подсчет открывающих и закрывающих скобок/квадратных скобок
                 open_brackets = content.count('(') + content.count('[') + content.count('{')
                 close_brackets = content.count(')') + content.count(']') + content.count('}')
                 if open_brackets != close_brackets:
-                    # Дополнительная проверка на незакрытые элементы в конце строки
                     if content.strip().endswith(',') or content.strip().endswith('(') or content.strip().endswith('['):
                         risks.append({
                             "type": "unbalanced_delimiter",

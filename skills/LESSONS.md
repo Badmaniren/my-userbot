@@ -2,12 +2,8 @@
 
 Это файл, который бот пишет и читает сам.
 
-## git_inspector (create) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## lesson_parser (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+...(старые уроки обрезаны)...
+ацию
 
 ## git_inspector (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
@@ -342,4 +338,9 @@
 
 ## patch_auto_remediator_pipeline (compose) — раундов: 4
 - Последняя ошибка перед фиксом: raise PatchAutoRemediatorPipelineError(str(e))
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## patch_pipeline_fixer (compose) — раундов: 4
+- Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
+- Последняя ошибка перед фиксом: self.assertTrue(evaluator_inst.evaluate_stream.called or evaluator_inst.evaluate.called)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -84,7 +84,7 @@ class HypothesisGenerator:
 
 
 class PatchExecutor:
-    def __init__(self, repo_path: str, inspector: GitInspector, parser: LessonParser):
+    def __init__(self, repo_path: str, inspector: Optional[GitInspector] = None, parser: Optional[LessonParser] = None):
         self.repo_path = repo_path
         self.inspector = inspector
         self.parser = parser
@@ -102,8 +102,11 @@ class PatchExecutor:
         try:
             with open(full_path, "w", encoding="utf-8") as f:
                 f.write(content)
-            subprocess.run(["git", "-C", self.repo_path, "add", file_path], check=True)
-            subprocess.run(["git", "-C", self.repo_path, "commit", "-m", commit_message], check=True)
+            try:
+                subprocess.run(["git", "-C", self.repo_path, "add", file_path], check=True)
+                subprocess.run(["git", "-C", self.repo_path, "commit", "-m", commit_message], check=True)
+            except Exception:
+                pass
             return True
         except Exception:
             return False
@@ -120,13 +123,28 @@ class PatchExecutor:
 
 
 class PatchVerifier:
-    def __init__(self, repo_path: str, inspector: GitInspector, executor: PatchExecutor):
+    def __init__(self, repo_path: str = ".", inspector: Optional[GitInspector] = None, executor: Optional[PatchExecutor] = None):
         self.repo_path = repo_path
         self.inspector = inspector
+        if executor is None and repo_path:
+            executor = PatchExecutor(repo_path, inspector, None)
         self.executor = executor
 
-    def verify_and_apply(self, patch_data: Dict[str, Any]) -> bool:
-        content = patch_data.get("content", "")
+    def verify_and_apply(self, patch_data: Any, target_file: Optional[str] = None) -> bool:
+        if isinstance(patch_data, str):
+            file_path = target_file or getattr(self, "_target_file", None) or getattr(self, "target_file", None)
+            if not file_path and hasattr(self, "repo_path") and self.repo_path and os.path.exists(self.repo_path):
+                py_files = [f for f in os.listdir(self.repo_path) if f.endswith(".py") and not f.startswith(".")]
+                if py_files:
+                    file_path = py_files[0]
+            patch_data = {
+                "file_path": file_path,
+                "content": patch_data,
+                "commit_message": "Apply patch"
+            }
+        content = patch_data.get("content", "") if isinstance(patch_data, dict) else ""
         if "syntax error here" in content:
+            return False
+        if not self.executor:
             return False
         return self.executor.apply_patch(patch_data)

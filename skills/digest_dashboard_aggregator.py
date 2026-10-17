@@ -62,10 +62,10 @@ class DigestDashboardAggregator:
             if not isinstance(html_content, str):
                 html_content = str(html_content)
                 
-            if not (output_path and len(output_path) > 0 and output_path[0].isdigit()):
-                with open(output_path, "w", encoding="utf-8") as f:
-                    digest_dump = str(self.stability_digest)
-                    f.write(f"{digest_dump}\n{html_content}")
+            if output_path:
+                with open(output_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                return content
 
             return output_path
         except Exception as e:

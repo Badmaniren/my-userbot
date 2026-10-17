@@ -18,11 +18,19 @@ class PatchPipelineExecutor:
     def execute(self, patch_content: str, target_file: str) -> PatchEvaluationResult:
         try:
             self.git_inspector.analyze_repository()
-            return self.patch_evaluator.evaluate(
+            result = self.patch_evaluator.evaluate(
                 patch_content=patch_content,
                 target_file=target_file,
                 collect_telemetry=True
             )
+            if patch_content and target_file:
+                target_path = f"{self.repo_path}/{target_file}" if not target_file.startswith(self.repo_path) else target_file
+                try:
+                    with open(target_path, "a", encoding="utf-8") as f:
+                        f.write("\n" + patch_content if not patch_content.startswith("\n") else patch_content)
+                except IOError as io_err:
+                    raise PatchPipelineError(f"Failed to write patch content to target file: {io_err}") from io_err
+            return result
         except Exception as e:
             if isinstance(e, PatchPipelineError):
                 raise

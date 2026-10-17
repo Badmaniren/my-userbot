@@ -19,7 +19,7 @@ class TestAnomalyCorrelatorIntegration(unittest.TestCase):
         self.correlator = AnomalyCorrelator(
             detector=self.detector,
             logger=self.logger,
-            threshold=50.0
+            threshold=25.0
         )
 
     def tearDown(self):

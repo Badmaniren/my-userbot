@@ -24,6 +24,8 @@ class AnomalyCorrelator:
 
         if detector is not None:
             self.detector = detector
+            if threshold is not None:
+                self.detector.threshold = threshold
         else:
             kwargs = {}
             if threshold is not None:

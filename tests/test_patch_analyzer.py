@@ -1,201 +1,304 @@
 import io
+import os
 import random
 import string
+import subprocess
+import tempfile
 import unittest
-import uuid
-from unittest.mock import patch, mock_open
+from unittest.mock import MagicMock, patch
 
-from skills.patch_analyzer import PatchAnalyzer, PatchAnalyzerError
-
-
-def _generate_random_token(length=8):
-    return "".join(random.choices(string.ascii_lowercase + string.digits, k=length))
-
-
-def _generate_random_filename(ext=".py"):
-    folder = _generate_random_token(6)
-    name = _generate_random_token(10)
-    return f"{folder}/{name}{ext}"
+from skills.patch_analyzer import (
+    GitInspector,
+    PatchAnalyzer,
+    PatchAnalyzerError,
+)
 
 
-def _build_unified_diff(file_path, old_lines, new_lines, start_old=1, start_new=1):
-    diff_lines = [
-        f"--- a/{file_path}",
-        f"+++ b/{file_path}",
-        f"@@ -{start_old},{len(old_lines)} +{start_new},{len(new_lines)} @@",
-    ]
-    for line in old_lines:
-        diff_lines.append(f"-{line}")
-    for line in new_lines:
-        diff_lines.append(f"+{line}")
-    return "\n".join(diff_lines) + "\n"
-
-
-class TestPatchAnalyzer(unittest.TestCase):
+class TestPatchAnalyzerExhaustive(unittest.TestCase):
     def setUp(self):
         self.analyzer = PatchAnalyzer()
 
-    def test_parse_valid_single_file_diff(self):
-        rand_file = _generate_random_filename()
-        rand_var = f"var_{_generate_random_token(6)}"
-        rand_val = random.randint(100, 9999)
+    def _generate_random_word(self, min_len=5, max_len=12):
+        chars = string.ascii_letters + string.digits
+        length = random.randint(min_len, max_len)
+        return "".join(random.choices(chars, k=length))
 
-        old_lines = [f"{rand_var} = {rand_val}"]
-        new_lines = [
-            f"{rand_var} = {rand_val + 1}",
-            f"print({rand_var})",
+    def _generate_random_filepath(self):
+        folder = self._generate_random_word(4, 8)
+        filename = self._generate_random_word(6, 12)
+        ext = random.choice([".py", ".txt", ".json", ".md", ".cpp"])
+        return f"{folder}/{filename}{ext}"
+
+    def _create_valid_diff(self, file_path, old_lines, new_lines, context_before=None, context_after=None):
+        if context_before is None:
+            context_before = [f" context_pre_{self._generate_random_word()}" for _ in range(random.randint(1, 2))]
+        if context_after is None:
+            context_after = [f" context_post_{self._generate_random_word()}" for _ in range(random.randint(1, 2))]
+
+        diff_lines = [
+            f"--- a/{file_path}",
+            f"+++ b/{file_path}",
         ]
-        diff_text = _build_unified_diff(rand_file, old_lines, new_lines)
 
-        result = self.analyzer.parse(diff_text)
+        old_count = len(context_before) + len(old_lines) + len(context_after)
+        new_count = len(context_before) + len(new_lines) + len(context_after)
 
+        old_start = random.randint(1, 100)
+        new_start = random.randint(1, 100)
+
+        header = f"@@ -{old_start},{old_count} +{new_start},{new_count} @@"
+        diff_lines.append(header)
+
+        for line in context_before:
+            diff_lines.append(line if line.startswith(" ") else f" {line}")
+        for line in old_lines:
+            diff_lines.append(line if line.startswith("-") else f"-{line}")
+        for line in new_lines:
+            diff_lines.append(line if line.startswith("+") else f"+{line}")
+        for line in context_after:
+            diff_lines.append(line if line.startswith(" ") else f" {line}")
+
+        return "\n".join(diff_lines)
+
+    def test_git_inspector_success(self):
+        repo_dir = f"/tmp/repo_{self._generate_random_word()}"
+        commit_hash = "".join(random.choices("0123456789abcdef", k=40))
+        expected_output = f"diff --git a/test b/test\n+{self._generate_random_word()}"
+
+        inspector = GitInspector(repo_dir=repo_dir)
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(stdout=expected_output)
+            output = inspector.get_file_diff(commit_hash)
+
+            mock_run.assert_called_once_with(
+                ["git", "show", "--unified=3", commit_hash],
+                cwd=repo_dir,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            self.assertEqual(output, expected_output)
+
+    def test_git_inspector_failure(self):
+        repo_dir = f"/tmp/repo_{self._generate_random_word()}"
+        commit_hash = "".join(random.choices("0123456789abcdef", k=40))
+
+        inspector = GitInspector(repo_dir=repo_dir)
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = subprocess.CalledProcessError(
+                returncode=128, cmd="git show", stderr=b"fatal: bad object"
+            )
+            with self.assertRaises(PatchAnalyzerError) as ctx:
+                inspector.get_file_diff(commit_hash)
+            self.assertIn("Failed to get git diff", str(ctx.exception))
+
+    def test_validate_structure_invalid_types_and_empty(self):
+        non_strings = [None, 1234, [], {}, 3.14]
+        for val in non_strings:
+            with self.assertRaises(PatchAnalyzerError):
+                self.analyzer.validate_structure(val)
+
+        whitespace_only = ["", "   ", "\t\t\n", "\r\n"]
+        for ws in whitespace_only:
+            with self.assertRaises(PatchAnalyzerError):
+                self.analyzer.validate_structure(ws)
+
+    def test_validate_structure_corrupted_hunk_header(self):
+        corrupted_header = f"@@ invalid_range +1,2 @@\n+{self._generate_random_word()}"
+        with self.assertRaises(PatchAnalyzerError) as ctx:
+            self.analyzer.validate_structure(corrupted_header)
+        self.assertIn("Corrupted hunk header", str(ctx.exception))
+
+    def test_validate_structure_hunk_count_mismatch(self):
+        file_path = self._generate_random_filepath()
+        # Declares 2 lines for old and 2 lines for new, but we provide 1 and 1
+        diff_text = (
+            f"--- a/{file_path}\n"
+            f"+++ b/{file_path}\n"
+            f"@@ -1,2 +1,2 @@\n"
+            f"-{self._generate_random_word()}\n"
+            f"+{self._generate_random_word()}\n"
+        )
+        with self.assertRaises(PatchAnalyzerError) as ctx:
+            self.analyzer.validate_structure(diff_text)
+        self.assertIn("Hunk line count mismatch", str(ctx.exception))
+
+    def test_parse_valid_single_file_patch(self):
+        path = self._generate_random_filepath()
+        del_line = f"del_{self._generate_random_word()}"
+        add_line_1 = f"add_{self._generate_random_word()}"
+        add_line_2 = f"add_{self._generate_random_word()}"
+
+        diff = self._create_valid_diff(
+            file_path=path,
+            old_lines=[del_line],
+            new_lines=[add_line_1, add_line_2],
+            context_before=[" ctx_pre"],
+            context_after=[" ctx_post"],
+        )
+
+        result = self.analyzer.parse(diff)
         self.assertIn("files", result)
         self.assertEqual(len(result["files"]), 1)
-        file_info = result["files"][0]
-        self.assertIn(rand_file, file_info["target_file"])
-        self.assertEqual(len(file_info["chunks"]), 1)
 
-        chunk = file_info["chunks"][0]
-        self.assertEqual(chunk["old_count"], len(old_lines))
-        self.assertEqual(chunk["new_count"], len(new_lines))
+        file_data = result["files"][0]
+        self.assertEqual(file_data["target_file"], path)
+        self.assertEqual(len(file_data["chunks"]), 1)
 
-    def test_statistics_calculation_accuracy(self):
-        file_count = random.randint(2, 4)
-        total_additions = 0
-        total_deletions = 0
-        diff_chunks = []
+        chunk = file_data["chunks"][0]
+        self.assertEqual(chunk["old_count"], 1)
+        self.assertEqual(chunk["new_count"], 2)
 
-        for _ in range(file_count):
-            rand_file = _generate_random_filename()
-            add_count = random.randint(1, 5)
-            del_count = random.randint(1, 5)
-            total_additions += add_count
-            total_deletions += del_count
+    def test_parse_multiple_files_patch(self):
+        path1 = self._generate_random_filepath()
+        path2 = self._generate_random_filepath()
+        while path1 == path2:
+            path2 = self._generate_random_filepath()
 
-            old_lines = [f"old_{_generate_random_token(4)}_{idx} = False" for idx in range(del_count)]
-            new_lines = [f"new_{_generate_random_token(4)}_{idx} = True" for idx in range(add_count)]
-            diff_chunks.append(_build_unified_diff(rand_file, old_lines, new_lines))
+        diff1 = self._create_valid_diff(path1, [self._generate_random_word()], [self._generate_random_word()])
+        diff2 = self._create_valid_diff(path2, [self._generate_random_word()], [self._generate_random_word()])
 
-        full_diff = "\n".join(diff_chunks)
-        stats = self.analyzer.get_statistics(full_diff)
+        combined_diff = f"{diff1}\n{diff2}"
+        result = self.analyzer.parse(combined_diff)
 
-        self.assertEqual(stats["files_changed"], file_count)
-        self.assertEqual(stats["additions"], total_additions)
-        self.assertEqual(stats["deletions"], total_deletions)
-        self.assertEqual(stats["total_changes"], total_additions + total_deletions)
+        self.assertEqual(len(result["files"]), 2)
+        target_files = [f["target_file"] for f in result["files"]]
+        self.assertIn(path1, target_files)
+        self.assertIn(path2, target_files)
 
-    def test_detect_syntax_risk_unclosed_delimiter(self):
-        rand_file = _generate_random_filename()
-        rand_func = f"func_{_generate_random_token(6)}"
-        broken_line = f"def {rand_func}(arg1, arg2: [1, 2, "
-        
-        diff_text = _build_unified_diff(rand_file, [], [broken_line])
-        risks = self.analyzer.detect_syntax_risks(diff_text)
-
-        self.assertTrue(any(risk.get("type") == "unbalanced_delimiter" for risk in risks))
-        self.assertTrue(any(rand_func in risk.get("details", "") for risk in risks))
-
-    def test_detect_syntax_risk_merge_conflict_marker(self):
-        rand_file = _generate_random_filename()
-        conflict_marker = f"<<<<<<< HEAD:{_generate_random_token(6)}"
-        rand_content = f"value = '{_generate_random_token(12)}'"
-
-        diff_text = _build_unified_diff(rand_file, [], [conflict_marker, rand_content])
-        risks = self.analyzer.detect_syntax_risks(diff_text)
-
-        self.assertTrue(any(risk.get("type") == "merge_conflict_marker" for risk in risks))
-
-    def test_detect_dangerous_calls_risk(self):
-        rand_file = _generate_random_filename()
-        dangerous_func = random.choice(["eval", "exec", "os.system"])
-        payload = f"payload_{_generate_random_token(5)}"
-        risky_line = f"{dangerous_func}('{payload}')"
-
-        diff_text = _build_unified_diff(rand_file, [], [risky_line])
-        risks = self.analyzer.detect_syntax_risks(diff_text)
-
-        self.assertTrue(any(risk.get("type") == "dangerous_call" for risk in risks))
-        self.assertTrue(any(dangerous_func in risk.get("details", "") for risk in risks))
-
-    def test_corrupted_hunk_header_raises_exception(self):
-        rand_file = _generate_random_filename()
-        corrupted_header = f"@@ -invalid_header +{_generate_random_token(4)} @@"
-        bad_diff = (
-            f"--- a/{rand_file}\n"
-            f"+++ b/{rand_file}\n"
-            f"{corrupted_header}\n"
-            f"+random_code_{_generate_random_token(5)} = 42\n"
-        )
+    def test_parse_invalid_inputs(self):
+        with self.assertRaises(PatchAnalyzerError):
+            self.analyzer.parse(None)
 
         with self.assertRaises(PatchAnalyzerError):
-            self.analyzer.validate_structure(bad_diff)
+            self.analyzer.parse("    \n  ")
 
-    def test_empty_or_whitespace_diff_raises_exception(self):
-        empty_diff = "   \n\t  \n"
-        with self.assertRaises(PatchAnalyzerError):
-            self.analyzer.parse(empty_diff)
+    def test_get_statistics_calculation(self):
+        file1 = self._generate_random_filepath()
+        file2 = self._generate_random_filepath()
 
-    def test_invalid_diff_type_raises_exception(self):
-        invalid_input = random.choice([None, 12345, [], {}])
-        with self.assertRaises(PatchAnalyzerError):
-            self.analyzer.parse(invalid_input)
+        add_count_f1 = random.randint(2, 5)
+        del_count_f1 = random.randint(1, 3)
 
-    def test_analyze_aggregate_pipeline(self):
-        rand_file = _generate_random_filename()
-        del_name = f"del_{_generate_random_token(4)}"
-        add_name = f"add_{_generate_random_token(4)}"
-        old_lines = [f"{del_name} = 1"]
-        new_lines = [f"{add_name} = 2"]
+        add_count_f2 = random.randint(1, 4)
+        del_count_f2 = random.randint(2, 4)
 
-        diff_text = _build_unified_diff(rand_file, old_lines, new_lines)
-        analysis = self.analyzer.analyze(diff_text)
+        old_lines_1 = [f"del_{self._generate_random_word()}" for _ in range(del_count_f1)]
+        new_lines_1 = [f"add_{self._generate_random_word()}" for _ in range(add_count_f1)]
 
-        self.assertIn("parsed", analysis)
-        self.assertIn("statistics", analysis)
-        self.assertIn("risks", analysis)
-        self.assertIn("is_valid", analysis)
+        old_lines_2 = [f"del_{self._generate_random_word()}" for _ in range(del_count_f2)]
+        new_lines_2 = [f"add_{self._generate_random_word()}" for _ in range(add_count_f2)]
 
-        self.assertTrue(analysis["is_valid"])
-        self.assertEqual(analysis["statistics"]["additions"], 1)
-        self.assertEqual(analysis["statistics"]["deletions"], 1)
+        diff1 = self._create_valid_diff(file1, old_lines_1, new_lines_1)
+        diff2 = self._create_valid_diff(file2, old_lines_2, new_lines_2)
+        combined = f"{diff1}\n{diff2}"
 
-    def test_analyze_stream_reading(self):
-        rand_file = _generate_random_filename()
-        rand_var = f"stream_{_generate_random_token(6)}"
-        diff_text = _build_unified_diff(rand_file, [], [f"{rand_var} = 999"])
+        stats = self.analyzer.get_statistics(combined)
 
-        stream = io.StringIO(diff_text)
-        stats = self.analyzer.analyze_stream(stream)
+        expected_additions = add_count_f1 + add_count_f2
+        expected_deletions = del_count_f1 + del_count_f2
 
-        self.assertEqual(stats["statistics"]["files_changed"], 1)
-        self.assertEqual(stats["statistics"]["additions"], 1)
+        self.assertEqual(stats["files_changed"], 2)
+        self.assertEqual(stats["additions"], expected_additions)
+        self.assertEqual(stats["deletions"], expected_deletions)
+        self.assertEqual(stats["total_changes"], expected_additions + expected_deletions)
 
-    def test_analyze_file_with_mocked_io(self):
-        rand_path = f"/var/tmp/{_generate_random_token(8)}/{_generate_random_token(5)}.patch"
-        rand_file = _generate_random_filename()
-        diff_text = _build_unified_diff(rand_file, ["x = 1"], ["x = 2", "y = 3"])
+    def test_get_statistics_non_string(self):
+        stats = self.analyzer.get_statistics(random.choice([None, 42, [], {}]))
+        self.assertEqual(stats, {"files_changed": 0, "additions": 0, "deletions": 0, "total_changes": 0})
 
-        with patch("builtins.open", mock_open(read_data=diff_text)) as mocked_file:
-            analysis = self.analyzer.analyze_file(rand_path)
-            mocked_file.assert_called_once_with(rand_path, "r", encoding="utf-8")
-            self.assertEqual(analysis["statistics"]["additions"], 2)
-            self.assertEqual(analysis["statistics"]["deletions"], 1)
+    def test_detect_syntax_risks_merge_markers(self):
+        marker = random.choice(["<<<<<<<", "=======", ">>>>>>>"])
+        content_word = self._generate_random_word()
+        line = f"+ {marker} {content_word}"
+        path = self._generate_random_filepath()
 
-    def test_hunk_line_count_mismatch_validation(self):
-        rand_file = _generate_random_filename()
-        declared_add_count = 5
-        actual_add_lines = [f"val_{idx} = {idx}" for idx in range(2)]  # Only 2 lines instead of 5
-        
-        diff_text = (
-            f"--- a/{rand_file}\n"
-            f"+++ b/{rand_file}\n"
-            f"@@ -0,0 +1,{declared_add_count} @@\n"
-        )
-        for line in actual_add_lines:
-            diff_text += f"+{line}\n"
+        diff = self._create_valid_diff(path, ["old_line"], [line[1:]])
+        risks = self.analyzer.detect_syntax_risks(diff)
 
-        with self.assertRaises(PatchAnalyzerError):
-            self.analyzer.validate_structure(diff_text)
+        found_marker = any(r.get("type") == "merge_conflict_marker" for r in risks)
+        self.assertTrue(found_marker)
+
+    def test_detect_syntax_risks_dangerous_calls(self):
+        danger = random.choice(["eval", "exec", "os.system"])
+        rand_arg = self._generate_random_word()
+        line = f"{danger}('{rand_arg}')"
+        path = self._generate_random_filepath()
+
+        diff = self._create_valid_diff(path, ["clean_code()"], [line])
+        risks = self.analyzer.detect_syntax_risks(diff)
+
+        danger_risks = [r for r in risks if r.get("type") == "dangerous_call"]
+        self.assertGreater(len(danger_risks), 0)
+        self.assertIn(danger, danger_risks[0]["details"])
+
+    def test_detect_syntax_risks_unbalanced_delimiters(self):
+        suffix = random.choice([",", "(", "["])
+        line = f"call_func_{self._generate_random_word()}(" + suffix
+        path = self._generate_random_filepath()
+
+        diff = self._create_valid_diff(path, ["safe_line()"], [line])
+        risks = self.analyzer.detect_syntax_risks(diff)
+
+        unbalanced = [r for r in risks if r.get("type") == "unbalanced_delimiter"]
+        self.assertGreater(len(unbalanced), 0)
+
+    def test_detect_syntax_risks_non_string(self):
+        self.assertEqual(self.analyzer.detect_syntax_risks(12345), [])
+
+    def test_analyze_valid_patch(self):
+        path = self._generate_random_filepath()
+        token = self._generate_random_word()
+        diff = self._create_valid_diff(path, ["old_val = 1"], [f"new_val = '{token}'"])
+
+        res = self.analyzer.analyze(diff)
+        self.assertTrue(res["is_valid"])
+        self.assertEqual(res["errors"], [])
+        self.assertIn(path, res["files"])
+        self.assertEqual(res["additions"], 1)
+        self.assertEqual(res["deletions"], 1)
+        self.assertEqual(len(res["chunks"]), 1)
+        self.assertEqual(res["chunks"][0]["new_count"], 1)
+
+    def test_analyze_invalid_patch(self):
+        garbage = f"not_a_diff_{self._generate_random_word()}"
+        res = self.analyzer.analyze(garbage)
+
+        self.assertFalse(res["is_valid"])
+        self.assertGreater(len(res["errors"]), 0)
+        self.assertEqual(res["syntax_risks"], [])
+        self.assertEqual(res["statistics"]["total_changes"], 0)
+
+    def test_analyze_stream(self):
+        path = self._generate_random_filepath()
+        token = self._generate_random_word()
+        diff = self._create_valid_diff(path, ["var_old"], [f"var_{token}"])
+
+        stream = io.StringIO(diff)
+        res = self.analyzer.analyze_stream(stream)
+
+        self.assertTrue(res["is_valid"])
+        self.assertIn(path, res["files"])
+
+    def test_analyze_file(self):
+        path = self._generate_random_filepath()
+        token = self._generate_random_word()
+        diff = self._create_valid_diff(path, ["const_a"], [f"const_{token}"])
+
+        with tempfile.NamedTemporaryFile("w+", encoding="utf-8", delete=False) as tmp:
+            tmp.write(diff)
+            tmp_path = tmp.name
+
+        try:
+            res = self.analyzer.analyze_file(tmp_path)
+            self.assertTrue(res["is_valid"])
+            self.assertIn(path, res["files"])
+            self.assertEqual(res["additions"], 1)
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
 
 
 if __name__ == "__main__":

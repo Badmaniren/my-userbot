@@ -1,78 +1,63 @@
 import unittest
-import uuid
-import random
 import tempfile
 import shutil
-from pathlib import Path
-
-from skills.patch_autofix_pipeline import patch_autofix_pipeline, PatchAutofixPipelineError
-from skills.patch_evaluator import PatchEvaluator, PatchEvaluationResult
-from skills.patch_autocorrector import PatchAutocorrector
+import os
+import uuid
+import random
+from skills.patch_autofix_pipeline import PatchAutofixPipeline, patch_autofix_pipeline
+from skills.patch_evaluator import PatchEvaluationResult
 
 
 class TestPatchAutofixPipelineIntegration(unittest.TestCase):
 
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
-        self.repo_path = self.test_dir
-        self.target_file = f"module_{uuid.uuid4().hex[:8]}.py"
+        self.target_file_name = f"test_file_{uuid.uuid4().hex[:8]}.py"
+        self.target_file_path = os.path.join(self.test_dir, self.target_file_name)
         
-        # Генерируем случайный некорректный патч (например, с синтаксической ошибкой или плохим стилем)
-        self.random_var = f"var_{uuid.uuid4().hex[:6]}"
-        self.malformed_patch = f"def {self.random_var}():\n    print({random.randint(100, 999)} \n# Syntax error unclosed parenthesis"
+        self.original_content = f"# Initial content {uuid.uuid4().hex}\nx = {random.randint(1, 100)}\n"
+        with open(self.target_file_path, "w", encoding="utf-8") as f:
+            f.write(self.original_content)
 
     def tearDown(self):
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
     def test_pipeline_integration_flow(self):
-        # Вызываем конвейер автоматического исправления и верификации патчей
-        # Композиция объединяет patch_evaluator и patch_autocorrector без моков
+        unique_string = f"print('{uuid.uuid4().hex}')"
         
+        malformed_patch = f"""--- {self.target_file_name}
++++ {self.target_file_name}
+@@ -1,2 +1,2 @@
+-x = 1
++x = 2
+ {unique_string}
+"""
+        pipeline = PatchAutofixPipeline(self.test_dir)
+        
+        result = pipeline.run(patch_content=malformed_patch, target_file=self.target_file_name)
+        
+        self.assertIsInstance(result, PatchEvaluationResult)
+        self.assertTrue(hasattr(result, "is_safe"))
+        self.assertTrue(hasattr(result, "is_valid"))
+        self.assertTrue(hasattr(result, "metrics"))
+
+    def test_functional_interface_integration(self):
+        random_val = random.randint(1000, 9999)
+        patch_content = f"""--- {self.target_file_name}
++++ {self.target_file_name}
+@@ -1,2 +1,2 @@
+-x = 1
++x = {random_val}
+"""
         result = patch_autofix_pipeline(
-            repo_path=self.repo_path,
-            patch_content=self.malformed_patch,
-            target_file=self.target_file
+            repo_path=self.test_dir,
+            patch_content=patch_content,
+            target_file=self.target_file_name
         )
-
-        # Проверяем реальные результаты выполнения композиции
-        self.assertIsNotNone(result, "Конвейер должен возвращать результат")
-        self.assertTrue(
-            isinstance(result, (PatchEvaluationResult, dict)), 
-            "Результат должен быть объектом оценки патча или словарем с результатами"
-        )
-
-        # Если это объект PatchEvaluationResult
-        if isinstance(result, PatchEvaluationResult):
-            self.assertTrue(hasattr(result, 'is_safe'))
-            self.assertTrue(hasattr(result, 'is_valid'))
-            self.assertTrue(hasattr(result, 'was_corrected'))
-        else:
-            # Если словарь
-            self.assertIn('is_valid', result)
-            self.assertIn('corrected_code', result)
-
-        # Проверяем, что файл был создан или обработан в репозитории
-        target_file_path = Path(self.repo_path) / self.target_file
-        # Конвейер может создавать файл при успешном применении или оставлять следы верификации
-        # Проверим, что инфраструктура отработала корректно
-        self.assertTrue(True, "Интеграционный тест конвейера успешно пройден")
-
-    def test_pipeline_with_random_stream(self):
-        random_id = uuid.uuid4().hex
-        stream_data = f"# Stream patch {random_id}\nx = {random.randint(1, 100)}"
         
-        try:
-            res = patch_autofix_pipeline(
-                repo_path=self.repo_path,
-                patch_content=stream_data,
-                target_file=f"stream_{random_id}.py"
-            )
-            self.assertIsNotNone(res)
-        except Exception as e:
-            # Конвейер может вызывать исключения при критических ошибках валидации, 
-            # но они должны быть связаны с логикой патчей, а не с импортами.
-            self.assertTrue(isinstance(e, (PatchAutofixPipelineError, Exception)))
+        self.assertIsInstance(result, PatchEvaluationResult)
+        self.assertIsNotNone(result.metrics)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

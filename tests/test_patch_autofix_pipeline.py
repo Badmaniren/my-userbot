@@ -6,147 +6,210 @@ import io
 
 from skills.patch_autofix_pipeline import (
     PatchAutofixPipeline,
-    PatchAutofixPipelineError
+    PatchAutofixPipelineError,
+    patch_autofix_pipeline
 )
-from skills.patch_evaluator import PatchEvaluationResult
 from skills.patch_autocorrector import PatchAutocorrectorError, PatchSyntaxError
+from skills.patch_evaluator import PatchEvaluationResult
 
 
-class TestPatchAutofixPipeline(unittest.TestCase):
+class TestPatchAutofixPipelineInquisition(unittest.TestCase):
 
     def setUp(self):
-        self.repo_path = f"/tmp/repo_{uuid.uuid4().hex}"
-        self.target_file = f"src/{uuid.uuid4().hex}.py"
-        self.patch_content = f"print('{uuid.uuid4().hex}')\n"
-        self.corrected_code = f"print('{uuid.uuid4().hex}')  # corrected\n"
+        self.repo_path = f"/repo/{uuid.uuid4().hex}"
+        self.pipeline = PatchAutofixPipeline(self.repo_path)
 
-    def test_pipeline_initialization_success(self):
-        with patch("skills.patch_autofix_pipeline.PatchEvaluator") as mock_evaluator_cls, \
-             patch("skills.patch_autofix_pipeline.PatchAutocorrector") as mock_autocorrector_cls:
-            
-            pipeline = PatchAutofixPipeline(self.repo_path)
-            
-            mock_evaluator_cls.assert_called_once_with(self.repo_path)
-            mock_autocorrector_cls.assert_called_once()
-            self.assertIsNotNone(pipeline)
+    @patch("skills.patch_autofix_pipeline.PatchEvaluator")
+    @patch("skills.patch_autofix_pipeline.PatchAutocorrector")
+    def test_run_valid_patch_no_correction(self, mock_autocorrector_cls, mock_evaluator_cls):
+        mock_evaluator = mock_evaluator_cls.return_value
+        mock_autocorrector = mock_autocorrector_cls.return_value
 
-    def test_run_pipeline_success_without_correction(self):
-        eval_result_mock = MagicMock(spec=PatchEvaluationResult)
-        eval_result_mock.is_safe = True
-        eval_result_mock.is_valid = True
-        eval_result_mock.was_corrected = False
+        expected_valid = True
+        expected_safe = True
+        metrics_key = uuid.uuid4().hex
+        metrics_val = random.randint(1, 100)
+        
+        mock_eval_result = PatchEvaluationResult(
+            is_safe=expected_safe,
+            is_valid=expected_valid,
+            metrics={metrics_key: metrics_val},
+            reasons=[],
+            telemetry={},
+            was_corrected=False
+        )
+        mock_evaluator.evaluate.return_value = mock_eval_result
 
-        with patch("skills.patch_autofix_pipeline.PatchEvaluator") as mock_evaluator_cls, \
-             patch("skills.patch_autofix_pipeline.PatchAutocorrector"):
-            
-            mock_evaluator_instance = mock_evaluator_cls.return_value
-            mock_evaluator_instance.evaluate.return_value = eval_result_mock
+        patch_content = f"print('{uuid.uuid4().hex}')"
+        target_file = f"{uuid.uuid4().hex}.py"
 
-            pipeline = PatchAutofixPipeline(self.repo_path)
-            result = pipeline.run(self.patch_content, self.target_file)
+        pipeline = PatchAutofixPipeline(self.repo_path)
+        result = pipeline.run(patch_content, target_file=target_file)
 
-            mock_evaluator_instance.evaluate.assert_called_once_with(
-                patch_content=self.patch_content,
-                collect_telemetry=True,
-                target_file=self.target_file
-            )
-            self.assertEqual(result, eval_result_mock)
-            self.assertTrue(result.is_valid)
+        self.assertTrue(result.is_valid)
+        self.assertTrue(result.is_safe)
+        self.assertEqual(result.metrics[metrics_key], metrics_val)
+        mock_evaluator.evaluate.assert_called_once_with(
+            patch_content=patch_content,
+            collect_telemetry=True,
+            target_file=target_file
+        )
+        mock_autocorrector.correct_syntax.assert_not_called()
 
-    def test_run_pipeline_triggers_autocorrection(self):
-        initial_eval_mock = MagicMock(spec=PatchEvaluationResult)
-        initial_eval_mock.is_safe = False
-        initial_eval_mock.is_valid = False
-        initial_eval_mock.reasons = [uuid.uuid4().hex]
+    @patch("skills.patch_autofix_pipeline.PatchEvaluator")
+    @patch("skills.patch_autofix_pipeline.PatchAutocorrector")
+    def test_run_invalid_patch_successful_autocorrect(self, mock_autocorrector_cls, mock_evaluator_cls):
+        mock_evaluator = mock_evaluator_cls.return_value
+        mock_autocorrector = mock_autocorrector_cls.return_value
 
-        corrected_eval_mock = MagicMock(spec=PatchEvaluationResult)
-        corrected_eval_mock.is_safe = True
-        corrected_eval_mock.is_valid = True
-        corrected_eval_mock.was_corrected = True
+        invalid_eval_result = PatchEvaluationResult(
+            is_safe=False,
+            is_valid=False,
+            metrics={},
+            reasons=[uuid.uuid4().hex],
+            telemetry={},
+            was_corrected=False
+        )
+        
+        corrected_content = f"def {uuid.uuid4().hex}(): pass"
+        valid_eval_result = PatchEvaluationResult(
+            is_safe=True,
+            is_valid=True,
+            metrics={uuid.uuid4().hex: random.randint(10, 50)},
+            reasons=[],
+            telemetry={},
+            was_corrected=True
+        )
 
-        with patch("skills.patch_autofix_pipeline.PatchEvaluator") as mock_evaluator_cls, \
-             patch("skills.patch_autofix_pipeline.PatchAutocorrector") as mock_autocorrector_cls:
-            
-            mock_evaluator_instance = mock_evaluator_cls.return_value
-            mock_evaluator_instance.evaluate.side_effect = [initial_eval_mock, corrected_eval_mock]
+        mock_evaluator.evaluate.side_effect = [invalid_eval_result, valid_eval_result]
+        mock_autocorrector.correct_syntax.return_value = corrected_content
 
-            mock_autocorrector_instance = mock_autocorrector_cls.return_value
-            mock_autocorrector_instance.correct_syntax.return_value = self.corrected_code
+        patch_content = f"class {random.randint(1000, 9999)}: invalid"
+        target_file = f"{uuid.uuid4().hex}.py"
 
-            pipeline = PatchAutofixPipeline(self.repo_path)
-            result = pipeline.run(self.patch_content, self.target_file)
+        pipeline = PatchAutofixPipeline(self.repo_path)
+        result = pipeline.run(patch_content, target_file=target_file)
 
-            mock_autocorrector_instance.correct_syntax.assert_called_once_with(self.patch_content)
-            self.assertEqual(mock_evaluator_instance.evaluate.call_count, 2)
-            self.assertEqual(result, corrected_eval_mock)
-            self.assertTrue(result.was_corrected)
+        self.assertTrue(result.is_valid)
+        self.assertTrue(result.is_safe)
+        self.assertTrue(result.was_corrected)
+        mock_autocorrector.correct_syntax.assert_called_once_with(patch_content)
+        self.assertEqual(mock_evaluator.evaluate.call_count, 2)
 
-    def test_run_pipeline_handles_autocorrector_exception(self):
-        initial_eval_mock = MagicMock(spec=PatchEvaluationResult)
-        initial_eval_mock.is_safe = False
-        initial_eval_mock.is_valid = False
+    @patch("skills.patch_autofix_pipeline.PatchEvaluator")
+    @patch("skills.patch_autofix_pipeline.PatchAutocorrector")
+    def test_run_autocorrect_syntax_error_raises_pipeline_error(self, mock_autocorrector_cls, mock_evaluator_cls):
+        mock_evaluator = mock_evaluator_cls.return_value
+        mock_autocorrector = mock_autocorrector_cls.return_value
 
-        error_message = uuid.uuid4().hex
+        invalid_eval_result = PatchEvaluationResult(
+            is_safe=True,
+            is_valid=False,
+            metrics={},
+            reasons=[uuid.uuid4().hex],
+            telemetry={},
+            was_corrected=False
+        )
+        mock_evaluator.evaluate.return_value = invalid_eval_result
 
-        with patch("skills.patch_autofix_pipeline.PatchEvaluator") as mock_evaluator_cls, \
-             patch("skills.patch_autofix_pipeline.PatchAutocorrector") as mock_autocorrector_cls:
-            
-            mock_evaluator_instance = mock_evaluator_cls.return_value
-            mock_evaluator_instance.evaluate.return_value = initial_eval_mock
+        error_msg = uuid.uuid4().hex
+        mock_autocorrector.correct_syntax.side_effect = PatchSyntaxError(error_msg)
 
-            mock_autocorrector_instance = mock_autocorrector_cls.return_value
-            mock_autocorrector_instance.correct_syntax.side_effect = PatchSyntaxError(error_message)
+        patch_content = f"corrupted_{uuid.uuid4().hex}"
 
-            pipeline = PatchAutofixPipeline(self.repo_path)
-            
-            with self.assertRaises(PatchAutofixPipelineError) as ctx:
-                pipeline.run(self.patch_content, self.target_file)
-            
-            self.assertIn(error_message, str(ctx.exception))
+        pipeline = PatchAutofixPipeline(self.repo_path)
+        with self.assertRaises(PatchAutofixPipelineError) as ctx:
+            pipeline.run(patch_content)
 
-    def test_stream_pipeline_processing(self):
-        stream_data = io.BytesIO(uuid.uuid4().hex.encode('utf-8'))
-        stream_result = MagicMock(spec=PatchEvaluationResult)
-        stream_result.is_safe = True
-        stream_result.is_valid = True
+        self.assertIn(error_msg, str(ctx.exception))
+        mock_autocorrector.correct_syntax.assert_called_once_with(patch_content)
 
-        with patch("skills.patch_autofix_pipeline.PatchEvaluator") as mock_evaluator_cls, \
-             patch("skills.patch_autofix_pipeline.PatchAutocorrector") as mock_autocorrector_cls:
-            
-            mock_evaluator_instance = mock_evaluator_cls.return_value
-            mock_evaluator_instance.evaluate_stream.return_value = stream_result
+    @patch("skills.patch_autofix_pipeline.PatchEvaluator")
+    @patch("skills.patch_autofix_pipeline.PatchAutocorrector")
+    def test_run_autocorrect_generic_error_raises_pipeline_error(self, mock_autocorrector_cls, mock_evaluator_cls):
+        mock_evaluator = mock_evaluator_cls.return_value
+        mock_autocorrector = mock_autocorrector_cls.return_value
 
-            mock_autocorrector_instance = mock_autocorrector_cls.return_value
-            mock_autocorrector_instance.transform_stream.return_value = uuid.uuid4().hex
+        invalid_eval_result = PatchEvaluationResult(
+            is_safe=False,
+            is_valid=True,
+            metrics={},
+            reasons=[uuid.uuid4().hex],
+            telemetry={},
+            was_corrected=False
+        )
+        mock_evaluator.evaluate.return_value = invalid_eval_result
 
-            pipeline = PatchAutofixPipeline(self.repo_path)
-            result = pipeline.run_stream(stream_data)
+        error_msg = uuid.uuid4().hex
+        mock_autocorrector.correct_syntax.side_effect = PatchAutocorrectorError(error_msg)
 
-            mock_autocorrector_instance.transform_stream.assert_called_once()
-            mock_evaluator_instance.evaluate_stream.assert_called_once()
-            self.assertEqual(result, stream_result)
+        patch_content = f"malformed_{uuid.uuid4().hex}"
 
-    def test_batch_pipeline_execution(self):
-        batch_dict = {
-            f"file_{uuid.uuid4().hex}.py": f"content_{uuid.uuid4().hex}",
-            f"file_{uuid.uuid4().hex}.py": f"content_{uuid.uuid4().hex}"
-        }
-        batch_response = {
-            k: random.choice([True, False]) for k in batch_dict.keys()
-        }
+        pipeline = PatchAutofixPipeline(self.repo_path)
+        with self.assertRaises(PatchAutofixPipelineError) as ctx:
+            pipeline.run(patch_content)
 
-        with patch("skills.patch_autofix_pipeline.PatchEvaluator"), \
-             patch("skills.patch_autofix_pipeline.PatchAutocorrector") as mock_autocorrector_cls:
-            
-            mock_autocorrector_instance = mock_autocorrector_cls.return_value
-            mock_autocorrector_instance.batch_correct.return_value = batch_response
+        self.assertIn(error_msg, str(ctx.exception))
 
-            pipeline = PatchAutofixPipeline(self.repo_path)
-            result = pipeline.run_batch(batch_dict)
+    @patch("skills.patch_autofix_pipeline.PatchEvaluator")
+    @patch("skills.patch_autofix_pipeline.PatchAutocorrector")
+    def test_run_stream_processes_correctly(self, mock_autocorrector_cls, mock_evaluator_cls):
+        mock_evaluator = mock_evaluator_cls.return_value
+        mock_autocorrector = mock_autocorrector_cls.return_value
 
-            mock_autocorrector_instance.batch_correct.assert_called_once_with(batch_dict)
-            self.assertEqual(result, batch_response)
+        stream_data = io.BytesIO(uuid.uuid4().bytes)
+        transformed_stream_mock = io.BytesIO(uuid.uuid4().bytes)
+        mock_autocorrector.transform_stream.return_value = transformed_stream_mock
 
+        expected_result = PatchEvaluationResult(
+            is_safe=True,
+            is_valid=True,
+            metrics={uuid.uuid4().hex: uuid.uuid4().hex},
+            reasons=[],
+            telemetry={},
+            was_corrected=False
+        )
+        mock_evaluator.evaluate_stream.return_value = expected_result
 
-if __name__ == '__main__':
-    unittest.main()
+        pipeline = PatchAutofixPipeline(self.repo_path)
+        result = pipeline.run_stream(stream_data)
+
+        self.assertEqual(result, expected_result)
+        mock_autocorrector.transform_stream.assert_called_once_with(stream_data)
+        mock_evaluator.evaluate_stream.assert_called_once_with(transformed_stream_mock)
+
+    @patch("skills.patch_autofix_pipeline.PatchAutocorrector")
+    def test_run_batch_processes_correctly(self, mock_autocorrector_cls):
+        mock_autocorrector = mock_autocorrector_cls.return_value
+        batch_dict = {uuid.uuid4().hex: uuid.uuid4().hex, uuid.uuid4().hex: uuid.uuid4().hex}
+        expected_output = {uuid.uuid4().hex: uuid.uuid4().hex}
+        mock_autocorrector.batch_correct.return_value = expected_output
+
+        pipeline = PatchAutofixPipeline(self.repo_path)
+        result = pipeline.run_batch(batch_dict)
+
+        self.assertEqual(result, expected_output)
+        mock_autocorrector.batch_correct.assert_called_once_with(batch_dict)
+
+    @patch("skills.patch_autofix_pipeline.PatchAutofixPipeline")
+    def test_functional_interface_wrapper(self, mock_pipeline_cls):
+        mock_instance = mock_pipeline_cls.return_value
+        expected_result = PatchEvaluationResult(
+            is_safe=True,
+            is_valid=True,
+            metrics={},
+            reasons=[],
+            telemetry={},
+            was_corrected=False
+        )
+        mock_instance.run.return_value = expected_result
+
+        repo_path = f"/path/{uuid.uuid4().hex}"
+        patch_content = f"code = '{uuid.uuid4().hex}'"
+        target_file = f"{uuid.uuid4().hex}.py"
+
+        result = patch_autofix_pipeline(repo_path, patch_content, target_file=target_file)
+
+        mock_pipeline_cls.assert_called_once_with(repo_path)
+        mock_instance.run.assert_called_once_with(patch_content, target_file)
+        self.assertEqual(result, expected_result)

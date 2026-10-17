@@ -21,6 +21,10 @@ class PatchPipelineIntegration:
             self.analyzer.analyze(patch_content)
         except PatchAnalyzerError as e:
             raise PatchPipelineError(str(e)) from e
+        except Exception as e:
+            if not isinstance(e, PatchPipelineError):
+                raise PatchPipelineError(str(e)) from e
+            raise
 
         try:
             return self.evaluator.evaluate(
@@ -30,6 +34,10 @@ class PatchPipelineIntegration:
             )
         except PatchEvaluatorError as e:
             raise PatchPipelineError(str(e)) from e
+        except Exception as e:
+            if not isinstance(e, PatchPipelineError):
+                raise PatchPipelineError(str(e)) from e
+            raise
 
     def run_stream(self, stream) -> PatchEvaluationResult:
         """Запуск конвейера для потоковых данных."""
@@ -37,12 +45,25 @@ class PatchPipelineIntegration:
             self.analyzer.analyze_stream(stream)
         except PatchAnalyzerError as e:
             raise PatchPipelineError(str(e)) from e
+        except Exception as e:
+            if not isinstance(e, PatchPipelineError):
+                raise PatchPipelineError(str(e)) from e
+            raise
 
         try:
             return self.evaluator.evaluate_stream(stream)
         except PatchEvaluatorError as e:
             raise PatchPipelineError(str(e)) from e
+        except Exception as e:
+            if not isinstance(e, PatchPipelineError):
+                raise PatchPipelineError(str(e)) from e
+            raise
 
     def execute_pipeline(self, patch_content: str, target_file: str = None) -> PatchEvaluationResult:
         """Полное выполнение конвейера с применением патча (интеграционный метод)."""
-        return self.run(patch_content, target_file=target_file)
+        try:
+            return self.run(patch_content, target_file=target_file)
+        except PatchPipelineError:
+            raise
+        except Exception as e:
+            raise PatchPipelineError(str(e)) from e

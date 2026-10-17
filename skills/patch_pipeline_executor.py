@@ -1,3 +1,4 @@
+import os
 from skills.git_inspector import GitInspector
 from skills.patch_evaluator import PatchEvaluator, PatchEvaluationResult
 
@@ -26,6 +27,7 @@ class PatchPipelineExecutor:
             if patch_content and target_file:
                 target_path = f"{self.repo_path}/{target_file}" if not target_file.startswith(self.repo_path) else target_file
                 try:
+                    os.makedirs(os.path.dirname(target_path), exist_ok=True)
                     with open(target_path, "a", encoding="utf-8") as f:
                         f.write("\n" + patch_content if not patch_content.startswith("\n") else patch_content)
                 except IOError as io_err:

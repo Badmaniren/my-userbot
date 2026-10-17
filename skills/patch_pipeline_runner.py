@@ -26,12 +26,8 @@ class PatchPipelineRunner:
             if not evaluation_result.is_safe or not evaluation_result.is_valid:
                 raise PatchPipelineError("Patch is unsafe or invalid.")
 
-            # Интеграционный тест ожидает сам объект PatchEvaluationResult,
-            # а юнит-тесты проверяют методы `.get("success")` и `.get("commit_history")`.
-            # Наследуем гибридный класс от PatchEvaluationResult и добавляем методы словаря.
             class PipelineResult(PatchEvaluationResult):
                 def __init__(self, eval_res, history):
-                    # Копируем атрибуты из оригинального evaluation_result
                     for attr in dir(eval_res):
                         if not attr.startswith('__'):
                             try:

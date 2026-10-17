@@ -1,5 +1,5 @@
 from skills.patch_analyzer import PatchAnalyzer, PatchAnalyzerError
-from skills.patch_verifier import PatchVerifier, PatchVerifierError
+from skills.patch_verifier import PatchVerifier, PatchExecutorError
 
 
 class PatchPipelineSupervisorError(Exception):
@@ -25,7 +25,7 @@ class PatchPipelineSupervisor:
 
         try:
             result = self.verifier.verify_and_apply(patch_data)
-        except PatchVerifierError as e:
+        except PatchExecutorError as e:
             raise PatchPipelineSupervisorError(str(e)) from e
 
         return result
@@ -39,7 +39,7 @@ class PatchPipelineSupervisor:
 
         try:
             result = self.verifier.verify_and_apply(patch_data)
-        except PatchVerifierError as e:
+        except PatchExecutorError as e:
             raise PatchPipelineSupervisorError(str(e)) from e
 
         return result

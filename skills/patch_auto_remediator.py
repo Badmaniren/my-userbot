@@ -31,8 +31,6 @@ class PatchAutoRemediator:
             raise PatchAutoRemediatorError("Patch is invalid")
 
         try:
-            # Некоторые версии AutonomousEngine.run_cycle могут принимать target_file, а некоторые нет.
-            # Попробуем передать аргумент, если он поддерживается или нужен интеграционному тесту.
             if target_file is not None:
                 try:
                     return self.autonomous_engine.run_cycle(max_commits=max_commits, target_file=target_file)

@@ -33,8 +33,15 @@ class PatchPipelineIntegration:
 
     def run_stream(self, stream) -> PatchEvaluationResult:
         """Запуск конвейера для потоковых данных."""
-        self.analyzer.analyze_stream(stream)
-        return self.evaluator.evaluate_stream(stream)
+        try:
+            self.analyzer.analyze_stream(stream)
+        except PatchAnalyzerError as e:
+            raise PatchPipelineError(str(e)) from e
+
+        try:
+            return self.evaluator.evaluate_stream(stream)
+        except PatchEvaluatorError as e:
+            raise PatchPipelineError(str(e)) from e
 
     def execute_pipeline(self, patch_content: str, target_file: str = None) -> PatchEvaluationResult:
         """Полное выполнение конвейера с применением патча (интеграционный метод)."""

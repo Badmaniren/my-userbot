@@ -14,6 +14,10 @@ class PatchExecutorError(Exception):
     """Исключение исполнителя патчей."""
     pass
 
+class PatchVerifierError(Exception):
+    """Исключение верификатора патчей."""
+    pass
+
 
 class GitInspector:
     def __init__(self, repo_path: str):
@@ -57,7 +61,7 @@ class GitInspector:
         history = self.get_commit_history(max_count=1)
         if history:
             return self.get_file_diff(history[0]["hash"])
-        return ""
+        return self._run_git(["show"])
 
 
 class LessonParser:
@@ -97,11 +101,13 @@ class PatchExecutor:
         if not file_path or content is None:
             return False
 
-        full_path = os.path.join(self.repo_path, file_path)
-        os.makedirs(os.path.dirname(full_path), exist_ok=True)
         try:
+            full_path = os.path.join(self.repo_path, file_path)
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+
             with open(full_path, "w", encoding="utf-8") as f:
                 f.write(content)
+
             subprocess.run(["git", "-C", self.repo_path, "add", file_path], check=True)
             subprocess.run(["git", "-C", self.repo_path, "commit", "-m", commit_message], check=True)
             return True
@@ -120,13 +126,40 @@ class PatchExecutor:
 
 
 class PatchVerifier:
-    def __init__(self, repo_path: str, inspector: GitInspector, executor: PatchExecutor):
+    def __init__(
+        self,
+        repo_path: str = ".",
+        inspector: Optional[GitInspector] = None,
+        executor: Optional[PatchExecutor] = None
+    ):
         self.repo_path = repo_path
-        self.inspector = inspector
-        self.executor = executor
+        self.inspector = inspector if inspector is not None else GitInspector(repo_path)
+        self.parser = LessonParser(self.inspector)
+        self.executor = executor if executor is not None else PatchExecutor(repo_path, self.inspector, self.parser)
 
-    def verify_and_apply(self, patch_data: Dict[str, Any]) -> bool:
-        content = patch_data.get("content", "")
-        if "syntax error here" in content:
+    def verify_and_apply(self, patch_data: Any, content: Optional[str] = None) -> bool:
+        if isinstance(patch_data, str) and content is not None:
+            patch_dict = {
+                "file_path": patch_data,
+                "content": content,
+                "commit_message": f"Apply patch to {patch_data}"
+            }
+        elif isinstance(patch_data, str):
+            patch_dict = {
+                "file_path": "patch.py",
+                "content": patch_data,
+                "commit_message": "Apply raw patch"
+            }
+        elif isinstance(patch_data, dict):
+            patch_dict = patch_data
+        else:
             return False
-        return self.executor.apply_patch(patch_data)
+
+        file_content = patch_dict.get("content", "")
+        if not isinstance(file_content, str):
+            file_content = str(file_content)
+
+        if "syntax error here" in file_content:
+            return False
+
+        return self.executor.apply_patch(patch_dict)

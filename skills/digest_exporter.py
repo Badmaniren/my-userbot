@@ -18,12 +18,15 @@ class DigestExporter:
     def export_json_report(self, output_path: str) -> str:
         """Экспортирует данные дайджеста и метрики визуализатора в JSON-файл."""
         try:
-            metrics = self.visualizer.get_summary_metrics()
-            text_rep = self.visualizer.render_text()
-            ascii_rep = self.visualizer.render_ascii_correlation_graph()
+            visualizer = getattr(self, 'visualizer', None)
+            metrics = visualizer.get_summary_metrics() if visualizer and hasattr(visualizer, 'get_summary_metrics') else {}
+            text_rep = visualizer.render_text() if visualizer and hasattr(visualizer, 'render_text') else ""
+            ascii_rep = visualizer.render_ascii_correlation_graph() if visualizer and hasattr(visualizer, 'render_ascii_correlation_graph') else ""
 
             if isinstance(metrics, dict):
                 data = metrics.copy()
+            elif isinstance(metrics, list):
+                data = {'anomalies': metrics}
             else:
                 data = {}
 
@@ -42,9 +45,10 @@ class DigestExporter:
     def export_html_report(self, output_path: str) -> str:
         """Экспортирует отчет в HTML-файл."""
         try:
-            metrics = self.visualizer.get_summary_metrics()
-            text_rep = self.visualizer.render_text()
-            ascii_rep = self.visualizer.render_ascii_correlation_graph()
+            visualizer = getattr(self, 'visualizer', None)
+            metrics = visualizer.get_summary_metrics() if visualizer and hasattr(visualizer, 'get_summary_metrics') else {}
+            text_rep = visualizer.render_text() if visualizer and hasattr(visualizer, 'render_text') else ""
+            ascii_rep = visualizer.render_ascii_correlation_graph() if visualizer and hasattr(visualizer, 'render_ascii_correlation_graph') else ""
 
             html_content = f"""<html>
     <head><title>Digest Report</title></head>

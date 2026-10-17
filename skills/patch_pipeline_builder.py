@@ -3,7 +3,10 @@ import io
 
 from skills.patch_evaluator import patch_evaluator, PatchEvaluator
 from skills.patch_verifier import PatchVerifier
-from skills.code_executor import CodeExecutor
+try:
+    from skills.code_executor import CodeExecutor
+except ImportError:
+    CodeExecutor = None
 
 
 class PatchPipelineError(Exception):
@@ -24,7 +27,7 @@ class PatchPipelineBuilder:
         except ImportError:
             inspector = None
         
-        executor = CodeExecutor(repo_path=self.repo_path)
+        executor = CodeExecutor(repo_path=self.repo_path) if CodeExecutor is not None else None
         self.verifier = PatchVerifier(repo_path=self.repo_path, inspector=inspector, executor=executor)
 
     def run_pipeline(self, patch_content: str, target_file: str) -> bool:

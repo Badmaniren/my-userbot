@@ -1,6 +1,8 @@
 from typing import Any, BinaryIO, Optional
 from skills.patch_evaluator import PatchEvaluator
 from skills.patch_verifier import PatchVerifier
+from skills.patch_inspector import PatchInspector
+from skills.patch_executor import PatchExecutor
 
 
 class PatchAutoPipelineError(Exception):
@@ -21,7 +23,9 @@ class PatchAutoPipeline:
     def __init__(self, repo_path: Optional[str] = None):
         self.repo_path = repo_path
         self.evaluator = PatchEvaluator(repo_path=repo_path)
-        self.verifier = PatchVerifier(repo_path=repo_path)
+        inspector = PatchInspector()
+        executor = PatchExecutor(repo_path=repo_path)
+        self.verifier = PatchVerifier(inspector=inspector, executor=executor, repo_path=repo_path)
 
     def run(
         self,
@@ -59,7 +63,6 @@ class PatchAutoPipeline:
             if not getattr(eval_result, "is_safe", False):
                 return PipelineResult(success=False, evaluation=eval_result)
 
-            # Получаем контент из потока повторно, если это возможно, либо читаем и возвращаем
             if hasattr(stream_data, "seek"):
                 stream_data.seek(0)
             patch_content = stream_data.read()

@@ -77,13 +77,23 @@ class PatchAutoRemediatorPipeline:
         }
 
     def run_remediation_pipeline(self, patch_content: str, target_file: str) -> dict:
-        analysis = self.analyzer.analyze(patch_content)
+        try:
+            analysis = self.analyzer.analyze(patch_content)
+        except PatchAnalyzerError as e:
+            raise PatchAutoRemediatorPipelineError(str(e))
+        except Exception as e:
+            raise PatchAutoRemediatorPipelineError(str(e))
         
-        check_result = self.checker.check(
-            patch_content=patch_content,
-            repo_path=self.repo_path,
-            target_file=target_file
-        )
+        try:
+            check_result = self.checker.check(
+                patch_content=patch_content,
+                repo_path=self.repo_path,
+                target_file=target_file
+            )
+        except PatchCheckerError as e:
+            raise PatchAutoRemediatorPipelineError(str(e))
+        except Exception as e:
+            raise PatchAutoRemediatorPipelineError(str(e))
 
         success = True
         if isinstance(check_result, dict):

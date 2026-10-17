@@ -26,6 +26,17 @@ def start_new(data):
             "normalized": normalized
         }
 
+    if isinstance(data, list):
+        return [
+            start_new(x) if isinstance(x, (dict, str)) else {
+                "source": "raw_metric",
+                "severity": "LOW",
+                "details": str(x),
+                "telemetry_snapshot": {"value": x},
+                "normalized": True
+            } for x in data
+        ]
+
     if not isinstance(data, dict):
         raise TypeError("Input must be a dict or file path string")
 

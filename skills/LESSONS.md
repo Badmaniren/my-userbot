@@ -276,3 +276,7 @@
 ## digest_dashboard_aggregator (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## digest_dashboard_generator (compose) — раундов: 4
+- Последняя ошибка перед фиксом: skills.digest_exporter.DigestExporterError: 'dict' object has no attribute 'export_digest_stream'
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

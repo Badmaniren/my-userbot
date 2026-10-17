@@ -320,3 +320,7 @@
 ## patch_pipeline_runner (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## patch_pipeline_builder (compose) — раундов: 4
+- Последняя ошибка перед фиксом: skills.patch_pipeline_builder.PatchPipelineError: Ошибка при верификации и применении патча: 'str' object has no attribute 'get'
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -62,7 +62,6 @@ class PatchEvaluator:
                     reasons = sanitizer.get_reasons()
                 return PatchEvaluationResult(is_safe=False, is_valid=False, reasons=reasons)
 
-            # Передаем repo_path при инициализации CodeValidator для совместимости с требованиями тестов
             try:
                 validator = CodeValidator(self.repo_path)
             except TypeError:
@@ -79,7 +78,17 @@ class PatchEvaluator:
             else:
                 val_result = {"is_valid": True, "metrics": {}}
 
-            verifier = PatchVerifier()
+            try:
+                verifier = PatchVerifier(repo_path=self.repo_path, inspector=None, executor=None)
+            except TypeError:
+                try:
+                    verifier = PatchVerifier(self.repo_path)
+                except TypeError:
+                    try:
+                        verifier = PatchVerifier()
+                    except TypeError:
+                        verifier = object()
+
             if hasattr(verifier, "verify"):
                 is_valid_verify = verifier.verify(sanitized_content)
             elif hasattr(verifier, "verify_patch"):

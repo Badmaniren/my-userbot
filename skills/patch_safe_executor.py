@@ -1,7 +1,5 @@
 from skills.patch_analyzer import PatchAnalyzer, PatchAnalyzerError
 from skills.patch_verifier import PatchVerifier
-from skills.code_inspector import CodeInspector
-from skills.command_executor import CommandExecutor
 
 
 class PatchSafeExecutorError(Exception):
@@ -13,9 +11,7 @@ class PatchSafeExecutor:
     def __init__(self, repo_path: str):
         self.repo_path = repo_path
         self.analyzer = PatchAnalyzer()
-        inspector = CodeInspector()
-        executor = CommandExecutor()
-        self.verifier = PatchVerifier(repo_path, inspector, executor)
+        self.verifier = PatchVerifier(repo_path)
 
     def execute(self, patch_data: dict) -> bool:
         diff = patch_data.get("diff", "")
@@ -41,8 +37,6 @@ class PatchSafeExecutor:
             risk_msg = ", ".join(risks) if risks else "Unknown risks detected"
             raise PatchSafeExecutorError(f"Unsafe patch detected: {risk_msg}")
 
-        # Создаем фиктивный patch_data для верификатора на основе потока, 
-        # так как verify_and_apply ожидает словарь с ключом "diff"
         if hasattr(stream, "seek"):
             stream.seek(0)
         diff_content = stream.read()

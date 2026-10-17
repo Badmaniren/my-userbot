@@ -3,6 +3,8 @@ import io
 
 from skills.patch_evaluator import patch_evaluator, PatchEvaluator
 from skills.patch_verifier import PatchVerifier
+from skills.code_inspector import CodeInspector
+from skills.code_executor import CodeExecutor
 
 
 class PatchPipelineError(Exception):
@@ -16,7 +18,9 @@ class PatchPipelineBuilder:
     def __init__(self, repo_path: str):
         self.repo_path = repo_path
         self.evaluator = PatchEvaluator(repo_path=self.repo_path)
-        self.verifier = PatchVerifier(repo_path=self.repo_path)
+        inspector = CodeInspector()
+        executor = CodeExecutor(repo_path=self.repo_path)
+        self.verifier = PatchVerifier(repo_path=self.repo_path, inspector=inspector, executor=executor)
 
     def run_pipeline(self, patch_content: str, target_file: str) -> bool:
         """Запускает полный пайплайн: оценка безопасности/валидности и верификация (применение)."""

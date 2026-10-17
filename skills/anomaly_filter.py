@@ -6,19 +6,24 @@ VALID_SEVERITIES = {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
 def start_new(data):
     if isinstance(data, str):
         with open(data, 'r', encoding='utf-8') as f:
-            content = f.read().strip()
+            content = f.read()
+        if isinstance(content, bytes):
+            content = content.decode('utf-8')
+        content = content.strip()
         parts = content.split(":", 2)
         if len(parts) < 3:
             raise ValueError("Malformed stream data format")
         source, severity, details = parts[0], parts[1], parts[2]
+        normalized = True
         if severity not in VALID_SEVERITIES:
             severity = "UNKNOWN"
+            normalized = False
         return {
             "source": source,
             "severity": severity,
             "details": details,
             "telemetry_snapshot": {},
-            "normalized": True
+            "normalized": normalized
         }
 
     if not isinstance(data, dict):
@@ -52,13 +57,15 @@ class AnomalyFilter:
             raise KeyError("Missing required keys")
         
         severity = raw_anomaly_data["severity"]
+        normalized = True
         if severity not in VALID_SEVERITIES:
             severity = "UNKNOWN"
+            normalized = False
 
         return {
             "source": raw_anomaly_data["source"],
             "severity": severity,
             "details": raw_anomaly_data["details"],
             "telemetry_snapshot": raw_anomaly_data["telemetry_snapshot"],
-            "normalized": True
+            "normalized": normalized
         }

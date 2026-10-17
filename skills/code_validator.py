@@ -44,7 +44,7 @@ class CodeValidator:
 
     def __init__(self, repo_path: str):
         self.repo_path = repo_path
-        self.forbidden_constructs: Set[str] = set()
+        self.forbidden_constructs: Set[str] = {"exec", "eval", "system", "__import__"}
 
     def add_forbidden_construct(self, construct: str) -> None:
         self.forbidden_constructs.add(construct)

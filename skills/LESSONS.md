@@ -290,3 +290,8 @@
 ## patch_verifier (compose) — раундов: 4
 - Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/unittest/mock.py", line 1357, in decoration_helper
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## patch_pipeline_builder (compose) — раундов: 4
+- Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
+- Последняя ошибка перед фиксом: FAIL: test_run_pipeline_verification_failure (tests.test_patch_pipeline_builder.TestPatchPipelineBuilder.test_run_pipeline_verification_failure)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

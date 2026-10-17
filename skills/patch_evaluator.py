@@ -26,11 +26,20 @@ class PatchEvaluationResult:
         self.was_corrected = was_corrected
 
 class CodeSanitizer:
+    def __init__(self):
+        self._reasons: List[str] = []
+
     def sanitize(self, patch_content: str) -> Tuple[str, bool]:
+        self._reasons = []
+        unsafe_keywords = ["os.system", "rm -rf", "exec(", "eval(", "subprocess", "shutil.rmtree"]
+        for kw in unsafe_keywords:
+            if kw in patch_content:
+                self._reasons.append(f"Обнаружен опасный код или команда: {kw}")
+                return patch_content, False
         return patch_content, True
     
     def get_reasons(self) -> List[str]:
-        return []
+        return self._reasons
 
 class CodeValidator:
     def validate(self, patch_content: str) -> Dict[str, Any]:

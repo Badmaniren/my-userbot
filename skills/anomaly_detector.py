@@ -45,11 +45,11 @@ class AnomalyDetector:
         
         mean_val = sum(history) / len(history)
         
-        # Строгая проверка отклонения только от среднего по истории на величину threshold,
-        # либо если значение превышает порог масштаба.
         if abs(target_value - mean_val) > self.threshold and target_value > self.threshold * 2:
             return True
         if abs(target_value - mean_val) > self.threshold * 2:
+            return True
+        if target_value > self.threshold * 2:
             return True
             
         return False

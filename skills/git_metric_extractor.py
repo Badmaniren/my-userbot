@@ -23,7 +23,7 @@ class GitMetricExtractor:
             self.inspector = inspector
         elif repo_path is not None:
             try:
-                self.inspector = GitInspector(repo_path)
+                self.inspector = GitInspector(repo_path=repo_path)
             except Exception as e:
                 raise GitMetricExtractorError(str(e))
         else:

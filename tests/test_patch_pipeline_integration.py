@@ -3,6 +3,7 @@ from unittest.mock import patch, MagicMock
 import uuid
 import random
 import io
+
 from skills.patch_pipeline_integration import (
     PatchPipelineIntegration,
     PatchPipelineError
@@ -10,116 +11,124 @@ from skills.patch_pipeline_integration import (
 from skills.patch_analyzer import PatchAnalyzerError
 from skills.patch_evaluator import PatchEvaluationResult, PatchEvaluatorError
 
+
 class TestPatchPipelineIntegration(unittest.TestCase):
 
     def setUp(self):
-        self.repo_path = f"/repo/{uuid.uuid4().hex}"
-        self.pipeline = PatchPipelineIntegration(repo_path=self.repo_path)
+        self.random_repo_path = f"/repo/{uuid.uuid4().hex}"
+        self.pipeline = PatchPipelineIntegration(repo_path=self.random_repo_path)
 
-    def test_pipeline_composition_initialization(self):
-        self.assertIsNotNone(self.pipeline)
-        self.assertEqual(self.pipeline.repo_path, self.repo_path)
+    def test_pipeline_initialization(self):
+        self.assertEqual(self.pipeline.repo_path, self.random_repo_path)
+        self.assertIsNotNone(self.pipeline.analyzer)
+        self.assertIsNotNone(self.pipeline.evaluator)
 
     def test_pipeline_run_success(self):
-        rand_patch_content = f"diff --git a/{uuid.uuid4().hex}.py b/{uuid.uuid4().hex}.py\n+print('{uuid.uuid4().hex}')"
-        rand_target_file = f"src/{uuid.uuid4().hex}.py"
-        
-        mock_analysis_result = {
-            "status": "clean",
-            "stats": {str(uuid.uuid4().hex): random.randint(1, 100)}
-        }
-        
+        patch_text = f"diff --git a/{uuid.uuid4().hex}.py b/{uuid.uuid4().hex}.py\n+print('{uuid.uuid4().hex}')"
+        target_file_name = f"{uuid.uuid4().hex}.py"
+
         mock_eval_result = PatchEvaluationResult(
             is_safe=True,
             is_valid=True,
-            metrics={str(uuid.uuid4().hex): random.random()},
-            reasons=[str(uuid.uuid4().hex)],
-            telemetry={str(uuid.uuid4().hex): str(uuid.uuid4().hex)},
+            metrics={"score": random.randint(80, 100)},
+            reasons=[],
+            telemetry={"cpu": random.random()},
             was_corrected=False
         )
 
-        with patch('skills.patch_pipeline_integration.PatchAnalyzer') as mock_analyzer_cls, \
-             patch('skills.patch_pipeline_integration.PatchEvaluator') as mock_evaluator_cls:
+        with patch.object(self.pipeline.analyzer, 'analyze') as mock_analyze, \
+             patch.object(self.pipeline.evaluator, 'evaluate', return_value=mock_eval_result) as mock_evaluate:
             
-            mock_analyzer_instance = mock_analyzer_cls.return_value
-            mock_analyzer_instance.analyze.return_value = mock_analysis_result
+            result = self.pipeline.run(patch_content=patch_text, target_file=target_file_name)
             
-            mock_evaluator_instance = mock_evaluator_cls.return_value
-            mock_evaluator_instance.evaluate.return_value = mock_eval_result
-
-            result = self.pipeline.run(rand_patch_content, target_file=rand_target_file)
-
-            self.assertTrue(result.is_safe)
-            self.assertTrue(result.is_valid)
-            mock_analyzer_instance.analyze.assert_called_once_with(rand_patch_content)
-            mock_evaluator_instance.evaluate.assert_called_once_with(
-                patch_content=rand_patch_content,
+            mock_analyze.assert_called_once_with(patch_text)
+            mock_evaluate.assert_called_once_with(
+                patch_content=patch_text,
                 collect_telemetry=True,
-                target_file=rand_target_file
+                target_file=target_file_name
             )
+            self.assertEqual(result, mock_eval_result)
 
     def test_pipeline_run_analyzer_error(self):
-        rand_patch_content = f"diff --git a/{uuid.uuid4().hex}.py b/{uuid.uuid4().hex}.py"
-        rand_error_msg = f"Analyzer crashed {uuid.uuid4().hex}"
+        patch_text = f"invalid_patch_{uuid.uuid4().hex}"
+        error_msg = f"Analyzer failed with {uuid.uuid4().hex}"
 
-        with patch('skills.patch_pipeline_integration.PatchAnalyzer') as mock_analyzer_cls, \
-             patch('skills.patch_pipeline_integration.PatchEvaluator') as mock_evaluator_cls:
-            
-            mock_analyzer_instance = mock_analyzer_cls.return_value
-            mock_analyzer_instance.analyze.side_effect = PatchAnalyzerError(rand_error_msg)
-
+        with patch.object(self.pipeline.analyzer, 'analyze', side_effect=PatchAnalyzerError(error_msg)):
             with self.assertRaises(PatchPipelineError) as ctx:
-                self.pipeline.run(rand_patch_content)
-            
-            self.assertIn(rand_error_msg, str(ctx.exception))
+                self.pipeline.run(patch_content=patch_text)
+            self.assertIn(error_msg, str(ctx.exception))
 
     def test_pipeline_run_evaluator_error(self):
-        rand_patch_content = f"diff --git a/{uuid.uuid4().hex}.py b/{uuid.uuid4().hex}.py"
-        rand_error_msg = f"Evaluator failed {uuid.uuid4().hex}"
+        patch_text = f"diff --git a/{uuid.uuid4().hex}.py b/{uuid.uuid4().hex}.py"
+        error_msg = f"Evaluator failed with {uuid.uuid4().hex}"
 
-        mock_analysis_result = {"status": "ok"}
-
-        with patch('skills.patch_pipeline_integration.PatchAnalyzer') as mock_analyzer_cls, \
-             patch('skills.patch_pipeline_integration.PatchEvaluator') as mock_evaluator_cls:
+        with patch.object(self.pipeline.analyzer, 'analyze'), \
+             patch.object(self.pipeline.evaluator, 'evaluate', side_effect=PatchEvaluatorError(error_msg)):
             
-            mock_analyzer_instance = mock_analyzer_cls.return_value
-            mock_analyzer_instance.analyze.return_value = mock_analysis_result
-            
-            mock_evaluator_instance = mock_evaluator_cls.return_value
-            mock_evaluator_instance.evaluate.side_effect = PatchEvaluatorError(rand_error_msg)
-
             with self.assertRaises(PatchPipelineError) as ctx:
-                self.pipeline.run(rand_patch_content)
-            
-            self.assertIn(rand_error_msg, str(ctx.exception))
+                self.pipeline.run(patch_content=patch_text)
+            self.assertIn(error_msg, str(ctx.exception))
 
     def test_pipeline_run_stream(self):
-        rand_stream_data = f"stream_diff_{uuid.uuid4().hex}".encode('utf-8')
-        mock_stream = io.BytesIO(rand_stream_data)
+        stream_content = f"stream_data_{uuid.uuid4().hex}".encode('utf-8')
+        stream_obj = io.BytesIO(stream_content)
 
         mock_eval_result = PatchEvaluationResult(
             is_safe=random.choice([True, False]),
             is_valid=True,
             metrics={},
+            reasons=[uuid.uuid4().hex],
+            telemetry={},
+            was_corrected=True
+        )
+
+        with patch.object(self.pipeline.analyzer, 'analyze_stream') as mock_analyze_stream, \
+             patch.object(self.pipeline.evaluator, 'evaluate_stream', return_value=mock_eval_result) as mock_evaluate_stream:
+            
+            result = self.pipeline.run_stream(stream_obj)
+
+            mock_analyze_stream.assert_called_once_with(stream_obj)
+            mock_evaluate_stream.assert_called_once_with(stream_obj)
+            self.assertEqual(result, mock_eval_result)
+
+    def test_pipeline_run_stream_analyzer_error(self):
+        stream_obj = io.BytesIO(b"bad stream")
+        error_msg = f"Stream analyze error {uuid.uuid4().hex}"
+
+        with patch.object(self.pipeline.analyzer, 'analyze_stream', side_effect=PatchAnalyzerError(error_msg)):
+            with self.assertRaises(PatchPipelineError) as ctx:
+                self.pipeline.run_stream(stream_obj)
+            self.assertIn(error_msg, str(ctx.exception))
+
+    def test_pipeline_run_stream_evaluator_error(self):
+        stream_obj = io.BytesIO(b"good analyze, bad eval")
+        error_msg = f"Stream eval error {uuid.uuid4().hex}"
+
+        with patch.object(self.pipeline.analyzer, 'analyze_stream'), \
+             patch.object(self.pipeline.evaluator, 'evaluate_stream', side_effect=PatchEvaluatorError(error_msg)):
+            
+            with self.assertRaises(PatchPipelineError) as ctx:
+                self.pipeline.run_stream(stream_obj)
+            self.assertIn(error_msg, str(ctx.exception))
+
+    def test_execute_pipeline_integration(self):
+        patch_text = f"diff --integration-{uuid.uuid4().hex}"
+        target_file = f"src/{uuid.uuid4().hex}.py"
+
+        mock_eval_result = PatchEvaluationResult(
+            is_safe=True,
+            is_valid=True,
+            metrics={"integrated": True},
             reasons=[],
             telemetry={},
             was_corrected=False
         )
 
-        with patch('skills.patch_pipeline_integration.PatchAnalyzer') as mock_analyzer_cls, \
-             patch('skills.patch_pipeline_integration.PatchEvaluator') as mock_evaluator_cls:
-            
-            mock_analyzer_instance = mock_analyzer_cls.return_value
-            mock_analyzer_instance.analyze_stream.return_value = {"stream_analyzed": True}
-            
-            mock_evaluator_instance = mock_evaluator_cls.return_value
-            mock_evaluator_instance.evaluate_stream.return_value = mock_eval_result
-
-            result = self.pipeline.run_stream(mock_stream)
-
+        with patch.object(self.pipeline, 'run', return_value=mock_eval_result) as mock_run:
+            result = self.pipeline.execute_pipeline(patch_content=patch_text, target_file=target_file)
+            mock_run.assert_called_once_with(patch_text, target_file=target_file)
             self.assertEqual(result, mock_eval_result)
-            mock_analyzer_instance.analyze_stream.assert_called_once_with(mock_stream)
-            mock_evaluator_instance.evaluate_stream.assert_called_once_with(mock_stream)
+
 
 if __name__ == '__main__':
     unittest.main()

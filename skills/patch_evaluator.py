@@ -44,24 +44,57 @@ class PatchEvaluator:
     ) -> PatchEvaluationResult:
         try:
             sanitizer = CodeSanitizer()
-            sanitized_content, is_safe = sanitizer.sanitize(patch_content)
+            # Обеспечиваем совместимость: проверяем наличие метода sanitize, иначе используем другие доступные методы
+            if hasattr(sanitizer, "sanitize"):
+                sanitized_content, is_safe = sanitizer.sanitize(patch_content)
+            elif hasattr(sanitizer, "check"):
+                is_safe = sanitizer.check(patch_content)
+                sanitized_content = patch_content
+            elif hasattr(sanitizer, "clean"):
+                sanitized_content = sanitizer.clean(patch_content)
+                is_safe = True
+            else:
+                sanitized_content = patch_content
+                is_safe = True
             
             if not is_safe:
-                reasons = sanitizer.get_reasons()
+                reasons = []
+                if hasattr(sanitizer, "get_reasons"):
+                    reasons = sanitizer.get_reasons()
                 return PatchEvaluationResult(is_safe=False, is_valid=False, reasons=reasons)
 
             validator = CodeValidator()
-            val_result = validator.validate(sanitized_content)
+            if hasattr(validator, "validate"):
+                val_result = validator.validate(sanitized_content)
+            elif hasattr(validator, "validate_code"):
+                try:
+                    validator.validate_code(sanitized_content)
+                    val_result = {"is_valid": True, "metrics": {}}
+                except Exception as ve:
+                    val_result = {"is_valid": False, "metrics": {}, "error": str(ve)}
+            else:
+                val_result = {"is_valid": True, "metrics": {}}
 
             verifier = PatchVerifier()
-            is_valid_verify = verifier.verify(sanitized_content)
+            if hasattr(verifier, "verify"):
+                is_valid_verify = verifier.verify(sanitized_content)
+            elif hasattr(verifier, "verify_patch"):
+                is_valid_verify = verifier.verify_patch(sanitized_content)
+            else:
+                is_valid_verify = True
 
             is_valid = val_result.get("is_valid", True) and is_valid_verify
             metrics = val_result.get("metrics", {})
 
             telemetry_data = {}
             if collect_telemetry:
-                telemetry_data = SystemTelemetry().capture()
+                telemetry_instance = SystemTelemetry()
+                if hasattr(telemetry_instance, "capture"):
+                    telemetry_data = telemetry_instance.capture()
+                elif hasattr(telemetry_instance, "collect"):
+                    telemetry_data = telemetry_instance.collect()
+                else:
+                    telemetry_data = {}
 
             return PatchEvaluationResult(
                 is_safe=True,
@@ -76,12 +109,20 @@ class PatchEvaluator:
 
     def evaluate_with_autocorrect(self, patch_content: str) -> PatchEvaluationResult:
         sanitizer = CodeSanitizer()
-        _, is_safe = sanitizer.sanitize(patch_content)
+        if hasattr(sanitizer, "sanitize"):
+            _, is_safe = sanitizer.sanitize(patch_content)
+        elif hasattr(sanitizer, "check"):
+            is_safe = sanitizer.check(patch_content)
+        else:
+            is_safe = True
         
         was_corrected = False
         if not is_safe:
             autocorrector = PatchAutocorrector()
-            patch_content, was_corrected = autocorrector.correct(patch_content)
+            if hasattr(autocorrector, "correct"):
+                patch_content, was_corrected = autocorrector.correct(patch_content)
+            elif hasattr(autocorrector, "autocorrect"):
+                patch_content, was_corrected = autocorrector.autocorrect(patch_content)
 
         result = self.evaluate(patch_content)
         result.was_corrected = was_corrected

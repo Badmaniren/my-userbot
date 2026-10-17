@@ -1,81 +1,173 @@
 import unittest
 from unittest.mock import patch, MagicMock
+import os
 import uuid
 import random
-import string
-import io
-import os
-
 from skills.digest_dashboard_generator import DigestDashboardGenerator, DigestDashboardGeneratorError
-from skills.anomaly_visualizer import AnomalyVisualizer
-from skills.digest_exporter import DigestExporter
+
 
 class TestDigestDashboardGenerator(unittest.TestCase):
 
     def setUp(self):
-        self.rand_str = lambda: ''.join(random.choices(string.ascii_letters, k=8))
-        self.rand_path = f"/tmp/{uuid.uuid4().hex}/{self.rand_str()}.json"
-        self.rand_html_path = f"/tmp/{uuid.uuid4().hex}/{self.rand_str()}.html"
-        self.digest_data = {
-            self.rand_str(): random.randint(1, 100),
-            self.rand_str(): self.rand_str()
-        }
-        self.generator = DigestDashboardGenerator(self.digest_data)
+        self.random_digest = {str(uuid.uuid4()): random.randint(1, 100)}
+        self.json_path = f"reports_{uuid.uuid4().hex}/{uuid.uuid4().hex}.json"
+        self.html_path = f"reports_{uuid.uuid4().hex}/{uuid.uuid4().hex}.html"
+        self.stream_id = uuid.uuid4().hex
 
-    def test_initialization_composition(self):
-        self.assertIsInstance(self.generator.visualizer, AnomalyVisualizer)
-        self.assertIsInstance(self.generator.exporter, DigestExporter)
+    def test_init_with_defaults(self):
+        with patch('skills.digest_dashboard_generator.AnomalyVisualizer') as mock_vis_cls, \
+             patch('skills.digest_dashboard_generator.DigestExporter') as mock_exp_cls:
+            
+            mock_vis_instance = MagicMock()
+            mock_exp_instance = MagicMock()
+            mock_vis_cls.return_value = mock_vis_instance
+            mock_exp_cls.return_value = mock_exp_instance
+
+            generator = DigestDashboardGenerator(stability_digest=self.random_digest)
+            
+            mock_vis_cls.assert_called_once_with(digest=self.random_digest)
+            mock_exp_cls.assert_called_once_with(stability_digest=self.random_digest, anomaly_visualizer=mock_vis_instance)
+            self.assertEqual(generator.digest_data, self.random_digest)
+
+    def test_init_with_custom_injections(self):
+        mock_vis = MagicMock()
+        mock_exp = MagicMock()
+
+        generator = DigestDashboardGenerator(
+            stability_digest=self.random_digest,
+            anomaly_visualizer=mock_vis,
+            digest_exporter=mock_exp
+        )
+
+        self.assertEqual(generator.visualizer, mock_vis)
+        self.assertEqual(generator.exporter, mock_exp)
 
     def test_generate_dashboard_success(self):
-        expected_json = f"{uuid.uuid4().hex}.json"
-        expected_html = f"{uuid.uuid4().hex}.html"
+        mock_vis = MagicMock()
+        mock_exp = MagicMock()
+        
+        expected_json_res = f"path_{uuid.uuid4().hex}.json"
+        expected_html_res = f"path_{uuid.uuid4().hex}.html"
+        
+        mock_exp.export_to_json.return_value = expected_json_res
+        mock_exp.export_to_html.return_value = expected_html_res
 
-        with patch.object(DigestExporter, 'export_to_json', return_value=expected_json) as mock_json, \
-             patch.object(DigestExporter, 'export_to_html', return_value=expected_html) as mock_html:
+        generator = DigestDashboardGenerator(
+            stability_digest=self.random_digest,
+            anomaly_visualizer=mock_vis,
+            digest_exporter=mock_exp
+        )
+
+        with patch('os.makedirs') as mock_makedirs, \
+             patch('os.path.exists', return_value=False) as mock_exists:
             
-            result = self.generator.generate_dashboard(self.rand_path, self.rand_html_path)
+            result = generator.generate_dashboard(self.json_path, self.html_path)
 
-            mock_json.assert_called_once_with(self.rand_path)
-            mock_html.assert_called_once_with(self.rand_html_path)
+            mock_exp.export_to_json.assert_called_once_with(self.json_path)
+            mock_exp.export_to_html.assert_called_once_with(self.html_path)
+            self.assertEqual(result, {
+                'json_report': expected_json_res,
+                'html_report': expected_html_res
+            })
+            self.assertTrue(mock_makedirs.called)
+
+    def test_generate_dashboard_handles_exception(self):
+        mock_vis = MagicMock()
+        mock_exp = MagicMock()
+        
+        random_error_msg = uuid.uuid4().hex
+        mock_exp.export_to_json.side_effect = Exception(random_error_msg)
+
+        generator = DigestDashboardGenerator(
+            stability_digest=self.random_digest,
+            anomaly_visualizer=mock_vis,
+            digest_exporter=mock_exp
+        )
+
+        with patch('os.makedirs'):
+            with self.assertRaises(DigestDashboardGeneratorError) as ctx:
+                generator.generate_dashboard(self.json_path, self.html_path)
             
-            self.assertIn('json_report', result)
-            self.assertIn('html_report', result)
-            self.assertEqual(result['json_report'], expected_json)
-            self.assertEqual(result['html_report'], expected_html)
-
-    def test_generate_dashboard_exporter_error(self):
-        with patch.object(DigestExporter, 'export_to_json', side_effect=Exception(self.rand_str())):
-            with self.assertRaises(DigestDashboardGeneratorError):
-                self.generator.generate_dashboard(self.rand_path, self.rand_html_path)
+            self.assertIn(random_error_msg, str(ctx.exception))
 
     def test_get_metrics_summary(self):
-        expected_metrics = {self.rand_str(): random.randint(100, 999)}
-        with patch.object(AnomalyVisualizer, 'get_summary_metrics', return_value=expected_metrics) as mock_metrics:
-            metrics = self.generator.get_metrics_summary()
-            mock_metrics.assert_called_once()
-            self.assertEqual(metrics, expected_metrics)
+        mock_vis = MagicMock()
+        expected_metrics = {uuid.uuid4().hex: random.randint(10, 500)}
+        mock_vis.get_summary_metrics.return_value = expected_metrics
+
+        generator = DigestDashboardGenerator(
+            stability_digest=self.random_digest,
+            anomaly_visualizer=mock_vis
+        )
+
+        metrics = generator.get_metrics_summary()
+        mock_vis.get_summary_metrics.assert_called_once()
+        self.assertEqual(metrics, expected_metrics)
 
     def test_render_ascii_graph(self):
-        expected_graph = f"\n[ASCII GRAPH] {self.rand_str()}\n"
-        with patch.object(AnomalyVisualizer, 'render_ascii_correlation_graph', return_value=expected_graph) as mock_graph:
-            graph = self.generator.render_ascii_graph()
-            mock_graph.assert_called_once()
-            self.assertEqual(graph, expected_graph)
+        mock_vis = MagicMock()
+        expected_graph = f"graph_{uuid.uuid4().hex}"
+        mock_vis.render_ascii_correlation_graph.return_value = expected_graph
 
-    def test_stream_export_integration(self):
-        stream_id = uuid.uuid4().hex
-        expected_stream_path = f"/tmp/{uuid.uuid4().hex}.json"
-        
-        with patch.object(DigestExporter, 'export_stream_to_json', return_value=expected_stream_path) as mock_stream:
-            res = self.generator.export_stream(stream_id, self.rand_path)
-            mock_stream.assert_called_once_with(stream_id, self.rand_path)
-            self.assertEqual(res, expected_stream_path)
+        generator = DigestDashboardGenerator(
+            stability_digest=self.random_digest,
+            anomaly_visualizer=mock_vis
+        )
 
-    def test_io_stream_processing_mock(self):
-        dummy_content = self.rand_str().encode('utf-8')
-        mock_file = io.BytesIO(dummy_content)
-        
-        with patch('skills.digest_dashboard_generator.open', return_value=mock_file, create=True):
-            with patch.object(DigestExporter, 'export_to_json', return_value=self.rand_path):
-                res = self.generator.generate_dashboard(self.rand_path, self.rand_html_path)
-                self.assertIsNotNone(res)
+        graph = generator.render_ascii_graph()
+        mock_vis.render_ascii_correlation_graph.assert_called_once()
+        self.assertEqual(graph, expected_graph)
+
+    def test_export_stream(self):
+        mock_exp = MagicMock()
+        expected_export_path = f"stream_{uuid.uuid4().hex}.json"
+        mock_exp.export_stream_to_json.return_value = expected_export_path
+
+        generator = DigestDashboardGenerator(
+            stability_digest=self.random_digest,
+            digest_exporter=mock_exp
+        )
+
+        res = generator.export_stream(self.stream_id, self.json_path)
+        mock_exp.export_stream_to_json.assert_called_once_with(self.stream_id, self.json_path)
+        self.assertEqual(res, expected_export_path)
+
+    def test_generate_html_dashboard(self):
+        mock_exp = MagicMock()
+        expected_html_path = f"html_{uuid.uuid4().hex}.html"
+        mock_exp.export_to_html.return_value = expected_html_path
+
+        generator = DigestDashboardGenerator(
+            stability_digest=self.random_digest,
+            digest_exporter=mock_exp
+        )
+
+        with patch('os.makedirs') as mock_makedirs, \
+             patch('os.path.exists', return_value=False):
+            
+            res = generator.generate_html_dashboard(self.html_path)
+            mock_exp.export_to_html.assert_called_once_with(self.html_path)
+            self.assertEqual(res, expected_html_path)
+            self.assertTrue(mock_makedirs.called)
+
+    def test_generate_json_dashboard(self):
+        mock_exp = MagicMock()
+        expected_json_path = f"json_{uuid.uuid4().hex}.json"
+        mock_exp.export_to_json.return_value = expected_json_path
+
+        generator = DigestDashboardGenerator(
+            stability_digest=self.random_digest,
+            digest_exporter=mock_exp
+        )
+
+        with patch('os.makedirs') as mock_makedirs, \
+             patch('os.path.exists', return_value=True):
+            
+            res = generator.generate_json_dashboard(self.json_path)
+            mock_exp.export_to_json.assert_called_once_with(self.json_path)
+            self.assertEqual(res, expected_json_path)
+            mock_makedirs.assert_not_called()
+
+
+if __name__ == '__main__':
+    unittest.main()

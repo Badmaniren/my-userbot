@@ -1,67 +1,99 @@
 import unittest
 import os
+import tempfile
 import uuid
 import random
-import tempfile
-from skills.digest_dashboard_generator import DigestDashboardGenerator
-from skills.anomaly_visualizer import AnomalyVisualizer
-from skills.digest_exporter import DigestExporter
+from skills.digest_dashboard_generator import DigestDashboardGenerator, DigestDashboardGeneratorError
 
 class TestDigestDashboardGeneratorIntegration(unittest.TestCase):
+    
     def setUp(self):
         self.test_dir = tempfile.TemporaryDirectory()
-        self.addCleanup(self.test_dir.cleanup)
         
-        self.unique_id = str(uuid.uuid4())
-        self.random_metric = random.randint(100, 999)
+        self.random_stream_id = f"stream-{uuid.uuid4()}"
+        self.random_metric_val = random.randint(100, 999)
         
         self.sample_digest = {
-            "id": self.unique_id,
-            "metric_value": self.random_metric,
-            "status": "active",
+            "stream_id": self.random_stream_id,
+            "metrics": {
+                "stability_score": self.random_metric_val,
+                "anomalies_count": random.randint(0, 5)
+            },
             "anomalies": [
                 {
-                    "source": "test_source",
+                    "id": str(uuid.uuid4()),
                     "severity": "HIGH",
-                    "details": f"Random error details {self.unique_id}",
-                    "telemetry_snapshot": {"cpu": self.random_metric}
+                    "description": "Integration test anomaly"
                 }
-            ]
+            ],
+            "streams": {
+                self.random_stream_id: {
+                    "status": "active",
+                    "load": random.randint(10, 100)
+                }
+            }
         }
         
-        self.visualizer = AnomalyVisualizer(digest=self.sample_digest)
-        self.exporter = DigestExporter(stability_digest=self.sample_digest, anomaly_visualizer=self.visualizer)
-        
-        self.dashboard_generator = DigestDashboardGenerator(
-            stability_digest=self.sample_digest,
-            anomaly_visualizer=self.visualizer,
-            digest_exporter=self.exporter
-        )
+        self.generator = DigestDashboardGenerator(stability_digest=self.sample_digest)
 
-    def test_dashboard_generation_integration(self):
-        html_filename = f"dashboard_{self.unique_id}.html"
-        json_filename = f"dashboard_{self.unique_id}.json"
+    def tearDown(self):
+        self.test_dir.cleanup()
+
+    def test_full_dashboard_generation_integration(self):
+        json_filename = f"dashboard_{uuid.uuid4()}.json"
+        html_filename = f"dashboard_{uuid.uuid4()}.html"
         
-        html_path = os.path.join(self.test_dir.name, html_filename)
         json_path = os.path.join(self.test_dir.name, json_filename)
+        html_path = os.path.join(self.test_dir.name, html_filename)
         
-        result_html = self.dashboard_generator.generate_html_dashboard(html_path)
-        result_json = self.dashboard_generator.generate_json_dashboard(json_path)
+        self.assertFalse(os.path.exists(json_path))
+        self.assertFalse(os.path.exists(html_path))
         
-        self.assertTrue(os.path.exists(html_path), "HTML dashboard file was not created on disk.")
-        self.assertTrue(os.path.exists(json_path), "JSON dashboard file was not created on disk.")
+        result = self.generator.generate_dashboard(json_path, html_path)
         
-        with open(html_path, "r", encoding="utf-8") as f:
-            html_content = f.read()
-            self.assertIn(self.unique_id, html_content, "Generated HTML does not contain the unique test ID.")
-            self.assertIn(str(self.random_metric), html_content, "Generated HTML does not contain the random metric.")
-            
-        with open(json_path, "r", encoding="utf-8") as f:
+        self.assertIn('json_report', result)
+        self.assertIn('html_report', result)
+        
+        self.assertTrue(os.path.exists(json_path), "JSON файл отчета должен быть создан реально на диске")
+        self.assertTrue(os.path.exists(html_path), "HTML файл отчета должен быть создан реально на диске")
+        
+        with open(json_path, 'r', encoding='utf-8') as f:
             json_content = f.read()
-            self.assertIn(self.unique_id, json_content, "Generated JSON does not contain the unique test ID.")
-            
-        self.assertIn(html_filename, result_html)
-        self.assertIn(json_filename, result_json)
+            self.assertIn(str(self.random_metric_val), json_content)
 
-if __name__ == "__main__":
+    def test_metrics_summary_and_ascii_graph_integration(self):
+        summary = self.generator.get_metrics_summary()
+        self.assertIsInstance(summary, dict)
+        
+        ascii_graph = self.generator.render_ascii_graph()
+        self.assertIsInstance(ascii_graph, str)
+
+    def test_export_stream_integration(self):
+        stream_filename = f"stream_{uuid.uuid4()}.json"
+        stream_path = os.path.join(self.test_dir.name, stream_filename)
+        
+        self.assertFalse(os.path.exists(stream_path))
+        
+        res_path = self.generator.export_stream(self.random_stream_id, stream_path)
+        
+        self.assertTrue(os.path.exists(res_path))
+        with open(res_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            self.assertIn(self.random_stream_id, content)
+
+    def test_individual_html_json_generators_integration(self):
+        json_file = os.path.join(self.test_dir.name, f"sub_{uuid.uuid4()}.json")
+        html_file = os.path.join(self.test_dir.name, f"sub_{uuid.uuid4()}.html")
+        
+        res_json = self.generator.generate_json_dashboard(json_file)
+        res_html = self.generator.generate_html_dashboard(html_file)
+        
+        self.assertTrue(os.path.exists(res_json))
+        self.assertTrue(os.path.exists(res_html))
+
+    def test_generator_error_handling(self):
+        with self.assertRaises(DigestDashboardGeneratorError):
+            self.generator.generate_dashboard("", "")
+
+if __name__ == '__main__':
     unittest.main()

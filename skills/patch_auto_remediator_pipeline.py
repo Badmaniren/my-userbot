@@ -1,4 +1,5 @@
 import io
+import os
 from skills.patch_analyzer import PatchAnalyzer, PatchAnalyzerError
 from skills.patch_checker import PatchChecker, PatchCheckerError
 
@@ -59,6 +60,9 @@ class PatchAutoRemediatorPipeline:
 
     def run_file(self, file_path: str, target_file: str) -> dict:
         try:
+            if not os.path.exists(file_path):
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write("")
             analysis = self.analyzer.analyze_file(file_path)
         except Exception as e:
             raise PatchAutoRemediatorPipelineError(str(e))

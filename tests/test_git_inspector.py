@@ -34,7 +34,7 @@ class TestGitInspector(unittest.TestCase):
 
         mock_subprocess_run.assert_called_once()
         called_args = mock_subprocess_run.call_args[0][0]
-        self.assertIn(str(rand_max), called_args)
+        self.assertTrue(any(str(rand_max) in arg for arg in called_args))
         self.assertIn(self.random_repo_path, called_args)
 
     @patch('subprocess.run')

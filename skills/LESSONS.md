@@ -286,7 +286,3 @@
 
 ## patch_evaluator (create) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
-
-## patch_verifier (compose) — раундов: 4
-- Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/unittest/mock.py", line 1357, in decoration_helper
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -25,7 +25,7 @@ class AutonomousEngine:
         self.patch_executor = patch_executor if patch_executor is not None else PatchExecutor(self.repo_path, self.git_inspector, self.lesson_parser)
         self.patch_verifier = patch_verifier if patch_verifier is not None else PatchVerifier(self.repo_path, self.git_inspector, self.patch_executor)
 
-    def run_cycle(self, max_commits=10):
+    def run_cycle(self, max_commits=10, target_file=None):
         try:
             hypotheses = self.hypothesis_generator.generate_hypotheses(max_commits)
             if not hypotheses:
@@ -36,7 +36,13 @@ class AutonomousEngine:
                 return {"success": False}
                 
             best_hypothesis = prioritized[0]
-            success = self.patch_verifier.verify_and_apply(best_hypothesis)
+            if target_file and isinstance(best_hypothesis, dict) and "file_path" not in best_hypothesis:
+                best_hypothesis["file_path"] = target_file
+
+            try:
+                success = self.patch_verifier.verify_and_apply(best_hypothesis)
+            except Exception:
+                success = False
             
             if success:
                 return {"success": True, "applied_hypothesis": best_hypothesis}

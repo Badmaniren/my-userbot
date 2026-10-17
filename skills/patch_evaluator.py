@@ -27,10 +27,14 @@ class PatchEvaluationResult:
 
 class CodeSanitizer:
     def sanitize(self, patch_content: str) -> Tuple[str, bool]:
+        forbidden_patterns = ["rm -rf", "exec(", "eval(", "os.system"]
+        for pattern in forbidden_patterns:
+            if pattern in patch_content:
+                return patch_content, False
         return patch_content, True
     
     def get_reasons(self) -> List[str]:
-        return []
+        return ["Patch contains forbidden / unsafe constructs."]
 
 class CodeValidator:
     def validate(self, patch_content: str) -> Dict[str, Any]:

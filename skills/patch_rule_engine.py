@@ -144,17 +144,31 @@ class PatchRuleEngine:
                     }
                     violations.append(violation)
                     if self.logger:
-                        self.logger.log_anomaly(
-                            anomaly_type="rule_violation",
-                            severity=severity,
-                            details={
-                                "rule_id": rid,
-                                "patch_id": patch_id,
-                                "pattern": pattern,
-                                "match": matched_text,
-                                "message": detail_msg,
-                            },
-                        )
+                        log_method = getattr(self.logger, "log_anomaly", None)
+                        if log_method:
+                            try:
+                                log_method(
+                                    anomaly_type="rule_violation",
+                                    severity=severity,
+                                    details={
+                                        "rule_id": rid,
+                                        "patch_id": patch_id,
+                                        "pattern": pattern,
+                                        "match": matched_text,
+                                        "message": detail_msg,
+                                    },
+                                )
+                            except TypeError:
+                                log_method(
+                                    severity=severity,
+                                    details={
+                                        "rule_id": rid,
+                                        "patch_id": patch_id,
+                                        "pattern": pattern,
+                                        "match": matched_text,
+                                        "message": detail_msg,
+                                    },
+                                )
 
             elif rule_type == "max_added_lines":
                 max_lines = rdata.get("threshold", 0)
@@ -169,17 +183,31 @@ class PatchRuleEngine:
                     }
                     violations.append(violation)
                     if self.logger:
-                        self.logger.log_anomaly(
-                            anomaly_type="rule_violation",
-                            severity=severity,
-                            details={
-                                "rule_id": rid,
-                                "patch_id": patch_id,
-                                "added_lines": added_lines_count,
-                                "threshold": max_lines,
-                                "message": detail_msg,
-                            },
-                        )
+                        log_method = getattr(self.logger, "log_anomaly", None)
+                        if log_method:
+                            try:
+                                log_method(
+                                    anomaly_type="rule_violation",
+                                    severity=severity,
+                                    details={
+                                        "rule_id": rid,
+                                        "patch_id": patch_id,
+                                        "added_lines": added_lines_count,
+                                        "threshold": max_lines,
+                                        "message": detail_msg,
+                                    },
+                                )
+                            except TypeError:
+                                log_method(
+                                    severity=severity,
+                                    details={
+                                        "rule_id": rid,
+                                        "patch_id": patch_id,
+                                        "added_lines": added_lines_count,
+                                        "threshold": max_lines,
+                                        "message": detail_msg,
+                                    },
+                                )
 
         is_valid = len(violations) == 0
         return {

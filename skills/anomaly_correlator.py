@@ -43,7 +43,12 @@ class AnomalyCorrelator:
             raise AnomalyCorrelatorError(str(e)) from e
 
     def analyze_execution_flow(self, execution_id, metrics_payload):
-        return self.detector.analyze_execution_metrics(execution_id, metrics_payload)
+        # Используем фильтр для обработки/очистки полезной нагрузки метрик перед анализом
+        try:
+            filtered_payload = self.filter.filter(metrics_payload)
+        except Exception:
+            filtered_payload = metrics_payload
+        return self.detector.analyze_execution_metrics(execution_id, filtered_payload)
 
     def get_correlation_report(self):
         return self.logger.get_structured_report()

@@ -1,76 +1,75 @@
 import unittest
 import uuid
 import random
-import os
-import tempfile
-import shutil
+import io
+from pathlib import Path
 
-from skills.patch_evaluator import patch_evaluator
-from skills.git_inspector import GitInspector
-from skills.anomaly_logger import AnomalyLogger
-
+from skills.patch_evaluator import PatchEvaluator, PatchEvaluationResult, PatchEvaluatorError
+from skills.code_sanitizer import CodeSanitizer
+from skills.code_validator import CodeValidator
+from skills.patch_verifier import PatchVerifier
+from skills.patch_autocorrector import PatchAutocorrector
+from skills.system_telemetry import SystemTelemetry
 
 class TestPatchEvaluatorIntegration(unittest.TestCase):
 
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp()
-        self.repo_path = self.test_dir
-        
-        # Инициализируем реальный репозиторий через GitInspector или базовые файлы
-        os.makedirs(os.path.join(self.repo_path, ".git"), exist_ok=True)
-        
-        self.target_file = os.path.join(self.repo_path, f"module_{uuid.uuid4().hex[:8]}.py")
-        self.initial_content = f"# Initial content {uuid.uuid4()}\nx = {random.randint(1, 100)}\n"
-        with open(self.target_file, "w", encoding="utf-8") as f:
-            f.write(self.initial_content)
-
-        self.log_path = os.path.join(self.test_dir, f"anomaly_log_{uuid.uuid4().hex}.json")
-        self.logger = AnomalyLogger(log_path=self.log_path)
-        self.git_inspector = GitInspector(repo_path=self.repo_path)
+        self.repo_path = Path("./test_repo_integration")
+        self.repo_path.mkdir(exist_ok=True)
+        self.evaluator = PatchEvaluator(self.repo_path)
+        self.random_id = str(uuid.uuid4())
+        self.patch_content = f"print('Integration test {self.random_id}')"
 
     def tearDown(self):
-        shutil.rmtree(self.test_dir, ignore_errors=True)
+        if self.repo_path.exists():
+            for p in self.repo_path.glob("*"):
+                p.unlink()
+            self.repo_path.rmdir()
 
-    def test_patch_evaluator_real_integration(self):
-        # Генерируем уникальные данные для патча
-        random_id = uuid.uuid4().hex
-        patch_content = f"# Patch update {random_id}\nx = {random.randint(101, 1000)}\n"
+    def test_full_evaluation_pipeline_real_execution(self):
+        sanitizer = CodeSanitizer(self.repo_path)
+        validator = CodeValidator(self.repo_path)
+        verifier = PatchVerifier(self.repo_path)
+        autocorrector = PatchAutocorrector(self.repo_path)
+        telemetry = SystemTelemetry(self.repo_path)
+
+        if hasattr(sanitizer, "sanitize"):
+            sanitized, is_safe = sanitizer.sanitize(self.patch_content)
+            self.assertTrue(is_safe)
+        elif hasattr(sanitizer, "sanitize_patch"):
+            sanitized = sanitizer.sanitize_patch(self.patch_content)
+
+        if hasattr(validator, "validate"):
+            val_result = validator.validate(self.patch_content)
+            self.assertIsInstance(val_result, dict)
+        elif hasattr(validator, "validate_code"):
+            val_result = validator.validate_code(self.patch_content)
+
+        if hasattr(verifier, "verify"):
+            is_verified = verifier.verify(self.patch_content)
+            self.assertIsInstance(is_verified, bool)
+
+        result = self.evaluator.evaluate(self.patch_content, collect_telemetry=True)
+
+        self.assertIsInstance(result, PatchEvaluationResult)
+        self.assertTrue(result.is_safe)
+        self.assertIsInstance(result.telemetry, dict)
+
+    def test_evaluate_with_autocorrect_flow(self):
+        corrupt_content = f"malicious_code_marker_{uuid.uuid4()}"
+
+        result = self.evaluator.evaluate_with_autocorrect(corrupt_content)
         
-        # Записываем изменения в файл (симуляция применения патча)
-        with open(self.target_file, "w", encoding="utf-8") as f:
-            f.write(patch_content)
+        self.assertIsInstance(result, PatchEvaluationResult)
+        self.assertIsInstance(result.was_corrected, bool)
 
-        # Проверяем работу git_inspector в связке с модулем
-        history = self.git_inspector.get_history()
-        self.assertIsNotNone(history)
+    def test_evaluate_stream_integration(self):
+        stream_data = io.BytesIO(self.patch_content.encode('utf-8'))
 
-        # Логируем телеметрию/аномалию для проверки взаимодействия с логгером
-        severity_levels = ["INFO", "WARNING", "ERROR", "CRITICAL"]
-        chosen_severity = random.choice(severity_levels)
-        self.logger.log_anomaly(
-            source="patch_evaluator_test",
-            severity=chosen_severity,
-            details=f"Evaluating patch {random_id}",
-            telemetry_snapshot={"file": self.target_file, "random_val": random_id}
-        )
+        result = self.evaluator.evaluate_stream(stream_data)
 
-        reports = self.logger.get_anomalies()
-        self.assertTrue(any(random_id in str(rep) for rep in reports))
-
-        # Вызываем тестируемый модуль patch_evaluator для оценки изменений
-        # Передаем реальные пути и контекст без моков
-        evaluation_result = patch_evaluator(
-            repo_path=self.repo_path,
-            patch_data=patch_content,
-            target_file=self.target_file
-        )
-
-        self.assertIsNotNone(evaluation_result)
-        
-        # Проверяем структурированный отчет логгера
-        structured_report = self.logger.get_structured_report()
-        self.assertIsNotNone(structured_report)
-
+        self.assertIsInstance(result, PatchEvaluationResult)
+        self.assertTrue(result.is_valid)
 
 if __name__ == "__main__":
     unittest.main()

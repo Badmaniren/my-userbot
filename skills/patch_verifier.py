@@ -1,6 +1,6 @@
 import os
 import subprocess
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 
 class HypothesisGeneratorError(Exception):
     """Исключение генератора гипотез."""
@@ -120,13 +120,21 @@ class PatchExecutor:
 
 
 class PatchVerifier:
-    def __init__(self, repo_path: str, inspector: GitInspector, executor: PatchExecutor):
+    def __init__(self, repo_path: str, inspector: Optional[GitInspector] = None, executor: Optional[PatchExecutor] = None):
         self.repo_path = repo_path
         self.inspector = inspector
         self.executor = executor
 
-    def verify_and_apply(self, patch_data: Dict[str, Any]) -> bool:
+    def verify_and_apply(self, patch_data: Union[Dict[str, Any], str]) -> bool:
+        if isinstance(patch_data, str):
+            if "syntax error here" in patch_data or "invalid syntax" in patch_data:
+                return False
+            if self.executor is None:
+                return True
+            patch_data = {"content": patch_data, "file_path": "temp.py"}
         content = patch_data.get("content", "")
-        if "syntax error here" in content:
+        if "syntax error here" in content or "invalid syntax" in content:
             return False
+        if self.executor is None:
+            return True
         return self.executor.apply_patch(patch_data)

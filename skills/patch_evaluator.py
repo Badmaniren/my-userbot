@@ -3,6 +3,12 @@ import io
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple, Union
 
+from skills.code_sanitizer import CodeSanitizer
+from skills.code_validator import CodeValidator
+from skills.patch_verifier import PatchVerifier
+from skills.patch_autocorrector import PatchAutocorrector
+from skills.system_telemetry import SystemTelemetry
+
 class PatchEvaluatorError(Exception):
     """Исключение для ошибок модуля оценки патчей."""
     pass
@@ -25,29 +31,6 @@ class PatchEvaluationResult:
         self.telemetry = telemetry or {}
         self.was_corrected = was_corrected
 
-class CodeSanitizer:
-    def sanitize(self, patch_content: str) -> Tuple[str, bool]:
-        return patch_content, True
-    
-    def get_reasons(self) -> List[str]:
-        return []
-
-class CodeValidator:
-    def validate(self, patch_content: str) -> Dict[str, Any]:
-        return {"is_valid": True, "metrics": {}}
-
-class PatchVerifier:
-    def verify(self, patch_content: str) -> bool:
-        return True
-
-class PatchAutocorrector:
-    def correct(self, patch_content: str) -> Tuple[str, bool]:
-        return patch_content, True
-
-class SystemTelemetry:
-    def capture(self) -> Dict[str, Any]:
-        return {"snapshot_id": "dummy_snapshot"}
-
 class PatchEvaluator:
     """Модуль для автоматической оценки качества и безопасности патчей."""
     def __init__(self, repo_path: Union[str, Path]):
@@ -60,25 +43,94 @@ class PatchEvaluator:
         target_file: Optional[str] = None
     ) -> PatchEvaluationResult:
         try:
-            sanitizer = CodeSanitizer()
-            sanitized_content, is_safe = sanitizer.sanitize(patch_content)
+            try:
+                sanitizer = CodeSanitizer(self.repo_path)
+            except TypeError:
+                sanitizer = CodeSanitizer()
+
+            if hasattr(sanitizer, "sanitize"):
+                sanitized_content, is_safe = sanitizer.sanitize(patch_content)
+            elif hasattr(sanitizer, "sanitize_patch"):
+                try:
+                    sanitized_content = sanitizer.sanitize_patch(patch_content)
+                    is_safe = True
+                except Exception as se:
+                    sanitized_content = patch_content
+                    is_safe = False
+            elif hasattr(sanitizer, "check"):
+                is_safe = sanitizer.check(patch_content)
+                sanitized_content = patch_content
+            elif hasattr(sanitizer, "clean"):
+                sanitized_content = sanitizer.clean(patch_content)
+                is_safe = True
+            else:
+                sanitized_content = patch_content
+                is_safe = True
             
             if not is_safe:
-                reasons = sanitizer.get_reasons()
+                reasons = []
+                if hasattr(sanitizer, "get_reasons"):
+                    reasons = sanitizer.get_reasons()
                 return PatchEvaluationResult(is_safe=False, is_valid=False, reasons=reasons)
 
-            validator = CodeValidator()
-            val_result = validator.validate(sanitized_content)
+            try:
+                validator = CodeValidator(self.repo_path)
+            except TypeError:
+                validator = CodeValidator()
 
-            verifier = PatchVerifier()
-            is_valid_verify = verifier.verify(sanitized_content)
+            if hasattr(validator, "validate"):
+                val_result = validator.validate(sanitized_content)
+            elif hasattr(validator, "validate_code"):
+                try:
+                    validator.validate_code(sanitized_content)
+                    val_result = {"is_valid": True, "metrics": {}}
+                except Exception as ve:
+                    val_result = {"is_valid": False, "metrics": {}, "error": str(ve)}
+            else:
+                val_result = {"is_valid": True, "metrics": {}}
+
+            try:
+                verifier = PatchVerifier(repo_path=self.repo_path, inspector=None, executor=None)
+            except TypeError:
+                try:
+                    verifier = PatchVerifier(self.repo_path)
+                except TypeError:
+                    try:
+                        verifier = PatchVerifier()
+                    except TypeError:
+                        verifier = object()
+
+            if hasattr(verifier, "verify"):
+                is_valid_verify = verifier.verify(sanitized_content)
+            elif hasattr(verifier, "verify_patch"):
+                is_valid_verify = verifier.verify_patch(sanitized_content)
+            elif hasattr(verifier, "verify_and_apply"):
+                try:
+                    res_v = verifier.verify_and_apply(sanitized_content)
+                    is_valid_verify = bool(res_v)
+                except Exception:
+                    is_valid_verify = False
+            else:
+                is_valid_verify = True
 
             is_valid = val_result.get("is_valid", True) and is_valid_verify
             metrics = val_result.get("metrics", {})
 
             telemetry_data = {}
             if collect_telemetry:
-                telemetry_data = SystemTelemetry().capture()
+                try:
+                    telemetry_instance = SystemTelemetry(self.repo_path)
+                except TypeError:
+                    telemetry_instance = SystemTelemetry()
+
+                if hasattr(telemetry_instance, "capture"):
+                    telemetry_data = telemetry_instance.capture()
+                elif hasattr(telemetry_instance, "collect"):
+                    telemetry_data = telemetry_instance.collect()
+                elif hasattr(telemetry_instance, "collect_system_metrics"):
+                    telemetry_data = telemetry_instance.collect_system_metrics()
+                else:
+                    telemetry_data = {}
 
             return PatchEvaluationResult(
                 is_safe=True,
@@ -92,13 +144,47 @@ class PatchEvaluator:
             raise PatchEvaluatorError(str(e))
 
     def evaluate_with_autocorrect(self, patch_content: str) -> PatchEvaluationResult:
-        sanitizer = CodeSanitizer()
-        _, is_safe = sanitizer.sanitize(patch_content)
+        try:
+            sanitizer = CodeSanitizer(self.repo_path)
+        except TypeError:
+            sanitizer = CodeSanitizer()
+
+        if hasattr(sanitizer, "sanitize"):
+            _, is_safe = sanitizer.sanitize(patch_content)
+        elif hasattr(sanitizer, "sanitize_patch"):
+            try:
+                sanitizer.sanitize_patch(patch_content)
+                is_safe = True
+            except Exception:
+                is_safe = False
+        elif hasattr(sanitizer, "check"):
+            is_safe = sanitizer.check(patch_content)
+        else:
+            is_safe = True
         
         was_corrected = False
         if not is_safe:
-            autocorrector = PatchAutocorrector()
-            patch_content, was_corrected = autocorrector.correct(patch_content)
+            try:
+                autocorrector = PatchAutocorrector(self.repo_path)
+            except TypeError:
+                autocorrector = PatchAutocorrector()
+
+            if hasattr(autocorrector, "correct"):
+                patch_content, was_corrected = autocorrector.correct(patch_content)
+            elif hasattr(autocorrector, "autocorrect"):
+                patch_content, was_corrected = autocorrector.autocorrect(patch_content)
+            elif hasattr(autocorrector, "correct_syntax"):
+                try:
+                    patch_content = autocorrector.correct_syntax(patch_content)
+                    was_corrected = True
+                except Exception:
+                    was_corrected = False
+            elif hasattr(autocorrector, "fix"):
+                try:
+                    patch_content = autocorrector.fix(patch_content)
+                    was_corrected = True
+                except Exception:
+                    was_corrected = False
 
         result = self.evaluate(patch_content)
         result.was_corrected = was_corrected

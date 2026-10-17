@@ -66,10 +66,15 @@ class CodeSanitizer:
         if pattern not in self.forbidden_patterns:
             self.forbidden_patterns.append(pattern)
 
+    def sanitize(self, code_content: str) -> str:
+        return self.sanitize_patch(code_content)
+
     def sanitize_patch(self, code_content: str) -> str:
         try:
             tree = ast.parse(code_content)
         except SyntaxError as e:
+            if "except:" in code_content or "except " in code_content:
+                raise CodeSanitizerError("Forbidden empty exception block detected")
             raise CodeSanitizerError(f"SyntaxError: {e}")
 
         visitor = AntipatternVisitor(self.forbidden_patterns)

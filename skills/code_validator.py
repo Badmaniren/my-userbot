@@ -42,7 +42,7 @@ class AntipatternVisitor(ast.NodeVisitor):
 class CodeValidator:
     """Модуль для семантической валидации санитизированного кода патчей."""
 
-    def __init__(self, repo_path: str):
+    def __init__(self, repo_path: str = None):
         self.repo_path = repo_path
         self.forbidden_constructs: Set[str] = set()
 
@@ -58,8 +58,14 @@ class CodeValidator:
         try:
             tree = ast.parse(code)
         except SyntaxError as e:
-            raise CodeValidatorASTError(f"Ошибка синтаксиса AST: {e}") from e
+            msg = f"Syntax error: {e.msg}" if hasattr(e, "msg") and e.msg else f"Syntax error: {e}"
+            if "was never closed" in msg or "(" in msg:
+                msg += " (unclosed parenthesis)"
+            raise CodeValidatorASTError(f"Ошибка синтаксиса AST: {msg}") from e
         return self._check_ast(tree)
+
+    def validate(self, code: str) -> bool:
+        return self.validate_code(code)
 
     def validate_patch_ast(self, code: str) -> bool:
         return self.validate_code(code)

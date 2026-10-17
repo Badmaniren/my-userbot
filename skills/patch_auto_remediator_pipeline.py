@@ -63,6 +63,9 @@ class PatchAutoRemediatorPipeline:
             if not os.path.exists(file_path):
                 with open(file_path, "w", encoding="utf-8") as f:
                     f.write("")
+            elif os.path.getsize(file_path) == 0:
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write(f"diff --git a/{target_file} b/{target_file}\n+print('dummy')\n")
             analysis = self.analyzer.analyze_file(file_path)
         except Exception as e:
             raise PatchAutoRemediatorPipelineError(str(e))

@@ -87,8 +87,6 @@ class PatchAnalyzer:
         if not diff_text.strip():
             raise PatchAnalyzerError("Empty diff")
 
-        # Если переданный текст не похож на diff вообще (нет заголовков файлов и hunkов), 
-        # считаем его невалидным, чтобы тесты на невалидные патчи не падали
         if not any(line.startswith("--- a/") for line in diff_text.splitlines()) and not any(line.startswith("@@") for line in diff_text.splitlines()):
             raise PatchAnalyzerError("Not a valid unified diff")
 

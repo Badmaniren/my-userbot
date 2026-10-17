@@ -33,6 +33,16 @@ class PatchQualityAggregator:
         if self.log_path is None and hasattr(self.logger, 'log_path'):
             self.log_path = self.logger.log_path
 
+    def _normalize_report(self):
+        anomaly_report = self.logger.get_structured_report()
+        if not isinstance(anomaly_report, dict):
+            anomalies_list = self.logger.get_anomalies()
+            anomaly_report = {
+                "total_anomalies": len(anomalies_list),
+                "anomalies": anomalies_list
+            }
+        return anomaly_report
+
     def log_anomaly_event(self, source, severity, details, telemetry_snapshot):
         try:
             self.logger.log_anomaly(
@@ -50,13 +60,7 @@ class PatchQualityAggregator:
         except Exception as e:
             raise PatchQualityAggregatorError(str(e))
 
-        anomaly_report = self.logger.get_structured_report()
-        if not isinstance(anomaly_report, dict):
-            anomalies_list = self.logger.get_anomalies()
-            anomaly_report = {
-                "total_anomalies": len(anomalies_list),
-                "anomalies": anomalies_list
-            }
+        anomaly_report = self._normalize_report()
         
         # Определяем security_state на основе результатов проверки
         status = checker_result.get("status", "")
@@ -77,13 +81,7 @@ class PatchQualityAggregator:
         except Exception as e:
             raise PatchQualityAggregatorError(str(e))
 
-        anomaly_report = self.logger.get_structured_report()
-        if not isinstance(anomaly_report, dict):
-            anomalies_list = self.logger.get_anomalies()
-            anomaly_report = {
-                "total_anomalies": len(anomalies_list),
-                "anomalies": anomalies_list
-            }
+        anomaly_report = self._normalize_report()
         
         status = checker_result.get("status", "")
         if status == "FAILED" or checker_result.get("score", 1.0) < 0.5:

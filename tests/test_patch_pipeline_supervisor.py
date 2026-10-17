@@ -1,96 +1,151 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 import uuid
 import random
 import io
-import string
 
 from skills.patch_pipeline_supervisor import PatchPipelineSupervisor, PatchPipelineSupervisorError
 from skills.patch_analyzer import PatchAnalyzerError
-from skills.patch_verifier import PatchVerifierError
+from skills.patch_verifier import PatchExecutorError
 
 
 class TestPatchPipelineSupervisor(unittest.TestCase):
 
     def setUp(self):
-        self.rand_repo_dir = f"/tmp/{uuid.uuid4().hex}"
-        self.rand_diff_text = f"diff --git a/{uuid.uuid4().hex}.py b/{uuid.uuid4().hex}.py\nindex {uuid.uuid4().hex[:7]}..{uuid.uuid4().hex[:7]} 100644\n--- a/file.py\n+++ b/file.py\n@@ -1,1 +1,1 @@\n-{uuid.uuid4().hex}\n+{uuid.uuid4().hex}"
-        self.rand_patch_data = {
+        self.repo_path = f"/tmp/{uuid.uuid4().hex}"
+        self.analyzer_mock = MagicMock()
+        self.verifier_mock = MagicMock()
+        self.supervisor = PatchPipelineSupervisor(
+            repo_path=self.repo_path,
+            analyzer=self.analyzer_mock,
+            verifier=self.verifier_mock
+        )
+
+    def test_run_pipeline_success(self):
+        diff_text = f"diff --git a/{uuid.uuid4().hex} b/{uuid.uuid4().hex}"
+        patch_data = {
             "id": uuid.uuid4().hex,
-            "diff": self.rand_diff_text,
+            "diff": diff_text,
             "target": f"{uuid.uuid4().hex}.py"
         }
-        self.supervisor = PatchPipelineSupervisor(repo_path=self.rand_repo_dir)
+        
+        self.analyzer_mock.analyze.return_value = {"status": uuid.uuid4().hex}
+        self.verifier_mock.verify_and_apply.return_value = True
 
-    @patch('skills.patch_pipeline_supervisor.PatchAnalyzer')
-    @patch('skills.patch_pipeline_supervisor.PatchVerifier')
-    def test_pipeline_success_cycle(self, mock_verifier_cls, mock_analyzer_cls):
-        mock_analyzer_instance = mock_analyzer_cls.return_value
-        mock_verifier_instance = mock_verifier_cls.return_value
+        result = self.supervisor.run_pipeline(patch_data)
 
-        expected_analysis = {
-            uuid.uuid4().hex: uuid.uuid4().hex,
-            "syntax_risk": False
+        self.assertTrue(result)
+        self.analyzer_mock.analyze.assert_called_once_with(diff_text)
+        self.verifier_mock.verify_and_apply.assert_called_once_with(patch_data)
+
+    def test_run_pipeline_analyzer_error(self):
+        diff_text = f"diff --git a/{uuid.uuid4().hex} b/{uuid.uuid4().hex}"
+        patch_data = {
+            "id": uuid.uuid4().hex,
+            "diff": diff_text,
+            "target": f"{uuid.uuid4().hex}.py"
         }
-        mock_analyzer_instance.analyze.return_value = expected_analysis
-        mock_verifier_instance.verify_and_apply.return_value = True
-
-        result = self.supervisor.run_pipeline(self.rand_patch_data)
-
-        self.assertTrue(result)
-        mock_analyzer_instance.analyze.assert_called_once_with(self.rand_patch_data["diff"])
-        mock_verifier_instance.verify_and_apply.assert_called_once_with(self.rand_patch_data)
-
-    @patch('skills.patch_pipeline_supervisor.PatchAnalyzer')
-    @patch('skills.patch_pipeline_supervisor.PatchVerifier')
-    def test_pipeline_analyzer_failure(self, mock_verifier_cls, mock_analyzer_cls):
-        mock_analyzer_instance = mock_analyzer_cls.return_value
-        mock_verifier_instance = mock_verifier_cls.return_value
-
-        rand_error_msg = uuid.uuid4().hex
-        mock_analyzer_instance.analyze.side_effect = PatchAnalyzerError(rand_error_msg)
+        err_msg = uuid.uuid4().hex
+        self.analyzer_mock.analyze.side_effect = PatchAnalyzerError(err_msg)
 
         with self.assertRaises(PatchPipelineSupervisorError) as ctx:
-            self.supervisor.run_pipeline(self.rand_patch_data)
+            self.supervisor.run_pipeline(patch_data)
+        
+        self.assertIn(err_msg, str(ctx.exception))
+        self.verifier_mock.verify_and_apply.assert_not_called()
 
-        self.assertIn(rand_error_msg, str(ctx.exception))
-        mock_verifier_instance.verify_and_apply.assert_not_called()
-
-    @patch('skills.patch_pipeline_supervisor.PatchAnalyzer')
-    @patch('skills.patch_pipeline_supervisor.PatchVerifier')
-    def test_pipeline_verifier_failure(self, mock_verifier_cls, mock_analyzer_cls):
-        mock_analyzer_instance = mock_analyzer_cls.return_value
-        mock_verifier_instance = mock_verifier_cls.return_value
-
-        mock_analyzer_instance.analyze.return_value = {"status": uuid.uuid4().hex}
-        rand_verifier_msg = uuid.uuid4().hex
-        mock_verifier_instance.verify_and_apply.side_effect = PatchVerifierError(rand_verifier_msg)
+    def test_run_pipeline_verifier_error(self):
+        diff_text = f"diff --git a/{uuid.uuid4().hex} b/{uuid.uuid4().hex}"
+        patch_data = {
+            "id": uuid.uuid4().hex,
+            "diff": diff_text,
+            "target": f"{uuid.uuid4().hex}.py"
+        }
+        err_msg = uuid.uuid4().hex
+        self.analyzer_mock.analyze.return_value = {"status": uuid.uuid4().hex}
+        self.verifier_mock.verify_and_apply.side_effect = PatchExecutorError(err_msg)
 
         with self.assertRaises(PatchPipelineSupervisorError) as ctx:
-            self.supervisor.run_pipeline(self.rand_patch_data)
+            self.supervisor.run_pipeline(patch_data)
+        
+        self.assertIn(err_msg, str(ctx.exception))
+        self.analyzer_mock.analyze.assert_called_once_with(diff_text)
 
-        self.assertIn(rand_verifier_msg, str(ctx.exception))
-        mock_analyzer_instance.analyze.assert_called_once_with(self.rand_patch_data["diff"])
-        mock_verifier_instance.verify_and_apply.assert_called_once_with(self.rand_patch_data)
+    def test_run_stream_pipeline_success(self):
+        stream_data = uuid.uuid4().hex.encode('utf-8')
+        stream = io.BytesIO(stream_data)
+        patch_data = {
+            "id": uuid.uuid4().hex,
+            "diff": f"diff --git a/{uuid.uuid4().hex} b/{uuid.uuid4().hex}",
+            "target": f"{uuid.uuid4().hex}.py"
+        }
+        
+        self.analyzer_mock.analyze_stream.return_value = {"analyzed": True}
+        self.verifier_mock.verify_and_apply.return_value = True
 
-    @patch('skills.patch_pipeline_supervisor.PatchAnalyzer')
-    @patch('skills.patch_pipeline_supervisor.PatchVerifier')
-    def test_pipeline_stream_processing(self, mock_verifier_cls, mock_analyzer_cls):
-        mock_analyzer_instance = mock_analyzer_cls.return_value
-        mock_verifier_instance = mock_verifier_cls.return_value
-
-        rand_stream_data = ''.join(random.choices(string.ascii_letters + string.digits, k=64))
-        stream_mock = io.BytesIO(rand_stream_data.encode('utf-8'))
-
-        mock_analyzer_instance.analyze_stream.return_value = {uuid.uuid4().hex: True}
-        mock_verifier_instance.verify_and_apply.return_value = True
-
-        result = self.supervisor.run_stream_pipeline(stream_mock, self.rand_patch_data)
+        result = self.supervisor.run_stream_pipeline(stream, patch_data)
 
         self.assertTrue(result)
-        mock_analyzer_instance.analyze_stream.assert_called_once()
-        mock_verifier_instance.verify_and_apply.assert_called_once_with(self.rand_patch_data)
+        self.analyzer_mock.analyze_stream.assert_called_once_with(stream)
+        self.verifier_mock.verify_and_apply.assert_called_once_with(patch_data)
+
+    def test_run_stream_pipeline_analyzer_error(self):
+        stream = io.BytesIO(uuid.uuid4().hex.encode('utf-8'))
+        patch_data = {
+            "id": uuid.uuid4().hex,
+            "diff": f"diff --git a/{uuid.uuid4().hex} b/{uuid.uuid4().hex}",
+            "target": f"{uuid.uuid4().hex}.py"
+        }
+        err_msg = uuid.uuid4().hex
+        self.analyzer_mock.analyze_stream.side_effect = PatchAnalyzerError(err_msg)
+
+        with self.assertRaises(PatchPipelineSupervisorError) as ctx:
+            self.supervisor.run_stream_pipeline(stream, patch_data)
+        
+        self.assertIn(err_msg, str(ctx.exception))
+        self.verifier_mock.verify_and_apply.assert_not_called()
+
+    def test_run_stream_pipeline_verifier_error(self):
+        stream = io.BytesIO(uuid.uuid4().hex.encode('utf-8'))
+        patch_data = {
+            "id": uuid.uuid4().hex,
+            "diff": f"diff --git a/{uuid.uuid4().hex} b/{uuid.uuid4().hex}",
+            "target": f"{uuid.uuid4().hex}.py"
+        }
+        err_msg = uuid.uuid4().hex
+        self.analyzer_mock.analyze_stream.return_value = {"analyzed": True}
+        self.verifier_mock.verify_and_apply.side_effect = PatchExecutorError(err_msg)
+
+        with self.assertRaises(PatchPipelineSupervisorError) as ctx:
+            self.supervisor.run_stream_pipeline(stream, patch_data)
+        
+        self.assertIn(err_msg, str(ctx.exception))
+        self.analyzer_mock.analyze_stream.assert_called_once_with(stream)
+
+    def test_process_patch_success(self):
+        diff_text = f"diff --git a/{uuid.uuid4().hex} b/{uuid.uuid4().hex}"
+        session_id = uuid.uuid4().hex
+        target_file = f"{uuid.uuid4().hex}.py"
+        
+        statistics_mock = {uuid.uuid4().hex: random.randint(1, 100)}
+        self.analyzer_mock.analyze.return_value = statistics_mock
+        self.verifier_mock.verify_and_apply.return_value = True
+
+        result = self.supervisor.process_patch(diff_text, session_id, target_file)
+
+        self.assertEqual(result["analyzed"], True)
+        self.assertEqual(result["verified"], True)
+        self.assertEqual(result["session_id"], session_id)
+        self.assertEqual(result["statistics"], statistics_mock)
+        
+        expected_patch_data = {
+            "id": session_id,
+            "diff": diff_text,
+            "target": target_file
+        }
+        self.analyzer_mock.analyze.assert_called_once_with(diff_text)
+        self.verifier_mock.verify_and_apply.assert_called_once_with(expected_patch_data)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

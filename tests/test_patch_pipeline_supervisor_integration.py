@@ -1,74 +1,98 @@
 import unittest
-import uuid
-import random
-import os
 import tempfile
 import shutil
-
-from skills.patch_pipeline_supervisor import PatchPipelineSupervisor
+import os
+import uuid
+import random
+from skills.patch_pipeline_supervisor import PatchPipelineSupervisor, PatchPipelineSupervisorError
 from skills.patch_analyzer import PatchAnalyzer
 from skills.patch_verifier import PatchVerifier
+
 
 class TestPatchPipelineSupervisorIntegration(unittest.TestCase):
 
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
-        os.chdir(self.test_dir)
+        self.repo_path = self.test_dir
         
-        # Инициализируем простейший git репозиторий для тестов верификатора и анализатора
-        os.system("git init")
-        os.system("git config user.name 'Test User'")
-        os.system("git config user.email 'test@example.com'")
+        self.target_filename = f"test_file_{uuid.uuid4().hex[:8]}.py"
+        self.target_file_path = os.path.join(self.repo_path, self.target_filename)
         
-        self.file_name = f"test_{uuid.uuid4().hex}.py"
-        self.file_path = os.path.join(self.test_dir, self.file_name)
-        
-        # Создаем базовый файл
-        with open(self.file_path, "w", encoding="utf-8") as f:
-            f.write("print('initial')\n")
-            
-        os.system("git add .")
-        os.system("git commit -m 'initial commit'")
+        with open(self.target_file_path, "w", encoding="utf-8") as f:
+            f.write("print('initial state')\n")
+
+        self.supervisor = PatchPipelineSupervisor(repo_path=self.repo_path)
 
     def tearDown(self):
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
-    def test_pipeline_supervisor_real_integration(self):
-        random_str = uuid.uuid4().hex
-        modified_content = f"print('initial')\nprint('{random_str}')\n"
+    def test_process_patch_integration_flow(self):
+        session_id = str(uuid.uuid4())
+        random_code_marker = f"marker_{random.randint(10000, 99999)}"
         
-        with open(self.file_path, "w", encoding="utf-8") as f:
-            f.write(modified_content)
-            
-        # Получаем реальный diff через git через командную строку для подготовки патча
-        import subprocess
-        diff_output = subprocess.check_output(["git", "diff"], text=True)
+        diff_text = f"""--- a/{self.target_filename}
++++ b/{self.target_filename}
+@@ -1,1 +1,2 @@
+ print('initial state')
++print('{random_code_marker}')
+"""
+
+        patch_data = {
+            "id": session_id,
+            "diff": diff_text,
+            "target": self.target_filename
+        }
+
+        result = self.supervisor.process_patch(
+            diff_text=diff_text,
+            session_id=session_id,
+            target_file=self.target_filename
+        )
+
+        self.assertIsInstance(result, dict)
+        self.assertTrue(result.get("analyzed"))
+        self.assertTrue(result.get("verified"))
+        self.assertEqual(result.get("session_id"), session_id)
+        self.assertIn("statistics", result)
+
+        pipeline_result = self.supervisor.run_pipeline(patch_data)
+        self.assertTrue(pipeline_result)
+
+    def test_run_stream_pipeline_integration(self):
+        session_id = str(uuid.uuid4())
+        random_code_marker = f"stream_marker_{random.randint(10000, 99999)}"
         
-        # Инициализируем реальные компоненты композиции без моков
-        analyzer = PatchAnalyzer()
-        verifier = PatchVerifier(repo_path=self.test_dir, inspector=None, executor=None)
-        
-        # Передаем реальные экземпляры в супервизор конвейера
-        supervisor = PatchPipelineSupervisor(analyzer=analyzer, verifier=verifier)
-        
-        # Генерируем случайный идентификатор сессии конвейера для проверки сквозной передачи
+        diff_text = f"""--- a/{self.target_filename}
++++ b/{self.target_filename}
+@@ -1,1 +1,2 @@
+ print('initial state')
++print('{random_code_marker}')
+"""
+
+        patch_data = {
+            "id": session_id,
+            "diff": diff_text,
+            "target": self.target_filename
+        }
+
+        stream = iter([diff_text])
+
+        stream_result = self.supervisor.run_stream_pipeline(stream, patch_data)
+        self.assertTrue(stream_result)
+
+    def test_pipeline_supervisor_error_wrapping(self):
+        invalid_diff = "totally invalid malformed diff text without headers"
         session_id = str(uuid.uuid4())
         
-        # Запускаем реальный конвейер обработки патча
-        pipeline_result = supervisor.process_patch(
-            diff_text=diff_output,
-            session_id=session_id,
-            target_file=self.file_name
-        )
-        
-        self.assertIsNotNone(pipeline_result)
-        self.assertIn("analyzed", pipeline_result)
-        self.assertIn("verified", pipeline_result)
-        self.assertEqual(pipeline_result.get("session_id"), session_id)
-        
-        # Проверяем, что анализ действительно отработал по переданному diff
-        analysis_stats = pipeline_result.get("statistics") or {}
-        self.assertIsInstance(analysis_stats, dict)
+        patch_data = {
+            "id": session_id,
+            "diff": invalid_diff,
+            "target": self.target_filename
+        }
+
+        with self.assertRaises(PatchPipelineSupervisorError):
+            self.supervisor.run_pipeline(patch_data)
+
 
 if __name__ == "__main__":
     unittest.main()

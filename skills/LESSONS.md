@@ -295,3 +295,7 @@
 - Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: FAIL: test_run_pipeline_verification_failure (tests.test_patch_pipeline_builder.TestPatchPipelineBuilder.test_run_pipeline_verification_failure)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## patch_auto_pipeline (compose) — раундов: 4
+- Последняя ошибка перед фиксом: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

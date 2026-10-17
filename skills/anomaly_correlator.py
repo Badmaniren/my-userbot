@@ -33,6 +33,8 @@ class AnomalyCorrelator:
             return is_anomaly
         except AnomalyDetectorError as e:
             raise AnomalyCorrelatorError(str(e)) from e
+        except (TypeError, ValueError) as e:
+            raise AnomalyCorrelatorError(str(e)) from e
 
     def analyze_execution_flow(self, execution_id, metrics_payload):
         return self.detector.analyze_execution_metrics(execution_id, metrics_payload)

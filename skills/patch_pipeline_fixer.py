@@ -7,10 +7,10 @@ from __future__ import annotations
 
 import io
 import os
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Union
 
 from skills.patch_checker import PatchChecker, PatchCheckerError
-from skills.patch_evaluator import PatchEvaluationResult, PatchEvaluator, PatchEvaluatorError
+from skills.patch_evaluator import PatchEvaluator, PatchEvaluatorError
 
 
 class PatchPipelineFixerError(Exception):
@@ -24,7 +24,7 @@ class PatchPipelineFixer:
         if not isinstance(repo_path, (str, bytes, os.PathLike)):
             raise TypeError("repo_path must be a valid path string or PathLike object")
         self.repo_path = str(repo_path)
-        self.evaluator = PatchEvaluator()
+        self.evaluator = PatchEvaluator(repo_path=self.repo_path)
         self.checker = PatchChecker(repo_path=self.repo_path)
 
     def _read_stream_or_str(self, patch_content: Union[str, bytes, io.IOBase]) -> str:
@@ -51,74 +51,79 @@ class PatchPipelineFixer:
 
         raw_patch = self._read_stream_or_str(patch_content)
 
-        # 1. Evaluate patch
-        eval_res = None
-        if hasattr(self.evaluator, "evaluate"):
-            eval_res = self.evaluator.evaluate(raw_patch, target_file)
+        try:
+            # 1. Evaluate patch
+            eval_res = None
+            if hasattr(self.evaluator, "evaluate"):
+                eval_res = self.evaluator.evaluate(raw_patch, target_file)
 
-        is_safe = getattr(eval_res, "is_safe", False)
-        is_valid = getattr(eval_res, "is_valid", False)
+            is_safe = getattr(eval_res, "is_safe", False)
+            is_valid = getattr(eval_res, "is_valid", False)
 
-        was_corrected = False
-        if (not is_safe or not is_valid) and auto_correct:
-            if hasattr(self.evaluator, "evaluate_with_autocorrect"):
-                autocorrect_res = self.evaluator.evaluate_with_autocorrect(raw_patch, target_file)
-                if getattr(autocorrect_res, "is_safe", False) and getattr(autocorrect_res, "is_valid", False):
-                    eval_res = autocorrect_res
-                    is_safe = True
-                    is_valid = True
-                    was_corrected = True
-                elif autocorrect_res is not None:
-                    eval_res = autocorrect_res
+            was_corrected = False
+            if (not is_safe or not is_valid) and auto_correct:
+                if hasattr(self.evaluator, "evaluate_with_autocorrect"):
+                    autocorrect_res = self.evaluator.evaluate_with_autocorrect(raw_patch, target_file)
+                    if getattr(autocorrect_res, "is_safe", False) and getattr(autocorrect_res, "is_valid", False):
+                        eval_res = autocorrect_res
+                        is_safe = True
+                        is_valid = True
+                        was_corrected = True
+                    elif autocorrect_res is not None:
+                        eval_res = autocorrect_res
 
-        reasons = getattr(eval_res, "reasons", []) if eval_res else []
-        metrics = getattr(eval_res, "metrics", {}) if eval_res else {}
-        if was_corrected:
-            setattr(eval_res, "was_corrected", True)
+            reasons = getattr(eval_res, "reasons", []) if eval_res else []
+            metrics = getattr(eval_res, "metrics", {}) if eval_res else {}
+            if was_corrected:
+                setattr(eval_res, "was_corrected", True)
 
-        if not (is_safe and is_valid):
+            if not (is_safe and is_valid):
+                return {
+                    "success": False,
+                    "is_safe": False,
+                    "applied": False,
+                    "reasons": reasons,
+                    "errors": reasons,
+                    "error": "; ".join(reasons) if reasons else "Patch safety or validation check failed",
+                    "metrics": metrics,
+                    "was_corrected": getattr(eval_res, "was_corrected", False),
+                }
+
+            # 2. Check and apply patch
+            patch_to_apply = getattr(eval_res, "corrected_patch", raw_patch) or raw_patch
+
+            checker_res = None
+            if hasattr(self.checker, "check_patch"):
+                checker_res = self.checker.check_patch(patch_to_apply, target_file=target_file)
+            elif hasattr(self.checker, "check"):
+                checker_res = self.checker.check(patch_to_apply, target_file=target_file)
+
+            if isinstance(checker_res, dict):
+                checker_success = checker_res.get("success", False)
+                return {
+                    "success": checker_success,
+                    "is_safe": True,
+                    "applied": checker_res.get("applied", checker_success),
+                    "status": checker_res.get("status", "passed" if checker_success else "failed"),
+                    "metrics": metrics,
+                    "was_corrected": getattr(eval_res, "was_corrected", was_corrected),
+                    "reasons": reasons,
+                    "diagnostics": checker_res.get("diagnostics", {}),
+                    "error": checker_res.get("error", "") if not checker_success else None,
+                }
+
             return {
-                "success": False,
-                "is_safe": False,
-                "applied": False,
-                "reasons": reasons,
-                "errors": reasons,
-                "error": "; ".join(reasons) if reasons else "Patch safety or validation check failed",
-                "metrics": metrics,
-                "was_corrected": getattr(eval_res, "was_corrected", False),
-            }
-
-        # 2. Check and apply patch
-        patch_to_apply = getattr(eval_res, "corrected_patch", raw_patch) or raw_patch
-
-        checker_res = None
-        if hasattr(self.checker, "check_patch"):
-            checker_res = self.checker.check_patch(patch_to_apply, target_file=target_file)
-        elif hasattr(self.checker, "check"):
-            checker_res = self.checker.check(patch_to_apply, target_file=target_file)
-
-        if isinstance(checker_res, dict):
-            checker_success = checker_res.get("success", False)
-            return {
-                "success": checker_success,
+                "success": True,
                 "is_safe": True,
-                "applied": checker_res.get("applied", checker_success),
-                "status": checker_res.get("status", "passed" if checker_success else "failed"),
+                "applied": True,
                 "metrics": metrics,
                 "was_corrected": getattr(eval_res, "was_corrected", was_corrected),
                 "reasons": reasons,
-                "diagnostics": checker_res.get("diagnostics", {}),
-                "error": checker_res.get("error", "") if not checker_success else None,
             }
-
-        return {
-            "success": True,
-            "is_safe": True,
-            "applied": True,
-            "metrics": metrics,
-            "was_corrected": getattr(eval_res, "was_corrected", was_corrected),
-            "reasons": reasons,
-        }
+        except (PatchEvaluatorError, PatchCheckerError):
+            raise
+        except Exception as exc:
+            raise PatchPipelineFixerError(f"Pipeline error: {exc}") from exc
 
     def process_stream(
         self,

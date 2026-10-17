@@ -43,7 +43,6 @@ class PatchApplier:
         if not hunk_indices:
             raise PatchApplierError("Invalid diff format: no hunk headers found.")
 
-        # Ensure header check or validity
         header_found = False
         for line in diff_lines:
             if line.startswith("--- ") or line.startswith("+++ "):
@@ -119,7 +118,7 @@ class PatchApplier:
                         match_idx = i
                         break
 
-            # Strategy 3: Prefix matching when lines partially match (e.g. integration test with comments)
+            # Strategy 3: Prefix matching when lines partially match
             if match_idx == -1 and expected_old_lines:
                 for i in range(len(result) - len(expected_old_lines) + 1):
                     match = True
@@ -156,7 +155,12 @@ class PatchApplier:
         orig_has_trailing_newline = content.endswith("\n") if content else True
         original_lines = content.splitlines()
 
-        new_lines = self._parse_and_apply(original_lines, diff_text)
+        try:
+            new_lines = self._parse_and_apply(original_lines, diff_text)
+        except PatchApplierError:
+            if dry_run:
+                return False
+            raise
 
         if dry_run:
             return True
@@ -183,6 +187,9 @@ class PatchApplier:
 def apply_patch(file_path, patch_content, dry_run=False, backup=True):
     applier = PatchApplier()
     try:
-        return applier.apply_patch(file_path, patch_content, dry_run=dry_run, backup=backup)
+        res = applier.apply_patch(file_path, patch_content, dry_run=dry_run, backup=backup)
+        if res is True:
+            return True
+        return False
     except PatchApplierError:
         return False

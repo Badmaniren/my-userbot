@@ -3,47 +3,64 @@ import uuid
 import random
 import tempfile
 import os
+
 from skills.anomaly_correlator import AnomalyCorrelator, AnomalyCorrelatorError
 from skills.anomaly_detector import AnomalyDetector
 from skills.anomaly_logger import AnomalyLogger
 
+
 class TestAnomalyCorrelatorIntegration(unittest.TestCase):
     def setUp(self):
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.log_path = os.path.join(self.temp_dir.name, f"test_log_{uuid.uuid4().hex}.json")
-        self.correlator = AnomalyCorrelator(log_path=self.log_path, threshold=50.0)
+        self.temp_log_file = tempfile.NamedTemporaryFile(delete=False, suffix=".json")
+        self.temp_log_file.close()
+        
+        self.logger = AnomalyLogger(log_path=self.temp_log_file.name)
+        self.detector = AnomalyDetector()
+        self.correlator = AnomalyCorrelator(
+            detector=self.detector,
+            logger=self.logger,
+            threshold=50.0
+        )
 
     def tearDown(self):
-        self.temp_dir.cleanup()
+        if os.path.exists(self.temp_log_file.name):
+            os.remove(self.temp_log_file.name)
 
-    def test_correlate_metric_and_events_integration(self):
-        metric_name = f"metric_{uuid.uuid4().hex[:8]}"
-        normal_value = float(random.randint(1, 40))
+    def test_correlate_metric_real_integration(self):
+        unique_metric_name = f"metric_{uuid.uuid4().hex[:8]}"
         anomaly_value = float(random.randint(51, 100))
+        normal_value = float(random.randint(1, 49))
 
-        res_normal = self.correlator.correlate_metric(metric_name, normal_value)
-        self.assertFalse(res_normal)
+        is_normal_detected = self.correlator.correlate_metric(unique_metric_name, normal_value)
+        self.assertFalse(is_normal_detected)
 
-        res_anomaly = self.correlator.correlate_metric(metric_name, anomaly_value)
-        self.assertTrue(res_anomaly)
-
-        events_data = self.correlator.correlate_events()
-        self.assertIn("correlated_count", events_data)
-        self.assertIn("report", events_data)
-        self.assertGreaterEqual(events_data["correlated_count"], 1)
+        is_anomaly_detected = self.correlator.correlate_metric(unique_metric_name, anomaly_value)
+        self.assertTrue(is_anomaly_detected)
 
         report = self.correlator.get_correlation_report()
-        self.assertIsNotNone(report)
+        self.assertIsInstance(report, (dict, list, str))
+
+        events = self.correlator.correlate_events()
+        self.assertIn("correlated_count", events)
+        self.assertGreaterEqual(events["correlated_count"], 1)
 
     def test_analyze_execution_flow_integration(self):
-        execution_id = str(uuid.uuid4())
-        metrics_payload = {
-            f"cpu_usage_{uuid.uuid4().hex[:4]}": float(random.randint(10, 99)),
-            f"memory_usage_{uuid.uuid4().hex[:4]}": float(random.randint(10, 99))
+        unique_execution_id = f"exec_{uuid.uuid4().hex}"
+        payload_data = {
+            f"cpu_load_{random.randint(1, 100)}": random.uniform(10.0, 99.0),
+            f"memory_usage_{random.randint(1, 100)}": random.uniform(20.0, 90.0)
         }
 
-        analysis_result = self.correlator.analyze_execution_flow(execution_id, metrics_payload)
+        analysis_result = self.correlator.analyze_execution_flow(unique_execution_id, payload_data)
         self.assertIsNotNone(analysis_result)
 
-if __name__ == '__main__':
+    def test_correlator_error_handling_chain(self):
+        invalid_metric_name = f"err_metric_{uuid.uuid4().hex[:6]}"
+        invalid_value = "non_numeric_random_data"
+
+        with self.assertRaises((AnomalyCorrelatorError, TypeError, ValueError)):
+            self.correlator.correlate_metric(invalid_metric_name, invalid_value)
+
+
+if __name__ == "__main__":
     unittest.main()

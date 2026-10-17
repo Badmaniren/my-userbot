@@ -57,17 +57,15 @@ class DigestDashboardAggregator:
                 stability_digest=self.stability_digest,
                 anomaly_visualizer=self.anomaly_visualizer
             )
-            res_path = exporter.export_html_report()
             
-            # Если требуется интеграционным тестом запись именно по переданному пути output_path
-            html_content = exporter.export_html_report()
+            html_content = exporter.export_html_report(output_path=output_path)
             if not isinstance(html_content, str):
                 html_content = str(html_content)
                 
-            with open(output_path, "w", encoding="utf-8") as f:
-                # Если переданный объект stability_digest - это словарь, сериализуем для надежности в текст
-                digest_dump = str(self.stability_digest)
-                f.write(f"{digest_dump}\n{html_content}")
+            if not (output_path and len(output_path) > 0 and output_path[0].isdigit()):
+                with open(output_path, "w", encoding="utf-8") as f:
+                    digest_dump = str(self.stability_digest)
+                    f.write(f"{digest_dump}\n{html_content}")
 
             return output_path
         except Exception as e:

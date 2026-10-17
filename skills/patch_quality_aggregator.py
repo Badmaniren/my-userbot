@@ -51,6 +51,12 @@ class PatchQualityAggregator:
             raise PatchQualityAggregatorError(str(e))
 
         anomaly_report = self.logger.get_structured_report()
+        if not isinstance(anomaly_report, dict):
+            anomalies_list = self.logger.get_anomalies()
+            anomaly_report = {
+                "total_anomalies": len(anomalies_list),
+                "anomalies": anomalies_list
+            }
         
         # Определяем security_state на основе результатов проверки
         status = checker_result.get("status", "")
@@ -72,6 +78,12 @@ class PatchQualityAggregator:
             raise PatchQualityAggregatorError(str(e))
 
         anomaly_report = self.logger.get_structured_report()
+        if not isinstance(anomaly_report, dict):
+            anomalies_list = self.logger.get_anomalies()
+            anomaly_report = {
+                "total_anomalies": len(anomalies_list),
+                "anomalies": anomalies_list
+            }
         
         status = checker_result.get("status", "")
         if status == "FAILED" or checker_result.get("score", 1.0) < 0.5:
@@ -89,7 +101,6 @@ class PatchQualityAggregator:
         try:
             checker_result = self.checker.check_patch(patch_content=patch_content, target_file=target_file)
         except Exception as e:
-            # Осмысленная обработка: логируем аномалию через logger и пробрасываем/трансформируем в статус FAILED
             self.logger.log_anomaly(
                 source="patch_checker",
                 severity="HIGH",

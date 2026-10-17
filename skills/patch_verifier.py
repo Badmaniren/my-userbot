@@ -1,4 +1,5 @@
 import os
+import ast
 import subprocess
 from typing import List, Dict, Any, Optional
 
@@ -12,6 +13,10 @@ class LessonParserError(Exception):
 
 class PatchExecutorError(Exception):
     """Исключение исполнителя патчей."""
+    pass
+
+class PatchVerifierError(Exception):
+    """Исключение верификатора патчей."""
     pass
 
 
@@ -97,9 +102,11 @@ class PatchExecutor:
         if not file_path or content is None:
             return False
 
-        full_path = os.path.join(self.repo_path, file_path)
-        os.makedirs(os.path.dirname(full_path), exist_ok=True)
         try:
+            full_path = os.path.join(self.repo_path, file_path)
+            dir_name = os.path.dirname(full_path)
+            if dir_name:
+                os.makedirs(dir_name, exist_ok=True)
             with open(full_path, "w", encoding="utf-8") as f:
                 f.write(content)
             subprocess.run(["git", "-C", self.repo_path, "add", file_path], check=True)
@@ -120,13 +127,45 @@ class PatchExecutor:
 
 
 class PatchVerifier:
-    def __init__(self, repo_path: str, inspector: GitInspector, executor: PatchExecutor):
-        self.repo_path = repo_path
-        self.inspector = inspector
-        self.executor = executor
+    def __init__(
+        self,
+        repo_path: Optional[str] = None,
+        inspector: Optional[GitInspector] = None,
+        executor: Optional[PatchExecutor] = None
+    ):
+        self.repo_path = repo_path if repo_path is not None else os.getcwd()
+        self.inspector = inspector if inspector is not None else GitInspector(self.repo_path)
+        if executor is not None:
+            self.executor = executor
+        else:
+            parser = LessonParser(self.inspector)
+            self.executor = PatchExecutor(self.repo_path, self.inspector, parser)
 
-    def verify_and_apply(self, patch_data: Dict[str, Any]) -> bool:
-        content = patch_data.get("content", "")
-        if "syntax error here" in content:
+    def verify_and_apply(self, patch_data: Any, content: Optional[str] = None) -> bool:
+        if isinstance(patch_data, dict):
+            p_data = dict(patch_data)
+        elif isinstance(patch_data, str):
+            p_data = {
+                "file_path": patch_data,
+                "content": content if content is not None else ""
+            }
+        else:
             return False
-        return self.executor.apply_patch(patch_data)
+
+        cnt = p_data.get("content")
+        if cnt is None and "code" in p_data:
+            cnt = p_data.get("code")
+            p_data["content"] = cnt
+
+        cnt_str = cnt if cnt is not None else ""
+        if "syntax error here" in cnt_str:
+            return False
+
+        file_path = p_data.get("file_path", "")
+        if file_path.endswith(".py") or not file_path:
+            try:
+                ast.parse(cnt_str)
+            except SyntaxError:
+                return False
+
+        return self.executor.apply_patch(p_data)

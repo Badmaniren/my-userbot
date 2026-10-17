@@ -18,7 +18,7 @@ class TestPatchEvaluatorInquisitor(unittest.TestCase):
     def setUp(self):
         self.evaluator_id = uuid.uuid4().hex
         self.repo_path = f"/tmp/{uuid.uuid4().hex}"
-        self.patch_content = f"def {uuid.uuid4().hex[:8]}():\n    return '{uuid.uuid4().hex}'"
+        self.patch_content = f"def func_{uuid.uuid4().hex[:8]}():\n    return '{uuid.uuid4().hex}'"
         self.evaluator = PatchEvaluator(repo_path=self.repo_path)
 
     def test_init_sets_properties(self):

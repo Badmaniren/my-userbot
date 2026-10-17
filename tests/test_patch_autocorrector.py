@@ -37,7 +37,7 @@ class TestPatchAutocorrector(unittest.TestCase):
         self.assertEqual(result, valid_code)
 
     def test_correct_syntax_raises_error_on_fatal_syntax(self):
-        invalid_code = f"def {uuid.uuid4().hex}():\n    print({random.randint(1, 10)}"
+        invalid_code = f"def func_{uuid.uuid4().hex}():\n    print({random.randint(1, 10)}"
         with self.assertRaises(PatchSyntaxError):
             self.autocorrector.correct_syntax(invalid_code)
 
@@ -88,7 +88,7 @@ class TestPatchAutocorrector(unittest.TestCase):
     def test_batch_correct_raises_on_invalid(self):
         key = uuid.uuid4().hex
         batch = {
-            key: f"def {uuid.uuid4().hex}("
+            key: f"def func_{uuid.uuid4().hex}("
         }
         with self.assertRaises(PatchSyntaxError):
             self.autocorrector.batch_correct(batch)

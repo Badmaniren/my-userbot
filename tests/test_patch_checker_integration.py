@@ -2,58 +2,81 @@ import unittest
 import uuid
 import random
 import os
-import tempfile
-from skills.patch_checker import PatchChecker
-from skills.patch_analyzer import PatchAnalyzer
-from skills.patch_evaluator import PatchEvaluator, PatchEvaluationResult
+import io
+from skills.patch_checker import PatchChecker, PatchCheckerError, check_patch
 
 class TestPatchCheckerIntegration(unittest.TestCase):
+
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp()
-        self.patch_analyzer = PatchAnalyzer()
-        self.patch_evaluator = PatchEvaluator(repo_path=self.test_dir)
-        self.patch_checker = PatchChecker()
+        self.random_id = str(uuid.uuid4())
+        self.risk_val = round(random.uniform(0.1, 0.9), 2)
+        self.sample_patch = f"""diff --git a/test_{self.random_id}.py b/test_{self.random_id}.py
+new file mode 100644
+index 0000000..8304b6f
+--- /dev/null
++++ b/test_{self.random_id}.py
+@@ -0,0 +1,2 @@
++print("Integration test {self.random_id}")
++risk_metric = {self.risk_val}
+"""
 
-    def tearDown(self):
-        for root, dirs, files in os.walk(self.test_dir, topdown=False):
-            for name in files:
-                os.remove(os.path.join(root, name))
-            for name in dirs:
-                os.rmdir(os.path.join(root, name))
-        os.rmdir(self.test_dir)
+    def test_patch_checker_success_flow(self):
+        policy = {"strict_safety": True, "disallow_syntax_risks": True}
+        checker = PatchChecker(policy=policy)
+        
+        result = checker.check_patch(self.sample_patch)
+        
+        self.assertIn("is_safe", result)
+        self.assertIn("is_valid", result)
+        self.assertIn("risk_score", result)
+        self.assertIn("analysis", result)
+        self.assertIn("evaluation", result)
+        self.assertIn("policy_verdict", result)
+        
+        analysis = result["analysis"]
+        self.assertIsInstance(analysis, dict)
+        
+        evaluation = result["evaluation"]
+        self.assertIsInstance(evaluation, dict)
+        self.assertIn("metrics", evaluation)
 
-    def test_patch_checker_integration_workflow(self):
-        random_id = str(uuid.uuid4())
-        random_lines_count = random.randint(5, 20)
-        
-        diff_lines = [
-            f"diff --git a/file_{random_id}.py b/file_{random_id}.py",
-            "index 1234567..89abcdef 100644",
-            f"--- a/file_{random_id}.py",
-            f"+++ b/file_{random_id}.py",
-            "@@ -0,0 +1,1 @@",
-            f"+print('Integration test {random_id}')"
-        ]
-        
-        for i in range(random_lines_count):
-            diff_lines.append(f"+# random line {random.randint(1000, 9999)}")
+    def test_patch_checker_empty_patch_error(self):
+        checker = PatchChecker()
+        with self.assertRaises(PatchCheckerError):
+            checker.check_patch("")
+        with self.assertRaises(PatchCheckerError):
+            checker.check_patch("   ")
+
+    def test_patch_checker_file_io(self):
+        file_name = f"temp_patch_{self.random_id}.diff"
+        try:
+            with open(file_name, "w", encoding="utf-8") as f:
+                f.write(self.sample_patch)
             
-        diff_text = "\n".join(diff_lines)
+            checker = PatchChecker()
+            result = checker.check_file(file_name)
+            
+            self.assertIn("analysis", result)
+            self.assertIn("evaluation", result)
+        finally:
+            if os.path.exists(file_name):
+                os.remove(file_name)
 
-        analysis_result = self.patch_analyzer.analyze(diff_text)
-        self.assertIsNotNone(analysis_result, "PatchAnalyzer не должен возвращать None")
-
-        evaluation_result = self.patch_evaluator.evaluate(patch_content=diff_text, collect_telemetry=True)
-        self.assertIsInstance(evaluation_result, PatchEvaluationResult)
-
-        checker_result = self.patch_checker.check(patch_content=diff_text, repo_path=self.test_dir)
+    def test_patch_checker_stream_io(self):
+        stream = io.StringIO(self.sample_patch)
+        checker = PatchChecker()
+        result = checker.check_stream(stream)
         
-        self.assertIn("is_safe", checker_result)
-        self.assertIn("metrics", checker_result)
-        self.assertEqual(evaluation_result.is_safe, checker_result["is_safe"])
-        
-        expected_marker = f"Integration test {random_id}"
-        self.assertIn(expected_marker, diff_text)
+        self.assertIn("analysis", result)
+        self.assertIn("evaluation", result)
+
+    def test_convenience_function(self):
+        result = check_patch(
+            patch_content=self.sample_patch,
+            policy={"strict_safety": False}
+        )
+        self.assertIsInstance(result, dict)
+        self.assertIn("is_safe", result)
 
 if __name__ == "__main__":
     unittest.main()

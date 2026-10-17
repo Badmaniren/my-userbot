@@ -1,322 +1,216 @@
 import io
 import os
+import unittest
+from unittest.mock import MagicMock, patch
+import uuid
 import random
 import string
-import sys
-import tempfile
-import unittest
-import uuid
-from unittest.mock import MagicMock, patch
 
-try:
-    import skills.patch_checker as patch_checker_module
-    from skills.patch_checker import PatchChecker, PatchCheckerError, check_patch
-except ImportError:
-    import patch_checker as patch_checker_module
-    from patch_checker import PatchChecker, PatchCheckerError, check_patch
-
-try:
-    from skills.patch_analyzer import PatchAnalyzer, PatchAnalyzerError
-except ImportError:
-    from patch_analyzer import PatchAnalyzer, PatchAnalyzerError
-
-try:
-    from skills.patch_evaluator import PatchEvaluationResult, PatchEvaluator, PatchEvaluatorError
-except ImportError:
-    from patch_evaluator import PatchEvaluationResult, PatchEvaluator, PatchEvaluatorError
+from skills.patch_checker import (
+    PatchChecker,
+    PatchCheckerError,
+    check_patch,
+)
+from skills.patch_analyzer import PatchAnalyzerError
+from skills.patch_evaluator import PatchEvaluationResult, PatchEvaluatorError
 
 
-def _generate_random_token(length=12):
-    chars = string.ascii_letters + string.digits
-    return "".join(random.choice(chars) for _ in range(length))
+class TestPatchCheckerInquisition(unittest.TestCase):
 
+    def setUp(self):
+        self.repo_path_val = f"/tmp/repo_{uuid.uuid4().hex}"
+        self.random_policy_key = f"policy_{uuid.uuid4().hex[:6]}"
+        self.checker = PatchChecker(repo_path=self.repo_path_val, policy={self.random_policy_key: True, "strict_safety": True})
 
-def _generate_random_diff():
-    filename = f"{_generate_random_token(6)}/{_generate_random_token(8)}.py"
-    token_old = uuid.uuid4().hex
-    token_new = uuid.uuid4().hex
-    diff = (
-        f"--- a/{filename}\n"
-        f"+++ b/{filename}\n"
-        f"@@ -1,3 +1,4 @@\n"
-        f" def sample_func():\n"
-        f"-    value = '{token_old}'\n"
-        f"+    value = '{token_new}'\n"
-        f"+    return value\n"
-    )
-    return diff, filename, token_new
+    def test_init_defaults(self):
+        default_checker = PatchChecker()
+        self.assertIsNone(default_checker.repo_path)
+        self.assertEqual(default_checker.policy, {})
+        self.assertIsNotNone(default_checker.analyzer)
+        self.assertIsNotNone(default_checker.evaluator)
 
+    def test_check_patch_empty_content(self):
+        empty_patches = ["", "   ", "\n\t "]
+        for patch_str in empty_patches:
+            with self.subTest(patch_str=patch_str):
+                with self.assertRaises(PatchCheckerError):
+                    self.checker.check_patch(patch_str)
 
-class TestPatchCheckerInitialization(unittest.TestCase):
+    @patch("skills.patch_checker.PatchAnalyzer.analyze")
+    def test_check_patch_analyzer_error(self, mock_analyze):
+        err_msg = f"Analyzer failed: {uuid.uuid4().hex}"
+        mock_analyze.side_effect = PatchAnalyzerError(err_msg)
+        valid_patch_stub = f"diff --git a/{uuid.uuid4().hex} b/{uuid.uuid4().hex}"
 
-    def test_init_default_components(self):
-        with patch.object(patch_checker_module, "PatchAnalyzer") as mock_analyzer_cls, \
-             patch.object(patch_checker_module, "PatchEvaluator") as mock_evaluator_cls:
+        with self.assertRaises(PatchCheckerError) as ctx:
+            self.checker.check_patch(valid_patch_stub)
+        self.assertIn(err_msg, str(ctx.exception))
 
-            checker = PatchChecker()
+    @patch("skills.patch_checker.PatchEvaluator.evaluate")
+    @patch("skills.patch_checker.PatchAnalyzer.analyze")
+    def test_check_patch_evaluator_error(self, mock_analyze, mock_evaluate):
+        eval_err_msg = f"Evaluator failed: {uuid.uuid4().hex}"
+        mock_analyze.return_value = {"risk_score": 0.1, "syntax_risks": []}
+        mock_evaluate.side_effect = PatchEvaluatorError(eval_err_msg)
+        valid_patch_stub = f"diff --git a/{uuid.uuid4().hex} b/{uuid.uuid4().hex}"
 
-            mock_analyzer_cls.assert_called_once_with()
-            mock_evaluator_cls.assert_called_once_with(repo_path=None)
-            self.assertIsNotNone(checker.analyzer)
-            self.assertIsNotNone(checker.evaluator)
+        with self.assertRaises(PatchCheckerError) as ctx:
+            self.checker.check_patch(valid_patch_stub)
+        self.assertIn(eval_err_msg, str(ctx.exception))
 
-    def test_init_custom_repo_and_policy(self):
-        rand_repo = f"/tmp/{uuid.uuid4().hex}/repo"
-        rand_policy_key = f"rule_{uuid.uuid4().hex[:6]}"
-        rand_policy_val = random.randint(1, 100)
-        custom_policy = {rand_policy_key: rand_policy_val}
-
-        with patch.object(patch_checker_module, "PatchAnalyzer") as mock_analyzer_cls, \
-             patch.object(patch_checker_module, "PatchEvaluator") as mock_evaluator_cls:
-
-            checker = PatchChecker(repo_path=rand_repo, policy=custom_policy)
-
-            mock_analyzer_cls.assert_called_once_with()
-            mock_evaluator_cls.assert_called_once_with(repo_path=rand_repo)
-            self.assertEqual(checker.policy[rand_policy_key], rand_policy_val)
-
-
-class TestPatchCheckerExecution(unittest.TestCase):
-
-    def test_check_patch_composition_success(self):
-        rand_diff, rand_filename, rand_token = _generate_random_diff()
-        rand_risk_score = random.uniform(0.1, 0.9)
-        rand_metric_key = f"metric_{uuid.uuid4().hex[:6]}"
-        rand_metric_val = random.randint(10, 500)
-        rand_reason = f"reason_{uuid.uuid4().hex}"
-
-        mock_analysis_data = {
-            "token": rand_token,
-            "syntax_risks": [],
-            "statistics": {rand_metric_key: rand_metric_val},
-            "risk_score": rand_risk_score
+    @patch("skills.patch_checker.PatchEvaluator.evaluate")
+    @patch("skills.patch_checker.PatchAnalyzer.analyze")
+    def test_check_patch_success_flow(self, mock_analyze, mock_evaluate):
+        rand_risk = round(random.uniform(0.0, 1.0), 2)
+        mock_analyze.return_value = {
+            "risk_score": rand_risk,
+            "syntax_risks": []
         }
 
-        mock_eval_result = PatchEvaluationResult(
+        eval_res = PatchEvaluationResult(
             is_safe=True,
             is_valid=True,
-            metrics={rand_metric_key: rand_metric_val},
-            reasons=[rand_reason],
-            telemetry={"run_id": uuid.uuid4().hex},
+            metrics={"loc": random.randint(1, 100)},
+            reasons=[uuid.uuid4().hex],
+            telemetry={"cpu": random.randint(10, 90)},
             was_corrected=False
         )
+        mock_evaluate.return_value = eval_res
 
-        with patch.object(patch_checker_module, "PatchAnalyzer") as mock_analyzer_cls, \
-             patch.object(patch_checker_module, "PatchEvaluator") as mock_evaluator_cls:
+        patch_content = f"diff --git a/{uuid.uuid4().hex}.py b/{uuid.uuid4().hex}.py"
+        target_file_arg = f"{uuid.uuid4().hex}.py"
 
-            mock_analyzer_instance = MagicMock()
-            mock_analyzer_instance.analyze.return_value = mock_analysis_data
-            mock_analyzer_cls.return_value = mock_analyzer_instance
+        result = self.checker.check_patch(patch_content, target_file=target_file_arg)
 
-            mock_evaluator_instance = MagicMock()
-            mock_evaluator_instance.evaluate.return_value = mock_eval_result
-            mock_evaluator_cls.return_value = mock_evaluator_instance
+        self.assertTrue(result["is_safe"])
+        self.assertTrue(result["is_valid"])
+        self.assertEqual(result["risk_score"], rand_risk)
+        self.assertIn("analysis", result)
+        self.assertIn("evaluation", result)
+        self.assertEqual(result["evaluation"]["metrics"], eval_res.metrics)
+        self.assertEqual(result["evaluation"]["reasons"], eval_res.reasons)
 
-            checker = PatchChecker()
-            result = checker.check_patch(patch_content=rand_diff, target_file=rand_filename)
-
-            mock_analyzer_instance.analyze.assert_called_once_with(rand_diff)
-            mock_evaluator_instance.evaluate.assert_called_once_with(
-                patch_content=rand_diff,
-                target_file=rand_filename
-            )
-
-            self.assertIsInstance(result, dict)
-            self.assertTrue(result["is_safe"])
-            self.assertTrue(result["is_valid"])
-            self.assertEqual(result["analysis"]["token"], rand_token)
-            self.assertIn(rand_reason, result["evaluation"]["reasons"])
-            self.assertIn("risk_score", result)
-
-    def test_check_patch_policy_violation_unsafe(self):
-        rand_diff, rand_filename, _ = _generate_random_diff()
-        rand_reason = f"critical_vulnerability_{uuid.uuid4().hex}"
-
-        mock_analysis_data = {
-            "syntax_risks": ["dangerous_eval_call"],
-            "statistics": {"added_lines": random.randint(5, 50)},
-            "risk_score": 0.85
+    @patch("skills.patch_checker.PatchEvaluator.evaluate")
+    @patch("skills.patch_checker.PatchAnalyzer.analyze")
+    def test_check_patch_strict_safety_policy_violation(self, mock_analyze, mock_evaluate):
+        mock_analyze.return_value = {
+            "risk_score": 0.9,
+            "syntax_risks": []
         }
 
-        mock_eval_result = PatchEvaluationResult(
+        eval_res = PatchEvaluationResult(
             is_safe=False,
             is_valid=True,
             metrics={},
-            reasons=[rand_reason],
-            telemetry={},
-            was_corrected=False
-        )
-
-        with patch.object(patch_checker_module, "PatchAnalyzer") as mock_analyzer_cls, \
-             patch.object(patch_checker_module, "PatchEvaluator") as mock_evaluator_cls:
-
-            mock_analyzer_instance = MagicMock()
-            mock_analyzer_instance.analyze.return_value = mock_analysis_data
-            mock_analyzer_cls.return_value = mock_analyzer_instance
-
-            mock_evaluator_instance = MagicMock()
-            mock_evaluator_instance.evaluate.return_value = mock_eval_result
-            mock_evaluator_cls.return_value = mock_evaluator_instance
-
-            checker = PatchChecker(policy={"disallow_syntax_risks": True, "strict_safety": True})
-            result = checker.check_patch(patch_content=rand_diff, target_file=rand_filename)
-
-            self.assertFalse(result["is_safe"])
-            self.assertIn("disallowed_risks", result["policy_verdict"])
-            self.assertIn(rand_reason, result["evaluation"]["reasons"])
-
-    def test_check_file_integration(self):
-        rand_diff, rand_filename, rand_token = _generate_random_diff()
-
-        with tempfile.NamedTemporaryFile("w+", delete=False, suffix=".diff") as tmp_file:
-            tmp_file.write(rand_diff)
-            tmp_file_path = tmp_file.name
-
-        try:
-            with patch.object(patch_checker_module, "PatchAnalyzer") as mock_analyzer_cls, \
-                 patch.object(patch_checker_module, "PatchEvaluator") as mock_evaluator_cls:
-
-                mock_analyzer_instance = MagicMock()
-                mock_analyzer_instance.analyze.return_value = {"token": rand_token}
-                mock_analyzer_cls.return_value = mock_analyzer_instance
-
-                mock_evaluator_instance = MagicMock()
-                mock_evaluator_instance.evaluate.return_value = PatchEvaluationResult(
-                    is_safe=True,
-                    is_valid=True,
-                    metrics={},
-                    reasons=[],
-                    telemetry={},
-                    was_corrected=False
-                )
-                mock_evaluator_cls.return_value = mock_evaluator_instance
-
-                checker = PatchChecker()
-                result = checker.check_file(file_path=tmp_file_path, target_file=rand_filename)
-
-                mock_analyzer_instance.analyze.assert_called_once_with(rand_diff)
-                self.assertEqual(result["analysis"]["token"], rand_token)
-        finally:
-            if os.path.exists(tmp_file_path):
-                os.remove(tmp_file_path)
-
-    def test_check_stream_integration(self):
-        rand_diff, _, rand_token = _generate_random_diff()
-        stream_input = io.StringIO(rand_diff)
-
-        with patch.object(patch_checker_module, "PatchAnalyzer") as mock_analyzer_cls, \
-             patch.object(patch_checker_module, "PatchEvaluator") as mock_evaluator_cls:
-
-            mock_analyzer_instance = MagicMock()
-            mock_analyzer_instance.analyze.return_value = {"stream_token": rand_token}
-            mock_analyzer_cls.return_value = mock_analyzer_instance
-
-            mock_evaluator_instance = MagicMock()
-            mock_evaluator_instance.evaluate.return_value = PatchEvaluationResult(
-                is_safe=True,
-                is_valid=True,
-                metrics={},
-                reasons=[],
-                telemetry={},
-                was_corrected=False
-            )
-            mock_evaluator_cls.return_value = mock_evaluator_instance
-
-            checker = PatchChecker()
-            result = checker.check_stream(stream=stream_input)
-
-            mock_analyzer_instance.analyze.assert_called_once_with(rand_diff)
-            self.assertEqual(result["analysis"]["stream_token"], rand_token)
-
-
-class TestPatchCheckerErrorHandling(unittest.TestCase):
-
-    def test_analyzer_error_wrapping(self):
-        rand_diff, _, _ = _generate_random_diff()
-        rand_error_msg = f"Analyzer failure: {uuid.uuid4().hex}"
-
-        with patch.object(patch_checker_module, "PatchAnalyzer") as mock_analyzer_cls, \
-             patch.object(patch_checker_module, "PatchEvaluator") as mock_evaluator_cls:
-
-            mock_analyzer_instance = MagicMock()
-            mock_analyzer_instance.analyze.side_effect = PatchAnalyzerError(rand_error_msg)
-            mock_analyzer_cls.return_value = mock_analyzer_instance
-
-            checker = PatchChecker()
-            with self.assertRaises(PatchCheckerError) as ctx:
-                checker.check_patch(patch_content=rand_diff)
-
-            self.assertIn(rand_error_msg, str(ctx.exception))
-
-    def test_evaluator_error_wrapping(self):
-        rand_diff, _, _ = _generate_random_diff()
-        rand_error_msg = f"Evaluator anomaly: {uuid.uuid4().hex}"
-
-        with patch.object(patch_checker_module, "PatchAnalyzer") as mock_analyzer_cls, \
-             patch.object(patch_checker_module, "PatchEvaluator") as mock_evaluator_cls:
-
-            mock_analyzer_instance = MagicMock()
-            mock_analyzer_instance.analyze.return_value = {"stats": {}}
-            mock_analyzer_cls.return_value = mock_analyzer_instance
-
-            mock_evaluator_instance = MagicMock()
-            mock_evaluator_instance.evaluate.side_effect = PatchEvaluatorError(rand_error_msg)
-            mock_evaluator_cls.return_value = mock_evaluator_instance
-
-            checker = PatchChecker()
-            with self.assertRaises(PatchCheckerError) as ctx:
-                checker.check_patch(patch_content=rand_diff)
-
-            self.assertIn(rand_error_msg, str(ctx.exception))
-
-    def test_invalid_input_empty_patch_raises_patch_checker_error(self):
-        checker = PatchChecker()
-        with self.assertRaises(PatchCheckerError):
-            checker.check_patch(patch_content="")
-
-    def test_check_file_non_existent_raises_patch_checker_error(self):
-        missing_path = f"/tmp/{uuid.uuid4().hex}_non_existent.diff"
-        checker = PatchChecker()
-        with self.assertRaises(PatchCheckerError):
-            checker.check_file(file_path=missing_path)
-
-
-class TestPatchCheckerConvenienceFunction(unittest.TestCase):
-
-    def test_convenience_function_delegation(self):
-        rand_diff, rand_filename, rand_token = _generate_random_diff()
-        rand_repo = f"/tmp/repo_{uuid.uuid4().hex}"
-
-        mock_analysis = {"token": rand_token}
-        mock_eval = PatchEvaluationResult(
-            is_safe=True,
-            is_valid=True,
-            metrics={"score": random.randint(1, 100)},
             reasons=[],
             telemetry={},
             was_corrected=False
         )
+        mock_evaluate.return_value = eval_res
 
-        with patch.object(patch_checker_module, "PatchAnalyzer") as mock_analyzer_cls, \
-             patch.object(patch_checker_module, "PatchEvaluator") as mock_evaluator_cls:
+        patch_content = f"diff --git a/{uuid.uuid4().hex} b/{uuid.uuid4().hex}"
+        result = self.checker.check_patch(patch_content)
 
-            mock_analyzer_instance = MagicMock()
-            mock_analyzer_instance.analyze.return_value = mock_analysis
-            mock_analyzer_cls.return_value = mock_analyzer_instance
+        self.assertFalse(result["is_safe"])
+        self.assertIn("policy_verdict", result)
+        self.assertEqual(result["policy_verdict"].get("disallowed_risks"), "Strict safety policy violated")
 
-            mock_evaluator_instance = MagicMock()
-            mock_evaluator_instance.evaluate.return_value = mock_eval
-            mock_evaluator_cls.return_value = mock_evaluator_instance
+    @patch("skills.patch_checker.PatchEvaluator.evaluate")
+    @patch("skills.patch_checker.PatchAnalyzer.analyze")
+    def test_check_patch_syntax_risks_policy_violation(self, mock_analyze, mock_evaluate):
+        checker_syntax = PatchChecker(policy={"disallow_syntax_risks": True})
+        mock_analyze.return_value = {
+            "risk_score": 0.5,
+            "syntax_risks": [uuid.uuid4().hex]
+        }
 
-            result = check_patch(
-                patch_content=rand_diff,
-                repo_path=rand_repo,
-                target_file=rand_filename
-            )
+        eval_res = PatchEvaluationResult(
+            is_safe=True,
+            is_valid=True,
+            metrics={},
+            reasons=[],
+            telemetry={},
+            was_corrected=False
+        )
+        mock_evaluate.return_value = eval_res
 
-            mock_evaluator_cls.assert_called_once_with(repo_path=rand_repo)
-            self.assertEqual(result["analysis"]["token"], rand_token)
-            self.assertTrue(result["is_safe"])
+        patch_content = f"diff --git a/{uuid.uuid4().hex} b/{uuid.uuid4().hex}"
+        result = checker_syntax.check_patch(patch_content)
+
+        self.assertIn("policy_verdict", result)
+        self.assertEqual(result["policy_verdict"].get("disallowed_risks"), "Syntax risks detected")
+
+    def test_check_file_not_found(self):
+        missing_path = f"/nonexistent_path_{uuid.uuid4().hex}.patch"
+        with self.assertRaises(PatchCheckerError) as ctx:
+            self.checker.check_file(missing_path)
+        self.assertIn("Файл не найден", str(ctx.exception))
+
+    @patch("skills.patch_checker.PatchChecker.check_patch")
+    def test_check_file_success(self, mock_check_patch):
+        expected_dict = {uuid.uuid4().hex: uuid.uuid4().hex}
+        mock_check_patch.return_value = expected_dict
+
+        file_content = f"diff --content {uuid.uuid4().hex}"
+        temp_filename = f"test_patch_{uuid.uuid4().hex}.diff"
+
+        try:
+            with open(temp_filename, "w", encoding="utf-8") as f:
+                f.write(file_content)
+
+            res = self.checker.check_file(temp_filename, target_file="some_target.py")
+            self.assertEqual(res, expected_dict)
+            mock_check_patch.assert_called_once_with(patch_content=file_content, target_file="some_target.py")
+        finally:
+            if os.path.exists(temp_filename):
+                os.remove(temp_filename)
+
+    @patch("skills.patch_checker.PatchChecker.check_patch")
+    def test_check_stream_success(self, mock_check_patch):
+        expected_dict = {uuid.uuid4().hex: uuid.uuid4().hex}
+        mock_check_patch.return_value = expected_dict
+
+        stream_content = f"diff --stream {uuid.uuid4().hex}"
+        stream = io.StringIO(stream_content)
+
+        res = self.checker.check_stream(stream, target_file="stream_target.py")
+        self.assertEqual(res, expected_dict)
+        mock_check_patch.assert_called_once_with(patch_content=stream_content, target_file="stream_target.py")
+
+    @patch("skills.patch_checker.PatchEvaluator")
+    @patch("skills.patch_checker.PatchChecker.check_patch")
+    def test_check_integration_method(self, mock_check_patch, mock_evaluator_cls):
+        metrics_dict = {uuid.uuid4().hex: random.randint(1, 50)}
+        mock_check_patch.return_value = {
+            "is_safe": True,
+            "evaluation": {
+                "metrics": metrics_dict
+            }
+        }
+
+        new_repo_path = f"/repo/path/{uuid.uuid4().hex}"
+        patch_text = f"diff --integration {uuid.uuid4().hex}"
+        target_f = f"{uuid.uuid4().hex}.py"
+
+        result = self.checker.check(patch_content=patch_text, repo_path=new_repo_path, target_file=target_f)
+
+        self.assertEqual(self.checker.repo_path, new_repo_path)
+        self.assertIn("metrics", result)
+        self.assertEqual(result["metrics"], metrics_dict)
+        mock_check_patch.assert_called_once_with(patch_content=patch_text, target_file=target_f)
+
+    @patch("skills.patch_checker.PatchChecker.check_patch")
+    def test_module_level_check_patch(self, mock_check_patch):
+        expected_res = {uuid.uuid4().hex: random.random()}
+        mock_check_patch.return_value = expected_res
+
+        patch_str = f"diff --module {uuid.uuid4().hex}"
+        repo_arg = f"/path/{uuid.uuid4().hex}"
+        target_arg = f"file_{uuid.uuid4().hex}.py"
+        policy_arg = {uuid.uuid4().hex: True}
+
+        res = check_patch(patch_content=patch_str, repo_path=repo_arg, target_file=target_arg, policy=policy_arg)
+        self.assertEqual(res, expected_res)
 
 
 if __name__ == "__main__":

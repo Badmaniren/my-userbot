@@ -58,7 +58,6 @@ class AnomalyVisualizer:
     def visualize_digest(self, data):
         """Поддерживает как один дайджест (dict), так и список аномалий от AnomalyLogger."""
         if isinstance(data, list):
-            # Интеграционный сценарий с AnomalyLogger: формируем сводку из списка аномалий
             report_lines = ["--- Anomaly Logger Digest ---"]
             for item in data:
                 source = item.get("source", "")

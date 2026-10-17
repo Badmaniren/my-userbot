@@ -105,11 +105,24 @@ class PatchRuleEngine:
 
     def validate_patch(self, patch_content: str) -> bool:
         for rid, rdata in self.rules.items():
-            pattern = rdata.get("pattern")
-            if pattern and re.search(pattern, patch_content):
-                raise RuleViolationError(
-                    f"Rule violation detected for rule '{rid}': pattern '{pattern}' matched."
+            rule_type = rdata.get("rule_type", "forbidden_pattern")
+            if rule_type == "forbidden_pattern":
+                pattern = rdata.get("pattern")
+                if pattern and re.search(pattern, patch_content):
+                    raise RuleViolationError(
+                        f"Rule violation detected for rule '{rid}': pattern '{pattern}' matched."
+                    )
+            elif rule_type == "max_added_lines":
+                added_lines_count = sum(
+                    1
+                    for line in patch_content.splitlines()
+                    if line.startswith("+") and not line.startswith("+++")
                 )
+                max_lines = rdata.get("threshold", 0)
+                if added_lines_count > max_lines:
+                    raise RuleViolationError(
+                        f"Added lines {added_lines_count} exceeded threshold {max_lines}"
+                    )
         return True
 
     def evaluate_patch(

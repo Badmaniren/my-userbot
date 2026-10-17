@@ -14,12 +14,12 @@ class AnomalyDetector:
     """
     def __init__(
         self, 
-        repo_path: str, 
+        repo_path: Optional[str] = None,
         threshold: float = 5.0, 
         git_inspector: Optional[Any] = None, 
         patch_verifier: Optional[Any] = None
     ) -> None:
-        self.repo_path = repo_path
+        self.repo_path = repo_path if repo_path is not None else "."
         self.threshold = threshold
         self.git_inspector = git_inspector
         self.patch_verifier = patch_verifier

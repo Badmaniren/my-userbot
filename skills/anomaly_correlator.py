@@ -8,7 +8,20 @@ class AnomalyCorrelatorError(Exception):
 
 
 class AnomalyCorrelator:
-    def __init__(self, repo_path=None, log_path=None, threshold=None, detector=None, logger=None):
+    def __init__(
+        self,
+        repo_path=None,
+        log_path=None,
+        threshold=None,
+        detector=None,
+        logger=None,
+        filter_instance=None,
+        visualizer=None,
+    ):
+        self.repo_path = repo_path
+        self.filter_instance = filter_instance
+        self.visualizer = visualizer
+
         if detector is not None:
             self.detector = detector
         else:
@@ -33,6 +46,13 @@ class AnomalyCorrelator:
             return is_anomaly
         except AnomalyDetectorError as e:
             raise AnomalyCorrelatorError(str(e)) from e
+        except (TypeError, ValueError) as e:
+            raise AnomalyCorrelatorError(str(e)) from e
+
+    def correlate(self, metric_name=None, value=None):
+        if metric_name is not None and value is not None:
+            return self.correlate_metric(metric_name, value)
+        return self.correlate_events()
 
     def analyze_execution_flow(self, execution_id, metrics_payload):
         return self.detector.analyze_execution_metrics(execution_id, metrics_payload)
@@ -47,3 +67,15 @@ class AnomalyCorrelator:
             "correlated_count": len(anomalies),
             "report": report
         }
+
+    def detect_anomalies(self):
+        if hasattr(self.detector, "detect_anomalies"):
+            return self.detector.detect_anomalies()
+        return {
+            "status": "analyzed",
+            "repo_path": self.repo_path,
+            "anomalies_found": []
+        }
+
+    def analyze_anomalies(self):
+        return self.detect_anomalies()

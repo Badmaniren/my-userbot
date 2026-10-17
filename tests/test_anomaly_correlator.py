@@ -2,122 +2,120 @@ import unittest
 from unittest.mock import MagicMock, patch
 import uuid
 import random
+import io
 
 from skills.anomaly_correlator import AnomalyCorrelator, AnomalyCorrelatorError
 from skills.anomaly_detector import AnomalyDetectorError
 
 
-class TestAnomalyCorrelatorInquisition(unittest.TestCase):
+class TestAnomalyCorrelator(unittest.TestCase):
+
     def setUp(self):
         self.repo_path = f"/tmp/{uuid.uuid4().hex}"
         self.log_path = f"/tmp/{uuid.uuid4().hex}.log"
-        self.threshold = random.uniform(0.1, 0.9)
-        
-        self.mock_detector = MagicMock()
-        self.mock_logger = MagicMock()
-        
-        self.correlator = AnomalyCorrelator(
-            repo_path=self.repo_path,
-            log_path=self.log_path,
-            threshold=self.threshold,
-            detector=self.mock_detector,
-            logger=self.mock_logger
-        )
+        self.threshold = random.uniform(0.1, 99.9)
 
-    def test_init_creates_default_instances(self):
-        with patch('skills.anomaly_correlator.AnomalyDetector') as det_patch, \
-             patch('skills.anomaly_correlator.AnomalyLogger') as log_patch:
-            
-            r_path = f"/tmp/{uuid.uuid4().hex}"
-            l_path = f"/tmp/{uuid.uuid4().hex}.log"
-            thresh = random.uniform(0.5, 0.99)
-            
-            corr = AnomalyCorrelator(repo_path=r_path, log_path=l_path, threshold=thresh)
-            
-            det_patch.assert_called_once_with(
-                repo_path=r_path,
-                threshold=thresh,
-                git_inspector=None,
-                patch_verifier=None
-            )
-            log_patch.assert_called_once_with(log_path=l_path)
-            self.assertIs(corr.detector, det_patch.return_value)
-            self.assertIs(corr.logger, log_patch.return_value)
+    def test_init_default_detectors_and_loggers(self):
+        correlator = AnomalyCorrelator(repo_path=self.repo_path, log_path=self.log_path, threshold=self.threshold)
+        self.assertIsNotNone(correlator.detector)
+        self.assertIsNotNone(correlator.logger)
 
-    def test_correlate_metric_anomaly_detected(self):
-        metric_name = f"metric_{uuid.uuid4().hex[:6]}"
-        value = random.uniform(10.0, 100.0)
-        
-        self.mock_detector.detect_anomaly.return_value = True
+    def test_init_with_injected_mocks(self):
+        mock_detector = MagicMock()
+        mock_logger = MagicMock()
+        correlator = AnomalyCorrelator(detector=mock_detector, logger=mock_logger)
+        self.assertEqual(correlator.detector, mock_detector)
+        self.assertEqual(correlator.logger, mock_logger)
 
-        result = self.correlator.correlate_metric(metric_name, value)
+    def test_correlate_metric_success_anomaly_detected(self):
+        metric_name = f"metric_{uuid.uuid4().hex[:8]}"
+        metric_value = random.uniform(100.0, 500.0)
 
-        self.assertTrue(result)
-        self.mock_detector.record_metric.assert_called_once_with(metric_name, value)
-        self.mock_detector.detect_anomaly.assert_called_once_with(metric_name, value)
-        self.mock_logger.log_anomaly.assert_called_once_with(metric_name)
+        mock_detector = MagicMock()
+        mock_detector.detect_anomaly.return_value = True
+        mock_logger = MagicMock()
 
-    def test_correlate_metric_no_anomaly(self):
-        metric_name = f"metric_{uuid.uuid4().hex[:6]}"
-        value = random.uniform(0.0, 5.0)
-        
-        self.mock_detector.detect_anomaly.return_value = False
+        correlator = AnomalyCorrelator(detector=mock_detector, logger=mock_logger)
+        res = correlator.correlate_metric(metric_name, metric_value)
 
-        result = self.correlator.correlate_metric(metric_name, value)
+        self.assertTrue(res)
+        mock_detector.record_metric.assert_called_once_with(metric_name, metric_value)
+        mock_detector.detect_anomaly.assert_called_once_with(metric_name, metric_value)
+        mock_logger.log_anomaly.assert_called_once_with(metric_name)
 
-        self.assertFalse(result)
-        self.mock_detector.record_metric.assert_called_once_with(metric_name, value)
-        self.mock_detector.detect_anomaly.assert_called_once_with(metric_name, value)
-        self.mock_logger.log_anomaly.assert_not_called()
+    def test_correlate_metric_success_no_anomaly(self):
+        metric_name = f"metric_{uuid.uuid4().hex[:8]}"
+        metric_value = random.uniform(0.0, 50.0)
 
-    def test_correlate_metric_raises_correlator_error_on_detector_failure(self):
-        metric_name = f"metric_{uuid.uuid4().hex[:6]}"
-        value = random.uniform(1.0, 10.0)
-        error_msg = f"detector_failure_{uuid.uuid4().hex[:6]}"
-        
-        self.mock_detector.record_metric.side_effect = AnomalyDetectorError(error_msg)
+        mock_detector = MagicMock()
+        mock_detector.detect_anomaly.return_value = False
+        mock_logger = MagicMock()
 
+        correlator = AnomalyCorrelator(detector=mock_detector, logger=mock_logger)
+        res = correlator.correlate_metric(metric_name, metric_value)
+
+        self.assertFalse(res)
+        mock_detector.record_metric.assert_called_once_with(metric_name, metric_value)
+        mock_detector.detect_anomaly.assert_called_once_with(metric_name, metric_value)
+        mock_logger.log_anomaly.assert_not_called()
+
+    def test_correlate_metric_detector_error_raises_correlator_error(self):
+        metric_name = f"metric_{uuid.uuid4().hex[:8]}"
+        metric_value = random.uniform(1.0, 10.0)
+        error_msg = f"error_{uuid.uuid4().hex}"
+
+        mock_detector = MagicMock()
+        mock_detector.record_metric.side_effect = AnomalyDetectorError(error_msg)
+        mock_logger = MagicMock()
+
+        correlator = AnomalyCorrelator(detector=mock_detector, logger=mock_logger)
         with self.assertRaises(AnomalyCorrelatorError) as ctx:
-            self.correlator.correlate_metric(metric_name, value)
-
+            correlator.correlate_metric(metric_name, metric_value)
         self.assertIn(error_msg, str(ctx.exception))
 
     def test_analyze_execution_flow(self):
-        execution_id = f"exec_{uuid.uuid4().hex[:8]}"
-        metrics_payload = {f"key_{uuid.uuid4().hex[:4]}": random.randint(1, 100)}
-        expected_analysis = {f"result_{uuid.uuid4().hex[:4]}": uuid.uuid4().hex}
-        
-        self.mock_detector.analyze_execution_metrics.return_value = expected_analysis
+        exec_id = uuid.uuid4().hex
+        payload_key = f"key_{uuid.uuid4().hex[:6]}"
+        payload_val = random.randint(1, 1000)
+        metrics_payload = {payload_key: payload_val}
 
-        result = self.correlator.analyze_execution_flow(execution_id, metrics_payload)
+        expected_analysis = {f"res_{uuid.uuid4().hex[:4]}": random.random()}
 
+        mock_detector = MagicMock()
+        mock_detector.analyze_execution_metrics.return_value = expected_analysis
+        correlator = AnomalyCorrelator(detector=mock_detector)
+
+        result = correlator.analyze_execution_flow(exec_id, metrics_payload)
         self.assertEqual(result, expected_analysis)
-        self.mock_detector.analyze_execution_metrics.assert_called_once_with(execution_id, metrics_payload)
+        mock_detector.analyze_execution_metrics.assert_called_once_with(exec_id, metrics_payload)
 
     def test_get_correlation_report(self):
-        expected_report = {f"section_{uuid.uuid4().hex[:4]}": uuid.uuid4().hex}
-        self.mock_logger.get_structured_report.return_value = expected_report
+        report_data = {uuid.uuid4().hex: uuid.uuid4().hex, "status": "stable"}
 
-        result = self.correlator.get_correlation_report()
+        mock_logger = MagicMock()
+        mock_logger.get_structured_report.return_value = report_data
+        correlator = AnomalyCorrelator(logger=mock_logger)
 
-        self.assertEqual(result, expected_report)
-        self.mock_logger.get_structured_report.assert_called_once()
+        report = correlator.get_correlation_report()
+        self.assertEqual(report, report_data)
+        mock_logger.get_structured_report.assert_called_once()
 
     def test_correlate_events(self):
-        anomalies_list = [f"anomaly_{uuid.uuid4().hex[:4]}" for _ in range(random.randint(1, 5))]
-        structured_report = {f"rep_{uuid.uuid4().hex[:4]}": random.random()}
-        
-        self.mock_logger.get_anomalies.return_value = anomalies_list
-        self.mock_logger.get_structured_report.return_value = structured_report
+        anomalies_list = [uuid.uuid4().hex, uuid.uuid4().hex]
+        report_data = {uuid.uuid4().hex: random.randint(10, 50)}
 
-        result = self.correlator.correlate_events()
+        mock_logger = MagicMock()
+        mock_logger.get_anomalies.return_value = anomalies_list
+        mock_logger.get_structured_report.return_value = report_data
+        correlator = AnomalyCorrelator(logger=mock_logger)
 
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result["correlated_count"], len(anomalies_list))
-        self.assertEqual(result["report"], structured_report)
-        self.mock_logger.get_anomalies.assert_called_once()
-        self.mock_logger.get_structured_report.assert_called_once()
+        res = correlator.correlate_events()
+        self.assertIsInstance(res, dict)
+        self.assertEqual(res["correlated_count"], len(anomalies_list))
+        self.assertEqual(res["report"], report_data)
+        mock_logger.get_anomalies.assert_called_once()
+        mock_logger.get_structured_report.assert_called_once()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

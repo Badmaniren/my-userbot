@@ -97,7 +97,6 @@ class PatchChecker:
         
         result = self.check_patch(patch_content=patch_content, target_file=target_file)
         
-        # Интеграционный тест ожидает ключ 'metrics' на верхнем уровне результата
         if "evaluation" in result and "metrics" in result["evaluation"]:
             result["metrics"] = result["evaluation"]["metrics"]
             

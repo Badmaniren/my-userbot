@@ -97,19 +97,25 @@ class PatchExecutor:
         if not file_path or content is None:
             return False
 
-        full_path = os.path.join(self.repo_path, file_path)
-        dir_name = os.path.dirname(full_path)
-        if dir_name:
-            os.makedirs(dir_name, exist_ok=True)
-        with open(full_path, "w", encoding="utf-8") as f:
-            f.write(content)
-        subprocess.run(["git", "-C", self.repo_path, "add", file_path], check=True)
-        subprocess.run(["git", "-C", self.repo_path, "commit", "-m", commit_message], check=True)
-        return True
+        try:
+            full_path = os.path.join(self.repo_path, file_path)
+            dir_name = os.path.dirname(full_path)
+            if dir_name:
+                os.makedirs(dir_name, exist_ok=True)
+            with open(full_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            subprocess.run(["git", "-C", self.repo_path, "add", file_path], check=True)
+            subprocess.run(["git", "-C", self.repo_path, "commit", "-m", commit_message], check=True)
+            return True
+        except Exception:
+            return False
 
     def rollback_patch(self, file_path: str, commit_hash: str) -> bool:
-        subprocess.run(["git", "-C", self.repo_path, "checkout", commit_hash, "--", file_path], check=True)
-        return True
+        try:
+            subprocess.run(["git", "-C", self.repo_path, "checkout", commit_hash, "--", file_path], check=True)
+            return True
+        except Exception:
+            return False
 
     def execute_from_lessons(self) -> Dict[str, Any]:
         return {"executed_lessons": 1, "status": "success"}

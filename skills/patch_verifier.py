@@ -2,6 +2,9 @@ import os
 import subprocess
 from typing import List, Dict, Any, Optional
 
+from skills.git_inspector import GitInspector
+from skills.patch_evaluator import PatchEvaluator
+
 class HypothesisGeneratorError(Exception):
     """Исключение генератора гипотез."""
     pass
@@ -13,51 +16,6 @@ class LessonParserError(Exception):
 class PatchExecutorError(Exception):
     """Исключение исполнителя патчей."""
     pass
-
-
-class GitInspector:
-    def __init__(self, repo_path: str):
-        self.repo_path = repo_path
-
-    def _run_git(self, args: List[str]) -> str:
-        res = subprocess.run(
-            ["git", "-C", self.repo_path] + args,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding="utf-8"
-        )
-        return res.stdout.strip()
-
-    def get_commit_history(self, max_count: int = 10) -> List[Dict[str, str]]:
-        output = self._run_git(["log", f"-n {max_count}", "--pretty=format:%H|%an|%s"])
-        history = []
-        if not output:
-            return history
-        for line in output.split("\n"):
-            parts = line.split("|", 2)
-            if len(parts) == 3:
-                history.append({"hash": parts[0], "author": parts[1], "message": parts[2]})
-        return history
-
-    def get_file_diff(self, commit_hash: str) -> str:
-        return self._run_git(["show", commit_hash])
-
-    def analyze_repository(self) -> Dict[str, Any]:
-        commits = self.get_commit_history()
-        return {"total_commits": len(commits), "latest_commit": commits[0] if commits else None}
-
-    def read_file_at_commit(self, commit_hash: str, file_path: str) -> str:
-        return self._run_git(["show", f"{commit_hash}:{file_path}"])
-
-    def get_history(self, max_count: int = 10) -> List[Dict[str, str]]:
-        return self.get_commit_history(max_count)
-
-    def get_latest_changes(self) -> str:
-        history = self.get_commit_history(max_count=1)
-        if history:
-            return self.get_file_diff(history[0]["hash"])
-        return ""
 
 
 class LessonParser:
@@ -84,7 +42,7 @@ class HypothesisGenerator:
 
 
 class PatchExecutor:
-    def __init__(self, repo_path: str, inspector: GitInspector, parser: LessonParser):
+    def __init__(self, repo_path: str, inspector: GitInspector, parser: Optional[LessonParser] = None):
         self.repo_path = repo_path
         self.inspector = inspector
         self.parser = parser
@@ -124,9 +82,17 @@ class PatchVerifier:
         self.repo_path = repo_path
         self.inspector = inspector
         self.executor = executor
+        self.evaluator = PatchEvaluator(repo_path)
 
     def verify_and_apply(self, patch_data: Dict[str, Any]) -> bool:
         content = patch_data.get("content", "")
+        file_path = patch_data.get("file_path", "")
+        
         if "syntax error here" in content:
             return False
+
+        eval_result = self.evaluator.evaluate(content, target_file=file_path)
+        if eval_result is None:
+            return False
+
         return self.executor.apply_patch(patch_data)

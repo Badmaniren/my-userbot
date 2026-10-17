@@ -31,7 +31,7 @@ class DigestDashboardGenerator:
 
     def generate_dashboard(self, json_path: str, html_path: str) -> dict:
         try:
-            # Автоматически создаем директорию для файлов, если она не существует (решает проблему с тестом мока I/O)
+            # Автоматически создаем директорию для файлов, если она не существует
             for path in [json_path, html_path]:
                 dir_name = os.path.dirname(path)
                 if dir_name and not os.path.exists(dir_name):

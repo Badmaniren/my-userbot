@@ -339,7 +339,3 @@
 ## patch_pipeline_integration (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## patch_auto_remediator_pipeline (compose) — раундов: 4
-- Последняя ошибка перед фиксом: raise PatchAutoRemediatorPipelineError(str(e))
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

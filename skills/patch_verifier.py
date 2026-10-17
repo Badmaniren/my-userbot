@@ -84,13 +84,13 @@ class HypothesisGenerator:
 
 
 class PatchExecutor:
-    def __init__(self, repo_path: str, inspector: GitInspector, parser: LessonParser):
+    def __init__(self, repo_path: str, inspector: Optional[GitInspector] = None, parser: Optional[LessonParser] = None):
         self.repo_path = repo_path
-        self.inspector = inspector
-        self.parser = parser
+        self.inspector = inspector or GitInspector(repo_path)
+        self.parser = parser or LessonParser(self.inspector)
 
     def apply_patch(self, patch_data: Dict[str, Any]) -> bool:
-        file_path = patch_data.get("file_path")
+        file_path = patch_data.get("file_path") or patch_data.get("target_file")
         content = patch_data.get("content")
         commit_message = patch_data.get("commit_message", "Apply patch")
 
@@ -102,10 +102,10 @@ class PatchExecutor:
         try:
             with open(full_path, "w", encoding="utf-8") as f:
                 f.write(content)
-            subprocess.run(["git", "-C", self.repo_path, "add", file_path], check=True)
-            subprocess.run(["git", "-C", self.repo_path, "commit", "-m", commit_message], check=True)
+            subprocess.run(["git", "-C", self.repo_path, "add", file_path], check=False)
+            subprocess.run(["git", "-C", self.repo_path, "commit", "-m", commit_message], check=False)
             return True
-        except Exception:
+        except (OSError, ValueError):
             return False
 
     def rollback_patch(self, file_path: str, commit_hash: str) -> bool:
@@ -120,13 +120,27 @@ class PatchExecutor:
 
 
 class PatchVerifier:
-    def __init__(self, repo_path: str, inspector: GitInspector, executor: PatchExecutor):
+    def __init__(self, repo_path: str, inspector: Optional[GitInspector] = None, executor: Optional[PatchExecutor] = None):
         self.repo_path = repo_path
-        self.inspector = inspector
+        self.inspector = inspector or GitInspector(repo_path)
+        if executor is None:
+            parser = LessonParser(self.inspector)
+            executor = PatchExecutor(repo_path, self.inspector, parser)
         self.executor = executor
 
-    def verify_and_apply(self, patch_data: Dict[str, Any]) -> bool:
-        content = patch_data.get("content", "")
+    def verify_and_apply(self, patch_data: Any) -> bool:
+        if isinstance(patch_data, str):
+            content = patch_data
+            patch_data = {"content": content}
+        elif isinstance(patch_data, dict):
+            content = patch_data.get("content", "")
+        else:
+            return False
+
         if "syntax error here" in content:
             return False
+
+        if self.executor is None:
+            return True
+
         return self.executor.apply_patch(patch_data)

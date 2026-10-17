@@ -29,20 +29,29 @@ def start_new(data):
     if not isinstance(data, dict):
         raise TypeError("Input must be a dict or file path string")
 
-    if not all(k in data for k in ("source", "severity", "details", "telemetry_snapshot")):
+    if all(k in data for k in ("source", "severity", "details", "telemetry_snapshot")):
+        source = data["source"]
+        severity = data["severity"]
+        details = data["details"]
+        telemetry_snapshot = data["telemetry_snapshot"]
+    elif "metric" in data and "value" in data:
+        source = str(data["metric"])
+        severity = data.get("severity", "HIGH" if data.get("value", 0) > 50 else "LOW")
+        details = data.get("details", f"Raw metric: {data['metric']} = {data['value']}")
+        telemetry_snapshot = data.get("telemetry_snapshot", {"metric": data["metric"], "value": data["value"]})
+    else:
         raise KeyError("Missing required keys in raw input data")
 
-    severity = data["severity"]
     normalized = True
     if severity not in VALID_SEVERITIES:
         severity = "UNKNOWN"
         normalized = False
 
     return {
-        "source": data["source"],
+        "source": source,
         "severity": severity,
-        "details": data["details"],
-        "telemetry_snapshot": data["telemetry_snapshot"],
+        "details": details,
+        "telemetry_snapshot": telemetry_snapshot,
         "normalized": normalized
     }
 

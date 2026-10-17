@@ -1,3 +1,4 @@
+import os
 from skills.anomaly_visualizer import AnomalyVisualizer
 from skills.digest_exporter import DigestExporter
 
@@ -30,6 +31,12 @@ class DigestDashboardGenerator:
 
     def generate_dashboard(self, json_path: str, html_path: str) -> dict:
         try:
+            # Автоматически создаем директорию для файлов, если она не существует (решает проблему с тестом мока I/O)
+            for path in [json_path, html_path]:
+                dir_name = os.path.dirname(path)
+                if dir_name and not os.path.exists(dir_name):
+                    os.makedirs(dir_name, exist_ok=True)
+
             json_res = self.exporter.export_to_json(json_path)
             html_res = self.exporter.export_to_html(html_path)
             return {
@@ -51,7 +58,13 @@ class DigestDashboardGenerator:
         return self.exporter.export_stream_to_json(stream_id, path)
 
     def generate_html_dashboard(self, html_path: str) -> str:
+        dir_name = os.path.dirname(html_path)
+        if dir_name and not os.path.exists(dir_name):
+            os.makedirs(dir_name, exist_ok=True)
         return self.exporter.export_to_html(html_path)
 
     def generate_json_dashboard(self, json_path: str) -> str:
+        dir_name = os.path.dirname(json_path)
+        if dir_name and not os.path.exists(dir_name):
+            os.makedirs(dir_name, exist_ok=True)
         return self.exporter.export_to_json(json_path)

@@ -1,8 +1,15 @@
-from skills.git_inspector import GitInspector
-from skills.lesson_parser import LessonParser
-from skills.hypothesis_generator import HypothesisGenerator
-from skills.patch_executor import PatchExecutor
-from skills.patch_verifier import PatchVerifier
+try:
+    from skills.git_inspector import GitInspector
+    from skills.lesson_parser import LessonParser
+    from skills.hypothesis_generator import HypothesisGenerator
+    from skills.patch_executor import PatchExecutor
+    from skills.patch_verifier import PatchVerifier
+except ImportError:
+    from git_inspector import GitInspector
+    from lesson_parser import LessonParser
+    from hypothesis_generator import HypothesisGenerator
+    from patch_executor import PatchExecutor
+    from patch_verifier import PatchVerifier
 
 class AutonomousEngineError(Exception):
     """Кастомное исключение для автономного движка."""

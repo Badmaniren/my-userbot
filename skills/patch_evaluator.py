@@ -44,7 +44,6 @@ class PatchEvaluator:
     ) -> PatchEvaluationResult:
         try:
             sanitizer = CodeSanitizer()
-            # Обеспечиваем совместимость: проверяем наличие метода sanitize, иначе используем другие доступные методы
             if hasattr(sanitizer, "sanitize"):
                 sanitized_content, is_safe = sanitizer.sanitize(patch_content)
             elif hasattr(sanitizer, "check"):
@@ -63,7 +62,12 @@ class PatchEvaluator:
                     reasons = sanitizer.get_reasons()
                 return PatchEvaluationResult(is_safe=False, is_valid=False, reasons=reasons)
 
-            validator = CodeValidator()
+            # Передаем repo_path при инициализации CodeValidator для совместимости с требованиями тестов
+            try:
+                validator = CodeValidator(self.repo_path)
+            except TypeError:
+                validator = CodeValidator()
+
             if hasattr(validator, "validate"):
                 val_result = validator.validate(sanitized_content)
             elif hasattr(validator, "validate_code"):

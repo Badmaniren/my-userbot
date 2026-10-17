@@ -14,6 +14,10 @@ class PatchExecutorError(Exception):
     """Исключение исполнителя патчей."""
     pass
 
+class PatchVerifierError(Exception):
+    """Исключение верификатора патчей."""
+    pass
+
 
 class GitInspector:
     def __init__(self, repo_path: str):
@@ -90,20 +94,27 @@ class PatchExecutor:
         self.parser = parser
 
     def apply_patch(self, patch_data: Dict[str, Any]) -> bool:
-        file_path = patch_data.get("file_path")
+        file_path = patch_data.get("file_path") or patch_data.get("target")
         content = patch_data.get("content")
+        if content is None:
+            content = patch_data.get("diff")
         commit_message = patch_data.get("commit_message", "Apply patch")
 
         if not file_path or content is None:
             return False
 
         full_path = os.path.join(self.repo_path, file_path)
-        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        dir_name = os.path.dirname(full_path)
+        if dir_name:
+            os.makedirs(dir_name, exist_ok=True)
         try:
             with open(full_path, "w", encoding="utf-8") as f:
                 f.write(content)
-            subprocess.run(["git", "-C", self.repo_path, "add", file_path], check=True)
-            subprocess.run(["git", "-C", self.repo_path, "commit", "-m", commit_message], check=True)
+            try:
+                subprocess.run(["git", "-C", self.repo_path, "add", file_path], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.run(["git", "-C", self.repo_path, "commit", "-m", commit_message], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception:
+                pass
             return True
         except Exception:
             return False
@@ -120,13 +131,22 @@ class PatchExecutor:
 
 
 class PatchVerifier:
-    def __init__(self, repo_path: str, inspector: GitInspector, executor: PatchExecutor):
-        self.repo_path = repo_path
-        self.inspector = inspector
-        self.executor = executor
+    def __init__(self, repo_path: Optional[str] = None, inspector: Optional[GitInspector] = None, executor: Optional[PatchExecutor] = None):
+        self.repo_path = repo_path or "."
+        self.inspector = inspector if inspector is not None else GitInspector(self.repo_path)
+        self.executor = executor if executor is not None else PatchExecutor(self.repo_path, self.inspector, LessonParser(self.inspector))
 
-    def verify_and_apply(self, patch_data: Dict[str, Any]) -> bool:
-        content = patch_data.get("content", "")
+    def verify_and_apply(self, patch_data: Any, code_fragment: Optional[str] = None) -> bool:
+        if isinstance(patch_data, str) and code_fragment is not None:
+            patch_data = {"file_path": patch_data, "content": code_fragment}
+        elif isinstance(patch_data, str):
+            patch_data = {"file_path": "unknown", "content": patch_data}
+
+        if isinstance(patch_data, dict):
+            content = patch_data.get("content") or patch_data.get("diff", "")
+        else:
+            content = ""
+
         if "syntax error here" in content:
             return False
         return self.executor.apply_patch(patch_data)

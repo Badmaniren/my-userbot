@@ -92,6 +92,8 @@ class PatchAnalyzer:
             raise PatchAnalyzerError("Invalid diff type")
         if not diff_text.strip():
             raise PatchAnalyzerError("Empty diff")
+        if not ("--- a/" in diff_text or "+++ b/" in diff_text or "@@" in diff_text):
+            raise PatchAnalyzerError("Invalid diff structure: missing diff/hunk headers")
 
         lines = diff_text.splitlines()
         hunk_header_pattern = re.compile(r"^@@\s*-\d+(?:,\d+)?\s+\+\d+(?:,\d+)?\s*@@")
@@ -235,7 +237,14 @@ class PatchAnalyzer:
             }
 
     def analyze_stream(self, stream):
-        content = stream.read()
+        if hasattr(stream, "read"):
+            content = stream.read()
+            if isinstance(content, bytes):
+                content = content.decode("utf-8")
+        elif hasattr(stream, "__iter__"):
+            content = "".join([chunk.decode("utf-8") if isinstance(chunk, bytes) else str(chunk) for chunk in stream])
+        else:
+            content = str(stream)
         return self.analyze(content)
 
     def analyze_file(self, file_path):

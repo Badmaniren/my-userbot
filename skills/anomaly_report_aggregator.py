@@ -32,7 +32,14 @@ class AnomalyReportAggregator:
             self.correlator.correlate_metric(metric_name, value)
             anomalies = self.correlator.correlate_events()
             
+            if isinstance(anomalies, dict):
+                anomalies = anomalies.get("report", [])
+            if not isinstance(anomalies, list):
+                anomalies = [anomalies] if anomalies else []
+
             for anomaly in anomalies:
+                if not isinstance(anomaly, dict):
+                    continue
                 self.anomaly_logger.log_anomaly(
                     source=anomaly.get("source"),
                     severity=anomaly.get("severity"),

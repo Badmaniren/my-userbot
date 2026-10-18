@@ -58,12 +58,9 @@ class AnomalyLogger:
     def get_anomalies(self):
         if not self.log_path or not os.path.exists(self.log_path):
             return []
-        try:
-            with open(self.log_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                return data if isinstance(data, list) else []
-        except Exception:
-            return []
+        with open(self.log_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data if isinstance(data, list) else []
 
     def get_structured_report(self):
         return self.get_anomalies()
@@ -80,11 +77,8 @@ class GitInspector:
 
     def _run_git(self, args):
         cmd = ["git"] + args
-        try:
-            result = subprocess.check_output(cmd, cwd=self.repo_path if os.path.exists(self.repo_path) else None)
-            return result
-        except Exception:
-            return b""
+        result = subprocess.check_output(cmd, cwd=self.repo_path if os.path.exists(self.repo_path) else None)
+        return result
 
     def get_file_diff(self, commit_hash):
         res = self._run_git(["show", commit_hash])

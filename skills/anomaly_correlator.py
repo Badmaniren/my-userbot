@@ -1,3 +1,4 @@
+import os
 from skills.anomaly_detector import AnomalyDetector, AnomalyDetectorError
 from skills.anomaly_logger import AnomalyLogger
 
@@ -9,6 +10,7 @@ class AnomalyCorrelatorError(Exception):
 
 class AnomalyCorrelator:
     def __init__(self, repo_path=None, log_path=None, threshold=None, detector=None, logger=None):
+        resolved_repo_path = repo_path if repo_path is not None else "."
         if detector is not None:
             self.detector = detector
         else:
@@ -17,12 +19,14 @@ class AnomalyCorrelator:
                 kwargs['threshold'] = threshold
             kwargs['git_inspector'] = None
             kwargs['patch_verifier'] = None
-            self.detector = AnomalyDetector(repo_path=repo_path, **kwargs)
+
+            self.detector = AnomalyDetector(repo_path=resolved_repo_path, **kwargs)
 
         if logger is not None:
             self.logger = logger
         else:
-            self.logger = AnomalyLogger(log_path=log_path)
+            resolved_log_path = log_path if log_path is not None else os.path.join(resolved_repo_path, "anomalies.log")
+            self.logger = AnomalyLogger(log_path=resolved_log_path)
 
     def correlate_metric(self, metric_name, value):
         try:

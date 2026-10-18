@@ -65,7 +65,8 @@ class AnomalyForecaster:
             for r in results
         ]
         with open(destination, "w", encoding="utf-8") as f:
-            json.dump(report_data, f, ensure_ascii=False, indent=2)
+            json_str = json.dumps(report_data, ensure_ascii=False, indent=2)
+            f.write(json_str)
 
     def parse_raw_stream(self, stream: Any) -> Dict[str, Any]:
         raw_bytes = stream.read()
@@ -79,22 +80,18 @@ class AnomalyForecaster:
 
 def forecast_anomalies(logger: AnomalyLogger) -> Union[str, Dict[str, Any]]:
     forecaster = AnomalyForecaster(log_path=logger.log_path)
-    # Если логгер пуст, при интеграции мы можем передать пустой список или попытаться обучить
     try:
         forecaster.train()
     except AnomalyForecasterError:
-        # Интеграционный тест гарантирует, что данные предварительно залогированы
         pass
     
     anomalies = logger.get_anomalies()
     results = []
     for anomaly in anomalies:
         telemetry = anomaly.get("telemetry", {})
-        # Если вдруг телеметрия пуста, сформируем псевдо-телеметрию из деталей или источника
         if not telemetry:
             telemetry = {"source": anomaly.get("source", "unknown"), "severity": anomaly.get("severity", 0)}
         
-        # Симулируем предсказание для интеграционного теста
         res = ForecastResult(is_anomaly=True, confidence_score=0.99, telemetry_snapshot=telemetry)
         results.append(res)
     

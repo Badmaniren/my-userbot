@@ -98,5 +98,9 @@ class AnomalyPipeline:
                     is_anom = self.detector_module.detect_anomaly(m_name, float(m_val))
                 except Exception:
                     is_anom = False
+
+                if self.threshold is not None and float(m_val) > float(self.threshold):
+                    is_anom = True
+
                 results[m_name] = is_anom
         return results

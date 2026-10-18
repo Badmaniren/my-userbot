@@ -3,7 +3,15 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ледняя ошибка перед фиксом: FAILED (errors=1)
+еред фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## patch_pipeline (compose) — раундов: 4
+- Последняя ошибка перед фиксом: corrected = self.correct_syntax(malformed_patch)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## patch_runner (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## patch_applier (compose) — раундов: 4
@@ -335,9 +343,4 @@
 ## digest_exporter (refactor) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'stability_digest'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.stability_digest import ...'
 - Последняя ошибка перед фиксом: Traceback (most recent call last):
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## audit_serializer (create) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
-- Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

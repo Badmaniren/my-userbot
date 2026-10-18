@@ -18,14 +18,27 @@ class DigestExporter:
     def export_json_report(self, output_path: str) -> str:
         """Экспортирует данные дайджеста и метрики визуализатора в JSON-файл."""
         try:
-            metrics = self.visualizer.get_summary_metrics()
-            text_rep = self.visualizer.render_text()
-            ascii_rep = self.visualizer.render_ascii_correlation_graph()
+            if self.visualizer is not None:
+                metrics = self.visualizer.get_summary_metrics()
+                text_rep = self.visualizer.render_text()
+                ascii_rep = self.visualizer.render_ascii_correlation_graph()
+            else:
+                metrics = {}
+                text_rep = ""
+                ascii_rep = ""
 
             if isinstance(metrics, dict):
                 data = metrics.copy()
             else:
                 data = {}
+
+            if self.digest is not None:
+                if hasattr(self.digest, 'generate_final_report'):
+                    data['report'] = self.digest.generate_final_report()
+                elif hasattr(self.digest, 'get_structured_report'):
+                    data['report'] = self.digest.get_structured_report()
+                elif isinstance(self.digest, dict):
+                    data.update(self.digest)
 
             data['text_report'] = text_rep
             data['ascii_graph'] = ascii_rep
@@ -42,15 +55,28 @@ class DigestExporter:
     def export_html_report(self, output_path: str) -> str:
         """Экспортирует отчет в HTML-файл."""
         try:
-            metrics = self.visualizer.get_summary_metrics()
-            text_rep = self.visualizer.render_text()
-            ascii_rep = self.visualizer.render_ascii_correlation_graph()
+            if self.visualizer is not None:
+                metrics = self.visualizer.get_summary_metrics()
+                text_rep = self.visualizer.render_text()
+                ascii_rep = self.visualizer.render_ascii_correlation_graph()
+            else:
+                metrics = {}
+                text_rep = ""
+                ascii_rep = ""
+
+            report_data = ""
+            if self.digest is not None:
+                if hasattr(self.digest, 'generate_final_report'):
+                    report_data = str(self.digest.generate_final_report())
+                elif hasattr(self.digest, 'get_structured_report'):
+                    report_data = str(self.digest.get_structured_report())
 
             html_content = f"""<html>
     <head><title>Digest Report</title></head>
     <body>
         <h1>Stability Digest Report</h1>
         <div>Metrics: {metrics}</div>
+        <div>Report Data: {report_data}</div>
         <div><pre>{text_rep}</pre></div>
         <div><pre>{ascii_rep}</pre></div>
     </body>

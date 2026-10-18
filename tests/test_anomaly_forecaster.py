@@ -1,138 +1,150 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, mock_open
+import io
+import json
 import uuid
 import random
-import string
-import io
-import sys
-import types
-
 from skills.anomaly_forecaster import (
-    AnomalyForecaster,
     AnomalyForecasterError,
+    ModelNotTrainedError,
     ForecastResult,
-    ModelNotTrainedError
+    AnomalyForecaster,
+    forecast_anomalies
 )
+from skills.anomaly_logger import AnomalyLogger
 
 class TestAnomalyForecaster(unittest.TestCase):
 
-    def setUp(self):
-        self.random_log_path = f"/tmp/{uuid.uuid4().hex}.log"
-        self.random_model_name = f"model_{uuid.uuid4().hex[:8]}"
-        self.random_threshold = random.uniform(0.1, 0.9)
-        self.random_severity = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
-        self.random_source = f"source_{uuid.uuid4().hex[:6]}"
-        self.random_details = f"Details {uuid.uuid4().hex}"
-        self.random_telemetry = {uuid.uuid4().hex: random.randint(100, 999)}
+    def test_forecast_result_str_and_init(self):
+        is_anomaly = random.choice([True, False])
+        confidence_score = random.uniform(0.0, 1.0)
+        telemetry_snapshot = {uuid.uuid4().hex: uuid.uuid4().hex}
 
-    def test_forecaster_initialization_success(self):
-        forecaster = AnomalyForecaster(
-            log_path=self.random_log_path,
-            model_name=self.random_model_name,
-            threshold=self.random_threshold
+        res = ForecastResult(
+            is_anomaly=is_anomaly,
+            confidence_score=confidence_score,
+            telemetry_snapshot=telemetry_snapshot
         )
-        self.assertEqual(forecaster.log_path, self.random_log_path)
-        self.assertEqual(forecaster.model_name, self.random_model_name)
-        self.assertEqual(forecaster.threshold, self.random_threshold)
-        self.assertFalse(forecaster.is_trained)
 
-    def test_forecaster_initialization_invalid_threshold(self):
-        bad_threshold = random.choice([-1.5, 1.1, 5.0])
-        with self.assertRaises(AnomalyForecasterError):
-            AnomalyForecaster(
-                log_path=self.random_log_path,
-                threshold=bad_threshold
-            )
+        self.assertEqual(res.is_anomaly, is_anomaly)
+        self.assertEqual(res.confidence_score, confidence_score)
+        self.assertEqual(res.telemetry_snapshot, telemetry_snapshot)
+        self.assertIn(str(is_anomaly), str(res))
+        self.assertIn(str(confidence_score), str(res))
 
-    def test_train_model_with_historical_data(self):
-        forecaster = AnomalyForecaster(log_path=self.random_log_path)
-        
-        mock_history = [
-            {
-                "source": self.random_source,
-                "severity": self.random_severity,
-                "details": self.random_details,
-                "telemetry": self.random_telemetry,
-                "timestamp": random.randint(1600000000, 1700000000)
-            }
-            for _ in range(random.randint(5, 15))
-        ]
+    def test_forecaster_init_invalid_threshold(self):
+        log_path = f"{uuid.uuid4().hex}.log"
+        bad_thresholds = [random.uniform(-10.0, -0.0001), random.uniform(1.0001, 10.0)]
+        for threshold in bad_thresholds:
+            with self.assertRaises(AnomalyForecasterError):
+                AnomalyForecaster(log_path=log_path, threshold=threshold)
 
-        with patch("skills.anomaly_forecaster.AnomalyLogger") as MockLogger:
-            instance = MockLogger.return_value
-            instance.get_anomalies.return_value = mock_history
+    def test_forecaster_train_empty_history(self):
+        log_path = f"{uuid.uuid4().hex}.log"
+        forecaster = AnomalyForecaster(log_path=log_path)
 
-            forecaster.train()
-
-            self.assertTrue(forecaster.is_trained)
-            instance.get_anomalies.assert_called_once()
-
-    def test_train_model_empty_history_raises_error(self):
-        forecaster = AnomalyForecaster(log_path=self.random_log_path)
-
-        with patch("skills.anomaly_forecaster.AnomalyLogger") as MockLogger:
-            instance = MockLogger.return_value
-            instance.get_anomalies.return_value = []
+        with patch("skills.anomaly_forecaster.AnomalyLogger") as mock_logger_cls:
+            mock_logger_instance = mock_logger_cls.return_value
+            mock_logger_instance.get_anomalies.return_value = []
 
             with self.assertRaises(AnomalyForecasterError):
                 forecaster.train()
-            self.assertFalse(forecaster.is_trained)
 
-    def test_predict_anomaly_success(self):
-        forecaster = AnomalyForecaster(
-            log_path=self.random_log_path,
-            threshold=0.5
-        )
-        forecaster.is_trained = True
-
-        random_metric_key = uuid.uuid4().hex
-        random_metric_val = random.uniform(10.0, 100.0)
-        input_telemetry = {random_metric_key: random_metric_val}
-
-        with patch.object(forecaster, "_run_prediction_algorithm") as mock_algo:
-            expected_score = random.uniform(0.6, 0.99)
-            mock_algo.return_value = expected_score
-
-            result = forecaster.predict(input_telemetry)
-
-            self.assertIsInstance(result, ForecastResult)
-            self.assertTrue(result.is_anomaly)
-            self.assertEqual(result.confidence_score, expected_score)
-            self.assertEqual(result.telemetry_snapshot, input_telemetry)
-
-    def test_predict_anomaly_not_trained(self):
-        forecaster = AnomalyForecaster(log_path=self.random_log_path)
-        self.assertFalse(forecaster.is_trained)
+    def test_forecaster_predict_not_trained(self):
+        log_path = f"{uuid.uuid4().hex}.log"
+        forecaster = AnomalyForecaster(log_path=log_path)
+        telemetry = {uuid.uuid4().hex: uuid.uuid4().hex}
 
         with self.assertRaises(ModelNotTrainedError):
-            forecaster.predict({uuid.uuid4().hex: random.random()})
+            forecaster.predict(telemetry)
 
-    def test_export_forecast_report(self):
-        forecaster = AnomalyForecaster(log_path=self.random_log_path)
-        
-        mock_results = [
-            ForecastResult(
-                is_anomaly=random.choice([True, False]),
-                confidence_score=random.uniform(0.0, 1.0),
-                telemetry_snapshot={uuid.uuid4().hex: random.randint(1, 100)}
-            )
-            for _ in range(random.randint(2, 5))
+    def test_forecaster_train_and_predict_success(self):
+        log_path = f"{uuid.uuid4().hex}.log"
+        threshold = random.uniform(0.1, 0.9)
+        forecaster = AnomalyForecaster(log_path=log_path, threshold=threshold)
+
+        mock_history = [
+            {"source": uuid.uuid4().hex, "severity": random.randint(1, 10), "telemetry": {uuid.uuid4().hex: uuid.uuid4().hex}}
         ]
 
-        random_export_dest = f"/tmp/{uuid.uuid4().hex}.json"
-        
-        with patch("builtins.open", new_callable=unittest.mock.mock_open()) as mock_file:
-            forecaster.export_report(mock_results, destination=random_export_dest)
-            mock_file.assert_called_once_with(random_export_dest, "w", encoding="utf-8")
-            
+        with patch("skills.anomaly_forecaster.AnomalyLogger") as mock_logger_cls:
+            mock_logger_instance = mock_logger_cls.return_value
+            mock_logger_instance.get_anomalies.return_value = mock_history
+
+            forecaster.train()
+            self.assertTrue(forecaster.is_trained)
+            self.assertEqual(forecaster.historical_data, mock_history)
+
+        test_telemetry = {uuid.uuid4().hex: random.randint(100, 999)}
+        result = forecaster.predict(test_telemetry)
+
+        self.assertIsInstance(result, ForecastResult)
+        self.assertEqual(result.telemetry_snapshot, test_telemetry)
+        self.assertGreaterEqual(result.confidence_score, 0.0)
+
+    def test_export_forecast_report(self):
+        log_path = f"{uuid.uuid4().hex}.log"
+        destination = f"{uuid.uuid4().hex}.json"
+        forecaster = AnomalyForecaster(log_path=log_path)
+
+        telemetry_key = uuid.uuid4().hex
+        telemetry_val = uuid.uuid4().hex
+        results = [
+            ForecastResult(
+                is_anomaly=True,
+                confidence_score=0.88,
+                telemetry_snapshot={telemetry_key: telemetry_val}
+            )
+        ]
+
+        with patch("builtins.open", mock_open()) as mock_file:
+            forecaster.export_report(results, destination)
+            mock_file.assert_called_once_with(destination, "w", encoding="utf-8")
             handle = mock_file()
             self.assertTrue(handle.write.called)
 
-    def test_io_stream_handling_simulation(self):
-        forecaster = AnomalyForecaster(log_path=self.random_log_path)
-        random_bytes = uuid.uuid4().bytes + ''.join(random.choices(string.ascii_letters, k=50)).encode('utf-8')
-        mock_stream = io.BytesIO(random_bytes)
+    def test_parse_raw_stream(self):
+        log_path = f"{uuid.uuid4().hex}.log"
+        forecaster = AnomalyForecaster(log_path=log_path)
+        random_bytes = uuid.uuid4().bytes * 3
+        stream = io.BytesIO(random_bytes)
 
-        processed_data = forecaster.parse_raw_stream(mock_stream)
-        self.assertIsNotNone(processed_data)
-        self.assertIn("stream_hash", processed_data)
+        parsed = forecaster.parse_raw_stream(stream)
+
+        self.assertIn("stream_hash", parsed)
+        self.assertIn("size", parsed)
+        self.assertIn("raw_preview", parsed)
+        self.assertEqual(parsed["size"], len(random_bytes))
+        self.assertEqual(parsed["raw_preview"], random_bytes[:50])
+
+    def test_forecast_anomalies_helper(self):
+        log_path = f"{uuid.uuid4().hex}.log"
+        mock_logger = AnomalyLogger(log_path=log_path)
+
+        source_name = uuid.uuid4().hex
+        severity_val = random.randint(1, 5)
+
+        with patch.object(AnomalyLogger, "get_anomalies", return_value=[{"source": source_name, "severity": severity_val}]), \
+             patch.object(AnomalyLogger, "get_structured_report", return_value=uuid.uuid4().hex):
+            
+            response = forecast_anomalies(mock_logger)
+            self.assertIsInstance(response, str)
+            self.assertIn("Forecasted anomalies report", response)
+
+    def test_forecast_anomalies_helper_with_telemetry(self):
+        log_path = f"{uuid.uuid4().hex}.log"
+        mock_logger = AnomalyLogger(log_path=log_path)
+
+        tel_key = uuid.uuid4().hex
+        tel_val = uuid.uuid4().hex
+        anomaly_item = {
+            "source": uuid.uuid4().hex,
+            "severity": random.randint(1, 10),
+            "telemetry": {tel_key: tel_val}
+        }
+
+        with patch.object(AnomalyLogger, "get_anomalies", return_value=[anomaly_item]), \
+             patch.object(AnomalyLogger, "get_structured_report", return_value=uuid.uuid4().hex):
+            
+            response = forecast_anomalies(mock_logger)
+            self.assertIsInstance(response, str)

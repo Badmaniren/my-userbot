@@ -3,18 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ЛЕН Унгой, передан на эскалацию
-
-## patch_pipeline (compose) — раундов: 4
-- Последняя ошибка перед фиксом: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## code_patcher (compose) — раундов: 4
-- Последняя ошибка перед фиксом: The above exception was the direct cause of the following exception:
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## patch_executor (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
+оследняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## patch_pipeline (compose) — раундов: 4
@@ -343,4 +332,8 @@
 
 ## audit_export_pipeline (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## audit_export_engine (compose) — раундов: 4
+- Последняя ошибка перед фиксом: AssertionError: [{'id': 'dac0a136-f43c-4d18-93c3-2e2ca4957585', 'source': 'source_963e2018', 'severity': 'LOW', 'details': 'Details for anomaly f44f3c46553b4be29b9786aa5fb76244', 'telemetry_snapshot': {'cpu_load': 0.3163213128854375, 'memory_usage': 490}}, {'id': 'a45dd77f-f82a-4156-a3c4-98dcf4a5645
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

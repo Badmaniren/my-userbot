@@ -4,9 +4,35 @@ from skills.anomaly_logger import AnomalyLogger
 VALID_SEVERITIES = {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
 
 def start_new(data):
+    if isinstance(data, list):
+        results = []
+        for item in data:
+            if isinstance(item, dict):
+                metric = item.get("metric", item.get("source", "unknown"))
+                status = item.get("status", item.get("severity", "LOW"))
+                if hasattr(status, "upper") and status.upper() in VALID_SEVERITIES:
+                    sev = status.upper()
+                elif status in ["critical", "warning"]:
+                    sev = "CRITICAL" if status == "critical" else "HIGH"
+                else:
+                    sev = "LOW"
+                val = item.get("value", "")
+                details = f"Metric {metric} reached value {val}" if val != "" else item.get("details", "")
+                results.append({
+                    "source": f"sensor_{metric}",
+                    "severity": sev,
+                    "details": details,
+                    "telemetry_snapshot": item,
+                    "normalized": True
+                })
+        return results
+
     if isinstance(data, str):
-        with open(data, 'r', encoding='utf-8') as f:
-            content = f.read()
+        try:
+            with open(data, 'r', encoding='utf-8') as f:
+                content = f.read()
+        except (OSError, FileNotFoundError, TypeError):
+            content = data
         if isinstance(content, bytes):
             content = content.decode('utf-8')
         content = content.strip()

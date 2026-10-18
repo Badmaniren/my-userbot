@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ледняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## patch_applier (compose) — раундов: 4
-- Последняя ошибка перед фиксом: raise PatchExecutorError("Invalid patch data format.")
+едняя ошибка перед фиксом: raise PatchExecutorError("Invalid patch data format.")
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## patch_pipeline (compose) — раундов: 4
@@ -340,4 +336,8 @@
 ## audit_serializer (create) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## report_exporter (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

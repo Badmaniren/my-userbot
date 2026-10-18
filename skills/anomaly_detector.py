@@ -43,10 +43,14 @@ class AnomalyDetector:
         if not history:
             raise AnomalyDetectorError(f"No history found for metric: {metric_name}")
         
-        mean_val = sum(history) / len(history)
-        
-        if abs(target_value - mean_val) > self.threshold or target_value > self.threshold * 2:
+        if abs(target_value) > self.threshold or target_value > self.threshold:
             return True
+
+        prior = history[:-1] if len(history) > 1 and history[-1] == target_value else history
+        if prior:
+            mean_val = sum(prior) / len(prior)
+            if abs(target_value - mean_val) > self.threshold:
+                return True
             
         return False
 

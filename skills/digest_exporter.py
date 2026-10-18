@@ -18,9 +18,14 @@ class DigestExporter:
     def export_json_report(self, output_path: str) -> str:
         """Экспортирует данные дайджеста и метрики визуализатора в JSON-файл."""
         try:
-            metrics = self.visualizer.get_summary_metrics()
-            text_rep = self.visualizer.render_text()
-            ascii_rep = self.visualizer.render_ascii_correlation_graph()
+            if self.visualizer is not None:
+                metrics = self.visualizer.get_summary_metrics()
+                text_rep = self.visualizer.render_text()
+                ascii_rep = self.visualizer.render_ascii_correlation_graph()
+            else:
+                metrics = {}
+                text_rep = ""
+                ascii_rep = ""
 
             if isinstance(metrics, dict):
                 data = metrics.copy()
@@ -29,6 +34,14 @@ class DigestExporter:
 
             data['text_report'] = text_rep
             data['ascii_graph'] = ascii_rep
+
+            if self.digest is not None:
+                if hasattr(self.digest, "generate_final_report"):
+                    data["audit_report"] = self.digest.generate_final_report()
+                elif hasattr(self.digest, "get_structured_report"):
+                    data["audit_report"] = self.digest.get_structured_report()
+                elif isinstance(self.digest, dict):
+                    data.update(self.digest)
 
             with open(output_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
@@ -42,9 +55,14 @@ class DigestExporter:
     def export_html_report(self, output_path: str) -> str:
         """Экспортирует отчет в HTML-файл."""
         try:
-            metrics = self.visualizer.get_summary_metrics()
-            text_rep = self.visualizer.render_text()
-            ascii_rep = self.visualizer.render_ascii_correlation_graph()
+            if self.visualizer is not None:
+                metrics = self.visualizer.get_summary_metrics()
+                text_rep = self.visualizer.render_text()
+                ascii_rep = self.visualizer.render_ascii_correlation_graph()
+            else:
+                metrics = {}
+                text_rep = ""
+                ascii_rep = ""
 
             html_content = f"""<html>
     <head><title>Digest Report</title></head>

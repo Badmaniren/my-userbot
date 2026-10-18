@@ -20,7 +20,7 @@ class AnomalyAuditHub:
             telemetry_snapshot=telemetry_snapshot
         )
 
-    def aggregate_and_report(self, metric_name: str, value: float):
+    def aggregate_and_report(self, metric_name: str = "default", value: float = 0.0):
         return self.aggregator.aggregate_and_report(
             metric_name=metric_name,
             value=value

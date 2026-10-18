@@ -3,7 +3,11 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- на эскалацию
+ит в main
+
+## anomaly_correlator (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## anomaly_mapper (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAIL: test_anomaly_mapper_integration_real_flow (tests.test_anomaly_mapper_integration.TestAnomalyMapperIntegration.test_anomaly_mapper_integration_real_flow)
@@ -331,8 +335,4 @@
 
 ## anomaly_audit_exporter (compose) — раундов: 4
 - Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/skills/code_validator.py", line 61, in validate_code
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## anomaly_report_aggregator (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

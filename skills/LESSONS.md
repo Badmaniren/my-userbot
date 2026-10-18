@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-
-- Античит поймал: Синтаксическая ошибка в коде: invalid character '—' (U+2014) (<unknown>, line 1)
-- Последняя ошибка перед фиксом: ERROR: test_process_patch_valid_integration (tests.test_patch_pipeline_integration.TestPatchPipelineIntegration.test_process_patch_valid_integration)
+tch_valid_integration (tests.test_patch_pipeline_integration.TestPatchPipelineIntegration.test_process_patch_valid_integration)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## patch_integrator (compose) — раундов: 4
@@ -337,4 +335,8 @@
 
 ## anomaly_audit_exporter (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## anomaly_pipeline (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

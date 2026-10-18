@@ -104,7 +104,7 @@ class GitInspector:
 
 
 class AutonomousReactorEngine:
-    def handle_anomaly(self, anomaly):
-        return {"status": "handled", "anomaly": anomaly}
+    def handle_anomaly(self, anomaly, target_value=None):
+        return {"status": "handled", "anomaly": anomaly, "target_value": target_value}
 
 anomaly_reactor = AutonomousReactorEngine()

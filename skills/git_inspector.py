@@ -1,6 +1,11 @@
 import os
 import subprocess
 
+def _to_str(val):
+    if isinstance(val, bytes):
+        return val.decode('utf-8')
+    return str(val or "")
+
 class GitInspector:
     def __init__(self, repo_path):
         self.repo_path = repo_path
@@ -18,7 +23,7 @@ class GitInspector:
                 stderr=subprocess.PIPE,
                 check=True
             )
-            output = result.stdout.decode('utf-8').strip()
+            output = _to_str(result.stdout).strip()
             if not output:
                 return []
             
@@ -49,7 +54,7 @@ class GitInspector:
                 stderr=subprocess.PIPE,
                 check=True
             )
-            return result.stdout.decode('utf-8')
+            return _to_str(result.stdout)
         except subprocess.CalledProcessError:
             return ""
 
@@ -80,7 +85,7 @@ class GitInspector:
                 stderr=subprocess.PIPE,
                 check=True
             )
-            return result.stdout.decode('utf-8')
+            return _to_str(result.stdout)
         except subprocess.CalledProcessError:
             return ""
 
@@ -98,6 +103,6 @@ class GitInspector:
                 stderr=subprocess.PIPE,
                 check=True
             )
-            return result.stdout.decode('utf-8')
+            return _to_str(result.stdout)
         except subprocess.CalledProcessError:
             return ""

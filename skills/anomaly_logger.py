@@ -61,4 +61,7 @@ class AnomalyLogger:
 
     def clear_logs(self):
         if os.path.exists(self.log_path):
-            os.remove(self.log_path)
+            try:
+                os.remove(self.log_path)
+            except OSError:
+                pass

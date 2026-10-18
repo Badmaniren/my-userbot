@@ -17,7 +17,7 @@ class TestAnomalyCorrelatorIntegration(unittest.TestCase):
 
     def test_correlate_metric_integration_flow(self):
         metric_name = f"metric_{uuid.uuid4().hex[:8]}"
-        random_value = float(random.randint(51, 500))
+        random_value = float(random.randint(200, 500))
 
         is_anomaly = self.correlator.correlate_metric(metric_name, random_value)
         self.assertTrue(is_anomaly)

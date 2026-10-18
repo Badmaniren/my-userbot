@@ -31,9 +31,12 @@ class AnomalyForecaster:
         self.is_trained = False
         self.historical_data: List[Dict[str, Any]] = []
 
-    def train(self) -> None:
-        logger = AnomalyLogger(log_path=self.log_path)
-        history = logger.get_anomalies()
+    def train(self, data: List[Dict[str, Any]] = None) -> None:
+        if data is not None:
+            history = data
+        else:
+            logger = AnomalyLogger(log_path=self.log_path)
+            history = logger.get_anomalies()
         if not history:
             raise AnomalyForecasterError("Cannot train model on empty historical data.")
         self.historical_data = history

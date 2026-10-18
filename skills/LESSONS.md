@@ -3,7 +3,8 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-гой, передан на эскалацию
+tch_valid_integration (tests.test_patch_pipeline_integration.TestPatchPipelineIntegration.test_process_patch_valid_integration)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## patch_integrator (compose) — раундов: 4
 - Последняя ошибка перед фиксом: ======================================================================
@@ -338,8 +339,4 @@
 
 ## anomaly_pipeline (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## anomaly_pipeline (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: Ran 268 tests in 0.326s
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

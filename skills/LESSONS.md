@@ -3,19 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-===========================
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## patch_manager (compose) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## extractor_tool_1792165051 (create) — раундов: 2
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: успешно прошёл тесты и влит в main
-
-## patch_pipeline_runner (compose) — раундов: 4
-- Последняя ошибка перед фиксом: module = self._get_module_from_name(name)
+ед фиксом: module = self._get_module_from_name(name)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## patch_executor (refactor) — раундов: 2
@@ -343,4 +331,9 @@
 
 ## anomaly_audit_bridge (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## audit_export_bridge (compose) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid character '—' (U+2014) (<unknown>, line 55); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Последняя ошибка перед фиксом: bridge = AuditExportBridge(self.repo_path, self.log_path, self.threshold)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

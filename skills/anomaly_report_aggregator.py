@@ -11,10 +11,8 @@ class AnomalyReportAggregator:
     def __init__(self, repo_path=None, log_path=None, threshold=None, detector=None, correlator=None, logger=None):
         if logger is not None:
             self.anomaly_logger = logger
-        elif log_path is not None:
-            self.anomaly_logger = AnomalyLogger(log_path=log_path)
         else:
-            self.anomaly_logger = AnomalyLogger()
+            self.anomaly_logger = AnomalyLogger(log_path=log_path or "/tmp/anomaly_report.log")
 
         if correlator is not None:
             self.correlator = correlator
@@ -30,15 +28,29 @@ class AnomalyReportAggregator:
     def aggregate_and_report(self, metric_name, value):
         try:
             self.correlator.correlate_metric(metric_name, value)
-            anomalies = self.correlator.correlate_events()
+            events = self.correlator.correlate_events()
             
+            if isinstance(events, dict):
+                anomalies = events.get("report", [])
+            elif isinstance(events, list):
+                anomalies = events
+            else:
+                anomalies = []
+
             for anomaly in anomalies:
-                self.anomaly_logger.log_anomaly(
-                    source=anomaly.get("source"),
-                    severity=anomaly.get("severity"),
-                    details=anomaly.get("details"),
-                    telemetry_snapshot=anomaly.get("telemetry_snapshot")
-                )
+                if isinstance(anomaly, dict):
+                    self.anomaly_logger.log_anomaly(
+                        source=anomaly.get("source"),
+                        severity=anomaly.get("severity"),
+                        details=anomaly.get("details"),
+                        telemetry_snapshot=anomaly.get("telemetry_snapshot")
+                    )
+                elif isinstance(anomaly, str):
+                    self.anomaly_logger.log_anomaly(
+                        source=anomaly,
+                        severity="WARNING",
+                        details={"metric": metric_name, "value": value}
+                    )
                 
             return self.anomaly_logger.get_structured_report()
         except AnomalyCorrelatorError as e:

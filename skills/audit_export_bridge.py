@@ -51,6 +51,12 @@ class AuditExportBridge:
                         norm_entry["metric_name"] = details["metric_name"]
                     if "value" in details and "value" not in norm_entry:
                         norm_entry["value"] = details["value"]
+                if "metric_name" not in norm_entry and norm_entry.get("source"):
+                    norm_entry["metric_name"] = norm_entry["source"]
+                if "value" not in norm_entry and hasattr(self.hub, "aggregator") and hasattr(self.hub.aggregator, "correlator") and hasattr(self.hub.aggregator.correlator, "detector"):
+                    hist = self.hub.aggregator.correlator.detector.get_metric_history(norm_entry.get("metric_name"))
+                    if hist:
+                        norm_entry["value"] = hist[-1]
                 normalized_data.append(norm_entry)
             else:
                 normalized_data.append(entry)

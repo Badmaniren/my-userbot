@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- на эскалацию
-
-## anomaly_mapper (compose) — раундов: 4
-- Последняя ошибка перед фиксом: FAIL: test_anomaly_mapper_integration_real_flow (tests.test_anomaly_mapper_integration.TestAnomalyMapperIntegration.test_anomaly_mapper_integration_real_flow)
+test_anomaly_mapper_integration.TestAnomalyMapperIntegration.test_anomaly_mapper_integration_real_flow)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## anomaly_visualizer (start_new) — раундов: 4
@@ -335,4 +332,8 @@
 
 ## anomaly_report_aggregator (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## anomaly_audit_hub (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

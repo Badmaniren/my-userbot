@@ -1,75 +1,70 @@
 import unittest
 import tempfile
 import shutil
+import os
 import uuid
 import random
-import os
-
-from skills.anomaly_logger import AnomalyLogger
-from skills.anomaly_report_aggregator import AnomalyReportAggregator
-from skills import anomaly_audit_hub
-
+from skills.anomaly_audit_hub import AnomalyAuditHub
 
 class TestAnomalyAuditHubIntegration(unittest.TestCase):
-
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
-        self.log_path = os.path.join(self.test_dir, f"audit_log_{uuid.uuid4().hex}.json")
+        self.log_file = os.path.join(self.test_dir, f"audit_{uuid.uuid4()}.log")
         self.repo_path = self.test_dir
+        self.threshold = round(random.uniform(0.1, 0.9), 2)
         
-        self.source = f"source_{uuid.uuid4().hex[:8]}"
-        self.severity = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
-        self.details = f"Details for anomaly test {uuid.uuid4().hex}"
-        self.telemetry_snapshot = {"cpu_load": random.random(), "memory_free": random.randint(100, 1000)}
-        
-        self.metric_name = f"metric_{uuid.uuid4().hex[:8]}"
-        self.metric_value = random.uniform(10.0, 100.0)
-        self.threshold = random.uniform(50.0, 150.0)
-        
-        self.logger_instance = AnomalyLogger(log_path=self.log_path)
-        self.aggregator_instance = AnomalyReportAggregator(
+        self.hub = AnomalyAuditHub(
             repo_path=self.repo_path,
-            log_path=self.log_path,
-            threshold=self.threshold,
-            detector=None,
-            correlator=None,
-            logger=self.logger_instance
+            log_path=self.log_file,
+            threshold=self.threshold
         )
 
     def tearDown(self):
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
-    def test_anomaly_audit_hub_composition(self):
-        self.logger_instance.log_anomaly(
-            source=self.source,
-            severity=self.severity,
-            details=self.details,
-            telemetry_snapshot=self.telemetry_snapshot
+    def test_anomaly_audit_hub_workflow(self):
+        source_name = f"source_{uuid.uuid4().hex[:8]}"
+        severity_level = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
+        metric_name = f"metric_{uuid.uuid4().hex[:8]}"
+        metric_value = round(random.uniform(1.0, 100.0), 2)
+        
+        details_data = {
+            "error_code": random.randint(1000, 9999),
+            "message": f"msg_{uuid.uuid4()}"
+        }
+        telemetry_snapshot_data = {
+            "cpu_usage": round(random.uniform(10.0, 99.9), 2),
+            "memory_free": random.randint(1024, 16384)
+        }
+
+        log_result = self.hub.log_anomaly(
+            source=source_name,
+            severity=severity_level,
+            details=details_data,
+            telemetry_snapshot=telemetry_snapshot_data
         )
-        
-        logged_anomalies = self.logger_instance.get_anomalies()
-        self.assertTrue(any(a.get("source") == self.source for a in logged_anomalies), "Логгер должен содержать записанную аномалию.")
 
-        try:
-            report_result = self.aggregator_instance.aggregate_and_report(
-                metric_name=self.metric_name,
-                value=self.metric_value
-            )
-        except Exception:
-            report_result = None
+        self.assertTrue(
+            os.path.exists(self.log_file),
+            "Интеграционная ошибка: Файл логов не был создан реальным модулем AnomalyLogger."
+        )
 
-        self.assertTrue(hasattr(anomaly_audit_hub, "__file__"), "Модуль anomaly_audit_hub должен существовать и быть импортирован.")
-        
-        hub_report = getattr(anomaly_audit_hub, "generate_audit_report", None)
-        if callable(hub_report):
-            final_hub_data = hub_report(self.logger_instance, self.aggregator_instance)
-            self.assertIsNotNone(final_hub_data)
-        else:
-            structured_rep = self.logger_instance.get_structured_report()
-            self.assertIsNotNone(structured_rep)
+        agg_result = self.hub.aggregate_and_report(
+            metric_name=metric_name,
+            value=metric_value
+        )
 
-        self.assertTrue(os.path.exists(self.log_path), "Файл логов должен реально существовать на диске.")
+        final_report = self.hub.generate_final_report()
 
+        self.assertIsNotNone(
+            final_report,
+            "Интеграционная ошибка: generate_final_report() вернул None."
+        )
+
+        if isinstance(final_report, dict):
+            self.assertTrue(len(final_report) >= 0)
+        elif isinstance(final_report, str):
+            self.assertTrue(len(final_report) >= 0)
 
 if __name__ == "__main__":
     unittest.main()

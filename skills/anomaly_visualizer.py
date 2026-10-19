@@ -26,7 +26,14 @@ class AnomalyVisualizer:
         lines.append("Correlations:")
         for c in correlations:
             lines.append(f"  {c.get('source')} -> {c.get('target')} : {c.get('coefficient')}")
-            
+
+        anomalies = self.digest.get("anomalies", [])
+        if anomalies:
+            lines.append("Anomalies:")
+            for a in anomalies:
+                if isinstance(a, dict):
+                    lines.append(f"  Source: {a.get('source')} | Severity: {a.get('severity')} | Details: {a.get('details')}")
+
         return "\n".join(lines)
 
     def render_ascii_correlation_graph(self) -> str:

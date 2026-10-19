@@ -13,7 +13,7 @@ class DigestExporter:
 
     def __init__(self, stability_digest=None, anomaly_visualizer=None):
         self.digest = stability_digest
-        self.visualizer = anomaly_visualizer
+        self.visualizer = anomaly_visualizer if anomaly_visualizer is not None else AnomalyVisualizer()
 
     def export_json_report(self, output_path: str) -> str:
         """Экспортирует данные дайджеста и метрики визуализатора в JSON-файл."""

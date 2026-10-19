@@ -34,10 +34,21 @@ class AnomalyPipeline:
         if not isinstance(filtered, dict) or not filtered:
             return {"is_anomaly": False}
 
-        metric_name, target_val = next(iter(filtered.items()))
+        if "telemetry_snapshot" in filtered and isinstance(filtered["telemetry_snapshot"], dict) and filtered["telemetry_snapshot"]:
+            metrics = filtered["telemetry_snapshot"]
+        else:
+            metrics = filtered
+
+        if not metrics:
+            return {"is_anomaly": False}
+
+        metric_name, target_val = next(iter(metrics.items()))
 
         try:
-            is_anomaly = self.detector_module.detect_anomaly(metric_name, target_val)
+            if hasattr(self.detector_module, "get_metric_history") and hasattr(self.detector_module, "record_metric"):
+                if not self.detector_module.get_metric_history(metric_name):
+                    self.detector_module.record_metric(metric_name, float(target_val))
+            is_anomaly = self.detector_module.detect_anomaly(metric_name, float(target_val))
         except Exception as e:
             raise AnomalyPipelineError(str(e)) from e
 

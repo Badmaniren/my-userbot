@@ -18,17 +18,20 @@ class DigestExporter:
     def export_json_report(self, output_path: str) -> str:
         """Экспортирует данные дайджеста и метрики визуализатора в JSON-файл."""
         try:
-            metrics = self.visualizer.get_summary_metrics()
-            text_rep = self.visualizer.render_text()
-            ascii_rep = self.visualizer.render_ascii_correlation_graph()
+            if self.visualizer is not None:
+                metrics = self.visualizer.get_summary_metrics()
+                text_rep = self.visualizer.render_text()
+                ascii_rep = self.visualizer.render_ascii_correlation_graph()
 
-            if isinstance(metrics, dict):
-                data = metrics.copy()
+                if isinstance(metrics, dict):
+                    data = metrics.copy()
+                else:
+                    data = {}
+
+                data['text_report'] = text_rep
+                data['ascii_graph'] = ascii_rep
             else:
-                data = {}
-
-            data['text_report'] = text_rep
-            data['ascii_graph'] = ascii_rep
+                data = {"status": "ok", "report": "empty_digest"}
 
             with open(output_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
@@ -42,9 +45,14 @@ class DigestExporter:
     def export_html_report(self, output_path: str) -> str:
         """Экспортирует отчет в HTML-файл."""
         try:
-            metrics = self.visualizer.get_summary_metrics()
-            text_rep = self.visualizer.render_text()
-            ascii_rep = self.visualizer.render_ascii_correlation_graph()
+            if self.visualizer is not None:
+                metrics = self.visualizer.get_summary_metrics()
+                text_rep = self.visualizer.render_text()
+                ascii_rep = self.visualizer.render_ascii_correlation_graph()
+            else:
+                metrics = {}
+                text_rep = ""
+                ascii_rep = ""
 
             html_content = f"""<html>
     <head><title>Digest Report</title></head>

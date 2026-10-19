@@ -3,7 +3,11 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-/Python/3.11.17/x64/lib/python3.11/unittest/mock.py", line 1357, in decoration_helper
+1
+- Статус: успешно прошёл тесты и влит в main
+
+## patch_verifier (compose) — раундов: 4
+- Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/unittest/mock.py", line 1357, in decoration_helper
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## patch_pipeline_builder (compose) — раундов: 4
@@ -334,8 +338,4 @@
 
 ## anomaly_audit_bridge (compose) — раундов: 4
 - Последняя ошибка перед фиксом: AttributeError: 'str' object has no attribute 'get'
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## anomaly_audit_exporter (compose) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

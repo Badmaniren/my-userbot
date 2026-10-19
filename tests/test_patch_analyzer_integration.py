@@ -1,126 +1,108 @@
-import os
-import shutil
-import subprocess
-import tempfile
 import unittest
 import uuid
-
-from skills.git_inspector import GitInspector
-from skills.patch_analyzer import PatchAnalyzer
+import random
+import os
+import tempfile
+import subprocess
+from skills.patch_analyzer import PatchAnalyzer, PatchAnalyzerError, GitInspector
 
 
 class TestPatchAnalyzerIntegration(unittest.TestCase):
     def setUp(self):
-        self.temp_dir = tempfile.mkdtemp()
-        self.repo_dir = os.path.join(self.temp_dir, f"repo_{uuid.uuid4().hex[:8]}")
-        os.makedirs(self.repo_dir)
-
-        subprocess.run(["git", "init"], cwd=self.repo_dir, check=True, capture_output=True)
-        subprocess.run(["git", "config", "user.name", "TestEngineer"], cwd=self.repo_dir, check=True)
-        subprocess.run(["git", "config", "user.email", "engineer@test.local"], cwd=self.repo_dir, check=True)
-
         self.analyzer = PatchAnalyzer()
-        self.inspector = GitInspector(self.repo_dir)
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.repo_path = self.temp_dir.name
+
+        # Инициализируем реальный git репозиторий для интеграционной проверки GitInspector и PatchAnalyzer
+        subprocess.run(["git", "init"], cwd=self.repo_path, capture_output=True, check=True)
+        subprocess.run(["git", "config", "user.email", "architect@test.com"], cwd=self.repo_path, capture_output=True, check=True)
+        subprocess.run(["git", "config", "user.name", "Architect"], cwd=self.repo_path, capture_output=True, check=True)
 
     def tearDown(self):
-        shutil.rmtree(self.temp_dir, ignore_errors=True)
+        self.temp_dir.cleanup()
 
-    def _commit_file(self, filename: str, content: str, message: str) -> str:
-        filepath = os.path.join(self.repo_dir, filename)
-        with open(filepath, "w", encoding="utf-8") as f:
-            f.write(content)
-        subprocess.run(["git", "add", filename], cwd=self.repo_dir, check=True, capture_output=True)
-        subprocess.run(["git", "commit", "-m", message], cwd=self.repo_dir, check=True, capture_output=True)
-        rev = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=self.repo_dir,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        return rev.stdout.strip()
+    def test_integration_git_and_patch_analyzer(self):
+        # Генерируем уникальные данные для теста, исключая хардкод
+        unique_file_name = f"file_{uuid.uuid4().hex[:8]}.py"
+        file_path = os.path.join(self.repo_path, unique_file_name)
 
-    def test_clean_patch_analysis_from_git_inspector(self):
-        file_token = uuid.uuid4().hex[:8]
-        filename = f"module_{file_token}.py"
-        base_var = f"var_{uuid.uuid4().hex[:6]}"
-        initial_code = f"def compute_{file_token}():\n    {base_var} = 10\n    return {base_var}\n"
+        random_code_line = f"print('{uuid.uuid4()}')"
 
-        self._commit_file(filename, initial_code, "Initial commit")
+        # Создаем файл в репозитории
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write("def initial():\n    pass\n")
 
-        add_token_1 = f"added_val_{uuid.uuid4().hex[:6]}"
-        add_token_2 = f"added_val_{uuid.uuid4().hex[:6]}"
-        modified_code = (
-            f"def compute_{file_token}():\n"
-            f"    {base_var} = 20\n"
-            f"    {add_token_1} = 30\n"
-            f"    {add_token_2} = {base_var} + {add_token_1}\n"
-            f"    return {add_token_2}\n"
-        )
-        head_commit = self._commit_file(filename, modified_code, "Update logic")
+        subprocess.run(["git", "add", unique_file_name], cwd=self.repo_path, capture_output=True, check=True)
+        subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=self.repo_path, capture_output=True, check=True)
 
-        raw_diff = self.inspector.get_file_diff(head_commit)
-        if isinstance(raw_diff, dict):
-            diff_text = raw_diff.get("diff", str(raw_diff))
-        else:
-            diff_text = str(raw_diff)
+        # Вносим изменения в файл
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(f"def initial():\n    {random_code_line}\n    return True\n")
 
-        analysis = self.analyzer.analyze(diff_text)
+        subprocess.run(["git", "add", unique_file_name], cwd=self.repo_path, capture_output=True, check=True)
+        subprocess.run(["git", "commit", "-m", "Update commit"], cwd=self.repo_path, capture_output=True, check=True)
 
+        # Получаем хэш последнего коммита
+        res = subprocess.run(["git", "rev-parse", "HEAD"], cwd=self.repo_path, capture_output=True, text=True, check=True)
+        commit_hash = res.stdout.strip()
+
+        # Интегрируем GitInspector и PatchAnalyzer без моков
+        inspector = GitInspector(self.repo_path)
+        diff_text = inspector.get_file_diff(commit_hash)
+
+        # Выполняем анализ реального diff
+        analysis_result = self.analyzer.analyze(diff_text)
+
+        self.assertTrue(analysis_result["is_valid"])
+        self.assertIn(unique_file_name, analysis_result["files"])
+        self.assertGreater(analysis_result["additions"], 0)
+
+        # Проверяем работу stream и file анализаторов
+        with tempfile.NamedTemporaryFile(mode="w+", delete=False, encoding="utf-8") as tmp:
+            tmp.write(diff_text)
+            tmp_name = tmp.name
+
+        try:
+            file_analysis = self.analyzer.analyze_file(tmp_name)
+            self.assertTrue(file_analysis["is_valid"])
+            self.assertEqual(file_analysis["additions"], analysis_result["additions"])
+
+            with open(tmp_name, "r", encoding="utf-8") as stream_f:
+                stream_analysis = self.analyzer.analyze_stream(stream_f)
+                self.assertTrue(stream_analysis["is_valid"])
+                self.assertEqual(stream_analysis["deletions"], analysis_result["deletions"])
+        finally:
+            if os.path.exists(tmp_name):
+                os.remove(tmp_name)
+
+    def test_integration_syntax_risks_and_validation(self):
+        # Генерируем случайную опасную конструкцию и случайный uuid
+        random_var = f"var_{uuid.uuid4().hex[:6]}"
+        malicious_diff = f"""--- a/test_risk.py
++++ b/test_risk.py
+@@ -1,1 +1,1 @@
+-print("old")
++{random_var} = eval("1 + 1")
+"""
+
+        analysis = self.analyzer.analyze(malicious_diff)
         self.assertTrue(analysis["is_valid"])
-        self.assertIn(filename, analysis["files"])
-        self.assertGreaterEqual(analysis["additions"], 3)
-        self.assertGreaterEqual(analysis["deletions"], 1)
-        self.assertGreater(len(analysis["chunks"]), 0)
-        self.assertEqual(len(analysis["syntax_risks"]), 0)
 
-    def test_detects_syntax_risks_in_patch(self):
-        file_token = uuid.uuid4().hex[:8]
-        filename = f"danger_{file_token}.py"
-        initial_code = f"def safe_func_{file_token}():\n    pass\n"
-        self._commit_file(filename, initial_code, "Initial safe func")
+        risk_detected = False
+        for risk in analysis["risks"]:
+            if risk["type"] == "dangerous_call" and "eval" in risk["details"]:
+                risk_detected = True
 
-        injected_token = uuid.uuid4().hex
-        risky_code = (
-            f"def safe_func_{file_token}():\n"
-            f"    eval(f'dangerous_payload_{injected_token}')\n"
-            f"    exec('x = 1')\n"
-            f"    unclosed_tuple = (1, 2,\n"
-        )
-        head_commit = self._commit_file(filename, risky_code, "Introduce syntax risks")
+        self.assertTrue(risk_detected, "Integrational check failed to detect dynamically injected eval risk")
 
-        raw_diff = self.inspector.get_file_diff(head_commit)
-        diff_text = raw_diff.get("diff", str(raw_diff)) if isinstance(raw_diff, dict) else str(raw_diff)
+    def test_integration_invalid_diff_raises_error(self):
+        garbage_data = f"random_garbage_{uuid.uuid4()}"
+        with self.assertRaises(PatchAnalyzerError):
+            self.analyzer.validate_structure(garbage_data)
 
-        analysis = self.analyzer.analyze(diff_text)
-
-        self.assertTrue(analysis["is_valid"])
-        self.assertIn(filename, analysis["files"])
-        self.assertGreater(len(analysis["syntax_risks"]), 0)
-
-        risk_descriptions = " ".join(
-            str(risk.get("description", risk) if isinstance(risk, dict) else risk)
-            for risk in analysis["syntax_risks"]
-        )
-        self.assertTrue(
-            "eval" in risk_descriptions.lower()
-            or "exec" in risk_descriptions.lower()
-            or "syntax" in risk_descriptions.lower()
-        )
-
-    def test_malformed_chunk_structure_marks_patch_invalid(self):
-        random_hash = uuid.uuid4().hex
-        corrupted_patch = (
-            f"--- a/broken_{random_hash}.py\n"
-            f"+++ b/broken_{random_hash}.py\n"
-            f"@@ invalid chunk header @@\n"
-            f"+print('malformed {random_hash}')\n"
-        )
-
-        analysis = self.analyzer.analyze(corrupted_patch)
-
-        self.assertFalse(analysis["is_valid"])
-        self.assertGreater(len(analysis.get("errors", [])), 0)
+        result = self.analyzer.analyze(garbage_data)
+        self.assertFalse(result["is_valid"])
+        self.assertTrue(len(result["errors"]) > 0)
 
 
 if __name__ == "__main__":

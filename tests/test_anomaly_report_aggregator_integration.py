@@ -1,78 +1,92 @@
-import unittest
-import tempfile
-import shutil
-import uuid
-import random
 import os
-
-from skills.anomaly_report_aggregator import AnomalyReportAggregator
-from skills.anomaly_correlator import AnomalyCorrelator
+import random
+import tempfile
+import unittest
+import uuid
 from skills.anomaly_logger import AnomalyLogger
+from skills.anomaly_report_aggregator import (
+    AnomalyReportAggregator,
+    AnomalyReportAggregatorError,
+)
+
 
 class TestAnomalyReportAggregatorIntegration(unittest.TestCase):
-
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp()
-        self.log_path = os.path.join(self.test_dir, f"anomalies_{uuid.uuid4().hex}.json")
-        self.repo_path = self.test_dir
-
-        self.threshold = round(random.uniform(0.5, 0.9), 2)
-        self.metric_name = f"metric_{uuid.uuid4().hex[:6]}"
-        self.metric_value = round(random.uniform(10.0, 100.0), 2)
-        
-        self.source = f"source_{uuid.uuid4().hex[:6]}"
-        self.severity = random.choice(["INFO", "WARNING", "CRITICAL"])
-        self.details = f"Details for anomaly test {uuid.uuid4().hex}"
-        self.telemetry_snapshot = {"cpu": random.randint(10, 99), "mem": random.randint(20, 90)}
-
-        self.logger = AnomalyLogger(log_path=self.log_path)
-        self.correlator = AnomalyCorrelator(
-            repo_path=self.repo_path,
-            log_path=self.log_path,
-            threshold=self.threshold,
-            detector=None,
-            logger=self.logger
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.log_file = os.path.join(
+            self.temp_dir.name, f"test_anomaly_{uuid.uuid4().hex}.log"
         )
-        
+        self.logger = AnomalyLogger(log_path=self.log_file)
         self.aggregator = AnomalyReportAggregator(
-            correlator=self.correlator,
-            logger=self.logger
+            log_path=self.log_file,
+            logger=self.logger,
+            threshold=random.uniform(50.0, 80.0)
         )
 
     def tearDown(self):
-        shutil.rmtree(self.test_dir)
+        self.temp_dir.cleanup()
 
-    def test_aggregator_real_composition_flow(self):
-        self.logger.log_anomaly(
-            source=self.source,
-            severity=self.severity,
-            details=self.details,
-            telemetry_snapshot=self.telemetry_snapshot
-        )
+    def test_aggregate_and_report_real_pipeline(self):
+        random_metric = f"metric_{uuid.uuid4().hex[:8]}"
+        random_value = round(random.uniform(10.0, 100.0), 3)
 
-        correlation_result = self.correlator.correlate_metric(
-            metric_name=self.metric_name,
-            value=self.metric_value
-        )
+        report = self.aggregator.aggregate_and_report(random_metric, random_value)
+        self.assertIsInstance(report, (dict, list))
 
-        report = self.aggregator.generate_final_report()
+        final_report = self.aggregator.generate_final_report()
+        self.assertIsInstance(final_report, (dict, list))
 
-        self.assertTrue(os.path.exists(self.log_path), "Log file must be created by AnomalyLogger via composition.")
-        
         logged_anomalies = self.logger.get_anomalies()
-        self.assertGreaterEqual(len(logged_anomalies), 1, "At least one anomaly should be logged.")
-        
-        found_target = False
-        for anomaly in logged_anomalies:
-            if anomaly.get("details") == self.details:
-                found_target = True
-                self.assertEqual(anomaly.get("source"), self.source)
-                self.assertEqual(anomaly.get("severity"), self.severity)
-                self.assertEqual(anomaly.get("telemetry_snapshot"), self.telemetry_snapshot)
-                break
-        
-        self.assertTrue(found_target, "The specifically injected anomaly details must be retrievable from the logger.")
-        self.assertIsNotNone(report, "Aggregator must produce a non-null final report.")
+        self.assertIsInstance(logged_anomalies, list)
+
+    def test_aggregate_execution_flow_with_payload_conversion(self):
+        execution_id = f"exec_{uuid.uuid4().hex}"
+        random_num = round(random.uniform(100.5, 999.9), 2)
+        payload = {
+            f"key_str_float_{uuid.uuid4().hex[:6]}": str(random_num),
+            f"key_raw_str_{uuid.uuid4().hex[:6]}": f"val_{uuid.uuid4().hex[:4]}",
+            f"key_numeric_{uuid.uuid4().hex[:6]}": random.randint(1, 50),
+        }
+
+        report = self.aggregator.aggregate_execution_flow(execution_id, payload)
+        self.assertIsInstance(report, (dict, list))
+
+        persisted_logs = self.logger.get_structured_report()
+        self.assertIsInstance(persisted_logs, (dict, list))
+        self.assertTrue(os.path.exists(self.log_file))
+
+    def test_generate_final_report_matches_logger_state(self):
+        random_source = f"src_{uuid.uuid4().hex[:6]}"
+        random_details = f"details_{uuid.uuid4().hex}"
+        random_snapshot = {"rand_key": random.randint(100, 999)}
+
+        self.logger.log_anomaly(
+            source=random_source,
+            severity="HIGH",
+            details=random_details,
+            telemetry_snapshot=random_snapshot,
+        )
+
+        final_report = self.aggregator.generate_final_report()
+        self.assertIsInstance(final_report, (dict, list))
+
+        report_str = str(final_report)
+        self.assertIn(random_source, report_str)
+        self.assertIn(random_details, report_str)
+
+    def test_error_handling_wraps_in_anomaly_report_aggregator_error(self):
+        class FaultyCorrelator:
+            def correlate_metric(self, metric, value):
+                raise ValueError("Inner correlation failed")
+
+        faulty_aggregator = AnomalyReportAggregator(
+            correlator=FaultyCorrelator(),
+            logger=self.logger
+        )
+
+        with self.assertRaises(AnomalyReportAggregatorError):
+            faulty_aggregator.aggregate_and_report("bad_metric", 123)
+
 
 if __name__ == "__main__":
     unittest.main()

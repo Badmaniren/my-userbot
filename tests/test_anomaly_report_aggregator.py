@@ -1,190 +1,226 @@
-import unittest
-from unittest.mock import patch, MagicMock
-import uuid
+import io
 import random
 import string
-import io
+import unittest
+from unittest.mock import MagicMock, patch
+import uuid
 
-from skills.anomaly_report_aggregator import AnomalyReportAggregator, AnomalyReportAggregatorError
+from skills.anomaly_correlator import AnomalyCorrelatorError
+from skills.anomaly_report_aggregator import (
+    AnomalyReportAggregator,
+    AnomalyReportAggregatorError,
+)
 
 
 class TestAnomalyReportAggregator(unittest.TestCase):
+    def _random_str(self, length=8):
+        chars = string.ascii_letters + string.digits
+        return "".join(random.choices(chars, k=length))
 
-    def setUp(self):
-        self.rand_repo = f"/repo/{uuid.uuid4().hex}"
-        self.rand_log = f"/logs/{uuid.uuid4().hex}.log"
-        self.rand_threshold = random.uniform(0.1, 9.9)
-        self.rand_detector = f"detector_{uuid.uuid4().hex[:6]}"
-        
-        self.aggregator = AnomalyReportAggregator(
-            repo_path=self.rand_repo,
-            log_path=self.rand_log,
-            threshold=self.rand_threshold,
-            detector=self.rand_detector
+    def _random_path(self):
+        return f"/tmp/{uuid.uuid4().hex}/{self._random_str(6)}.log"
+
+    def test_init_with_custom_logger_and_correlator(self):
+        mock_logger = MagicMock()
+        mock_correlator = MagicMock()
+        aggregator = AnomalyReportAggregator(
+            logger=mock_logger, correlator=mock_correlator
         )
+        self.assertIs(aggregator.anomaly_logger, mock_logger)
+        self.assertIs(aggregator.correlator, mock_correlator)
 
-    @patch('skills.anomaly_report_aggregator.AnomalyCorrelator')
-    @patch('skills.anomaly_report_aggregator.AnomalyLogger')
-    def test_initialization_and_composition(self, mock_logger_cls, mock_correlator_cls):
-        rand_repo_local = f"/repo/{uuid.uuid4().hex}"
-        rand_log_local = f"/logs/{uuid.uuid4().hex}.log"
-        rand_threshold_local = random.uniform(1.0, 5.0)
-        rand_detector_local = f"det_{uuid.uuid4().hex}"
+    def test_init_creates_defaults_when_omitted(self):
+        random_repo = f"/repo/{uuid.uuid4().hex}"
+        random_log = self._random_path()
+        random_thresh = random.uniform(1.0, 50.0)
 
-        instance = AnomalyReportAggregator(
-            repo_path=rand_repo_local,
-            log_path=rand_log_local,
-            threshold=rand_threshold_local,
-            detector=rand_detector_local
-        )
+        with patch("skills.anomaly_report_aggregator.AnomalyLogger") as mock_logger_cls, \
+             patch("skills.anomaly_report_aggregator.AnomalyCorrelator") as mock_correlator_cls:
+            instance_logger = MagicMock()
+            mock_logger_cls.return_value = instance_logger
+            instance_correlator = MagicMock()
+            mock_correlator_cls.return_value = instance_correlator
 
-        mock_correlator_cls.assert_called_once_with(
-            repo_path=rand_repo_local,
-            log_path=rand_log_local,
-            threshold=rand_threshold_local,
-            detector=rand_detector_local,
-            logger=instance.anomaly_logger
-        )
-        mock_logger_cls.assert_called_once_with(log_path=rand_log_local)
+            aggregator = AnomalyReportAggregator(
+                repo_path=random_repo,
+                log_path=random_log,
+                threshold=random_thresh,
+            )
 
-    @patch('skills.anomaly_report_aggregator.AnomalyCorrelator')
-    @patch('skills.anomaly_report_aggregator.AnomalyLogger')
-    def test_aggregate_and_report_success(self, mock_logger_cls, mock_correlator_cls):
-        mock_correlator_instance = mock_correlator_cls.return_value
-        mock_logger_instance = mock_logger_cls.return_value
+            mock_logger_cls.assert_called_once_with(log_path=random_log)
+            mock_correlator_cls.assert_called_once_with(
+                repo_path=random_repo,
+                log_path=random_log,
+                threshold=random_thresh,
+                detector=None,
+                logger=instance_logger,
+            )
+            self.assertIs(aggregator.anomaly_logger, instance_logger)
+            self.assertIs(aggregator.correlator, instance_correlator)
 
-        rand_metric = f"metric_{uuid.uuid4().hex[:6]}"
-        rand_value = random.randint(100, 999)
-        rand_source = f"src_{uuid.uuid4().hex[:4]}"
-        rand_severity = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
-        rand_details = f"details_{uuid.uuid4().hex}"
-        rand_snapshot = {"telemetry_id": uuid.uuid4().hex}
+    def test_aggregate_and_report_success_with_dicts_and_non_dicts(self):
+        mock_logger = MagicMock()
+        mock_correlator = MagicMock()
 
-        mock_correlator_instance.correlate_events.return_value = [
+        metric_name = f"metric_{uuid.uuid4().hex}"
+        metric_val = random.uniform(10.0, 100.0)
+
+        expected_source = f"src_{uuid.uuid4().hex}"
+        expected_severity = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
+        expected_details = f"details_{uuid.uuid4().hex}"
+        expected_telemetry = {f"k_{self._random_str(4)}": random.randint(1, 100)}
+
+        raw_str_anomaly = f"string_err_{uuid.uuid4().hex}"
+
+        mock_correlator.correlate_events.return_value = [
             {
-                "source": rand_source,
-                "severity": rand_severity,
-                "details": rand_details,
-                "telemetry_snapshot": rand_snapshot
-            }
+                "source": expected_source,
+                "severity": expected_severity,
+                "details": expected_details,
+                "telemetry_snapshot": expected_telemetry,
+            },
+            raw_str_anomaly,
         ]
 
-        rand_report = f"report_{uuid.uuid4().hex}"
-        mock_logger_instance.get_structured_report.return_value = rand_report
+        expected_report = {
+            "token": uuid.uuid4().hex,
+            "count": 2,
+            "status": "COMPLETED",
+        }
+        mock_logger.get_structured_report.return_value = expected_report
 
         aggregator = AnomalyReportAggregator(
-            repo_path=self.rand_repo,
-            log_path=self.rand_log,
-            threshold=self.rand_threshold,
-            detector=self.rand_detector
+            logger=mock_logger, correlator=mock_correlator
         )
+        report = aggregator.aggregate_and_report(metric_name, metric_val)
 
-        result = aggregator.aggregate_and_report(rand_metric, rand_value)
+        mock_correlator.correlate_metric.assert_called_once_with(metric_name, metric_val)
+        mock_correlator.correlate_events.assert_called_once()
 
-        mock_correlator_instance.correlate_metric.assert_called_once_with(rand_metric, rand_value)
-        mock_correlator_instance.correlate_events.assert_called_once()
-        
-        mock_logger_instance.log_anomaly.assert_called_once_with(
-            source=rand_source,
-            severity=rand_severity,
-            details=rand_details,
-            telemetry_snapshot=rand_snapshot
+        self.assertEqual(mock_logger.log_anomaly.call_count, 2)
+        mock_logger.log_anomaly.assert_any_call(
+            source=expected_source,
+            severity=expected_severity,
+            details=expected_details,
+            telemetry_snapshot=expected_telemetry,
         )
-        mock_logger_instance.get_structured_report.assert_called_once()
-        self.assertEqual(result, rand_report)
+        mock_logger.log_anomaly.assert_any_call(
+            source=raw_str_anomaly,
+            severity="UNKNOWN",
+            details=raw_str_anomaly,
+            telemetry_snapshot={},
+        )
+        self.assertEqual(report, expected_report)
 
-    @patch('skills.anomaly_report_aggregator.AnomalyCorrelator')
-    @patch('skills.anomaly_report_aggregator.AnomalyLogger')
-    def test_aggregate_execution_flow_success(self, mock_logger_cls, mock_correlator_cls):
-        mock_correlator_instance = mock_correlator_cls.return_value
-        mock_logger_instance = mock_logger_cls.return_value
+    def test_aggregate_and_report_correlator_error_wrapped(self):
+        mock_logger = MagicMock()
+        mock_correlator = MagicMock()
+        err_msg = f"correlator_failure_{uuid.uuid4().hex}"
+        mock_correlator.correlate_events.side_effect = AnomalyCorrelatorError(err_msg)
 
-        rand_exec_id = uuid.uuid4().hex
-        rand_payload = {uuid.uuid4().hex: random.random()}
-        
-        rand_source = f"src_{uuid.uuid4().hex}"
-        rand_severity = random.choice(["INFO", "WARNING", "FATAL"])
-        rand_details = uuid.uuid4().hex
-        rand_snapshot = {uuid.uuid4().hex: uuid.uuid4().hex}
+        aggregator = AnomalyReportAggregator(
+            logger=mock_logger, correlator=mock_correlator
+        )
+        with self.assertRaises(AnomalyReportAggregatorError) as ctx:
+            aggregator.aggregate_and_report(uuid.uuid4().hex, random.random())
 
-        mock_correlator_instance.analyze_execution_flow.return_value = [
+        self.assertIn(err_msg, str(ctx.exception))
+
+    def test_aggregate_execution_flow_casts_numeric_strings_and_handles_mixed(self):
+        mock_logger = MagicMock()
+        mock_correlator = MagicMock()
+
+        numeric_float_val = round(random.uniform(1.5, 99.5), 3)
+        numeric_str_val = str(numeric_float_val)
+        non_numeric_str = f"non_num_{uuid.uuid4().hex}"
+        already_int = random.randint(100, 200)
+
+        payload_input = {
+            "castable": numeric_str_val,
+            "non_castable": non_numeric_str,
+            "int_val": already_int,
+        }
+
+        execution_id = f"exec_{uuid.uuid4().hex}"
+        expected_anomaly_source = f"src_{uuid.uuid4().hex}"
+        mock_correlator.analyze_execution_flow.return_value = [
             {
-                "source": rand_source,
-                "severity": rand_severity,
-                "details": rand_details,
-                "telemetry_snapshot": rand_snapshot
-            }
-        ]
-        
-        rand_final_report = uuid.uuid4().hex
-        mock_logger_instance.get_structured_report.return_value = rand_final_report
-
-        aggregator = AnomalyReportAggregator(
-            repo_path=self.rand_repo,
-            log_path=self.rand_log,
-            threshold=self.rand_threshold,
-            detector=self.rand_detector
-        )
-
-        report = aggregator.aggregate_execution_flow(rand_exec_id, rand_payload)
-
-        mock_correlator_instance.analyze_execution_flow.assert_called_once_with(rand_exec_id, rand_payload)
-        mock_logger_instance.log_anomaly.assert_called_once_with(
-            source=rand_source,
-            severity=rand_severity,
-            details=rand_details,
-            telemetry_snapshot=rand_snapshot
-        )
-        self.assertEqual(report, rand_final_report)
-
-    @patch('skills.anomaly_report_aggregator.AnomalyCorrelator')
-    @patch('skills.anomaly_report_aggregator.AnomalyLogger')
-    def test_correlator_error_handling(self, mock_logger_cls, mock_correlator_cls):
-        from skills.anomaly_correlator import AnomalyCorrelatorError
-        mock_correlator_instance = mock_correlator_cls.return_value
-        mock_correlator_instance.correlate_metric.side_effect = AnomalyCorrelatorError(uuid.uuid4().hex)
-
-        aggregator = AnomalyReportAggregator(
-            repo_path=self.rand_repo,
-            log_path=self.rand_log,
-            threshold=self.rand_threshold,
-            detector=self.rand_detector
-        )
-
-        with self.assertRaises(AnomalyReportAggregatorError):
-            aggregator.aggregate_and_report(uuid.uuid4().hex, random.randint(1, 100))
-
-    @patch('skills.anomaly_report_aggregator.AnomalyCorrelator')
-    @patch('skills.anomaly_report_aggregator.AnomalyLogger')
-    def test_stream_io_handling(self, mock_logger_cls, mock_correlator_cls):
-        mock_correlator_instance = mock_correlator_cls.return_value
-        mock_logger_instance = mock_logger_cls.return_value
-
-        rand_stream_data = ''.join(random.choices(string.ascii_letters + string.digits, k=128)).encode('utf-8')
-        bio = io.BytesIO(rand_stream_data)
-
-        mock_correlator_instance.correlate_events.return_value = [
-            {
-                "source": uuid.uuid4().hex,
+                "source": expected_anomaly_source,
                 "severity": "CRITICAL",
-                "details": bio.read().decode('utf-8'),
-                "telemetry_snapshot": {}
+                "details": "High deviation detected",
+                "telemetry_snapshot": {"val": numeric_float_val},
             }
         ]
+        mock_report = {"flow_report_id": uuid.uuid4().hex, "anomalies_count": 1}
+        mock_logger.get_structured_report.return_value = mock_report
 
         aggregator = AnomalyReportAggregator(
-            repo_path=self.rand_repo,
-            log_path=self.rand_log,
-            threshold=self.rand_threshold,
-            detector=self.rand_detector
+            logger=mock_logger, correlator=mock_correlator
+        )
+        result = aggregator.aggregate_execution_flow(execution_id, payload_input)
+
+        mock_correlator.analyze_execution_flow.assert_called_once()
+        called_exec_id, called_payload = mock_correlator.analyze_execution_flow.call_args[0]
+        self.assertEqual(called_exec_id, execution_id)
+        self.assertIsInstance(called_payload["castable"], float)
+        self.assertAlmostEqual(called_payload["castable"], numeric_float_val)
+        self.assertNotIn("non_castable", called_payload)
+        self.assertEqual(called_payload["int_val"], float(already_int))
+
+        mock_logger.log_anomaly.assert_called_once_with(
+            source=expected_anomaly_source,
+            severity="CRITICAL",
+            details="High deviation detected",
+            telemetry_snapshot={"val": numeric_float_val},
+        )
+        self.assertEqual(result, mock_report)
+
+    def test_aggregate_execution_flow_correlator_exception_wrapped(self):
+        mock_logger = MagicMock()
+        mock_correlator = MagicMock()
+        type_err_msg = f"'>' not supported between instances of 'str' and 'float' - {uuid.uuid4().hex}"
+        mock_correlator.analyze_execution_flow.side_effect = TypeError(type_err_msg)
+
+        aggregator = AnomalyReportAggregator(
+            logger=mock_logger, correlator=mock_correlator
         )
 
-        aggregator.aggregate_and_report(uuid.uuid4().hex, random.random())
+        with self.assertRaises(AnomalyReportAggregatorError) as ctx:
+            aggregator.aggregate_execution_flow(uuid.uuid4().hex, {"metric": "invalid"})
 
-        mock_logger_instance.log_anomaly.assert_called_once()
-        logged_args = mock_logger_instance.log_anomaly.call_args[1]
-        self.assertEqual(logged_args["details"], rand_stream_data.decode('utf-8'))
+        self.assertIn(type_err_msg, str(ctx.exception))
+
+    def test_generate_final_report_success(self):
+        mock_logger = MagicMock()
+        mock_correlator = MagicMock()
+        random_report = {
+            "summary_id": uuid.uuid4().hex,
+            "metrics": {self._random_str(5): random.random()},
+        }
+        mock_logger.get_structured_report.return_value = random_report
+
+        aggregator = AnomalyReportAggregator(
+            logger=mock_logger, correlator=mock_correlator
+        )
+        report = aggregator.generate_final_report()
+
+        mock_logger.get_structured_report.assert_called_once()
+        self.assertEqual(report, random_report)
+
+    def test_generate_final_report_exception_wrapped(self):
+        mock_logger = MagicMock()
+        mock_correlator = MagicMock()
+        err_text = f"logger_failure_{uuid.uuid4().hex}"
+        mock_logger.get_structured_report.side_effect = RuntimeError(err_text)
+
+        aggregator = AnomalyReportAggregator(
+            logger=mock_logger, correlator=mock_correlator
+        )
+        with self.assertRaises(AnomalyReportAggregatorError) as ctx:
+            aggregator.generate_final_report()
+
+        self.assertIn(err_text, str(ctx.exception))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

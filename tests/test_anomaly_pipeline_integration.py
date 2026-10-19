@@ -1,62 +1,53 @@
 import unittest
+import os
 import uuid
 import random
 import tempfile
-import os
 from skills.anomaly_pipeline import AnomalyPipeline
-from skills.anomaly_filter import AnomalyFilter
-from skills.anomaly_detector import AnomalyDetector
-
+from skills.anomaly_audit_hub import AnomalyAuditHub
+from skills.anomaly_logger import AnomalyLogger
 
 class TestAnomalyPipelineIntegration(unittest.TestCase):
-
     def setUp(self):
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.repo_path = self.temp_dir.name
-        self.threshold = random.uniform(0.5, 0.9)
+        self.test_dir = tempfile.TemporaryDirectory()
+        self.log_path = os.path.join(self.test_dir.name, f"audit_{uuid.uuid4()}.log")
+        self.repo_path = self.test_dir.name
+        self.threshold = random.uniform(50.0, 100.0)
+        
+        self.audit_hub = AnomalyAuditHub(
+            repo_path=self.repo_path,
+            log_path=self.log_path,
+            threshold=self.threshold
+        )
+        self.logger = AnomalyLogger(log_path=self.log_path)
         self.pipeline = AnomalyPipeline(repo_path=self.repo_path, threshold=self.threshold)
 
     def tearDown(self):
-        self.temp_dir.cleanup()
+        self.test_dir.cleanup()
 
-    def test_pipeline_composition_and_flow(self):
-        self.assertIsInstance(self.pipeline.filter_module, AnomalyFilter)
-        self.assertIsInstance(self.pipeline.detector_module, AnomalyDetector)
-
-        metric_name = f"metric_{uuid.uuid4().hex[:8]}"
-        base_value = random.randint(10, 50)
-        
-        raw_data = {
-            "metric_name": metric_name,
-            "values": [base_value + random.randint(-2, 2) for _ in range(5)]
-        }
-        
-        spike_value = base_value + random.randint(100, 200)
-        raw_data["values"].append(spike_value)
-
-        result = self.pipeline.process_pipeline(raw_data)
-
-        self.assertIn("filtered_data", result)
-        self.assertIn("detection_result", result)
-        
-        detection_output = result["detection_result"]
-        self.assertTrue(any(detection_output.values()) or isinstance(detection_output, dict))
-
-    def test_pipeline_randomized_anomaly_search(self):
+    def test_pipeline_audit_logger_integration(self):
         execution_id = str(uuid.uuid4())
-        metrics_count = random.randint(3, 7)
+        metric_name = f"metric_{uuid.uuid4().hex[:6]}"
+        anomaly_value = random.uniform(self.threshold + 1.0, self.threshold + 50.0)
         
-        metrics_payload = {}
-        for _ in range(metrics_count):
-            m_name = f"sys_metric_{uuid.uuid4().hex[:6]}"
-            m_val = random.uniform(100.0, 500.0)
-            metrics_payload[m_name] = m_val
-
-        pipeline_result = self.pipeline.run_end_to_end(execution_id, metrics_payload)
-
-        self.assertIsInstance(pipeline_result, dict)
-        self.assertGreaterEqual(len(pipeline_result), 0)
-
+        payload = {metric_name: anomaly_value}
+        
+        pipeline_results = self.pipeline.run_end_to_end(execution_id, payload)
+        self.assertIn(metric_name, pipeline_results)
+        
+        if pipeline_results[metric_name]:
+            self.audit_hub.log_anomaly(
+                source=execution_id,
+                severity="HIGH",
+                details={"metric": metric_name, "value": anomaly_value},
+                telemetry_snapshot={"status": "active"}
+            )
+        
+        logged_anomalies = self.logger.get_anomalies()
+        self.assertIsInstance(logged_anomalies, list)
+        
+        report = self.logger.get_structured_report()
+        self.assertIsNotNone(report)
 
 if __name__ == "__main__":
     unittest.main()

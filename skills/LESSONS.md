@@ -3,12 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- перед фиксом: FAIL: test_run_pipeline_verification_failure (tests.test_patch_pipeline_builder.TestPatchPipelineBuilder.test_run_pipeline_verification_failure)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## patch_auto_pipeline (compose) — раундов: 4
-- Последняя ошибка перед фиксом: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+Унгой, передан на эскалацию
 
 ## patch_autofix_pipeline (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
@@ -338,4 +333,9 @@
 ## anomaly_audit_hub (refactor) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## anomaly_audit_hub (refactor) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Последняя ошибка перед фиксом: raise CodeValidatorASTError(f"Ошибка синтаксиса AST: {e}") from e
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -9,6 +9,9 @@ class AnomalyReportAggregatorError(Exception):
 
 class AnomalyReportAggregator:
     def __init__(self, repo_path=None, log_path=None, threshold=None, detector=None, correlator=None, logger=None):
+        self.repo_path = repo_path
+        self.log_path = log_path
+        self.threshold = threshold
         if logger is not None:
             self.anomaly_logger = logger
         elif log_path is not None:

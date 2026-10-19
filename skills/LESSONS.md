@@ -3,7 +3,9 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- main
+
+- Последняя ошибка перед фиксом: skills.anomaly_visualizer.AnomalyVisualizerError: Digest must be a dictionary.
+- Статус: успешно прошёл тесты и влит в main
 
 ## digest_dashboard_aggregator (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
@@ -332,8 +334,4 @@
 
 ## anomaly_report_aggregator (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/skills/code_validator.py", line 61, in validate_code
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## anomaly_report_aggregator (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

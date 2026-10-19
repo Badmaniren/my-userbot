@@ -60,9 +60,10 @@ class AnomalyDetector:
         
         anomalies_detected = []
         for name, val in metrics.items():
-            self.record_metric(name, val)
-            if val > self.threshold * 5:
-                anomalies_detected.append(name)
+            if isinstance(val, (int, float)) and not isinstance(val, bool):
+                self.record_metric(name, val)
+                if val > self.threshold * 5:
+                    anomalies_detected.append(name)
 
         return {
             "execution_id": execution_id,

@@ -42,7 +42,7 @@ class AntipatternVisitor(ast.NodeVisitor):
 class CodeValidator:
     """Модуль для семантической валидации санитизированного кода патчей."""
 
-    def __init__(self, repo_path: str):
+    def __init__(self, repo_path: str = "."):
         self.repo_path = repo_path
         self.forbidden_constructs: Set[str] = set()
 

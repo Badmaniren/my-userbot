@@ -11,6 +11,10 @@ class AnomalyAuditHub:
             threshold=threshold,
             logger=self.logger
         )
+        self.aggregator.repo_path = repo_path
+        self.aggregator.log_path = log_path
+        self.aggregator.threshold = threshold
+        self.aggregator.logger = self.logger
 
     def log_anomaly(self, source: str, severity: str, details: dict, telemetry_snapshot: dict):
         return self.logger.log_anomaly(

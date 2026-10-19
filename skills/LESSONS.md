@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- main
-
-## digest_dashboard_aggregator (compose) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+й, передан на эскалацию
 
 ## digest_dashboard_aggregator (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
@@ -336,4 +332,8 @@
 
 ## anomaly_report_aggregator (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## audit_report_formatter (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

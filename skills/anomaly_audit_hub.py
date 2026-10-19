@@ -27,4 +27,10 @@ class AnomalyAuditHub:
         )
 
     def generate_final_report(self):
-        return self.aggregator.generate_final_report()
+        report = self.aggregator.generate_final_report()
+        if isinstance(report, list):
+            return {
+                "anomalies": report,
+                "total_anomalies": len(report)
+            }
+        return report

@@ -49,5 +49,25 @@ class TestAnomalyPipelineIntegration(unittest.TestCase):
         report = self.logger.get_structured_report()
         self.assertIsNotNone(report)
 
+    def test_pipeline_single_run_flow(self):
+        metric_name = f"metric_{uuid.uuid4().hex[:6]}"
+        val = random.uniform(1.0, 50.0)
+        self.pipeline.detector_module.record_metric(metric_name, 10.0)
+        single_input = {metric_name: val}
+        run_result = self.pipeline.run(single_input)
+        self.assertIn("is_anomaly", run_result)
+        self.assertEqual(run_result.get("metric_name"), metric_name)
+        self.assertEqual(run_result.get("target_value"), val)
+
+    def test_pipeline_run_batch_flow(self):
+        m1 = f"metric1_{uuid.uuid4().hex[:6]}"
+        m2 = f"metric2_{uuid.uuid4().hex[:6]}"
+        self.pipeline.detector_module.record_metric(m1, 10.0)
+        self.pipeline.detector_module.record_metric(m2, 20.0)
+        batch_data = {m1: 10.0, m2: 20.0}
+        batch_results = self.pipeline.run_batch(batch_data)
+        self.assertIn(m1, batch_results)
+        self.assertIn(m2, batch_results)
+
 if __name__ == "__main__":
     unittest.main()

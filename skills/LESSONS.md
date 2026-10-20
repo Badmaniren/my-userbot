@@ -3,12 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ngine (create) — раундов: 4
-- Последняя ошибка перед фиксом: RecursionError: maximum recursion depth exceeded while calling a Python object
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## patch_analyzer (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
+ors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## patch_evaluator (refactor) — раундов: 4
@@ -341,4 +336,9 @@ ngine (create) — раундов: 4
 ## digest_exporter (refactor) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## anomaly_report_aggregator (refactor) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Последняя ошибка перед фиксом: The above exception was the direct cause of the following exception:
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

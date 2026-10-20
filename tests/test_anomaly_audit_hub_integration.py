@@ -50,7 +50,7 @@ class TestAnomalyAuditHubIntegration(unittest.TestCase):
         self.assertTrue(os.path.exists(self.log_file), "Лог-файл должен быть создан в процессе работы AnomalyLogger.")
 
         metric_name = f"metric_{uuid.uuid4().hex[:6]}"
-        metric_value = round(random.uniform(self.threshold + 0.1, self.threshold + 50.0), 2)
+        metric_value = round(random.uniform(self.threshold * 2.0 + 1.0, self.threshold * 2.0 + 50.0), 2)
 
         agg_result = self.hub.aggregate_and_report(
             metric_name=metric_name,

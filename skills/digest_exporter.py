@@ -25,7 +25,7 @@ class DigestExporter:
             if isinstance(metrics, dict):
                 data = metrics.copy()
             else:
-                data = {}
+                data = {'metrics': metrics}
 
             data['text_report'] = text_rep
             data['ascii_graph'] = ascii_rep

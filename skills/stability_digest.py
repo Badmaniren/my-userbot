@@ -10,7 +10,7 @@ class StabilityDigestError(Exception):
 class StabilityDigest:
     """Модуль для формирования аналитических дайджестов стабильности на основе телеметрии и аномалий."""
 
-    def __init__(self, repo_path: str, anomaly_detector: AnomalyCorrelator, system_telemetry: SystemTelemetry):
+    def __init__(self, repo_path: str = ".", anomaly_detector=None, system_telemetry=None):
         self.repo_path = repo_path
         self.anomaly_detector = anomaly_detector
         self.system_telemetry = system_telemetry

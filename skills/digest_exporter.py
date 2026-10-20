@@ -18,9 +18,28 @@ class DigestExporter:
     def export_json_report(self, output_path: str) -> str:
         """Экспортирует данные дайджеста и метрики визуализатора в JSON-файл."""
         try:
-            metrics = self.visualizer.get_summary_metrics()
-            text_rep = self.visualizer.render_text()
-            ascii_rep = self.visualizer.render_ascii_correlation_graph()
+            metrics = {}
+            if self.visualizer and hasattr(self.visualizer, 'get_summary_metrics'):
+                try:
+                    metrics = self.visualizer.get_summary_metrics()
+                except Exception as e:
+                    raise DigestExporterError(str(e))
+            if not metrics and self.visualizer and hasattr(self.visualizer, 'digest') and isinstance(self.visualizer.digest, dict):
+                metrics = self.visualizer.digest
+
+            text_rep = ""
+            if self.visualizer and hasattr(self.visualizer, 'render_text'):
+                try:
+                    text_rep = self.visualizer.render_text()
+                except Exception as e:
+                    raise DigestExporterError(str(e))
+
+            ascii_rep = ""
+            if self.visualizer and hasattr(self.visualizer, 'render_ascii_correlation_graph'):
+                try:
+                    ascii_rep = self.visualizer.render_ascii_correlation_graph()
+                except Exception as e:
+                    raise DigestExporterError(str(e))
 
             if isinstance(metrics, dict):
                 data = metrics.copy()
@@ -42,9 +61,28 @@ class DigestExporter:
     def export_html_report(self, output_path: str) -> str:
         """Экспортирует отчет в HTML-файл."""
         try:
-            metrics = self.visualizer.get_summary_metrics()
-            text_rep = self.visualizer.render_text()
-            ascii_rep = self.visualizer.render_ascii_correlation_graph()
+            metrics = {}
+            if self.visualizer and hasattr(self.visualizer, 'get_summary_metrics'):
+                try:
+                    metrics = self.visualizer.get_summary_metrics()
+                except Exception as e:
+                    raise DigestExporterError(str(e))
+            if not metrics and self.visualizer and hasattr(self.visualizer, 'digest') and isinstance(self.visualizer.digest, dict):
+                metrics = self.visualizer.digest
+
+            text_rep = ""
+            if self.visualizer and hasattr(self.visualizer, 'render_text'):
+                try:
+                    text_rep = self.visualizer.render_text()
+                except Exception as e:
+                    raise DigestExporterError(str(e))
+
+            ascii_rep = ""
+            if self.visualizer and hasattr(self.visualizer, 'render_ascii_correlation_graph'):
+                try:
+                    ascii_rep = self.visualizer.render_ascii_correlation_graph()
+                except Exception as e:
+                    raise DigestExporterError(str(e))
 
             html_content = f"""<html>
     <head><title>Digest Report</title></head>
@@ -68,6 +106,8 @@ class DigestExporter:
     def export_stream_to_json(self, stream_id: str, output_path: str) -> str:
         """Экспортирует поток дайджеста в JSON."""
         try:
+            if not self.digest or not hasattr(self.digest, 'export_digest_stream'):
+                raise DigestExporterError("Stability digest is not configured or missing export_digest_stream method")
             stream_data = self.digest.export_digest_stream(stream_id)
             with open(output_path, 'w', encoding='utf-8') as f:
                 json.dump(stream_data, f, ensure_ascii=False, indent=4)

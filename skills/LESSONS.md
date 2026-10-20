@@ -3,13 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-передан на эскалацию
-
-## patch_reporter (create) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## git_metric_extractor (create) — раундов: 4
-- Последняя ошибка перед фиксом: AssertionError: 'config_e35f72.json' not found in []
+еред фиксом: AssertionError: 'config_e35f72.json' not found in []
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## anomaly_filter (start_new) — раундов: 2
@@ -340,4 +334,8 @@
 ## digest_exporter (refactor) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: FAILED (errors=4)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## digest_exporter (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: obj, end = self.raw_decode(s, idx=_w(s, 0).end())
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

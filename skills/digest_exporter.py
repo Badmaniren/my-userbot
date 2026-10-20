@@ -30,8 +30,9 @@ class DigestExporter:
             data['text_report'] = text_rep
             data['ascii_graph'] = ascii_rep
 
+            content = json.dumps(data, ensure_ascii=False, indent=4)
             with open(output_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=4)
+                f.write(content)
 
             return output_path
         except Exception as e:
@@ -69,8 +70,9 @@ class DigestExporter:
         """Экспортирует поток дайджеста в JSON."""
         try:
             stream_data = self.digest.export_digest_stream(stream_id)
+            content = json.dumps(stream_data, ensure_ascii=False, indent=4)
             with open(output_path, 'w', encoding='utf-8') as f:
-                json.dump(stream_data, f, ensure_ascii=False, indent=4)
+                f.write(content)
             return output_path
         except Exception as e:
             if isinstance(e, DigestExporterError):
@@ -85,8 +87,9 @@ class DigestExporter:
             else:
                 data = {}
 
+            content = json.dumps(data, ensure_ascii=False, indent=4)
             with open(output_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=4)
+                f.write(content)
             return output_path
         except Exception as e:
             if isinstance(e, DigestExporterError):

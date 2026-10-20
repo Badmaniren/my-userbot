@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ВАЛЕН Унгой, передан на эскалацию
-
-## patch_pipeline_builder (compose) — раундов: 4
-- Последняя ошибка перед фиксом: skills.patch_pipeline_builder.PatchPipelineError: Ошибка при верификации и применении патча: 'str' object has no attribute 'get'
+eError: Ошибка при верификации и применении патча: 'str' object has no attribute 'get'
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## patch_pipeline_controller (compose) — раундов: 4
@@ -337,5 +334,9 @@
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## anomaly_pipeline (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: Traceback (most recent call last):
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## digest_exporter (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: Traceback (most recent call last):
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

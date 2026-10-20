@@ -3,14 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-eate) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## patch_checker (compose) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: успешно прошёл тесты и влит в main
-
-## patch_pipeline_integration (compose) — раундов: 4
+ine_integration (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -340,4 +333,8 @@ eate) — раундов: 1
 
 ## digest_exporter (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: Traceback (most recent call last):
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## anomaly_pipeline (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/skills/anomaly_pipeline.py", line 32, in run
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

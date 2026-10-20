@@ -25,16 +25,28 @@ class AnomalyPipeline:
             except TypeError:
                 self.detector_module = AnomalyDetector()
 
+    def _extract_metrics_map(self, filtered):
+        if not isinstance(filtered, dict):
+            return {}
+        if "details" in filtered and isinstance(filtered["details"], dict):
+            return filtered["details"]
+        if "telemetry_snapshot" in filtered and isinstance(filtered["telemetry_snapshot"], dict) and filtered["telemetry_snapshot"]:
+            return filtered["telemetry_snapshot"]
+        return {k: v for k, v in filtered.items() if k not in ("source", "severity", "normalized")}
+
     def run(self, raw_input):
         try:
             filtered = self.filter_module.filter(raw_input)
+        except (KeyError, TypeError):
+            filtered = raw_input
         except Exception as e:
             raise AnomalyPipelineError(str(e)) from e
 
-        if not isinstance(filtered, dict) or not filtered:
+        metrics_map = self._extract_metrics_map(filtered)
+        if not metrics_map:
             return {"is_anomaly": False}
 
-        metric_name, target_val = next(iter(filtered.items()))
+        metric_name, target_val = next(iter(metrics_map.items()))
 
         try:
             is_anomaly = self.detector_module.detect_anomaly(metric_name, target_val)
@@ -50,12 +62,15 @@ class AnomalyPipeline:
     def run_batch(self, raw_batch_data):
         try:
             filtered = self.filter_module.filter(raw_batch_data)
+        except (KeyError, TypeError):
+            filtered = raw_batch_data
         except Exception as e:
             raise AnomalyPipelineError(str(e)) from e
 
         results = {}
-        if isinstance(filtered, dict):
-            for metric_name, target_val in filtered.items():
+        metrics_map = self._extract_metrics_map(filtered)
+        if isinstance(metrics_map, dict):
+            for metric_name, target_val in metrics_map.items():
                 try:
                     is_anomaly = self.detector_module.detect_anomaly(metric_name, target_val)
                 except Exception as e:

@@ -68,7 +68,10 @@ class DigestExporter:
     def export_stream_to_json(self, stream_id: str, output_path: str) -> str:
         """Экспортирует поток дайджеста в JSON."""
         try:
-            stream_data = self.digest.export_digest_stream(stream_id)
+            if self.digest and hasattr(self.digest, 'export_digest_stream'):
+                stream_data = self.digest.export_digest_stream(stream_id)
+            else:
+                stream_data = {}
             with open(output_path, 'w', encoding='utf-8') as f:
                 json.dump(stream_data, f, ensure_ascii=False, indent=4)
             return output_path

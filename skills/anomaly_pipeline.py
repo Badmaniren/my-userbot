@@ -13,9 +13,12 @@ class AnomalyPipeline:
         self.threshold = threshold
         
         try:
-            self.filter_module = AnomalyFilter()
-        except TypeError:
             self.filter_module = AnomalyFilter(repo_path=repo_path)
+        except TypeError:
+            try:
+                self.filter_module = AnomalyFilter()
+            except Exception:
+                self.filter_module = AnomalyFilter()
             
         try:
             self.detector_module = AnomalyDetector(repo_path=repo_path, threshold=threshold)
@@ -23,11 +26,16 @@ class AnomalyPipeline:
             try:
                 self.detector_module = AnomalyDetector(threshold=threshold)
             except TypeError:
-                self.detector_module = AnomalyDetector()
+                try:
+                    self.detector_module = AnomalyDetector()
+                except Exception:
+                    self.detector_module = AnomalyDetector()
 
     def run(self, raw_input):
         try:
             filtered = self.filter_module.filter(raw_input)
+        except (KeyError, ValueError):
+            filtered = raw_input
         except Exception as e:
             raise AnomalyPipelineError(str(e)) from e
 
@@ -37,7 +45,9 @@ class AnomalyPipeline:
         metric_name, target_val = next(iter(filtered.items()))
 
         try:
-            is_anomaly = self.detector_module.detect_anomaly(metric_name, target_val)
+            if hasattr(self.detector_module, "record_metric"):
+                self.detector_module.record_metric(metric_name, float(target_val))
+            is_anomaly = self.detector_module.detect_anomaly(metric_name, float(target_val))
         except Exception as e:
             raise AnomalyPipelineError(str(e)) from e
 
@@ -50,6 +60,8 @@ class AnomalyPipeline:
     def run_batch(self, raw_batch_data):
         try:
             filtered = self.filter_module.filter(raw_batch_data)
+        except (KeyError, ValueError):
+            filtered = raw_batch_data
         except Exception as e:
             raise AnomalyPipelineError(str(e)) from e
 
@@ -57,7 +69,9 @@ class AnomalyPipeline:
         if isinstance(filtered, dict):
             for metric_name, target_val in filtered.items():
                 try:
-                    is_anomaly = self.detector_module.detect_anomaly(metric_name, target_val)
+                    if hasattr(self.detector_module, "record_metric"):
+                        self.detector_module.record_metric(metric_name, float(target_val))
+                    is_anomaly = self.detector_module.detect_anomaly(metric_name, float(target_val))
                 except Exception as e:
                     raise AnomalyPipelineError(str(e)) from e
                 results[metric_name] = is_anomaly
@@ -76,11 +90,15 @@ class AnomalyPipeline:
                 if isinstance(v, list):
                     for val in v:
                         try:
+                            if hasattr(self.detector_module, "record_metric"):
+                                self.detector_module.record_metric(k, float(val))
                             detection_output[k] = self.detector_module.detect_anomaly(k, float(val))
                         except Exception:
                             detection_output[k] = False
                 else:
                     try:
+                        if hasattr(self.detector_module, "record_metric"):
+                            self.detector_module.record_metric(k, float(v))
                         detection_output[k] = self.detector_module.detect_anomaly(k, float(v))
                     except Exception:
                         detection_output[k] = False
@@ -95,6 +113,8 @@ class AnomalyPipeline:
         if isinstance(metrics_payload, dict):
             for m_name, m_val in metrics_payload.items():
                 try:
+                    if hasattr(self.detector_module, "record_metric"):
+                        self.detector_module.record_metric(m_name, float(m_val))
                     is_anom = self.detector_module.detect_anomaly(m_name, float(m_val))
                 except Exception:
                     is_anom = False

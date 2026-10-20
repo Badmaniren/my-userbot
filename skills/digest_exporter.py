@@ -69,6 +69,8 @@ class DigestExporter:
         """Экспортирует поток дайджеста в JSON."""
         try:
             stream_data = self.digest.export_digest_stream(stream_id)
+            if not isinstance(stream_data, dict):
+                stream_data = {}
             with open(output_path, 'w', encoding='utf-8') as f:
                 json.dump(stream_data, f, ensure_ascii=False, indent=4)
             return output_path
@@ -80,10 +82,19 @@ class DigestExporter:
     def export_to_json(self, output_path: str) -> str:
         """Метод-адаптер под интеграционный тест для экспорта в JSON."""
         try:
-            if self.visualizer and hasattr(self.visualizer, 'digest') and isinstance(self.visualizer.digest, dict):
-                data = self.visualizer.digest.copy()
-            else:
-                data = {}
+            data = {}
+            if self.visualizer and hasattr(self.visualizer, 'digest'):
+                dig = self.visualizer.digest
+                if isinstance(dig, dict):
+                    data = dig.copy()
+
+            if not data and self.digest and hasattr(self.digest, 'export_digest_stream'):
+                try:
+                    res = self.digest.export_digest_stream("default")
+                    if isinstance(res, dict):
+                        data = res.copy()
+                except Exception:
+                    data = {}
 
             with open(output_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
@@ -96,12 +107,13 @@ class DigestExporter:
     def export_to_html(self, output_path: str) -> str:
         """Метод-адаптер под интеграционный тест для экспорта в HTML."""
         try:
-            if self.visualizer and hasattr(self.visualizer, 'digest') and isinstance(self.visualizer.digest, dict):
-                data = self.visualizer.digest
-            else:
-                data = {}
+            data = {}
+            if self.visualizer and hasattr(self.visualizer, 'digest'):
+                dig = self.visualizer.digest
+                if isinstance(dig, dict):
+                    data = dig
 
-            html_content = f"<html><body><pre>{json.dumps(data)}</pre></body></html>"
+            html_content = f"<html><body><pre>{json.dumps(data if isinstance(data, dict) else {})}</pre></body></html>"
             with open(output_path, 'w', encoding='utf-8') as f:
                 f.write(html_content)
             return output_path

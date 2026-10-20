@@ -10,7 +10,7 @@ class StabilityDigestError(Exception):
 class StabilityDigest:
     """Модуль для формирования аналитических дайджестов стабильности на основе телеметрии и аномалий."""
 
-    def __init__(self, repo_path: str, anomaly_detector: AnomalyCorrelator, system_telemetry: SystemTelemetry):
+    def __init__(self, repo_path: str = ".", anomaly_detector: AnomalyCorrelator = None, system_telemetry: SystemTelemetry = None):
         self.repo_path = repo_path
         self.anomaly_detector = anomaly_detector
         self.system_telemetry = system_telemetry
@@ -18,12 +18,12 @@ class StabilityDigest:
     def generate_digest(self, execution_id=None) -> dict:
         """Генерирует дайджест стабильности, объединяя сводку телеметрии и результаты детектирования аномалий."""
         try:
-            summary = self.system_telemetry.get_telemetry_summary()
+            summary = self.system_telemetry.get_telemetry_summary() if self.system_telemetry and hasattr(self.system_telemetry, "get_telemetry_summary") else {}
             
             # Поддержка как реального интерфейса AnomalyCorrelator, так и моков из юнита
-            if hasattr(self.anomaly_detector, "detect_anomalies"):
+            if self.anomaly_detector and hasattr(self.anomaly_detector, "detect_anomalies"):
                 anomalies = self.anomaly_detector.detect_anomalies()
-            elif hasattr(self.anomaly_detector, "analyze_anomalies"):
+            elif self.anomaly_detector and hasattr(self.anomaly_detector, "analyze_anomalies"):
                 anomalies = self.anomaly_detector.analyze_anomalies()
             else:
                 anomalies = []
@@ -39,12 +39,14 @@ class StabilityDigest:
 
     def export_digest_stream(self, stream_id: str) -> dict:
         """Экспортирует слепок телеметрии по заданному идентификатору потока."""
-        return self.system_telemetry.collect_snapshot(stream_id)
+        if self.system_telemetry and hasattr(self.system_telemetry, "collect_snapshot"):
+            return self.system_telemetry.collect_snapshot(stream_id)
+        return {}
 
     def analyze_digest_trends(self, metric_name: str) -> dict:
         """Анализирует тренды для указанной метрики на основе её истории."""
         try:
-            history = self.system_telemetry.get_metric_history(metric_name)
+            history = self.system_telemetry.get_metric_history(metric_name) if self.system_telemetry and hasattr(self.system_telemetry, "get_metric_history") else []
             
             # Простейший расчет тренда
             trend = "stable"

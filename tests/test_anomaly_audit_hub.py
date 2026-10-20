@@ -2,120 +2,92 @@ import unittest
 from unittest.mock import patch, MagicMock
 import uuid
 import random
-import io
-import string
-
 from skills.anomaly_audit_hub import AnomalyAuditHub
-
 
 class TestAnomalyAuditHub(unittest.TestCase):
 
     def setUp(self):
-        self.repo_path_val = f"/tmp/{uuid.uuid4().hex}/{uuid.uuid4().hex}"
-        self.log_path_val = f"/var/log/{uuid.uuid4().hex}.log"
-        self.threshold_val = round(random.uniform(1.0, 100.0), 2)
+        self.repo_path = f"/repo/{uuid.uuid4().hex}"
+        self.log_path = f"/logs/{uuid.uuid4().hex}.log"
+        self.threshold = round(random.uniform(0.1, 99.9), 2)
 
-    def test_composition_and_initialization(self):
         with patch('skills.anomaly_audit_hub.AnomalyLogger') as mock_logger_cls, \
              patch('skills.anomaly_audit_hub.AnomalyReportAggregator') as mock_aggregator_cls:
 
-            mock_logger_instance = mock_logger_cls.return_value
-            mock_aggregator_instance = mock_aggregator_cls.return_value
+            self.mock_logger_instance = mock_logger_cls.return_value
+            self.mock_aggregator_instance = mock_aggregator_cls.return_value
 
-            hub = AnomalyAuditHub(
-                repo_path=self.repo_path_val,
-                log_path=self.log_path_val,
-                threshold=self.threshold_val
+            self.hub = AnomalyAuditHub(
+                repo_path=self.repo_path,
+                log_path=self.log_path,
+                threshold=self.threshold
             )
 
-            mock_logger_cls.assert_called_once_with(log_path=self.log_path_val)
+    def test_init_instantiates_dependencies(self):
+        with patch('skills.anomaly_audit_hub.AnomalyLogger') as mock_logger_cls, \
+             patch('skills.anomaly_audit_hub.AnomalyReportAggregator') as mock_aggregator_cls:
+
+            r_path = f"/path/{uuid.uuid4().hex}"
+            l_path = f"/path/{uuid.uuid4().hex}.log"
+            thresh = random.random()
+
+            hub = AnomalyAuditHub(repo_path=r_path, log_path=l_path, threshold=thresh)
+
+            mock_logger_cls.assert_called_once_with(log_path=l_path)
             mock_aggregator_cls.assert_called_once_with(
-                repo_path=self.repo_path_val,
-                log_path=self.log_path_val,
-                threshold=self.threshold_val,
-                logger=mock_logger_instance
-            )
-            self.assertEqual(hub.logger, mock_logger_instance)
-            self.assertEqual(hub.aggregator, mock_aggregator_instance)
-
-    def test_audit_log_anomaly_delegation(self):
-        source_val = ''.join(random.choices(string.ascii_letters, k=10))
-        severity_val = random.choice(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'])
-        details_val = {uuid.uuid4().hex: uuid.uuid4().hex}
-        telemetry_val = {uuid.uuid4().hex: random.randint(1, 1000)}
-
-        with patch('skills.anomaly_audit_hub.AnomalyLogger') as mock_logger_cls, \
-             patch('skills.anomaly_audit_hub.AnomalyReportAggregator'):
-
-            mock_logger_instance = mock_logger_cls.return_value
-            hub = AnomalyAuditHub(
-                repo_path=self.repo_path_val,
-                log_path=self.log_path_val,
-                threshold=self.threshold_val
+                repo_path=r_path,
+                log_path=l_path,
+                threshold=thresh,
+                logger=hub.logger
             )
 
-            hub.log_anomaly(
-                source=source_val,
-                severity=severity_val,
-                details=details_val,
-                telemetry_snapshot=telemetry_val
-            )
+    def test_log_anomaly_delegates_to_logger(self):
+        source = f"source_{uuid.uuid4().hex[:6]}"
+        severity = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
+        details = {uuid.uuid4().hex: uuid.uuid4().hex}
+        telemetry_snapshot = {uuid.uuid4().hex: random.randint(1, 1000)}
 
-            mock_logger_instance.log_anomaly.assert_called_once_with(
-                source=source_val,
-                severity=severity_val,
-                details=details_val,
-                telemetry_snapshot=telemetry_val
-            )
-
-    def test_audit_aggregate_and_report_delegation(self):
-        metric_name_val = f"metric_{uuid.uuid4().hex[:6]}"
-        value_val = random.uniform(0.0, 500.0)
         expected_result = {uuid.uuid4().hex: uuid.uuid4().hex}
+        self.mock_logger_instance.log_anomaly.return_value = expected_result
 
-        with patch('skills.anomaly_audit_hub.AnomalyLogger'), \
-             patch('skills.anomaly_audit_hub.AnomalyReportAggregator') as mock_aggregator_cls:
+        result = self.hub.log_anomaly(
+            source=source,
+            severity=severity,
+            details=details,
+            telemetry_snapshot=telemetry_snapshot
+        )
 
-            mock_aggregator_instance = mock_aggregator_cls.return_value
-            mock_aggregator_instance.aggregate_and_report.return_value = expected_result
+        self.mock_logger_instance.log_anomaly.assert_called_once_with(
+            source=source,
+            severity=severity,
+            details=details,
+            telemetry_snapshot=telemetry_snapshot
+        )
+        self.assertEqual(result, expected_result)
 
-            hub = AnomalyAuditHub(
-                repo_path=self.repo_path_val,
-                log_path=self.log_path_val,
-                threshold=self.threshold_val
-            )
+    def test_aggregate_and_report_delegates_to_aggregator(self):
+        metric_name = f"metric_{uuid.uuid4().hex[:8]}"
+        value = round(random.uniform(-500.0, 500.0), 4)
+        expected_aggregate = {uuid.uuid4().hex: random.random()}
 
-            result = hub.aggregate_and_report(metric_name=metric_name_val, value=value_val)
+        self.mock_aggregator_instance.aggregate_and_report.return_value = expected_aggregate
 
-            mock_aggregator_instance.aggregate_and_report.assert_called_once_with(
-                metric_name=metric_name_val,
-                value=value_val
-            )
-            self.assertEqual(result, expected_result)
+        result = self.hub.aggregate_and_report(metric_name=metric_name, value=value)
 
-    def test_audit_generate_final_report_delegation(self):
-        expected_report = {
-            uuid.uuid4().hex: uuid.uuid4().hex,
-            "status": random.choice(["SECURE", "VULNERABLE", "WARNING"])
-        }
+        self.mock_aggregator_instance.aggregate_and_report.assert_called_once_with(
+            metric_name=metric_name,
+            value=value
+        )
+        self.assertEqual(result, expected_aggregate)
 
-        with patch('skills.anomaly_audit_hub.AnomalyLogger'), \
-             patch('skills.anomaly_audit_hub.AnomalyReportAggregator') as mock_aggregator_cls:
+    def test_generate_final_report_delegates_to_aggregator(self):
+        expected_report = f"report_content_{uuid.uuid4().hex}"
+        self.mock_aggregator_instance.generate_final_report.return_value = expected_report
 
-            mock_aggregator_instance = mock_aggregator_cls.return_value
-            mock_aggregator_instance.generate_final_report.return_value = expected_report
+        result = self.hub.generate_final_report()
 
-            hub = AnomalyAuditHub(
-                repo_path=self.repo_path_val,
-                log_path=self.log_path_val,
-                threshold=self.threshold_val
-            )
-
-            report = hub.generate_final_report()
-
-            mock_aggregator_instance.generate_final_report.assert_called_once()
-            self.assertEqual(report, expected_report)
-
+        self.mock_aggregator_instance.generate_final_report.assert_called_once()
+        self.assertEqual(result, expected_report)
 
 if __name__ == '__main__':
     unittest.main()

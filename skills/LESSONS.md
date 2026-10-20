@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ine_integration (compose) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## patch_auto_remediator_pipeline (compose) — раундов: 4
+iator_pipeline (compose) — раундов: 4
 - Последняя ошибка перед фиксом: raise PatchAutoRemediatorPipelineError(str(e))
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -337,4 +333,8 @@ ine_integration (compose) — раундов: 4
 
 ## anomaly_pipeline (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/skills/anomaly_pipeline.py", line 32, in run
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## digest_exporter (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: Traceback (most recent call last):
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

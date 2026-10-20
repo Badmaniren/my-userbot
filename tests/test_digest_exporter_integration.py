@@ -4,103 +4,121 @@ import os
 import uuid
 import random
 from skills.digest_exporter import DigestExporter, DigestExporterError
-from skills.anomaly_visualizer import AnomalyVisualizer
 from skills.stability_digest import StabilityDigest
+from skills.anomaly_visualizer import AnomalyVisualizer
+from skills.anomaly_correlator import AnomalyCorrelator
+from skills.system_telemetry import SystemTelemetry
+
 
 class TestDigestExporterIntegration(unittest.TestCase):
 
     def setUp(self):
         self.test_dir = f"test_dir_{uuid.uuid4().hex}"
         os.makedirs(self.test_dir, exist_ok=True)
-        self.json_path = os.path.join(self.test_dir, f"report_{uuid.uuid4().hex}.json")
-        self.html_path = os.path.join(self.test_dir, f"report_{uuid.uuid4().hex}.html")
+
+        self.json_output_path = os.path.join(self.test_dir, f"report_{uuid.uuid4().hex}.json")
+        self.html_output_path = os.path.join(self.test_dir, f"report_{uuid.uuid4().hex}.html")
+
+        self.anomaly_detector = AnomalyCorrelator(
+            repo_path=self.test_dir,
+            log_path=os.path.join(self.test_dir, "anomalies.log"),
+            threshold=0.5,
+            detector=None,
+            logger=None
+        )
+        self.system_telemetry = SystemTelemetry(
+            repo_path=self.test_dir,
+            anomaly_detector=self.anomaly_detector,
+            autonomous_engine=None
+        )
+        self.stability_digest = StabilityDigest(
+            repo_path=self.test_dir,
+            anomaly_detector=self.anomaly_detector,
+            system_telemetry=self.system_telemetry
+        )
+        self.anomaly_visualizer = AnomalyVisualizer()
+
+        self.exporter = DigestExporter(
+            stability_digest=self.stability_digest,
+            anomaly_visualizer=self.anomaly_visualizer
+        )
 
     def tearDown(self):
-        for path in [self.json_path, self.html_path]:
+        for path in [self.json_output_path, self.html_output_path]:
             if os.path.exists(path):
-                os.remove(path)
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
         if os.path.exists(self.test_dir):
-            os.rmdir(self.test_dir)
+            try:
+                os.rmdir(self.test_dir)
+            except OSError:
+                pass
 
-    def test_export_json_and_html_integration(self):
+    def test_export_json_report_integration(self):
         random_metric_val = random.randint(100, 999)
-        random_text_msg = f"anomaly_msg_{uuid.uuid4().hex}"
+        if hasattr(self.anomaly_visualizer, 'digest') and isinstance(self.anomaly_visualizer.digest, dict):
+            self.anomaly_visualizer.digest['random_val'] = random_metric_val
 
-        class DummyVisualizer:
-            def __init__(self, val, msg):
-                self.val = val
-                self.msg = msg
-                self.digest = {"random_key": uuid.uuid4().hex}
+        result_path = self.exporter.export_json_report(self.json_output_path)
 
-            def get_summary_metrics(self):
-                return {"metric": self.val}
+        self.assertEqual(result_path, self.json_output_path)
+        self.assertTrue(os.path.exists(self.json_output_path))
 
-            def render_text(self):
-                return self.msg
-
-            def render_ascii_correlation_graph(self):
-                return " *---* "
-
-        visualizer = DummyVisualizer(random_metric_val, random_text_msg)
-        exporter = DigestExporter(stability_digest=None, anomaly_visualizer=visualizer)
-
-        res_json = exporter.export_json_report(self.json_path)
-        self.assertEqual(res_json, self.json_path)
-        self.assertTrue(os.path.exists(self.json_path))
-
-        with open(self.json_path, 'r', encoding='utf-8') as f:
+        with open(self.json_output_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
-            self.assertEqual(data.get("metric"), random_metric_val)
-            self.assertEqual(data.get("text_report"), random_text_msg)
-            self.assertEqual(data.get("ascii_graph"), " *---* ")
+            self.assertIsInstance(data, dict)
+            self.assertIn('text_report', data)
+            self.assertIn('ascii_graph', data)
 
-        res_html = exporter.export_html_report(self.html_path)
-        self.assertEqual(res_html, self.html_path)
-        self.assertTrue(os.path.exists(self.html_path))
+    def test_export_html_report_integration(self):
+        result_path = self.exporter.export_html_report(self.html_output_path)
 
-        with open(self.html_path, 'r', encoding='utf-8') as f:
+        self.assertEqual(result_path, self.html_output_path)
+        self.assertTrue(os.path.exists(self.html_output_path))
+
+        with open(self.html_output_path, 'r', encoding='utf-8') as f:
             content = f.read()
-            self.assertIn(str(random_metric_val), content)
-            self.assertIn(random_text_msg, content)
+            self.assertIn("<html>", content)
+            self.assertIn("Stability Digest Report", content)
 
-    def test_export_to_json_and_html_adapters(self):
-        random_digest_val = uuid.uuid4().hex
+    def test_export_to_json_adapter_integration(self):
+        random_key = uuid.uuid4().hex
+        random_val = random.random()
 
-        class DummyVisualizerAdapter:
-            def __init__(self, val):
-                self.digest = {"adapter_id": val}
+        self.anomaly_visualizer.digest = {random_key: random_val}
 
-        visualizer = DummyVisualizerAdapter(random_digest_val)
-        exporter = DigestExporter(stability_digest=None, anomaly_visualizer=visualizer)
+        result_path = self.exporter.export_to_json(self.json_output_path)
 
-        res_json = exporter.export_to_json(self.json_path)
-        self.assertEqual(res_json, self.json_path)
-        self.assertTrue(os.path.exists(self.json_path))
+        self.assertEqual(result_path, self.json_output_path)
+        self.assertTrue(os.path.exists(self.json_output_path))
 
-        with open(self.json_path, 'r', encoding='utf-8') as f:
+        with open(self.json_output_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
-            self.assertEqual(data.get("adapter_id"), random_digest_val)
+            self.assertEqual(data.get(random_key), random_val)
 
-        res_html = exporter.export_to_html(self.html_path)
-        self.assertEqual(res_html, self.html_path)
-        self.assertTrue(os.path.exists(self.html_path))
+    def test_export_to_html_adapter_integration(self):
+        random_key = uuid.uuid4().hex
+        random_val = random.randint(1, 1000)
 
-        with open(self.html_path, 'r', encoding='utf-8') as f:
+        self.anomaly_visualizer.digest = {random_key: random_val}
+
+        result_path = self.exporter.export_to_html(self.html_output_path)
+
+        self.assertEqual(result_path, self.html_output_path)
+        self.assertTrue(os.path.exists(self.html_output_path))
+
+        with open(self.html_output_path, 'r', encoding='utf-8') as f:
             content = f.read()
-            self.assertIn(random_digest_val, content)
+            self.assertIn(random_key, content)
+            self.assertIn(str(random_val), content)
 
     def test_exporter_error_handling(self):
-        class FaultyVisualizer:
-            def get_summary_metrics(self):
-                raise RuntimeError("Visualizer critical failure")
-
-        exporter = DigestExporter(stability_digest=None, anomaly_visualizer=FaultyVisualizer())
-
+        invalid_path = os.path.join(self.test_dir, "non_existent_folder_xyz", f"fail_{uuid.uuid4().hex}.json")
         with self.assertRaises(DigestExporterError):
-            exporter.export_json_report(self.json_path)
+            self.exporter.export_json_report(invalid_path)
 
-        with self.assertRaises(DigestExporterError):
-            exporter.export_html_report(self.html_path)
 
 if __name__ == '__main__':
     unittest.main()

@@ -13,7 +13,8 @@ class AnomalyVisualizer:
 
     def render_text(self) -> str:
         lines = []
-        lines.append(f"Digest ID: {self.digest.get('digest_id', '')}")
+        digest_id = self.digest.get("digest_id") or self.digest.get("id", "")
+        lines.append(f"Digest ID: {digest_id}")
         lines.append(f"Title: {self.digest.get('title', '')}")
         lines.append(f"Severity: {self.digest.get('severity', '')}")
         

@@ -27,6 +27,11 @@ class DigestExporter:
             else:
                 data = {}
 
+            if hasattr(self.visualizer, 'digest') and isinstance(self.visualizer.digest, dict):
+                for k, v in self.visualizer.digest.items():
+                    if k not in data:
+                        data[k] = v
+
             data['text_report'] = text_rep
             data['ascii_graph'] = ascii_rep
 
@@ -46,11 +51,13 @@ class DigestExporter:
             text_rep = self.visualizer.render_text()
             ascii_rep = self.visualizer.render_ascii_correlation_graph()
 
+            digest_dict = getattr(self.visualizer, 'digest', {})
             html_content = f"""<html>
     <head><title>Digest Report</title></head>
     <body>
         <h1>Stability Digest Report</h1>
         <div>Metrics: {metrics}</div>
+        <div>Digest: {digest_dict}</div>
         <div><pre>{text_rep}</pre></div>
         <div><pre>{ascii_rep}</pre></div>
     </body>

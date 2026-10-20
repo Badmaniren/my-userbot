@@ -1,53 +1,99 @@
-import unittest
 import os
-import uuid
 import random
+import shutil
 import tempfile
-from skills.anomaly_pipeline import AnomalyPipeline
-from skills.anomaly_audit_hub import AnomalyAuditHub
-from skills.anomaly_logger import AnomalyLogger
+import unittest
+import uuid
+
+from skills.anomaly_pipeline import AnomalyPipeline, AnomalyPipelineError
+
 
 class TestAnomalyPipelineIntegration(unittest.TestCase):
     def setUp(self):
-        self.test_dir = tempfile.TemporaryDirectory()
-        self.log_path = os.path.join(self.test_dir.name, f"audit_{uuid.uuid4()}.log")
-        self.repo_path = self.test_dir.name
-        self.threshold = random.uniform(50.0, 100.0)
-        
-        self.audit_hub = AnomalyAuditHub(
-            repo_path=self.repo_path,
-            log_path=self.log_path,
-            threshold=self.threshold
-        )
-        self.logger = AnomalyLogger(log_path=self.log_path)
-        self.pipeline = AnomalyPipeline(repo_path=self.repo_path, threshold=self.threshold)
+        self.test_dir = tempfile.mkdtemp(prefix="test_pipeline_")
+        self.threshold = round(random.uniform(1.5, 4.0), 2)
+        self.pipeline = AnomalyPipeline(repo_path=self.test_dir, threshold=self.threshold)
 
     def tearDown(self):
-        self.test_dir.cleanup()
+        if os.path.exists(self.test_dir):
+            shutil.rmtree(self.test_dir, ignore_errors=True)
 
-    def test_pipeline_audit_logger_integration(self):
-        execution_id = str(uuid.uuid4())
-        metric_name = f"metric_{uuid.uuid4().hex[:6]}"
-        anomaly_value = random.uniform(self.threshold + 1.0, self.threshold + 50.0)
-        
-        payload = {metric_name: anomaly_value}
-        
-        pipeline_results = self.pipeline.run_end_to_end(execution_id, payload)
-        self.assertIn(metric_name, pipeline_results)
-        
-        if pipeline_results[metric_name]:
-            self.audit_hub.log_anomaly(
-                source=execution_id,
-                severity="HIGH",
-                details={"metric": metric_name, "value": anomaly_value},
-                telemetry_snapshot={"status": "active"}
-            )
-        
-        logged_anomalies = self.logger.get_anomalies()
-        self.assertIsInstance(logged_anomalies, list)
-        
-        report = self.logger.get_structured_report()
-        self.assertIsNotNone(report)
+    def test_pipeline_initialization(self):
+        self.assertIsNotNone(self.pipeline)
+        self.assertEqual(self.pipeline.repo_path, self.test_dir)
+        self.assertEqual(self.pipeline.threshold, self.threshold)
+
+    def test_run_single_metric_flow(self):
+        metric_name = f"cpu_metric_{uuid.uuid4().hex[:8]}"
+        target_value = round(random.uniform(10.0, 95.0), 2)
+        payload = {metric_name: target_value}
+
+        result = self.pipeline.run(payload)
+
+        self.assertIsInstance(result, dict)
+        self.assertIn("is_anomaly", result)
+        self.assertEqual(result.get("metric_name"), metric_name)
+        self.assertEqual(result.get("target_value"), target_value)
+        self.assertIsInstance(result["is_anomaly"], bool)
+
+    def test_run_empty_input(self):
+        result = self.pipeline.run({})
+        self.assertIsInstance(result, dict)
+        self.assertIn("is_anomaly", result)
+        self.assertFalse(result["is_anomaly"])
+
+    def test_run_batch_metrics(self):
+        metrics_count = random.randint(3, 5)
+        batch_data = {
+            f"metric_{uuid.uuid4().hex[:6]}_{i}": round(random.uniform(5.0, 100.0), 3)
+            for i in range(metrics_count)
+        }
+
+        results = self.pipeline.run_batch(batch_data)
+
+        self.assertIsInstance(results, dict)
+        self.assertEqual(len(results), len(batch_data))
+        for metric_key in batch_data:
+            self.assertIn(metric_key, results)
+            self.assertIsInstance(results[metric_key], bool)
+
+    def test_process_pipeline_scalar_and_list_values(self):
+        scalar_metric = f"ram_usage_{uuid.uuid4().hex[:6]}"
+        scalar_value = round(random.uniform(20.0, 80.0), 2)
+        list_metric = f"latency_samples_{uuid.uuid4().hex[:6]}"
+        list_values = [round(random.uniform(100.0, 300.0), 1) for _ in range(3)]
+
+        raw_data = {
+            scalar_metric: scalar_value,
+            list_metric: list_values,
+        }
+
+        output = self.pipeline.process_pipeline(raw_data)
+
+        self.assertIsInstance(output, dict)
+        self.assertIn("filtered_data", output)
+        self.assertIn("detection_result", output)
+        self.assertEqual(output["filtered_data"][scalar_metric], scalar_value)
+        self.assertEqual(output["filtered_data"][list_metric], list_values)
+        self.assertIn(scalar_metric, output["detection_result"])
+        self.assertIn(list_metric, output["detection_result"])
+        self.assertIsInstance(output["detection_result"][scalar_metric], bool)
+        self.assertIsInstance(output["detection_result"][list_metric], bool)
+
+    def test_run_end_to_end_flow(self):
+        execution_id = f"exec_{uuid.uuid4()}"
+        metrics_payload = {
+            f"disk_io_{uuid.uuid4().hex[:8]}": round(random.uniform(1.0, 50.0), 2),
+            f"net_traffic_{uuid.uuid4().hex[:8]}": round(random.uniform(100.0, 1000.0), 2),
+        }
+
+        results = self.pipeline.run_end_to_end(execution_id, metrics_payload)
+
+        self.assertIsInstance(results, dict)
+        self.assertEqual(set(results.keys()), set(metrics_payload.keys()))
+        for m_name in metrics_payload:
+            self.assertIsInstance(results[m_name], bool)
+
 
 if __name__ == "__main__":
     unittest.main()

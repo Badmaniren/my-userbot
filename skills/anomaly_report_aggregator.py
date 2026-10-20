@@ -30,15 +30,18 @@ class AnomalyReportAggregator:
     def aggregate_and_report(self, metric_name, value):
         try:
             self.correlator.correlate_metric(metric_name, value)
-            anomalies = self.correlator.correlate_events()
+            res = self.correlator.correlate_events()
+            anomalies = res.get("report", []) if isinstance(res, dict) else res
             
-            for anomaly in anomalies:
-                self.anomaly_logger.log_anomaly(
-                    source=anomaly.get("source"),
-                    severity=anomaly.get("severity"),
-                    details=anomaly.get("details"),
-                    telemetry_snapshot=anomaly.get("telemetry_snapshot")
-                )
+            if isinstance(anomalies, list):
+                for anomaly in anomalies:
+                    if isinstance(anomaly, dict):
+                        self.anomaly_logger.log_anomaly(
+                            source=anomaly.get("source"),
+                            severity=anomaly.get("severity"),
+                            details=anomaly.get("details"),
+                            telemetry_snapshot=anomaly.get("telemetry_snapshot")
+                        )
                 
             return self.anomaly_logger.get_structured_report()
         except AnomalyCorrelatorError as e:
@@ -47,14 +50,18 @@ class AnomalyReportAggregator:
     def aggregate_execution_flow(self, execution_id, payload):
         try:
             anomalies = self.correlator.analyze_execution_flow(execution_id, payload)
+            if isinstance(anomalies, dict):
+                anomalies = anomalies.get("report", [])
             
-            for anomaly in anomalies:
-                self.anomaly_logger.log_anomaly(
-                    source=anomaly.get("source"),
-                    severity=anomaly.get("severity"),
-                    details=anomaly.get("details"),
-                    telemetry_snapshot=anomaly.get("telemetry_snapshot")
-                )
+            if isinstance(anomalies, list):
+                for anomaly in anomalies:
+                    if isinstance(anomaly, dict):
+                        self.anomaly_logger.log_anomaly(
+                            source=anomaly.get("source"),
+                            severity=anomaly.get("severity"),
+                            details=anomaly.get("details"),
+                            telemetry_snapshot=anomaly.get("telemetry_snapshot")
+                        )
                 
             return self.anomaly_logger.get_structured_report()
         except Exception as e:

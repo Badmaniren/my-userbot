@@ -18,9 +18,9 @@ class DigestExporter:
     def export_json_report(self, output_path: str) -> str:
         """Экспортирует данные дайджеста и метрики визуализатора в JSON-файл."""
         try:
-            metrics = self.visualizer.get_summary_metrics()
-            text_rep = self.visualizer.render_text()
-            ascii_rep = self.visualizer.render_ascii_correlation_graph()
+            metrics = self.visualizer.get_summary_metrics() if self.visualizer and hasattr(self.visualizer, 'get_summary_metrics') else {}
+            text_rep = self.visualizer.render_text() if self.visualizer and hasattr(self.visualizer, 'render_text') else ""
+            ascii_rep = self.visualizer.render_ascii_correlation_graph() if self.visualizer and hasattr(self.visualizer, 'render_ascii_correlation_graph') else ""
 
             if isinstance(metrics, dict):
                 data = metrics.copy()
@@ -42,9 +42,9 @@ class DigestExporter:
     def export_html_report(self, output_path: str) -> str:
         """Экспортирует отчет в HTML-файл."""
         try:
-            metrics = self.visualizer.get_summary_metrics()
-            text_rep = self.visualizer.render_text()
-            ascii_rep = self.visualizer.render_ascii_correlation_graph()
+            metrics = self.visualizer.get_summary_metrics() if self.visualizer and hasattr(self.visualizer, 'get_summary_metrics') else {}
+            text_rep = self.visualizer.render_text() if self.visualizer and hasattr(self.visualizer, 'render_text') else ""
+            ascii_rep = self.visualizer.render_ascii_correlation_graph() if self.visualizer and hasattr(self.visualizer, 'render_ascii_correlation_graph') else ""
 
             html_content = f"""<html>
     <head><title>Digest Report</title></head>
@@ -68,7 +68,10 @@ class DigestExporter:
     def export_stream_to_json(self, stream_id: str, output_path: str) -> str:
         """Экспортирует поток дайджеста в JSON."""
         try:
-            stream_data = self.digest.export_digest_stream(stream_id)
+            if self.digest and hasattr(self.digest, 'export_digest_stream'):
+                stream_data = self.digest.export_digest_stream(stream_id)
+            else:
+                stream_data = {}
             with open(output_path, 'w', encoding='utf-8') as f:
                 json.dump(stream_data, f, ensure_ascii=False, indent=4)
             return output_path

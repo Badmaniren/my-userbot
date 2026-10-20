@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-iator_pipeline (compose) — раундов: 4
-- Последняя ошибка перед фиксом: raise PatchAutoRemediatorPipelineError(str(e))
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+передан на эскалацию
 
 ## patch_pipeline_fixer (compose) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
@@ -337,4 +335,8 @@ iator_pipeline (compose) — раундов: 4
 
 ## digest_exporter (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: Traceback (most recent call last):
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## anomaly_audit_hub (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

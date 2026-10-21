@@ -44,7 +44,7 @@ class TestAuditExportPipelineIntegration(unittest.TestCase):
             telemetry_snapshot={"cpu": random.randint(10, 99)}
         )
 
-        pipeline.aggregate_metric(
+        pipeline.audit_hub.aggregate_and_report(
             metric_name=self.metric_name,
             value=self.metric_value
         )

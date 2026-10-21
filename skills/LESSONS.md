@@ -3,13 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-: успешно прошёл тесты и влит в main
-
-## anomaly_report_aggregator (compose) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## patch_metric_collector (create) — раундов: 4
-- Античит поймал: ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'anomaly_filter'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.anomaly_filter import ...'
+ушки. Используй честный импорт: 'from skills.anomaly_filter import ...'
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -343,3 +337,7 @@
 ## extractor_tool_1792595633 (create) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main
+
+## digest_audit_pipeline (compose) — раундов: 4
+- Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/tests/test_digest_audit_pipeline_integration.py", line 27, in test_pipeline_audit_and_export_json_integration
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

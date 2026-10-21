@@ -18,17 +18,19 @@ class DigestExporter:
     def export_json_report(self, output_path: str) -> str:
         """Экспортирует данные дайджеста и метрики визуализатора в JSON-файл."""
         try:
-            metrics = self.visualizer.get_summary_metrics()
-            text_rep = self.visualizer.render_text()
-            ascii_rep = self.visualizer.render_ascii_correlation_graph()
+            metrics = self.visualizer.get_summary_metrics() if self.visualizer and hasattr(self.visualizer, 'get_summary_metrics') else None
+            text_rep = self.visualizer.render_text() if self.visualizer and hasattr(self.visualizer, 'render_text') else None
+            ascii_rep = self.visualizer.render_ascii_correlation_graph() if self.visualizer and hasattr(self.visualizer, 'render_ascii_correlation_graph') else None
 
             if isinstance(metrics, dict):
                 data = metrics.copy()
             else:
                 data = {}
 
-            data['text_report'] = text_rep
-            data['ascii_graph'] = ascii_rep
+            if text_rep is not None:
+                data['text_report'] = text_rep
+            if ascii_rep is not None:
+                data['ascii_graph'] = ascii_rep
 
             with open(output_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
@@ -42,9 +44,9 @@ class DigestExporter:
     def export_html_report(self, output_path: str) -> str:
         """Экспортирует отчет в HTML-файл."""
         try:
-            metrics = self.visualizer.get_summary_metrics()
-            text_rep = self.visualizer.render_text()
-            ascii_rep = self.visualizer.render_ascii_correlation_graph()
+            metrics = self.visualizer.get_summary_metrics() if self.visualizer and hasattr(self.visualizer, 'get_summary_metrics') else None
+            text_rep = self.visualizer.render_text() if self.visualizer and hasattr(self.visualizer, 'render_text') else None
+            ascii_rep = self.visualizer.render_ascii_correlation_graph() if self.visualizer and hasattr(self.visualizer, 'render_ascii_correlation_graph') else None
 
             html_content = f"""<html>
     <head><title>Digest Report</title></head>
@@ -68,7 +70,11 @@ class DigestExporter:
     def export_stream_to_json(self, stream_id: str, output_path: str) -> str:
         """Экспортирует поток дайджеста в JSON."""
         try:
-            stream_data = self.digest.export_digest_stream(stream_id)
+            if self.digest and hasattr(self.digest, 'export_digest_stream'):
+                stream_data = self.digest.export_digest_stream(stream_id)
+            else:
+                stream_data = {}
+
             with open(output_path, 'w', encoding='utf-8') as f:
                 json.dump(stream_data, f, ensure_ascii=False, indent=4)
             return output_path
@@ -80,8 +86,12 @@ class DigestExporter:
     def export_to_json(self, output_path: str) -> str:
         """Метод-адаптер под интеграционный тест для экспорта в JSON."""
         try:
-            if self.visualizer and hasattr(self.visualizer, 'digest') and isinstance(self.visualizer.digest, dict):
+            if self.visualizer and getattr(self.visualizer, 'digest', None) is not None and isinstance(self.visualizer.digest, dict):
                 data = self.visualizer.digest.copy()
+            elif self.digest and getattr(self.digest, 'digest', None) is not None and isinstance(self.digest.digest, dict):
+                data = self.digest.digest.copy()
+            elif isinstance(self.digest, dict):
+                data = self.digest.copy()
             else:
                 data = {}
 
@@ -96,8 +106,12 @@ class DigestExporter:
     def export_to_html(self, output_path: str) -> str:
         """Метод-адаптер под интеграционный тест для экспорта в HTML."""
         try:
-            if self.visualizer and hasattr(self.visualizer, 'digest') and isinstance(self.visualizer.digest, dict):
+            if self.visualizer and getattr(self.visualizer, 'digest', None) is not None and isinstance(self.visualizer.digest, dict):
                 data = self.visualizer.digest
+            elif self.digest and getattr(self.digest, 'digest', None) is not None and isinstance(self.digest.digest, dict):
+                data = self.digest.digest
+            elif isinstance(self.digest, dict):
+                data = self.digest
             else:
                 data = {}
 

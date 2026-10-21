@@ -13,19 +13,43 @@ class DigestExporter:
 
     def __init__(self, stability_digest=None, anomaly_visualizer=None):
         self.digest = stability_digest
-        self.visualizer = anomaly_visualizer
+        if anomaly_visualizer is not None:
+            self.visualizer = anomaly_visualizer
+        elif isinstance(stability_digest, AnomalyVisualizer):
+            self.visualizer = stability_digest
+        else:
+            self.visualizer = AnomalyVisualizer()
 
     def export_json_report(self, output_path: str) -> str:
         """Экспортирует данные дайджеста и метрики визуализатора в JSON-файл."""
         try:
-            metrics = self.visualizer.get_summary_metrics()
-            text_rep = self.visualizer.render_text()
-            ascii_rep = self.visualizer.render_ascii_correlation_graph()
+            report_data = None
+            if self.digest is not None:
+                if hasattr(self.digest, "generate_final_report"):
+                    report_data = self.digest.generate_final_report()
+                elif hasattr(self.digest, "get_structured_report"):
+                    report_data = self.digest.get_structured_report()
+                elif isinstance(self.digest, (dict, list)):
+                    report_data = self.digest
+
+            if report_data is not None and hasattr(self.visualizer, "visualize_digest"):
+                text_rep = self.visualizer.visualize_digest(report_data)
+            else:
+                text_rep = self.visualizer.render_text() if hasattr(self.visualizer, "render_text") else ""
+
+            metrics = self.visualizer.get_summary_metrics() if hasattr(self.visualizer, "get_summary_metrics") else {}
+            ascii_rep = self.visualizer.render_ascii_correlation_graph() if hasattr(self.visualizer, "render_ascii_correlation_graph") else ""
 
             if isinstance(metrics, dict):
                 data = metrics.copy()
             else:
                 data = {}
+
+            if isinstance(report_data, list):
+                data["anomalies"] = report_data
+                data["audit_logs"] = report_data
+            elif isinstance(report_data, dict):
+                data.update(report_data)
 
             data["text_report"] = text_rep
             data["ascii_graph"] = ascii_rep
@@ -42,15 +66,29 @@ class DigestExporter:
     def export_html_report(self, output_path: str) -> str:
         """Экспортирует отчет в HTML-файл."""
         try:
-            metrics = self.visualizer.get_summary_metrics()
-            text_rep = self.visualizer.render_text()
-            ascii_rep = self.visualizer.render_ascii_correlation_graph()
+            report_data = None
+            if self.digest is not None:
+                if hasattr(self.digest, "generate_final_report"):
+                    report_data = self.digest.generate_final_report()
+                elif hasattr(self.digest, "get_structured_report"):
+                    report_data = self.digest.get_structured_report()
+                elif isinstance(self.digest, (dict, list)):
+                    report_data = self.digest
+
+            if report_data is not None and hasattr(self.visualizer, "visualize_digest"):
+                text_rep = self.visualizer.visualize_digest(report_data)
+            else:
+                text_rep = self.visualizer.render_text() if hasattr(self.visualizer, "render_text") else ""
+
+            metrics = self.visualizer.get_summary_metrics() if hasattr(self.visualizer, "get_summary_metrics") else {}
+            ascii_rep = self.visualizer.render_ascii_correlation_graph() if hasattr(self.visualizer, "render_ascii_correlation_graph") else ""
 
             html_content = f"""<html>
     <head><title>Digest Report</title></head>
     <body>
         <h1>Stability Digest Report</h1>
         <div>Metrics: {metrics}</div>
+        <div>Report: {json.dumps(report_data) if report_data else ''}</div>
         <div><pre>{text_rep}</pre></div>
         <div><pre>{ascii_rep}</pre></div>
     </body>

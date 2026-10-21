@@ -40,6 +40,7 @@ class AnomalyLogger:
 
         with open(self.log_path, 'a', encoding='utf-8') as f:
             f.write(json.dumps(anomaly_data) + '\n')
+        return anomaly_data
 
     def get_structured_report(self):
         if not os.path.exists(self.log_path):

@@ -27,10 +27,10 @@ class DigestExporter:
             else:
                 data = {}
 
-            data['text_report'] = text_rep
-            data['ascii_graph'] = ascii_rep
+            data["text_report"] = text_rep
+            data["ascii_graph"] = ascii_rep
 
-            with open(output_path, 'w', encoding='utf-8') as f:
+            with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
 
             return output_path
@@ -56,7 +56,7 @@ class DigestExporter:
     </body>
 </html>"""
 
-            with open(output_path, 'w', encoding='utf-8') as f:
+            with open(output_path, "w", encoding="utf-8") as f:
                 f.write(html_content)
 
             return output_path
@@ -69,7 +69,7 @@ class DigestExporter:
         """Экспортирует поток дайджеста в JSON."""
         try:
             stream_data = self.digest.export_digest_stream(stream_id)
-            with open(output_path, 'w', encoding='utf-8') as f:
+            with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(stream_data, f, ensure_ascii=False, indent=4)
             return output_path
         except Exception as e:
@@ -80,12 +80,12 @@ class DigestExporter:
     def export_to_json(self, output_path: str) -> str:
         """Метод-адаптер под интеграционный тест для экспорта в JSON."""
         try:
-            if self.visualizer and hasattr(self.visualizer, 'digest') and isinstance(self.visualizer.digest, dict):
+            if self.visualizer and hasattr(self.visualizer, "digest") and isinstance(self.visualizer.digest, dict):
                 data = self.visualizer.digest.copy()
             else:
                 data = {}
 
-            with open(output_path, 'w', encoding='utf-8') as f:
+            with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
             return output_path
         except Exception as e:
@@ -96,13 +96,13 @@ class DigestExporter:
     def export_to_html(self, output_path: str) -> str:
         """Метод-адаптер под интеграционный тест для экспорта в HTML."""
         try:
-            if self.visualizer and hasattr(self.visualizer, 'digest') and isinstance(self.visualizer.digest, dict):
+            if self.visualizer and hasattr(self.visualizer, "digest") and isinstance(self.visualizer.digest, dict):
                 data = self.visualizer.digest
             else:
                 data = {}
 
             html_content = f"<html><body><pre>{json.dumps(data)}</pre></body></html>"
-            with open(output_path, 'w', encoding='utf-8') as f:
+            with open(output_path, "w", encoding="utf-8") as f:
                 f.write(html_content)
             return output_path
         except Exception as e:

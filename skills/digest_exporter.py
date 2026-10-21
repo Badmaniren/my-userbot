@@ -82,6 +82,15 @@ class DigestExporter:
         try:
             if self.visualizer and hasattr(self.visualizer, "digest") and isinstance(self.visualizer.digest, dict):
                 data = self.visualizer.digest.copy()
+            elif self.digest:
+                if hasattr(self.digest, "generate_final_report"):
+                    data = self.digest.generate_final_report()
+                elif hasattr(self.digest, "get_structured_report"):
+                    data = self.digest.get_structured_report()
+                elif isinstance(self.digest, dict):
+                    data = self.digest.copy()
+                else:
+                    data = {}
             else:
                 data = {}
 
@@ -98,6 +107,15 @@ class DigestExporter:
         try:
             if self.visualizer and hasattr(self.visualizer, "digest") and isinstance(self.visualizer.digest, dict):
                 data = self.visualizer.digest
+            elif self.digest:
+                if hasattr(self.digest, "generate_final_report"):
+                    data = self.digest.generate_final_report()
+                elif hasattr(self.digest, "get_structured_report"):
+                    data = self.digest.get_structured_report()
+                elif isinstance(self.digest, dict):
+                    data = self.digest
+                else:
+                    data = {}
             else:
                 data = {}
 

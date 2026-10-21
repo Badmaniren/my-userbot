@@ -77,13 +77,17 @@ class DigestExporter:
                 raise e
             raise DigestExporterError(str(e))
 
+    def _get_export_data(self):
+        if self.visualizer and hasattr(self.visualizer, "digest") and isinstance(self.visualizer.digest, dict) and self.visualizer.digest:
+            return self.visualizer.digest.copy()
+        if self.digest and hasattr(self.digest, "generate_final_report"):
+            return self.digest.generate_final_report()
+        return {}
+
     def export_to_json(self, output_path: str) -> str:
         """Метод-адаптер под интеграционный тест для экспорта в JSON."""
         try:
-            if self.visualizer and hasattr(self.visualizer, "digest") and isinstance(self.visualizer.digest, dict):
-                data = self.visualizer.digest.copy()
-            else:
-                data = {}
+            data = self._get_export_data()
 
             with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
@@ -96,10 +100,7 @@ class DigestExporter:
     def export_to_html(self, output_path: str) -> str:
         """Метод-адаптер под интеграционный тест для экспорта в HTML."""
         try:
-            if self.visualizer and hasattr(self.visualizer, "digest") and isinstance(self.visualizer.digest, dict):
-                data = self.visualizer.digest
-            else:
-                data = {}
+            data = self._get_export_data()
 
             html_content = f"<html><body><pre>{json.dumps(data)}</pre></body></html>"
             with open(output_path, "w", encoding="utf-8") as f:

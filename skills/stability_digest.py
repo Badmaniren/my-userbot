@@ -1,3 +1,4 @@
+from typing import Optional, Any, Dict, List
 from skills.anomaly_correlator import AnomalyCorrelator
 from skills.system_telemetry import SystemTelemetry
 
@@ -10,10 +11,25 @@ class StabilityDigestError(Exception):
 class StabilityDigest:
     """Модуль для формирования аналитических дайджестов стабильности на основе телеметрии и аномалий."""
 
-    def __init__(self, repo_path: str, anomaly_detector: AnomalyCorrelator, system_telemetry: SystemTelemetry):
-        self.repo_path = repo_path
-        self.anomaly_detector = anomaly_detector
-        self.system_telemetry = system_telemetry
+    def __init__(
+        self,
+        repo_path: Optional[str] = ".",
+        anomaly_detector: Optional[Any] = None,
+        system_telemetry: Optional[Any] = None,
+    ) -> None:
+        self.repo_path = repo_path or "."
+        if anomaly_detector is None:
+            self.anomaly_detector = AnomalyCorrelator(repo_path=self.repo_path)
+        else:
+            self.anomaly_detector = anomaly_detector
+
+        if system_telemetry is None:
+            self.system_telemetry = SystemTelemetry(
+                repo_path=self.repo_path,
+                anomaly_detector=self.anomaly_detector,
+            )
+        else:
+            self.system_telemetry = system_telemetry
 
     def generate_digest(self, execution_id=None) -> dict:
         """Генерирует дайджест стабильности, объединяя сводку телеметрии и результаты детектирования аномалий."""

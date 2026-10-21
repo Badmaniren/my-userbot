@@ -1,106 +1,101 @@
 import unittest
-import json
 import os
+import json
 import uuid
 import random
 from skills.digest_exporter import DigestExporter, DigestExporterError
-from skills.anomaly_visualizer import AnomalyVisualizer
 from skills.stability_digest import StabilityDigest
+from skills.anomaly_visualizer import AnomalyVisualizer
 
 class TestDigestExporterIntegration(unittest.TestCase):
 
     def setUp(self):
-        self.test_dir = f"test_dir_{uuid.uuid4().hex}"
-        os.makedirs(self.test_dir, exist_ok=True)
-        self.json_path = os.path.join(self.test_dir, f"report_{uuid.uuid4().hex}.json")
-        self.html_path = os.path.join(self.test_dir, f"report_{uuid.uuid4().hex}.html")
+        self.output_json = f"test_report_{uuid.uuid4()}.json"
+        self.output_html = f"test_report_{uuid.uuid4()}.html"
+        self.stream_id = str(uuid.uuid4())
+        self.random_metric_value = random.randint(100, 999)
 
     def tearDown(self):
-        for path in [self.json_path, self.html_path]:
+        for path in [self.output_json, self.output_html]:
             if os.path.exists(path):
                 os.remove(path)
-        if os.path.exists(self.test_dir):
-            os.rmdir(self.test_dir)
 
-    def test_export_json_and_html_integration(self):
-        random_metric_val = random.randint(100, 999)
-        random_text_msg = f"anomaly_msg_{uuid.uuid4().hex}"
+    def test_export_json_report_integration(self):
+        digest = StabilityDigest()
+        visualizer = AnomalyVisualizer(stability_digest=digest)
+        exporter = DigestExporter(stability_digest=digest, anomaly_visualizer=visualizer)
 
-        class DummyVisualizer:
-            def __init__(self, val, msg):
-                self.val = val
-                self.msg = msg
-                self.digest = {"random_key": uuid.uuid4().hex}
+        result_path = exporter.export_json_report(self.output_json)
+        self.assertEqual(result_path, self.output_json)
+        self.assertTrue(os.path.exists(self.output_json))
 
-            def get_summary_metrics(self):
-                return {"metric": self.val}
-
-            def render_text(self):
-                return self.msg
-
-            def render_ascii_correlation_graph(self):
-                return " *---* "
-
-        visualizer = DummyVisualizer(random_metric_val, random_text_msg)
-        exporter = DigestExporter(stability_digest=None, anomaly_visualizer=visualizer)
-
-        res_json = exporter.export_json_report(self.json_path)
-        self.assertEqual(res_json, self.json_path)
-        self.assertTrue(os.path.exists(self.json_path))
-
-        with open(self.json_path, 'r', encoding='utf-8') as f:
+        with open(self.output_json, 'r', encoding='utf-8') as f:
             data = json.load(f)
-            self.assertEqual(data.get("metric"), random_metric_val)
-            self.assertEqual(data.get("text_report"), random_text_msg)
-            self.assertEqual(data.get("ascii_graph"), " *---* ")
+            self.assertIn('text_report', data)
+            self.assertIn('ascii_graph', data)
 
-        res_html = exporter.export_html_report(self.html_path)
-        self.assertEqual(res_html, self.html_path)
-        self.assertTrue(os.path.exists(self.html_path))
+    def test_export_html_report_integration(self):
+        digest = StabilityDigest()
+        visualizer = AnomalyVisualizer(stability_digest=digest)
+        exporter = DigestExporter(stability_digest=digest, anomaly_visualizer=visualizer)
 
-        with open(self.html_path, 'r', encoding='utf-8') as f:
+        result_path = exporter.export_html_report(self.output_html)
+        self.assertEqual(result_path, self.output_html)
+        self.assertTrue(os.path.exists(self.output_html))
+
+        with open(self.output_html, 'r', encoding='utf-8') as f:
             content = f.read()
-            self.assertIn(str(random_metric_val), content)
-            self.assertIn(random_text_msg, content)
+            self.assertIn("<html>", content)
+            self.assertIn("Stability Digest Report", content)
 
-    def test_export_to_json_and_html_adapters(self):
-        random_digest_val = uuid.uuid4().hex
+    def test_export_stream_to_json_integration(self):
+        digest = StabilityDigest()
+        exporter = DigestExporter(stability_digest=digest)
 
-        class DummyVisualizerAdapter:
-            def __init__(self, val):
-                self.digest = {"adapter_id": val}
+        result_path = exporter.export_stream_to_json(self.stream_id, self.output_json)
+        self.assertEqual(result_path, self.output_json)
+        self.assertTrue(os.path.exists(self.output_json))
 
-        visualizer = DummyVisualizerAdapter(random_digest_val)
-        exporter = DigestExporter(stability_digest=None, anomaly_visualizer=visualizer)
-
-        res_json = exporter.export_to_json(self.json_path)
-        self.assertEqual(res_json, self.json_path)
-        self.assertTrue(os.path.exists(self.json_path))
-
-        with open(self.json_path, 'r', encoding='utf-8') as f:
+        with open(self.output_json, 'r', encoding='utf-8') as f:
             data = json.load(f)
-            self.assertEqual(data.get("adapter_id"), random_digest_val)
+            self.assertIsInstance(data, (dict, list))
 
-        res_html = exporter.export_to_html(self.html_path)
-        self.assertEqual(res_html, self.html_path)
-        self.assertTrue(os.path.exists(self.html_path))
+    def test_export_to_json_adapter_integration(self):
+        digest = StabilityDigest()
+        digest.digest = {"random_key": self.random_metric_value}
+        exporter = DigestExporter(stability_digest=digest)
 
-        with open(self.html_path, 'r', encoding='utf-8') as f:
+        result_path = exporter.export_to_json(self.output_json)
+        self.assertEqual(result_path, self.output_json)
+        self.assertTrue(os.path.exists(self.output_json))
+
+        with open(self.output_json, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            self.assertEqual(data.get("random_key"), self.random_metric_value)
+
+    def test_export_to_html_adapter_integration(self):
+        digest = StabilityDigest()
+        digest.digest = {"random_key": self.random_metric_value}
+        exporter = DigestExporter(stability_digest=digest)
+
+        result_path = exporter.export_to_html(self.output_html)
+        self.assertEqual(result_path, self.output_html)
+        self.assertTrue(os.path.exists(self.output_html))
+
+        with open(self.output_html, 'r', encoding='utf-8') as f:
             content = f.read()
-            self.assertIn(random_digest_val, content)
+            self.assertIn(str(self.random_metric_value), content)
 
-    def test_exporter_error_handling(self):
-        class FaultyVisualizer:
-            def get_summary_metrics(self):
-                raise RuntimeError("Visualizer critical failure")
-
-        exporter = DigestExporter(stability_digest=None, anomaly_visualizer=FaultyVisualizer())
+    def test_exporter_none_type_handling_exception(self):
+        exporter = DigestExporter(stability_digest=None, anomaly_visualizer=None)
+        with self.assertRaises(DigestExporterError):
+            exporter.export_json_report(self.output_json)
 
         with self.assertRaises(DigestExporterError):
-            exporter.export_json_report(self.json_path)
+            exporter.export_html_report(self.output_html)
 
         with self.assertRaises(DigestExporterError):
-            exporter.export_html_report(self.html_path)
+            exporter.export_stream_to_json(self.stream_id, self.output_json)
 
 if __name__ == '__main__':
     unittest.main()

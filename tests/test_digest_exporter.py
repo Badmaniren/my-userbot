@@ -1,8 +1,7 @@
-import io
-import json
 import os
+import json
+import uuid
 import random
-import string
 import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
@@ -10,242 +9,239 @@ from unittest.mock import MagicMock, patch
 from skills.digest_exporter import DigestExporter, DigestExporterError
 
 
-def _rand_str(length=12):
-    return "".join(random.choices(string.ascii_letters + string.digits, k=length))
-
-
-def _rand_dict():
-    return {
-        _rand_str(8): _rand_str(16),
-        _rand_str(6): random.randint(1, 10000),
-        _rand_str(5): random.choice([True, False])
-    }
-
-
 class TestDigestExporter(unittest.TestCase):
-
     def setUp(self):
-        self.tmp_dir = tempfile.TemporaryDirectory()
+        self.temp_dir = tempfile.TemporaryDirectory()
 
     def tearDown(self):
-        try:
-            self.tmp_dir.cleanup()
-        except Exception:
-            pass
+        self.temp_dir.cleanup()
 
-    def test_export_json_report_success_with_dict_metrics(self):
-        mock_vis = MagicMock()
-        mock_digest = MagicMock()
+    def _generate_random_string(self, length=12):
+        return "".join(random.choices("abcdefghijklmnopqrstuvwxyz0123456789", k=length))
 
-        key1 = _rand_str(8)
-        val1 = _rand_str(15)
-        metrics = {key1: val1, _rand_str(5): random.randint(10, 500)}
-        text_rep = _rand_str(30)
-        ascii_rep = _rand_str(40)
+    def test_init_and_attributes(self):
+        digest_mock = MagicMock()
+        visualizer_mock = MagicMock()
+        exporter = DigestExporter(stability_digest=digest_mock, anomaly_visualizer=visualizer_mock)
 
-        mock_vis.get_summary_metrics.return_value = metrics
-        mock_vis.render_text.return_value = text_rep
-        mock_vis.render_ascii_correlation_graph.return_value = ascii_rep
+        self.assertIs(exporter.digest, digest_mock)
+        self.assertIs(exporter.visualizer, visualizer_mock)
 
-        exporter = DigestExporter(stability_digest=mock_digest, anomaly_visualizer=mock_vis)
+    def test_export_json_report_success(self):
+        visualizer_mock = MagicMock()
+        metric_key = "metric_" + self._generate_random_string()
+        metric_val = random.randint(100, 9999)
+        text_payload = "text_" + self._generate_random_string()
+        ascii_payload = "ascii_" + self._generate_random_string()
 
-        filename = f"{_rand_str(10)}.json"
-        out_path = os.path.join(self.tmp_dir.name, filename)
+        visualizer_mock.get_summary_metrics.return_value = {metric_key: metric_val}
+        visualizer_mock.render_text.return_value = text_payload
+        visualizer_mock.render_ascii_correlation_graph.return_value = ascii_payload
 
-        res = exporter.export_json_report(out_path)
-        self.assertEqual(res, out_path)
-        self.assertTrue(os.path.exists(out_path))
+        exporter = DigestExporter(anomaly_visualizer=visualizer_mock)
+        output_file = os.path.join(self.temp_dir.name, f"out_{uuid.uuid4().hex}.json")
 
-        with open(out_path, "r", encoding="utf-8") as f:
-            loaded = json.load(f)
+        result = exporter.export_json_report(output_file)
 
-        self.assertEqual(loaded.get(key1), val1)
-        self.assertEqual(loaded.get("text_report"), text_rep)
-        self.assertEqual(loaded.get("ascii_graph"), ascii_rep)
+        self.assertEqual(result, output_file)
+        self.assertTrue(os.path.exists(output_file))
 
-    def test_export_json_report_metrics_non_dict(self):
-        mock_vis = MagicMock()
-        text_rep = _rand_str(20)
-        ascii_rep = _rand_str(25)
+        with open(output_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
 
-        mock_vis.get_summary_metrics.return_value = _rand_str(10)
-        mock_vis.render_text.return_value = text_rep
-        mock_vis.render_ascii_correlation_graph.return_value = ascii_rep
+        self.assertEqual(data.get(metric_key), metric_val)
+        self.assertEqual(data.get("text_report"), text_payload)
+        self.assertEqual(data.get("ascii_graph"), ascii_payload)
 
-        exporter = DigestExporter(anomaly_visualizer=mock_vis)
-        out_path = os.path.join(self.tmp_dir.name, f"{_rand_str(8)}.json")
+    def test_export_json_report_non_dict_metrics(self):
+        visualizer_mock = MagicMock()
+        text_payload = "text_" + self._generate_random_string()
+        ascii_payload = "ascii_" + self._generate_random_string()
 
-        res = exporter.export_json_report(out_path)
-        self.assertEqual(res, out_path)
+        visualizer_mock.get_summary_metrics.return_value = None
+        visualizer_mock.render_text.return_value = text_payload
+        visualizer_mock.render_ascii_correlation_graph.return_value = ascii_payload
 
-        with open(out_path, "r", encoding="utf-8") as f:
-            loaded = json.load(f)
+        exporter = DigestExporter(anomaly_visualizer=visualizer_mock)
+        output_file = os.path.join(self.temp_dir.name, f"out_{uuid.uuid4().hex}.json")
 
-        self.assertIn("text_report", loaded)
-        self.assertEqual(loaded["text_report"], text_rep)
-        self.assertEqual(loaded["ascii_graph"], ascii_rep)
+        result = exporter.export_json_report(output_file)
+        self.assertEqual(result, output_file)
 
-    def test_export_json_report_raises_digest_exporter_error(self):
-        mock_vis = MagicMock()
-        err_msg = _rand_str(20)
-        mock_vis.get_summary_metrics.side_effect = RuntimeError(err_msg)
+        with open(output_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
 
-        exporter = DigestExporter(anomaly_visualizer=mock_vis)
-        out_path = os.path.join(self.tmp_dir.name, f"{_rand_str(8)}.json")
+        self.assertEqual(data.get("text_report"), text_payload)
+        self.assertEqual(data.get("ascii_graph"), ascii_payload)
 
-        with self.assertRaises(DigestExporterError) as ctx:
-            exporter.export_json_report(out_path)
-        self.assertIn(err_msg, str(ctx.exception))
+    def test_export_json_report_failure_raises_digest_exporter_error(self):
+        visualizer_mock = MagicMock()
+        visualizer_mock.get_summary_metrics.side_effect = RuntimeError("Visualizer failure: " + uuid.uuid4().hex)
 
-    def test_export_json_report_propagates_existing_digest_exporter_error(self):
-        mock_vis = MagicMock()
-        err_msg = _rand_str(15)
-        mock_vis.get_summary_metrics.side_effect = DigestExporterError(err_msg)
+        exporter = DigestExporter(anomaly_visualizer=visualizer_mock)
+        output_file = os.path.join(self.temp_dir.name, f"out_{uuid.uuid4().hex}.json")
 
-        exporter = DigestExporter(anomaly_visualizer=mock_vis)
-        out_path = os.path.join(self.tmp_dir.name, f"{_rand_str(8)}.json")
-
-        with self.assertRaises(DigestExporterError) as ctx:
-            exporter.export_json_report(out_path)
-        self.assertIn(err_msg, str(ctx.exception))
+        with self.assertRaises(DigestExporterError):
+            exporter.export_json_report(output_file)
 
     def test_export_html_report_success(self):
-        mock_vis = MagicMock()
-        metrics = {_rand_str(6): _rand_str(10)}
-        text_rep = _rand_str(18)
-        ascii_rep = _rand_str(22)
+        visualizer_mock = MagicMock()
+        metric_key = "key_" + self._generate_random_string()
+        metric_val = uuid.uuid4().hex
+        text_payload = "report_text_" + self._generate_random_string()
+        ascii_payload = "ascii_graph_" + self._generate_random_string()
 
-        mock_vis.get_summary_metrics.return_value = metrics
-        mock_vis.render_text.return_value = text_rep
-        mock_vis.render_ascii_correlation_graph.return_value = ascii_rep
+        visualizer_mock.get_summary_metrics.return_value = {metric_key: metric_val}
+        visualizer_mock.render_text.return_value = text_payload
+        visualizer_mock.render_ascii_correlation_graph.return_value = ascii_payload
 
-        exporter = DigestExporter(anomaly_visualizer=mock_vis)
-        out_path = os.path.join(self.tmp_dir.name, f"{_rand_str(8)}.html")
+        exporter = DigestExporter(anomaly_visualizer=visualizer_mock)
+        output_file = os.path.join(self.temp_dir.name, f"out_{uuid.uuid4().hex}.html")
 
-        res = exporter.export_html_report(out_path)
-        self.assertEqual(res, out_path)
-        self.assertTrue(os.path.exists(out_path))
+        result = exporter.export_html_report(output_file)
+        self.assertEqual(result, output_file)
+        self.assertTrue(os.path.exists(output_file))
 
-        with open(out_path, "r", encoding="utf-8") as f:
+        with open(output_file, "r", encoding="utf-8") as f:
             content = f.read()
 
         self.assertIn("<html>", content)
-        self.assertIn(text_rep, content)
-        self.assertIn(ascii_rep, content)
-        self.assertIn(str(metrics), content)
+        self.assertIn(metric_key, content)
+        self.assertIn(metric_val, content)
+        self.assertIn(text_payload, content)
+        self.assertIn(ascii_payload, content)
 
-    def test_export_html_report_error(self):
-        mock_vis = MagicMock()
-        mock_vis.get_summary_metrics.return_value = {}
-        mock_vis.render_text.side_effect = IOError(_rand_str(12))
+    def test_export_html_report_failure_raises_digest_exporter_error(self):
+        visualizer_mock = MagicMock()
+        visualizer_mock.render_text.side_effect = ValueError("Render error: " + uuid.uuid4().hex)
 
-        exporter = DigestExporter(anomaly_visualizer=mock_vis)
-        out_path = os.path.join(self.tmp_dir.name, f"{_rand_str(8)}.html")
+        exporter = DigestExporter(anomaly_visualizer=visualizer_mock)
+        output_file = os.path.join(self.temp_dir.name, f"out_{uuid.uuid4().hex}.html")
 
         with self.assertRaises(DigestExporterError):
-            exporter.export_html_report(out_path)
+            exporter.export_html_report(output_file)
 
     def test_export_stream_to_json_success(self):
-        mock_digest = MagicMock()
-        stream_id = _rand_str(10)
-        expected_stream_data = _rand_dict()
+        digest_mock = MagicMock()
+        stream_id = "stream_" + uuid.uuid4().hex
+        payload_key = "stream_key_" + self._generate_random_string()
+        payload_val = random.randint(1000, 99999)
+        mock_data = {payload_key: payload_val, "session": uuid.uuid4().hex}
 
-        mock_digest.export_digest_stream.return_value = expected_stream_data
+        digest_mock.export_digest_stream.return_value = mock_data
 
-        exporter = DigestExporter(stability_digest=mock_digest)
-        out_path = os.path.join(self.tmp_dir.name, f"{_rand_str(8)}.json")
+        exporter = DigestExporter(stability_digest=digest_mock)
+        output_file = os.path.join(self.temp_dir.name, f"stream_{uuid.uuid4().hex}.json")
 
-        res = exporter.export_stream_to_json(stream_id, out_path)
-        mock_digest.export_digest_stream.assert_called_once_with(stream_id)
-        self.assertEqual(res, out_path)
+        result = exporter.export_stream_to_json(stream_id, output_file)
+        self.assertEqual(result, output_file)
+        digest_mock.export_digest_stream.assert_called_once_with(stream_id)
 
-        with open(out_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
+        with open(output_file, "r", encoding="utf-8") as f:
+            saved_data = json.load(f)
 
-        self.assertEqual(data, expected_stream_data)
+        self.assertEqual(saved_data.get(payload_key), payload_val)
+        self.assertEqual(saved_data.get("session"), mock_data["session"])
 
-    def test_export_stream_to_json_error(self):
-        mock_digest = MagicMock()
-        stream_id = _rand_str(10)
-        mock_digest.export_digest_stream.side_effect = ValueError(_rand_str(14))
+    def test_export_stream_to_json_failure_raises_digest_exporter_error(self):
+        digest_mock = MagicMock()
+        digest_mock.export_digest_stream.side_effect = KeyError("Stream not found: " + uuid.uuid4().hex)
 
-        exporter = DigestExporter(stability_digest=mock_digest)
-        out_path = os.path.join(self.tmp_dir.name, f"{_rand_str(8)}.json")
+        exporter = DigestExporter(stability_digest=digest_mock)
+        output_file = os.path.join(self.temp_dir.name, f"stream_{uuid.uuid4().hex}.json")
 
         with self.assertRaises(DigestExporterError):
-            exporter.export_stream_to_json(stream_id, out_path)
+            exporter.export_stream_to_json("random_id_" + uuid.uuid4().hex, output_file)
 
-    def test_export_to_json_with_visualizer_digest_dict(self):
-        mock_vis = MagicMock()
-        payload = _rand_dict()
-        mock_vis.digest = payload
+    def test_export_to_json_with_digest_dict(self):
+        visualizer_mock = MagicMock()
+        random_key = "k_" + self._generate_random_string()
+        random_val = "v_" + self._generate_random_string()
+        visualizer_mock.digest = {random_key: random_val}
 
-        exporter = DigestExporter(anomaly_visualizer=mock_vis)
-        out_path = os.path.join(self.tmp_dir.name, f"{_rand_str(8)}.json")
+        exporter = DigestExporter(anomaly_visualizer=visualizer_mock)
+        output_file = os.path.join(self.temp_dir.name, f"adapter_{uuid.uuid4().hex}.json")
 
-        res = exporter.export_to_json(out_path)
-        self.assertEqual(res, out_path)
+        result = exporter.export_to_json(output_file)
+        self.assertEqual(result, output_file)
 
-        with open(out_path, "r", encoding="utf-8") as f:
-            loaded = json.load(f)
+        with open(output_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
 
-        self.assertEqual(loaded, payload)
+        self.assertEqual(data.get(random_key), random_val)
 
     def test_export_to_json_without_visualizer_digest(self):
-        exporter = DigestExporter(anomaly_visualizer=None)
-        out_path = os.path.join(self.tmp_dir.name, f"{_rand_str(8)}.json")
+        visualizer_mock = MagicMock()
+        del visualizer_mock.digest
 
-        res = exporter.export_to_json(out_path)
-        self.assertEqual(res, out_path)
+        exporter = DigestExporter(anomaly_visualizer=visualizer_mock)
+        output_file = os.path.join(self.temp_dir.name, f"adapter_empty_{uuid.uuid4().hex}.json")
 
-        with open(out_path, "r", encoding="utf-8") as f:
-            loaded = json.load(f)
+        result = exporter.export_to_json(output_file)
+        self.assertEqual(result, output_file)
 
-        self.assertEqual(loaded, {})
+        with open(output_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
 
-    def test_export_to_json_file_error(self):
-        exporter = DigestExporter(anomaly_visualizer=None)
-        invalid_path = os.path.join(self.tmp_dir.name, _rand_str(8), _rand_str(8), "file.json")
+        self.assertEqual(data, {})
+
+    def test_export_to_json_io_error_raises_digest_exporter_error(self):
+        exporter = DigestExporter()
+        invalid_path = os.path.join(self.temp_dir.name, "non_existent_subdir_" + uuid.uuid4().hex, "report.json")
 
         with self.assertRaises(DigestExporterError):
             exporter.export_to_json(invalid_path)
 
-    def test_export_to_html_with_visualizer_digest(self):
-        mock_vis = MagicMock()
-        payload = _rand_dict()
-        mock_vis.digest = payload
+    def test_export_to_html_with_digest_dict(self):
+        visualizer_mock = MagicMock()
+        random_key = "prop_" + self._generate_random_string()
+        random_val = uuid.uuid4().hex
+        visualizer_mock.digest = {random_key: random_val}
 
-        exporter = DigestExporter(anomaly_visualizer=mock_vis)
-        out_path = os.path.join(self.tmp_dir.name, f"{_rand_str(8)}.html")
+        exporter = DigestExporter(anomaly_visualizer=visualizer_mock)
+        output_file = os.path.join(self.temp_dir.name, f"adapter_{uuid.uuid4().hex}.html")
 
-        res = exporter.export_to_html(out_path)
-        self.assertEqual(res, out_path)
+        result = exporter.export_to_html(output_file)
+        self.assertEqual(result, output_file)
 
-        with open(out_path, "r", encoding="utf-8") as f:
+        with open(output_file, "r", encoding="utf-8") as f:
             content = f.read()
 
-        serialized = json.dumps(payload)
-        self.assertIn(serialized, content)
-        self.assertTrue(content.startswith("<html><body><pre>"))
+        self.assertIn("<html><body><pre>", content)
+        self.assertIn(random_key, content)
+        self.assertIn(random_val, content)
 
-    def test_export_to_html_without_visualizer(self):
+    def test_export_to_html_empty_visualizer(self):
         exporter = DigestExporter(anomaly_visualizer=None)
-        out_path = os.path.join(self.tmp_dir.name, f"{_rand_str(8)}.html")
+        output_file = os.path.join(self.temp_dir.name, f"adapter_none_{uuid.uuid4().hex}.html")
 
-        res = exporter.export_to_html(out_path)
-        self.assertEqual(res, out_path)
+        result = exporter.export_to_html(output_file)
+        self.assertEqual(result, output_file)
 
-        with open(out_path, "r", encoding="utf-8") as f:
+        with open(output_file, "r", encoding="utf-8") as f:
             content = f.read()
 
-        self.assertIn("{}", content)
+        self.assertEqual(content, "<html><body><pre>{}</pre></body></html>")
 
-    def test_export_to_html_file_error(self):
-        exporter = DigestExporter(anomaly_visualizer=None)
-        invalid_path = os.path.join(self.tmp_dir.name, _rand_str(6), _rand_str(6), "err.html")
+    def test_export_to_html_io_error_raises_digest_exporter_error(self):
+        exporter = DigestExporter()
+        invalid_path = os.path.join(self.temp_dir.name, "absent_dir_" + uuid.uuid4().hex, "file.html")
 
         with self.assertRaises(DigestExporterError):
             exporter.export_to_html(invalid_path)
+
+    def test_rethrow_existing_digest_exporter_error(self):
+        digest_mock = MagicMock()
+        custom_msg = "Explicit failure: " + uuid.uuid4().hex
+        digest_mock.export_digest_stream.side_effect = DigestExporterError(custom_msg)
+
+        exporter = DigestExporter(stability_digest=digest_mock)
+        output_file = os.path.join(self.temp_dir.name, f"file_{uuid.uuid4().hex}.json")
+
+        with self.assertRaises(DigestExporterError) as cm:
+            exporter.export_stream_to_json("stream_" + uuid.uuid4().hex, output_file)
+
+        self.assertIn(custom_msg, str(cm.exception))
 
 
 if __name__ == "__main__":

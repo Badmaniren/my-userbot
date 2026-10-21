@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ом: raise CodeValidatorASTError(f"Ошибка синтаксиса AST: {e}") from e
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## anomaly_security_gateway (compose) — раундов: 4
-- Последняя ошибка перед фиксом: raise CodeValidatorASTError(f"Ошибка синтаксиса AST: {e}") from e
+иса AST: {e}") from e
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## audit_exporter (compose) — раундов: 4
@@ -337,4 +333,8 @@
 
 ## anomaly_pipeline (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## audit_export_pipeline (compose) — раундов: 4
+- Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/skills/anomaly_report_aggregator.py", line 37, in aggregate_and_report
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

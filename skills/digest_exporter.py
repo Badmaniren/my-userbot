@@ -1,4 +1,6 @@
 import json
+from typing import Any, Dict, Optional, Union
+
 from skills.anomaly_visualizer import AnomalyVisualizer
 from skills.stability_digest import StabilityDigest
 
@@ -11,13 +13,20 @@ class DigestExporterError(Exception):
 class DigestExporter:
     """Модуль экспорта дайджестов и визуализаций в структурированные файлы отчетов."""
 
-    def __init__(self, stability_digest=None, anomaly_visualizer=None):
-        self.digest = stability_digest
-        self.visualizer = anomaly_visualizer
+    def __init__(
+        self,
+        stability_digest: Optional[Union[StabilityDigest, Dict[str, Any]]] = None,
+        anomaly_visualizer: Optional[AnomalyVisualizer] = None,
+    ) -> None:
+        self.digest: Optional[Union[StabilityDigest, Dict[str, Any]]] = stability_digest
+        self.visualizer: Optional[AnomalyVisualizer] = anomaly_visualizer
 
     def export_json_report(self, output_path: str) -> str:
         """Экспортирует данные дайджеста и метрики визуализатора в JSON-файл."""
         try:
+            if not self.visualizer:
+                raise DigestExporterError("AnomalyVisualizer is not initialized")
+
             metrics = self.visualizer.get_summary_metrics()
             text_rep = self.visualizer.render_text()
             ascii_rep = self.visualizer.render_ascii_correlation_graph()
@@ -42,6 +51,9 @@ class DigestExporter:
     def export_html_report(self, output_path: str) -> str:
         """Экспортирует отчет в HTML-файл."""
         try:
+            if not self.visualizer:
+                raise DigestExporterError("AnomalyVisualizer is not initialized")
+
             metrics = self.visualizer.get_summary_metrics()
             text_rep = self.visualizer.render_text()
             ascii_rep = self.visualizer.render_ascii_correlation_graph()
@@ -68,7 +80,16 @@ class DigestExporter:
     def export_stream_to_json(self, stream_id: str, output_path: str) -> str:
         """Экспортирует поток дайджеста в JSON."""
         try:
-            stream_data = self.digest.export_digest_stream(stream_id)
+            if self.digest is None:
+                raise DigestExporterError("StabilityDigest is not initialized")
+
+            if isinstance(self.digest, dict):
+                stream_data = self.digest.get(stream_id, self.digest)
+            elif hasattr(self.digest, "export_digest_stream"):
+                stream_data = self.digest.export_digest_stream(stream_id)
+            else:
+                stream_data = {}
+
             with open(output_path, 'w', encoding='utf-8') as f:
                 json.dump(stream_data, f, ensure_ascii=False, indent=4)
             return output_path
@@ -82,6 +103,10 @@ class DigestExporter:
         try:
             if self.visualizer and hasattr(self.visualizer, 'digest') and isinstance(self.visualizer.digest, dict):
                 data = self.visualizer.digest.copy()
+            elif isinstance(self.digest, dict):
+                data = self.digest.copy()
+            elif self.digest and hasattr(self.digest, 'digest') and isinstance(self.digest.digest, dict):
+                data = self.digest.digest.copy()
             else:
                 data = {}
 
@@ -98,6 +123,10 @@ class DigestExporter:
         try:
             if self.visualizer and hasattr(self.visualizer, 'digest') and isinstance(self.visualizer.digest, dict):
                 data = self.visualizer.digest
+            elif isinstance(self.digest, dict):
+                data = self.digest
+            elif self.digest and hasattr(self.digest, 'digest') and isinstance(self.digest.digest, dict):
+                data = self.digest.digest
             else:
                 data = {}
 

@@ -3,7 +3,8 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-t recent call last):
+рещено создавать заглушки. Используй честный импорт: 'from skills.stability_digest import ...'
+- Последняя ошибка перед фиксом: Traceback (most recent call last):
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## audit_serializer (create) — раундов: 4
@@ -339,8 +340,4 @@ t recent call last):
 
 ## anomaly_audit_hub (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/unittest/mock.py", line 939, in assert_called_with
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## digest_exporter (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

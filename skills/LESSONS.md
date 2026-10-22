@@ -3,7 +3,10 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-рещено создавать заглушки. Используй честный импорт: 'from skills.stability_digest import ...'
+ Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## digest_exporter (refactor) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'stability_digest'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.stability_digest import ...'
 - Последняя ошибка перед фиксом: Traceback (most recent call last):
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -336,8 +339,4 @@
 
 ## anomaly_audit_hub (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: skills.code_validator.CodeValidatorASTError: Ошибка синтаксиса AST: invalid syntax (<unknown>, line 2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## anomaly_audit_hub (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/unittest/mock.py", line 939, in assert_called_with
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

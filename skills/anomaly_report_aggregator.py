@@ -27,18 +27,33 @@ class AnomalyReportAggregator:
                 logger=self.anomaly_logger
             )
 
+    def _extract_anomalies(self, anomalies):
+        if isinstance(anomalies, dict):
+            if "report" in anomalies and isinstance(anomalies["report"], list):
+                return anomalies["report"]
+            elif "anomalies" in anomalies and isinstance(anomalies["anomalies"], list):
+                return anomalies["anomalies"]
+            elif "source" in anomalies or "details" in anomalies or "severity" in anomalies:
+                return [anomalies]
+            else:
+                return []
+        elif isinstance(anomalies, list):
+            return anomalies
+        return []
+
     def aggregate_and_report(self, metric_name, value):
         try:
             self.correlator.correlate_metric(metric_name, value)
             anomalies = self.correlator.correlate_events()
             
-            for anomaly in anomalies:
-                self.anomaly_logger.log_anomaly(
-                    source=anomaly.get("source"),
-                    severity=anomaly.get("severity"),
-                    details=anomaly.get("details"),
-                    telemetry_snapshot=anomaly.get("telemetry_snapshot")
-                )
+            for anomaly in self._extract_anomalies(anomalies):
+                if isinstance(anomaly, dict):
+                    self.anomaly_logger.log_anomaly(
+                        source=anomaly.get("source"),
+                        severity=anomaly.get("severity"),
+                        details=anomaly.get("details"),
+                        telemetry_snapshot=anomaly.get("telemetry_snapshot")
+                    )
                 
             return self.anomaly_logger.get_structured_report()
         except AnomalyCorrelatorError as e:
@@ -48,13 +63,14 @@ class AnomalyReportAggregator:
         try:
             anomalies = self.correlator.analyze_execution_flow(execution_id, payload)
             
-            for anomaly in anomalies:
-                self.anomaly_logger.log_anomaly(
-                    source=anomaly.get("source"),
-                    severity=anomaly.get("severity"),
-                    details=anomaly.get("details"),
-                    telemetry_snapshot=anomaly.get("telemetry_snapshot")
-                )
+            for anomaly in self._extract_anomalies(anomalies):
+                if isinstance(anomaly, dict):
+                    self.anomaly_logger.log_anomaly(
+                        source=anomaly.get("source"),
+                        severity=anomaly.get("severity"),
+                        details=anomaly.get("details"),
+                        telemetry_snapshot=anomaly.get("telemetry_snapshot")
+                    )
                 
             return self.anomaly_logger.get_structured_report()
         except Exception as e:

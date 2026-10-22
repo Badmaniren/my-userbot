@@ -44,7 +44,7 @@ class TestCodeValidatorInquisition(unittest.TestCase):
         self.assertTrue(result)
 
     def test_validate_ast_structure_invalid_syntax(self):
-        malformed_code = f"def {uuid.uuid4().hex[:6]}():\n    print(unclosed_string"
+        malformed_code = f"def func_{uuid.uuid4().hex[:6]}():\n    print(unclosed_string"
         
         with self.assertRaises(CodeValidatorASTError):
             self.validator.validate_code(malformed_code)
@@ -96,7 +96,7 @@ class TestCodeValidatorInquisition(unittest.TestCase):
         self.validator.add_forbidden_construct(target_name)
 
         code_snippet = f"""
-class {uuid.uuid4().hex[:8].capitalize()}:
+class TestClass_{uuid.uuid4().hex[:8]}:
     def run(self):
         {target_name}()
 """

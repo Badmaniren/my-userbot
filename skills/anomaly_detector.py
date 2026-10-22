@@ -14,12 +14,12 @@ class AnomalyDetector:
     """
     def __init__(
         self, 
-        repo_path: str, 
+        repo_path: Optional[str] = None,
         threshold: float = 5.0, 
         git_inspector: Optional[Any] = None, 
         patch_verifier: Optional[Any] = None
     ) -> None:
-        self.repo_path = repo_path
+        self.repo_path = repo_path or "."
         self.threshold = threshold
         self.git_inspector = git_inspector
         self.patch_verifier = patch_verifier
@@ -43,9 +43,12 @@ class AnomalyDetector:
         if not history:
             raise AnomalyDetectorError(f"No history found for metric: {metric_name}")
         
+        if target_value > self.threshold:
+            return True
+
         mean_val = sum(history) / len(history)
         
-        if abs(target_value - mean_val) > self.threshold or target_value > self.threshold * 2:
+        if abs(target_value - mean_val) > self.threshold:
             return True
             
         return False

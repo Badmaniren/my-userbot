@@ -6,10 +6,14 @@ class AnomalyVisualizerError(Exception):
     pass
 
 class AnomalyVisualizer:
-    def __init__(self, digest=None):
-        if digest is not None and not isinstance(digest, dict):
+    def __init__(self, digest=None, stability_digest=None):
+        target_digest = digest if digest is not None else stability_digest
+        if target_digest is not None and hasattr(target_digest, "digest"):
+            target_digest = getattr(target_digest, "digest")
+
+        if target_digest is not None and not isinstance(target_digest, dict):
             raise AnomalyVisualizerError("Digest must be a dictionary.")
-        self.digest = digest if digest is not None else {}
+        self.digest = target_digest if target_digest is not None else {}
 
     def render_text(self) -> str:
         lines = []

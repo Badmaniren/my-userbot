@@ -1,5 +1,5 @@
 from skills.anomaly_logger import AnomalyLogger
-from skills.anomaly_report_aggregator import AnomalyReportAggregator
+from skills.anomaly_report_aggregator import AnomalyReportAggregator, AnomalyReportAggregatorError
 
 
 class AnomalyAuditHub:
@@ -13,14 +13,20 @@ class AnomalyAuditHub:
         )
 
     def log_anomaly(self, source: str, severity: str, details: dict, telemetry_snapshot: dict):
-        return self.logger.log_anomaly(
+        result = self.logger.log_anomaly(
             source=source,
             severity=severity,
             details=details,
             telemetry_snapshot=telemetry_snapshot
         )
+        if result is None:
+            return {}
+        return result
 
     def aggregate_and_report(self, metric_name: str, value: float):
+        if not metric_name or (isinstance(value, float) and value != value):
+            raise AnomalyReportAggregatorError("Invalid metric name or value")
+
         return self.aggregator.aggregate_and_report(
             metric_name=metric_name,
             value=value

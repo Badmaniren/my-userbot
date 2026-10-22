@@ -27,34 +27,71 @@ class AnomalyReportAggregator:
                 logger=self.anomaly_logger
             )
 
+    def _extract_anomalies_list(self, anomalies):
+        if isinstance(anomalies, dict):
+            if "report" in anomalies and isinstance(anomalies["report"], list):
+                return anomalies["report"]
+            elif "anomalies" in anomalies and isinstance(anomalies["anomalies"], list):
+                return anomalies["anomalies"]
+            elif "report" in anomalies and isinstance(anomalies["report"], dict):
+                return [anomalies["report"]]
+            else:
+                return [anomalies]
+        elif isinstance(anomalies, list):
+            return anomalies
+        else:
+            return []
+
     def aggregate_and_report(self, metric_name, value):
         try:
             self.correlator.correlate_metric(metric_name, value)
-            anomalies = self.correlator.correlate_events()
+            raw_anomalies = self.correlator.correlate_events()
+            anomalies = self._extract_anomalies_list(raw_anomalies)
             
             for anomaly in anomalies:
-                self.anomaly_logger.log_anomaly(
-                    source=anomaly.get("source"),
-                    severity=anomaly.get("severity"),
-                    details=anomaly.get("details"),
-                    telemetry_snapshot=anomaly.get("telemetry_snapshot")
-                )
+                if isinstance(anomaly, dict):
+                    self.anomaly_logger.log_anomaly(
+                        source=anomaly.get("source"),
+                        severity=anomaly.get("severity"),
+                        details=anomaly.get("details"),
+                        telemetry_snapshot=anomaly.get("telemetry_snapshot")
+                    )
+                elif isinstance(anomaly, str):
+                    self.anomaly_logger.log_anomaly(
+                        source=anomaly,
+                        severity="UNKNOWN",
+                        details={},
+                        telemetry_snapshot=None
+                    )
                 
             return self.anomaly_logger.get_structured_report()
         except AnomalyCorrelatorError as e:
             raise AnomalyReportAggregatorError(str(e))
+        except Exception as e:
+            if isinstance(e, AnomalyReportAggregatorError):
+                raise
+            raise AnomalyReportAggregatorError(str(e))
 
     def aggregate_execution_flow(self, execution_id, payload):
         try:
-            anomalies = self.correlator.analyze_execution_flow(execution_id, payload)
+            raw_anomalies = self.correlator.analyze_execution_flow(execution_id, payload)
+            anomalies = self._extract_anomalies_list(raw_anomalies)
             
             for anomaly in anomalies:
-                self.anomaly_logger.log_anomaly(
-                    source=anomaly.get("source"),
-                    severity=anomaly.get("severity"),
-                    details=anomaly.get("details"),
-                    telemetry_snapshot=anomaly.get("telemetry_snapshot")
-                )
+                if isinstance(anomaly, dict):
+                    self.anomaly_logger.log_anomaly(
+                        source=anomaly.get("source"),
+                        severity=anomaly.get("severity"),
+                        details=anomaly.get("details"),
+                        telemetry_snapshot=anomaly.get("telemetry_snapshot")
+                    )
+                elif isinstance(anomaly, str):
+                    self.anomaly_logger.log_anomaly(
+                        source=anomaly,
+                        severity="UNKNOWN",
+                        details={},
+                        telemetry_snapshot=None
+                    )
                 
             return self.anomaly_logger.get_structured_report()
         except Exception as e:

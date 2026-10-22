@@ -185,6 +185,44 @@ class TestAnomalyReportAggregator(unittest.TestCase):
         logged_args = mock_logger_instance.log_anomaly.call_args[1]
         self.assertEqual(logged_args["details"], rand_stream_data.decode('utf-8'))
 
+    @patch('skills.anomaly_report_aggregator.AnomalyCorrelator')
+    @patch('skills.anomaly_report_aggregator.AnomalyLogger')
+    def test_aggregate_and_report_handles_dict_response_and_string_items(self, mock_logger_cls, mock_correlator_cls):
+        mock_correlator_instance = mock_correlator_cls.return_value
+        mock_logger_instance = mock_logger_cls.return_value
+
+        # Return dict with 'report' list containing mixed types
+        mock_correlator_instance.correlate_events.return_value = {
+            "correlated_count": 2,
+            "report": [
+                {"source": "src_1", "severity": "HIGH", "details": {"err": 1}, "telemetry_snapshot": None},
+                "src_string_only"
+            ]
+        }
+
+        aggregator = AnomalyReportAggregator(
+            repo_path=self.rand_repo,
+            log_path=self.rand_log,
+            threshold=self.rand_threshold,
+            detector=self.rand_detector
+        )
+
+        aggregator.aggregate_and_report("metric_test", 12.34)
+
+        self.assertEqual(mock_logger_instance.log_anomaly.call_count, 2)
+        mock_logger_instance.log_anomaly.assert_any_call(
+            source="src_1",
+            severity="HIGH",
+            details={"err": 1},
+            telemetry_snapshot=None
+        )
+        mock_logger_instance.log_anomaly.assert_any_call(
+            source="src_string_only",
+            severity="UNKNOWN",
+            details={},
+            telemetry_snapshot=None
+        )
+
 
 if __name__ == '__main__':
     unittest.main()

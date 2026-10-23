@@ -13,11 +13,16 @@ class DigestExporter:
 
     def __init__(self, stability_digest=None, anomaly_visualizer=None):
         self.digest = stability_digest
-        self.visualizer = anomaly_visualizer
+        if anomaly_visualizer is None and isinstance(stability_digest, dict):
+            self.visualizer = AnomalyVisualizer(digest=stability_digest)
+        else:
+            self.visualizer = anomaly_visualizer
 
     def export_json_report(self, output_path: str) -> str:
         """Экспортирует данные дайджеста и метрики визуализатора в JSON-файл."""
         try:
+            if not self.visualizer:
+                raise DigestExporterError("Anomaly visualizer is required for json report export")
             metrics = self.visualizer.get_summary_metrics()
             text_rep = self.visualizer.render_text()
             ascii_rep = self.visualizer.render_ascii_correlation_graph()
@@ -37,11 +42,13 @@ class DigestExporter:
         except Exception as e:
             if isinstance(e, DigestExporterError):
                 raise e
-            raise DigestExporterError(str(e))
+            raise DigestExporterError(str(e)) from e
 
     def export_html_report(self, output_path: str) -> str:
         """Экспортирует отчет в HTML-файл."""
         try:
+            if not self.visualizer:
+                raise DigestExporterError("Anomaly visualizer is required for html report export")
             metrics = self.visualizer.get_summary_metrics()
             text_rep = self.visualizer.render_text()
             ascii_rep = self.visualizer.render_ascii_correlation_graph()
@@ -63,11 +70,47 @@ class DigestExporter:
         except Exception as e:
             if isinstance(e, DigestExporterError):
                 raise e
-            raise DigestExporterError(str(e))
+            raise DigestExporterError(str(e)) from e
+
+    def export_markdown_report(self, output_path: str) -> str:
+        """Экспортирует отчет в Markdown-файл."""
+        try:
+            if not self.visualizer:
+                raise DigestExporterError("Anomaly visualizer is required for markdown report export")
+            metrics = self.visualizer.get_summary_metrics()
+            text_rep = self.visualizer.render_text()
+            ascii_rep = self.visualizer.render_ascii_correlation_graph()
+
+            md_content = f"""# Stability Digest Report
+
+## Metrics
+{metrics}
+
+## Report
+```
+{text_rep}
+```
+
+## Correlation Graph
+```
+{ascii_rep}
+```
+"""
+
+            with open(output_path, "w", encoding="utf-8") as f:
+                f.write(md_content)
+
+            return output_path
+        except Exception as e:
+            if isinstance(e, DigestExporterError):
+                raise e
+            raise DigestExporterError(str(e)) from e
 
     def export_stream_to_json(self, stream_id: str, output_path: str) -> str:
         """Экспортирует поток дайджеста в JSON."""
         try:
+            if not self.digest:
+                raise DigestExporterError("Stability digest is required for stream export")
             stream_data = self.digest.export_digest_stream(stream_id)
             with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(stream_data, f, ensure_ascii=False, indent=4)
@@ -75,13 +118,15 @@ class DigestExporter:
         except Exception as e:
             if isinstance(e, DigestExporterError):
                 raise e
-            raise DigestExporterError(str(e))
+            raise DigestExporterError(str(e)) from e
 
     def export_to_json(self, output_path: str) -> str:
         """Метод-адаптер под интеграционный тест для экспорта в JSON."""
         try:
             if self.visualizer and hasattr(self.visualizer, "digest") and isinstance(self.visualizer.digest, dict):
                 data = self.visualizer.digest.copy()
+            elif isinstance(self.digest, dict):
+                data = self.digest.copy()
             else:
                 data = {}
 
@@ -91,13 +136,15 @@ class DigestExporter:
         except Exception as e:
             if isinstance(e, DigestExporterError):
                 raise e
-            raise DigestExporterError(str(e))
+            raise DigestExporterError(str(e)) from e
 
     def export_to_html(self, output_path: str) -> str:
         """Метод-адаптер под интеграционный тест для экспорта в HTML."""
         try:
             if self.visualizer and hasattr(self.visualizer, "digest") and isinstance(self.visualizer.digest, dict):
                 data = self.visualizer.digest
+            elif isinstance(self.digest, dict):
+                data = self.digest
             else:
                 data = {}
 
@@ -108,4 +155,23 @@ class DigestExporter:
         except Exception as e:
             if isinstance(e, DigestExporterError):
                 raise e
-            raise DigestExporterError(str(e))
+            raise DigestExporterError(str(e)) from e
+
+    def export_to_markdown(self, output_path: str) -> str:
+        """Метод-адаптер под интеграционный тест для экспорта в Markdown."""
+        try:
+            if self.visualizer and hasattr(self.visualizer, "digest") and isinstance(self.visualizer.digest, dict):
+                data = self.visualizer.digest
+            elif isinstance(self.digest, dict):
+                data = self.digest
+            else:
+                data = {}
+
+            md_content = f"# Digest Report\n\n```json\n{json.dumps(data, indent=2)}\n```\n"
+            with open(output_path, "w", encoding="utf-8") as f:
+                f.write(md_content)
+            return output_path
+        except Exception as e:
+            if isinstance(e, DigestExporterError):
+                raise e
+            raise DigestExporterError(str(e)) from e

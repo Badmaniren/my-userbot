@@ -3,8 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-(<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
-- Последняя ошибка перед фиксом: bridge = AuditExportBridge(self.repo_path, self.log_path, self.threshold)
+h, self.log_path, self.threshold)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## anomaly_audit_exporter (compose) — раундов: 4
@@ -343,4 +342,8 @@
 
 ## anomaly_audit_hub (refactor) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## digest_exporter (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: Traceback (most recent call last):
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

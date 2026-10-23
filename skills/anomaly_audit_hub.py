@@ -4,6 +4,9 @@ from skills.anomaly_report_aggregator import AnomalyReportAggregator
 
 class AnomalyAuditHub:
     def __init__(self, repo_path: str, log_path: str, threshold: float):
+        self.repo_path = repo_path
+        self.log_path = log_path
+        self.threshold = threshold
         self.logger = AnomalyLogger(log_path=log_path)
         self.aggregator = AnomalyReportAggregator(
             repo_path=repo_path,
@@ -27,4 +30,11 @@ class AnomalyAuditHub:
         )
 
     def generate_final_report(self):
-        return self.aggregator.generate_final_report()
+        report = self.aggregator.generate_final_report()
+        if isinstance(report, list):
+            return {
+                "anomalies": report,
+                "summary": "Final anomaly audit report",
+                "total": len(report)
+            }
+        return report

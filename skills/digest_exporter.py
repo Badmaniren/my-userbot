@@ -18,9 +18,9 @@ class DigestExporter:
     def export_json_report(self, output_path: str) -> str:
         """Экспортирует данные дайджеста и метрики визуализатора в JSON-файл."""
         try:
-            metrics = self.visualizer.get_summary_metrics()
-            text_rep = self.visualizer.render_text()
-            ascii_rep = self.visualizer.render_ascii_correlation_graph()
+            metrics = self.visualizer.get_summary_metrics() if self.visualizer else {}
+            text_rep = self.visualizer.render_text() if self.visualizer else ""
+            ascii_rep = self.visualizer.render_ascii_correlation_graph() if self.visualizer else ""
 
             if isinstance(metrics, dict):
                 data = metrics.copy()
@@ -36,15 +36,15 @@ class DigestExporter:
             return output_path
         except Exception as e:
             if isinstance(e, DigestExporterError):
-                raise e
-            raise DigestExporterError(str(e))
+                raise
+            raise DigestExporterError(str(e)) from e
 
     def export_html_report(self, output_path: str) -> str:
         """Экспортирует отчет в HTML-файл."""
         try:
-            metrics = self.visualizer.get_summary_metrics()
-            text_rep = self.visualizer.render_text()
-            ascii_rep = self.visualizer.render_ascii_correlation_graph()
+            metrics = self.visualizer.get_summary_metrics() if self.visualizer else {}
+            text_rep = self.visualizer.render_text() if self.visualizer else ""
+            ascii_rep = self.visualizer.render_ascii_correlation_graph() if self.visualizer else ""
 
             html_content = f"""<html>
     <head><title>Digest Report</title></head>
@@ -62,20 +62,22 @@ class DigestExporter:
             return output_path
         except Exception as e:
             if isinstance(e, DigestExporterError):
-                raise e
-            raise DigestExporterError(str(e))
+                raise
+            raise DigestExporterError(str(e)) from e
 
     def export_stream_to_json(self, stream_id: str, output_path: str) -> str:
         """Экспортирует поток дайджеста в JSON."""
         try:
+            if self.digest is None:
+                raise DigestExporterError("StabilityDigest is not initialized")
             stream_data = self.digest.export_digest_stream(stream_id)
             with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(stream_data, f, ensure_ascii=False, indent=4)
             return output_path
         except Exception as e:
             if isinstance(e, DigestExporterError):
-                raise e
-            raise DigestExporterError(str(e))
+                raise
+            raise DigestExporterError(str(e)) from e
 
     def export_to_json(self, output_path: str) -> str:
         """Метод-адаптер под интеграционный тест для экспорта в JSON."""
@@ -90,8 +92,8 @@ class DigestExporter:
             return output_path
         except Exception as e:
             if isinstance(e, DigestExporterError):
-                raise e
-            raise DigestExporterError(str(e))
+                raise
+            raise DigestExporterError(str(e)) from e
 
     def export_to_html(self, output_path: str) -> str:
         """Метод-адаптер под интеграционный тест для экспорта в HTML."""
@@ -107,5 +109,5 @@ class DigestExporter:
             return output_path
         except Exception as e:
             if isinstance(e, DigestExporterError):
-                raise e
-            raise DigestExporterError(str(e))
+                raise
+            raise DigestExporterError(str(e)) from e

@@ -10,7 +10,7 @@ class StabilityDigestError(Exception):
 class StabilityDigest:
     """Модуль для формирования аналитических дайджестов стабильности на основе телеметрии и аномалий."""
 
-    def __init__(self, repo_path: str, anomaly_detector: AnomalyCorrelator, system_telemetry: SystemTelemetry):
+    def __init__(self, repo_path: str = ".", anomaly_detector: AnomalyCorrelator = None, system_telemetry: SystemTelemetry = None):
         self.repo_path = repo_path
         self.anomaly_detector = anomaly_detector
         self.system_telemetry = system_telemetry
@@ -39,7 +39,14 @@ class StabilityDigest:
 
     def export_digest_stream(self, stream_id: str) -> dict:
         """Экспортирует слепок телеметрии по заданному идентификатору потока."""
-        return self.system_telemetry.collect_snapshot(stream_id)
+        try:
+            if self.system_telemetry is None:
+                raise StabilityDigestError("SystemTelemetry is not initialized")
+            return self.system_telemetry.collect_snapshot(stream_id)
+        except Exception as e:
+            if isinstance(e, StabilityDigestError):
+                raise
+            raise StabilityDigestError(str(e)) from e
 
     def analyze_digest_trends(self, metric_name: str) -> dict:
         """Анализирует тренды для указанной метрики на основе её истории."""

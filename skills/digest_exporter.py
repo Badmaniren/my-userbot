@@ -36,8 +36,8 @@ class DigestExporter:
             return output_path
         except Exception as e:
             if isinstance(e, DigestExporterError):
-                raise e
-            raise DigestExporterError(str(e))
+                raise
+            raise DigestExporterError(str(e)) from e
 
     def export_html_report(self, output_path: str) -> str:
         """Экспортирует отчет в HTML-файл."""
@@ -62,8 +62,8 @@ class DigestExporter:
             return output_path
         except Exception as e:
             if isinstance(e, DigestExporterError):
-                raise e
-            raise DigestExporterError(str(e))
+                raise
+            raise DigestExporterError(str(e)) from e
 
     def export_stream_to_json(self, stream_id: str, output_path: str) -> str:
         """Экспортирует поток дайджеста в JSON."""
@@ -74,8 +74,8 @@ class DigestExporter:
             return output_path
         except Exception as e:
             if isinstance(e, DigestExporterError):
-                raise e
-            raise DigestExporterError(str(e))
+                raise
+            raise DigestExporterError(str(e)) from e
 
     def export_to_json(self, output_path: str) -> str:
         """Метод-адаптер под интеграционный тест для экспорта в JSON."""
@@ -90,8 +90,8 @@ class DigestExporter:
             return output_path
         except Exception as e:
             if isinstance(e, DigestExporterError):
-                raise e
-            raise DigestExporterError(str(e))
+                raise
+            raise DigestExporterError(str(e)) from e
 
     def export_to_html(self, output_path: str) -> str:
         """Метод-адаптер под интеграционный тест для экспорта в HTML."""
@@ -107,5 +107,5 @@ class DigestExporter:
             return output_path
         except Exception as e:
             if isinstance(e, DigestExporterError):
-                raise e
-            raise DigestExporterError(str(e))
+                raise
+            raise DigestExporterError(str(e)) from e

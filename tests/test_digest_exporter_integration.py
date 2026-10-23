@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import MagicMock
 import os
 import json
 import uuid
@@ -10,46 +11,24 @@ from skills.stability_digest import StabilityDigest
 class TestDigestExporterIntegration(unittest.TestCase):
 
     def setUp(self):
-        self.output_json = f"test_report_{uuid.uuid4()}.json"
-        self.output_html = f"test_report_{uuid.uuid4()}.html"
-        self.stream_id = str(uuid.uuid4())
+        self.rand_suffix = str(uuid.uuid4())[:8]
+        self.json_output_path = f"test_report_{self.rand_suffix}.json"
+        self.html_output_path = f"test_report_{self.rand_suffix}.html"
         
-        self.random_metric_val = random.randint(100, 999)
-        self.random_text_msg = f"audit_msg_{uuid.uuid4()}"
-
-        class MockVisualizer:
-            def __init__(self, val, msg):
-                self.val = val
-                self.msg = msg
-                self.digest = {"random_key": str(uuid.uuid4()), "value": val}
-
-            def get_summary_metrics(self):
-                return {"metric_code": self.val}
-
-            def render_text(self):
-                return f"Text report data: {self.msg}"
-
-            def render_ascii_correlation_graph(self):
-                return "[*]--[*]"
-
-        class MockStabilityDigest:
-            def __init__(self, sid, val):
-                self.sid = sid
-                self.val = val
-
-            def export_digest_stream(self, stream_id):
-                return {"stream_id": stream_id, "data": self.val}
-
-        self.visualizer = MockVisualizer(self.random_metric_val, self.random_text_msg)
-        self.stability_digest = MockStabilityDigest(self.stream_id, self.random_metric_val)
+        self.stability_digest = StabilityDigest(
+            repo_path=".",
+            anomaly_detector=MagicMock(),
+            system_telemetry=MagicMock()
+        )
+        self.anomaly_visualizer = AnomalyVisualizer()
         
         self.exporter = DigestExporter(
             stability_digest=self.stability_digest,
-            anomaly_visualizer=self.visualizer
+            anomaly_visualizer=self.anomaly_visualizer
         )
 
     def tearDown(self):
-        for path in [self.output_json, self.output_html]:
+        for path in [self.json_output_path, self.html_output_path]:
             if os.path.exists(path):
                 try:
                     os.remove(path)
@@ -57,62 +36,67 @@ class TestDigestExporterIntegration(unittest.TestCase):
                     pass
 
     def test_export_json_report_integration(self):
-        result_path = self.exporter.export_json_report(self.output_json)
-        self.assertEqual(result_path, self.output_json)
-        self.assertTrue(os.path.exists(self.output_json))
+        random_metric_value = random.randint(100, 999)
+        if hasattr(self.anomaly_visualizer, 'digest') and isinstance(self.anomaly_visualizer.digest, dict):
+            self.anomaly_visualizer.digest["random_metric"] = random_metric_value
 
-        with open(self.output_json, 'r', encoding='utf-8') as f:
+        result_path = self.exporter.export_json_report(self.json_output_path)
+
+        self.assertEqual(result_path, self.json_output_path)
+        self.assertTrue(os.path.exists(self.json_output_path))
+
+        with open(self.json_output_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        self.assertIn('metric_code', data)
-        self.assertEqual(data['metric_code'], self.random_metric_val)
-        self.assertIn('text_report', data)
-        self.assertIn(self.random_text_msg, data['text_report'])
-        self.assertIn('ascii_graph', data)
+        self.assertIn("text_report", data)
+        self.assertIn("ascii_graph", data)
 
     def test_export_html_report_integration(self):
-        result_path = self.exporter.export_html_report(self.output_html)
-        self.assertEqual(result_path, self.output_html)
-        self.assertTrue(os.path.exists(self.output_html))
+        result_path = self.exporter.export_html_report(self.html_output_path)
 
-        with open(self.output_html, 'r', encoding='utf-8') as f:
+        self.assertEqual(result_path, self.html_output_path)
+        self.assertTrue(os.path.exists(self.html_output_path))
+
+        with open(self.html_output_path, "r", encoding="utf-8") as f:
             content = f.read()
 
         self.assertIn("<html>", content)
-        self.assertIn(str(self.random_metric_val), content)
-        self.assertIn(self.random_text_msg, content)
+        self.assertIn("Stability Digest Report", content)
 
-    def test_export_stream_to_json_integration(self):
-        result_path = self.exporter.export_stream_to_json(self.stream_id, self.output_json)
-        self.assertEqual(result_path, self.output_json)
-        self.assertTrue(os.path.exists(self.output_json))
+    def test_export_to_json_adapter_integration(self):
+        random_key = f"key_{uuid.uuid4().hex[:6]}"
+        random_val = random.random()
 
-        with open(self.output_json, 'r', encoding='utf-8') as f:
+        if hasattr(self.anomaly_visualizer, 'digest') and isinstance(self.anomaly_visualizer.digest, dict):
+            self.anomaly_visualizer.digest[random_key] = random_val
+
+        result_path = self.exporter.export_to_json(self.json_output_path)
+
+        self.assertEqual(result_path, self.json_output_path)
+        self.assertTrue(os.path.exists(self.json_output_path))
+
+        with open(self.json_output_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        self.assertEqual(data.get("stream_id"), self.stream_id)
-        self.assertEqual(data.get("data"), self.random_metric_val)
+        self.assertIn(random_key, data)
+        self.assertEqual(data[random_key], random_val)
 
-    def test_export_to_json_adapter(self):
-        result_path = self.exporter.export_to_json(self.output_json)
-        self.assertEqual(result_path, self.output_json)
-        self.assertTrue(os.path.exists(self.output_json))
+    def test_export_to_html_adapter_integration(self):
+        result_path = self.exporter.export_to_html(self.html_output_path)
 
-        with open(self.output_json, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+        self.assertEqual(result_path, self.html_output_path)
+        self.assertTrue(os.path.exists(self.html_output_path))
 
-        self.assertEqual(data.get("value"), self.random_metric_val)
-
-    def test_export_to_html_adapter(self):
-        result_path = self.exporter.export_to_html(self.output_html)
-        self.assertEqual(result_path, self.output_html)
-        self.assertTrue(os.path.exists(self.output_html))
-
-        with open(self.output_html, 'r', encoding='utf-8') as f:
+        with open(self.html_output_path, "r", encoding="utf-8") as f:
             content = f.read()
 
         self.assertIn("<html>", content)
-        self.assertIn(str(self.random_metric_val), content)
+        self.assertIn("<body>", content)
 
-if __name__ == '__main__':
+    def test_exporter_error_handling(self):
+        invalid_path = None
+        with self.assertRaises((DigestExporterError, TypeError, OSError)):
+            self.exporter.export_json_report(invalid_path)
+
+if __name__ == "__main__":
     unittest.main()

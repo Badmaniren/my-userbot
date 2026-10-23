@@ -32,13 +32,21 @@ class AnomalyReportAggregator:
             self.correlator.correlate_metric(metric_name, value)
             anomalies = self.correlator.correlate_events()
             
+            if isinstance(anomalies, dict):
+                # correlate_events returns dict like {"correlated_count": x, "report": [...]},
+                # or in mocks a list of anomaly dicts.
+                anomalies = anomalies.get("report", [])
+                if not isinstance(anomalies, list):
+                    anomalies = []
+
             for anomaly in anomalies:
-                self.anomaly_logger.log_anomaly(
-                    source=anomaly.get("source"),
-                    severity=anomaly.get("severity"),
-                    details=anomaly.get("details"),
-                    telemetry_snapshot=anomaly.get("telemetry_snapshot")
-                )
+                if isinstance(anomaly, dict):
+                    self.anomaly_logger.log_anomaly(
+                        source=anomaly.get("source"),
+                        severity=anomaly.get("severity"),
+                        details=anomaly.get("details"),
+                        telemetry_snapshot=anomaly.get("telemetry_snapshot")
+                    )
                 
             return self.anomaly_logger.get_structured_report()
         except AnomalyCorrelatorError as e:

@@ -80,10 +80,15 @@ class DigestExporter:
     def export_to_json(self, output_path: str) -> str:
         """Метод-адаптер под интеграционный тест для экспорта в JSON."""
         try:
+            data = {}
             if self.visualizer and hasattr(self.visualizer, "digest") and isinstance(self.visualizer.digest, dict):
                 data = self.visualizer.digest.copy()
-            else:
-                data = {}
+            elif self.digest and hasattr(self.digest, "digest") and isinstance(self.digest.digest, dict):
+                data = self.digest.digest.copy()
+            elif self.digest and hasattr(self.digest, "get_summary_metrics"):
+                res = self.digest.get_summary_metrics()
+                if isinstance(res, dict):
+                    data = res.copy()
 
             with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
@@ -96,12 +101,13 @@ class DigestExporter:
     def export_to_html(self, output_path: str) -> str:
         """Метод-адаптер под интеграционный тест для экспорта в HTML."""
         try:
+            data = {}
             if self.visualizer and hasattr(self.visualizer, "digest") and isinstance(self.visualizer.digest, dict):
                 data = self.visualizer.digest
-            else:
-                data = {}
+            elif self.digest and hasattr(self.digest, "digest") and isinstance(self.digest.digest, dict):
+                data = self.digest.digest
 
-            html_content = f"<html><body><pre>{json.dumps(data)}</pre></body></html>"
+            html_content = f"<html><body><div>Stability Digest Report</div><pre>{json.dumps(data)}</pre></body></html>"
             with open(output_path, "w", encoding="utf-8") as f:
                 f.write(html_content)
             return output_path

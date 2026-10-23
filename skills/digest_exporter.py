@@ -68,6 +68,8 @@ class DigestExporter:
     def export_stream_to_json(self, stream_id: str, output_path: str) -> str:
         """Экспортирует поток дайджеста в JSON."""
         try:
+            if self.digest is None:
+                raise DigestExporterError("StabilityDigest is not provided")
             stream_data = self.digest.export_digest_stream(stream_id)
             with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(stream_data, f, ensure_ascii=False, indent=4)

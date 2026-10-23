@@ -18,6 +18,9 @@ class DigestExporter:
     def export_json_report(self, output_path: str) -> str:
         """Экспортирует данные дайджеста и метрики визуализатора в JSON-файл."""
         try:
+            if self.visualizer is None:
+                raise DigestExporterError("Anomaly visualizer is None")
+
             metrics = self.visualizer.get_summary_metrics()
             text_rep = self.visualizer.render_text()
             ascii_rep = self.visualizer.render_ascii_correlation_graph()
@@ -37,11 +40,14 @@ class DigestExporter:
         except Exception as e:
             if isinstance(e, DigestExporterError):
                 raise e
-            raise DigestExporterError(str(e))
+            raise DigestExporterError(str(e)) from e
 
     def export_html_report(self, output_path: str) -> str:
         """Экспортирует отчет в HTML-файл."""
         try:
+            if self.visualizer is None:
+                raise DigestExporterError("Anomaly visualizer is None")
+
             metrics = self.visualizer.get_summary_metrics()
             text_rep = self.visualizer.render_text()
             ascii_rep = self.visualizer.render_ascii_correlation_graph()
@@ -63,11 +69,14 @@ class DigestExporter:
         except Exception as e:
             if isinstance(e, DigestExporterError):
                 raise e
-            raise DigestExporterError(str(e))
+            raise DigestExporterError(str(e)) from e
 
     def export_stream_to_json(self, stream_id: str, output_path: str) -> str:
         """Экспортирует поток дайджеста в JSON."""
         try:
+            if self.digest is None or not hasattr(self.digest, "export_digest_stream"):
+                raise DigestExporterError("Stability digest does not support stream export")
+
             stream_data = self.digest.export_digest_stream(stream_id)
             with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(stream_data, f, ensure_ascii=False, indent=4)
@@ -75,13 +84,22 @@ class DigestExporter:
         except Exception as e:
             if isinstance(e, DigestExporterError):
                 raise e
-            raise DigestExporterError(str(e))
+            raise DigestExporterError(str(e)) from e
 
     def export_to_json(self, output_path: str) -> str:
         """Метод-адаптер под интеграционный тест для экспорта в JSON."""
         try:
             if self.visualizer and hasattr(self.visualizer, "digest") and isinstance(self.visualizer.digest, dict):
                 data = self.visualizer.digest.copy()
+            elif self.digest and hasattr(self.digest, "digest") and isinstance(self.digest.digest, dict):
+                data = self.digest.digest.copy()
+            elif self.digest and hasattr(self.digest, "export_digest_stream"):
+                try:
+                    data = self.digest.export_digest_stream("default")
+                    if not isinstance(data, dict):
+                        data = {}
+                except Exception:
+                    data = {}
             else:
                 data = {}
 
@@ -91,13 +109,22 @@ class DigestExporter:
         except Exception as e:
             if isinstance(e, DigestExporterError):
                 raise e
-            raise DigestExporterError(str(e))
+            raise DigestExporterError(str(e)) from e
 
     def export_to_html(self, output_path: str) -> str:
         """Метод-адаптер под интеграционный тест для экспорта в HTML."""
         try:
             if self.visualizer and hasattr(self.visualizer, "digest") and isinstance(self.visualizer.digest, dict):
                 data = self.visualizer.digest
+            elif self.digest and hasattr(self.digest, "digest") and isinstance(self.digest.digest, dict):
+                data = self.digest.digest
+            elif self.digest and hasattr(self.digest, "export_digest_stream"):
+                try:
+                    data = self.digest.export_digest_stream("default")
+                    if not isinstance(data, dict):
+                        data = {}
+                except Exception:
+                    data = {}
             else:
                 data = {}
 
@@ -108,4 +135,4 @@ class DigestExporter:
         except Exception as e:
             if isinstance(e, DigestExporterError):
                 raise e
-            raise DigestExporterError(str(e))
+            raise DigestExporterError(str(e)) from e

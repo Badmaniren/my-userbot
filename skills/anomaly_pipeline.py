@@ -5,7 +5,6 @@ import re
 class AnomalyLogger:
     def __init__(self, log_path=None):
         self.log_path = log_path or "anomaly.log"
-        # Ensure directory exists if log_path contains a directory
         log_dir = os.path.dirname(self.log_path)
         if log_dir and not os.path.exists(log_dir):
             os.makedirs(log_dir, exist_ok=True)

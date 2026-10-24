@@ -3,7 +3,8 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-следняя ошибка перед фиксом: raise CodeValidatorASTError(f"Ошибка синтаксиса AST: {e}") from e
+ поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Последняя ошибка перед фиксом: raise CodeValidatorASTError(f"Ошибка синтаксиса AST: {e}") from e
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## audit_pipeline_exporter (compose) — раундов: 4
@@ -328,8 +329,4 @@
 
 ## anomaly_audit_hub (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## anomaly_audit_hub (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -31,14 +31,23 @@ class AnomalyReportAggregator:
         try:
             self.correlator.correlate_metric(metric_name, value)
             anomalies = self.correlator.correlate_events()
-            
-            for anomaly in anomalies:
-                self.anomaly_logger.log_anomaly(
-                    source=anomaly.get("source"),
-                    severity=anomaly.get("severity"),
-                    details=anomaly.get("details"),
-                    telemetry_snapshot=anomaly.get("telemetry_snapshot")
-                )
+            if isinstance(anomalies, dict):
+                anomaly_list = anomalies.get("report", [])
+                if isinstance(anomaly_list, dict):
+                    anomaly_list = [anomaly_list]
+            elif isinstance(anomalies, list):
+                anomaly_list = anomalies
+            else:
+                anomaly_list = []
+
+            for anomaly in anomaly_list:
+                if isinstance(anomaly, dict):
+                    self.anomaly_logger.log_anomaly(
+                        source=anomaly.get("source"),
+                        severity=anomaly.get("severity"),
+                        details=anomaly.get("details"),
+                        telemetry_snapshot=anomaly.get("telemetry_snapshot")
+                    )
                 
             return self.anomaly_logger.get_structured_report()
         except AnomalyCorrelatorError as e:

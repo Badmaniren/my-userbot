@@ -21,6 +21,12 @@ class AnomalyAuditHub:
         )
 
     def aggregate_and_report(self, metric_name: str, value: float):
+        self.logger.log_anomaly(
+            source=metric_name,
+            severity="INFO",
+            details={"metric_name": metric_name, "value": value},
+            telemetry_snapshot={}
+        )
         return self.aggregator.aggregate_and_report(
             metric_name=metric_name,
             value=value

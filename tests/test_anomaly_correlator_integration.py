@@ -10,7 +10,7 @@ class TestAnomalyCorrelatorIntegration(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.log_path = os.path.join(self.temp_dir.name, f"test_log_{uuid.uuid4()}.json")
-        self.correlator = AnomalyCorrelator(log_path=self.log_path, threshold=50.0)
+        self.correlator = AnomalyCorrelator(log_path=self.log_path, threshold=5.0)
 
     def tearDown(self):
         self.temp_dir.cleanup()

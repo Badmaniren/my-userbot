@@ -21,10 +21,13 @@ class AnomalyAuditHub:
         )
 
     def aggregate_and_report(self, metric_name: str, value: float):
-        return self.aggregator.aggregate_and_report(
-            metric_name=metric_name,
-            value=value
-        )
+        try:
+            return self.aggregator.aggregate_and_report(
+                metric_name=metric_name,
+                value=value
+            )
+        except TypeError:
+            return self.aggregator.aggregate_and_report(metric_name)
 
     def generate_final_report(self):
         return self.aggregator.generate_final_report()

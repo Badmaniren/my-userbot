@@ -4,6 +4,9 @@ from skills.anomaly_report_aggregator import AnomalyReportAggregator
 
 class AnomalyAuditHub:
     def __init__(self, repo_path: str, log_path: str, threshold: float):
+        self.repo_path = repo_path
+        self.log_path = log_path
+        self.threshold = threshold
         self.logger = AnomalyLogger(log_path=log_path)
         self.aggregator = AnomalyReportAggregator(
             repo_path=repo_path,

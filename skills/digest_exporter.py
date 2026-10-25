@@ -18,6 +18,8 @@ class DigestExporter:
     def export_json_report(self, output_path: str) -> str:
         """Экспортирует данные дайджеста и метрики визуализатора в JSON-файл."""
         try:
+            if not self.visualizer:
+                raise DigestExporterError("Anomaly visualizer is not initialized")
             metrics = self.visualizer.get_summary_metrics()
             text_rep = self.visualizer.render_text()
             ascii_rep = self.visualizer.render_ascii_correlation_graph()
@@ -42,6 +44,8 @@ class DigestExporter:
     def export_html_report(self, output_path: str) -> str:
         """Экспортирует отчет в HTML-файл."""
         try:
+            if not self.visualizer:
+                raise DigestExporterError("Anomaly visualizer is not initialized")
             metrics = self.visualizer.get_summary_metrics()
             text_rep = self.visualizer.render_text()
             ascii_rep = self.visualizer.render_ascii_correlation_graph()
@@ -68,6 +72,8 @@ class DigestExporter:
     def export_stream_to_json(self, stream_id: str, output_path: str) -> str:
         """Экспортирует поток дайджеста в JSON."""
         try:
+            if not self.digest:
+                raise DigestExporterError("Stability digest is not initialized")
             stream_data = self.digest.export_digest_stream(stream_id)
             with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(stream_data, f, ensure_ascii=False, indent=4)

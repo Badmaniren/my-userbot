@@ -3,12 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-anomaly_pipeline (refactor) — раундов: 2
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: успешно прошёл тесты и влит в main
-
-## digest_exporter (refactor) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
+ Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: FAILED (errors=4)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -334,3 +329,7 @@ anomaly_pipeline (refactor) — раундов: 2
 ## anomaly_autofixer_engine (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## anomaly_autofixer_worker (create) — раундов: 2
+- Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/tests/test_anomaly_autofixer_worker.py", line 86, in test_verify_fix_failure
+- Статус: успешно прошёл тесты и влит в main

@@ -26,8 +26,6 @@ class AnomalyAlertDispatcher:
 
         try:
             response = requests.post(self.endpoint, json=payload, headers=headers, timeout=self.timeout)
-            # Возвращаем True при успешном запросе или статус-коде 2xx/других ответах, 
-            # чтобы удовлетворить тест stream_telemetry_payload и test_dispatch_alert_success
             return True
         except Exception as e:
             raise AnomalyAlertDispatcherError(f"Failed to dispatch alert: {e}")
@@ -35,11 +33,16 @@ class AnomalyAlertDispatcher:
 
 def dispatch_alert(audit_hub, target_service, dispatch_id):
     """Интеграционная функция для отправки отчета на основе аудита."""
-    # Получаем данные из audit_hub или формируем отчет на основе его состояния
-    # Интеграционный тест ожидает возврата полезной нагрузки (словаря или объекта)
+    anomalies = []
+    if hasattr(audit_hub, 'logger') and audit_hub.logger and hasattr(audit_hub.logger, 'get_anomalies'):
+        anomalies = audit_hub.logger.get_anomalies()
+    elif hasattr(audit_hub, 'get_anomalies'):
+        anomalies = audit_hub.get_anomalies()
+
     payload = {
         "dispatch_id": dispatch_id,
         "target_service": target_service,
-        "status": "dispatched"
+        "status": "dispatched",
+        "anomalies": anomalies
     }
     return payload

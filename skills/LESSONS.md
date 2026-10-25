@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-on was the direct cause of the following exception:
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## anomaly_audit_hub (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: The above exception was the direct cause of the following exception:
+следняя ошибка перед фиксом: The above exception was the direct cause of the following exception:
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## anomaly_pipeline (refactor) — раундов: 2
@@ -332,4 +328,8 @@ on was the direct cause of the following exception:
 
 ## anomaly_autofixer (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=2, errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## anomaly_autofixer_engine (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

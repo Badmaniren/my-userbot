@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-factor) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
-- Последняя ошибка перед фиксом: The above exception was the direct cause of the following exception:
+on was the direct cause of the following exception:
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## anomaly_audit_hub (refactor) — раундов: 4
@@ -330,4 +328,8 @@ factor) — раундов: 4
 ## anomaly_autofixer (create) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: AssertionError: b'' != b'V\x12\t\x98\xc0\xa5E\xd8\x94\x97\xe78\x0f\xc9\rL'
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## anomaly_autofixer (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=2, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

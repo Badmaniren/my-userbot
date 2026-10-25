@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-следняя ошибка перед фиксом: The above exception was the direct cause of the following exception:
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## anomaly_pipeline (refactor) — раундов: 2
+anomaly_pipeline (refactor) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main
 
@@ -328,6 +325,10 @@
 
 ## anomaly_autofixer (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=2, errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## anomaly_autofixer_engine (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## anomaly_autofixer_engine (create) — раундов: 4

@@ -3,7 +3,11 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-"/home/runner/work/my-userbot/my-userbot/skills/anomaly_pipeline.py", line 32, in run
+t call last):
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## anomaly_pipeline (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/skills/anomaly_pipeline.py", line 32, in run
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## digest_exporter (refactor) — раундов: 4
@@ -325,10 +329,6 @@
 
 ## anomaly_audit_hub (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## anomaly_audit_hub (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## anomaly_audit_hub (refactor) — раундов: 4

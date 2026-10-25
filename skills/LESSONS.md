@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
-- Последняя ошибка перед фиксом: FAILED (errors=4)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+ Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## digest_exporter (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: obj, end = self.raw_decode(s, idx=_w(s, 0).end())
@@ -333,3 +331,7 @@
 ## anomaly_autofixer_worker (create) — раундов: 2
 - Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/tests/test_anomaly_autofixer_worker.py", line 86, in test_verify_fix_failure
 - Статус: успешно прошёл тесты и влит в main
+
+## anomaly_verifier (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

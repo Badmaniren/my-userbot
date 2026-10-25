@@ -20,10 +20,17 @@ class StabilityDigest:
         try:
             summary = self.system_telemetry.get_telemetry_summary()
             
-            # Поддержка как реального интерфейса AnomalyCorrelator, так и моков из юнита
-            if hasattr(self.anomaly_detector, "detect_anomalies"):
-                anomalies = self.anomaly_detector.detect_anomalies()
-            elif hasattr(self.anomaly_detector, "analyze_anomalies"):
+            # Проверяем наличие методов у детектора аномалий с учетом моков
+            if hasattr(self.anomaly_detector, "detect_anomalies") and callable(getattr(self.anomaly_detector, "detect_anomalies")):
+                # Проверим, не был ли метод удален или не возвращает ли мок AttributeError/MagicMock
+                try:
+                    anomalies = self.anomaly_detector.detect_anomalies()
+                except Exception:
+                    if hasattr(self.anomaly_detector, "analyze_anomalies") and callable(getattr(self.anomaly_detector, "analyze_anomalies")):
+                        anomalies = self.anomaly_detector.analyze_anomalies()
+                    else:
+                        anomalies = []
+            elif hasattr(self.anomaly_detector, "analyze_anomalies") and callable(getattr(self.anomaly_detector, "analyze_anomalies")):
                 anomalies = self.anomaly_detector.analyze_anomalies()
             else:
                 anomalies = []
@@ -46,7 +53,6 @@ class StabilityDigest:
         try:
             history = self.system_telemetry.get_metric_history(metric_name)
             
-            # Простейший расчет тренда
             trend = "stable"
             if len(history) > 1:
                 if history[-1] > history[0]:

@@ -3,7 +3,9 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-цию
+dit_pipeline (compose) — раундов: 4
+- Последняя ошибка перед фиксом: return self.assert_called_with(*args, **kwargs)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## audit_export_pipeline (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
@@ -327,8 +329,4 @@
 
 ## anomaly_telemetry_analyzer (create) — раундов: 4
 - Последняя ошибка перед фиксом: SyntaxError: invalid decimal literal
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## anomaly_pattern_matcher (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

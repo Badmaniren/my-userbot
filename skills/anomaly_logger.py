@@ -8,6 +8,11 @@ class AnomalyLogger:
     def __init__(self, log_path: str):
         self.log_path = log_path
 
+    def _get_target_path(self):
+        if self.log_path and os.path.isdir(self.log_path):
+            return os.path.join(self.log_path, "anomalies.log")
+        return self.log_path
+
     def log_anomaly(self, source=None, severity=None, details=None, telemetry_snapshot=None):
         if isinstance(source, dict):
             anomaly_data = source.copy()
@@ -38,15 +43,20 @@ class AnomalyLogger:
         except SystemTelemetryError:
             pass
 
-        with open(self.log_path, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(anomaly_data) + '\n')
+        target_path = self._get_target_path()
+        if target_path:
+            parent_dir = os.path.dirname(os.path.abspath(target_path))
+            os.makedirs(parent_dir, exist_ok=True)
+            with open(target_path, 'a', encoding='utf-8') as f:
+                f.write(json.dumps(anomaly_data) + '\n')
 
     def get_structured_report(self):
-        if not os.path.exists(self.log_path):
+        target_path = self._get_target_path()
+        if not target_path or not os.path.exists(target_path) or os.path.isdir(target_path):
             return []
         
         report = []
-        with open(self.log_path, 'r', encoding='utf-8') as f:
+        with open(target_path, 'r', encoding='utf-8') as f:
             for line in f:
                 line = line.strip()
                 if line:
@@ -60,5 +70,6 @@ class AnomalyLogger:
         return self.get_structured_report()
 
     def clear_logs(self):
-        if os.path.exists(self.log_path):
-            os.remove(self.log_path)
+        target_path = self._get_target_path()
+        if target_path and os.path.exists(target_path) and not os.path.isdir(target_path):
+            os.remove(target_path)

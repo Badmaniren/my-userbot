@@ -1,80 +1,45 @@
 import unittest
 import uuid
 import random
-import os
-import tempfile
-from skills.patch_sanitizer import sanitize_patch
-from skills.anomaly_audit_hub import AnomalyAuditHub
-from skills.anomaly_logger import AnomalyLogger
+from skills.patch_sanitizer import PatchSanitizer, PatchSanitizerError, sanitize_patch
+
 
 class TestPatchSanitizerIntegration(unittest.TestCase):
-    def setUp(self):
-        self.test_dir = tempfile.TemporaryDirectory()
-        self.log_path = os.path.join(self.test_dir.name, f"anomaly_{uuid.uuid4()}.log")
-        self.repo_path = self.test_dir.name
-        self.audit_hub = AnomalyAuditHub(repo_path=self.repo_path, log_path=self.log_path, threshold=random.randint(5, 10))
-        self.anomaly_logger = AnomalyLogger(log_path=self.log_path)
-
-    def tearDown(self):
-        self.test_dir.cleanup()
 
     def test_patch_sanitizer_integration_flow(self):
-        unique_patch_id = str(uuid.uuid4())
-        random_payload_size = random.randint(100, 2000)
-        malicious_content = f"// MALICIOUS INJECTION {unique_patch_id}\n" + "A" * random_payload_size
+        random_id = str(uuid.uuid4())
+        trailing_spaces_patch = f"diff --git a/file.py b/file.py   \n+print('{random_id}')    \r\n-old_line   \r"
         
-        raw_patch = (
-            f"diff --git a/target_{unique_patch_id}.py b/target_{unique_patch_id}.py\n"
-            f"index {uuid.uuid4().hex[:7]}..{uuid.uuid4().hex[:7]} 100644\n"
-            f"--- a/target_{unique_patch_id}.py\n"
-            f"+++ b/target_{unique_patch_id}.py\n"
-            f"@@ -1,1 +1,2 @@\n"
-            f" {malicious_content}"
-        )
-
-        sanitized_result = sanitize_patch(raw_patch)
+        sanitizer = PatchSanitizer()
         
-        self.assertIsNotNone(sanitized_result, "Sanitizer returned None for valid input structure.")
+        # Интеграционная проверка через публичный метод с потоком
+        stream_result = sanitizer.sanitize(sanitize_patch.__globals__['io'].StringIO(trailing_spaces_patch))
         
-        if len(sanitized_result) < len(raw_patch):
-            severity = "HIGH"
-            details = f"Patch {unique_patch_id} was normalized or scrubbed for anomalies."
-        else:
-            severity = "LOW"
-            details = f"Patch {unique_patch_id} passed normalization cleanly."
-
-        telemetry_snapshot = {
-            "payload_size": random_payload_size,
-            "uuid_marker": unique_patch_id,
-            "entropy": random.uniform(0.1, 0.9)
-        }
-
-        self.audit_hub.log_anomaly(
-            source="patch_sanitizer",
-            severity=severity,
-            details=details,
-            telemetry_snapshot=telemetry_snapshot
-        )
-
-        aggregated_metric = self.audit_hub.aggregate_and_report(
-            metric_name=f"sanitization_check_{unique_patch_id[:8]}",
-            value=float(random_payload_size)
-        )
-        self.assertIsNotNone(aggregated_metric)
-
-        report = self.audit_hub.generate_final_report()
-        self.assertIsInstance(report, (dict, str, list))
-
-        logged_anomalies = self.anomaly_logger.get_anomalies()
-        self.assertTrue(len(logged_anomalies) > 0, "Anomaly logger failed to record audit events from real integration.")
+        # Проверка отсутствия \r и правых пробелов, сохранение содержимого со случайным ID
+        self.assertNotIn("\r", stream_result)
+        self.assertIn(f"+print('{random_id}')", stream_result)
         
-        found_target = False
-        for anomaly in logged_anomalies:
-            if unique_patch_id in str(anomaly):
-                found_target = True
-                break
-        
-        self.assertTrue(found_target, f"Expected unique identifier {unique_patch_id} not found in anomaly logs.")
+        for line in stream_result.splitlines():
+            self.assertEqual(line, line.rstrip())
 
-if __name__ == '__main__':
+        # Интеграционная проверка функции-обертки
+        wrapper_result = sanitize_patch(trailing_spaces_patch)
+        self.assertEqual(stream_result, wrapper_result)
+
+        # Проверка удаления бинарных дифов
+        binary_patch = f"Binary files a/bin_{random_id} and b/bin_{random_id} differ\nIndex: file.py\n+content_{random_id}"
+        cleaned_binary = sanitizer.remove_binary_diffs(sanitize_patch.__globals__['io'].StringIO(binary_patch))
+        self.assertNotIn("Binary files", cleaned_binary)
+        self.assertIn(f"+content_{random_id}", cleaned_binary)
+
+        # Проверка исключения при пустом потоке
+        with self.assertRaises(PatchSanitizerError):
+            sanitizer.sanitize(sanitize_patch.__globals__['io'].StringIO(""))
+
+        # Проверка исключения при наличии нулевых байтов
+        with self.assertRaises(PatchSanitizerError):
+            sanitizer.sanitize(sanitize_patch.__globals__['io'].StringIO(f"test\x00{random_id}"))
+
+
+if __name__ == "__main__":
     unittest.main()

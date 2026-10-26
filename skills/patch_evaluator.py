@@ -71,11 +71,8 @@ class PatchEvaluator:
             try:
                 val_result = validator.validate(sanitized_content)
             except Exception as e:
-                # Если валидатор падает из-за синтаксиса или AST (например, числовые имена классов в тестах инквизиции), 
-                # мы обрабатываем это как невалидный патч или пробрасываем, если это ожидается тестами evaluate_raises.
                 if isinstance(e, PatchEvaluatorError):
                     raise
-                # Проверим, не является ли это специально вызванной ошибкой для тест-кейсов evaluate
                 val_result = {"is_valid": False, "metrics": {}}
 
             verifier = PatchVerifier()

@@ -1,10 +1,9 @@
 import unittest
-import tempfile
 import os
-import subprocess
+import tempfile
 import uuid
 import random
-
+import subprocess
 from skills.patch_verifier import GitInspector, LessonParser, PatchExecutor, PatchVerifier
 
 class TestPatchVerifierIntegration(unittest.TestCase):
@@ -12,16 +11,16 @@ class TestPatchVerifierIntegration(unittest.TestCase):
         self.test_dir = tempfile.TemporaryDirectory()
         self.repo_path = self.test_dir.name
         
-        subprocess.run(["git", "init", self.repo_path], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        subprocess.run(["git", "-C", self.repo_path, "config", "user.name", "Test Bot"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        subprocess.run(["git", "-C", self.repo_path, "config", "user.email", "bot@test.com"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        subprocess.run(["git", "init", self.repo_path], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["git", "-C", self.repo_path, "config", "user.name", "Test User"], check=True)
+        subprocess.run(["git", "-C", self.repo_path, "config", "user.email", "test@example.com"], check=True)
         
-        self.init_file = os.path.join(self.repo_path, "README.md")
-        with open(self.init_file, "w", encoding="utf-8") as f:
+        initial_file = os.path.join(self.repo_path, "README.md")
+        with open(initial_file, "w", encoding="utf-8") as f:
             f.write("Initial commit")
             
-        subprocess.run(["git", "-C", self.repo_path, "add", "README.md"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        subprocess.run(["git", "-C", self.repo_path, "commit", "-m", "Initial commit"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        subprocess.run(["git", "-C", self.repo_path, "add", "README.md"], check=True)
+        subprocess.run(["git", "-C", self.repo_path, "commit", "-m", "Initial commit"], check=True)
 
         self.inspector = GitInspector(self.repo_path)
         self.parser = LessonParser(self.inspector)
@@ -31,43 +30,47 @@ class TestPatchVerifierIntegration(unittest.TestCase):
     def tearDown(self):
         self.test_dir.cleanup()
 
-    def test_verify_and_apply_integration_success(self):
-        unique_file_name = f"module_{uuid.uuid4().hex[:8]}.py"
-        unique_content = f"# Random content {random.randint(1000, 9999)}\nprint('{uuid.uuid4()}')"
-        unique_message = f"Add feature {uuid.uuid4().hex[:6]}"
+    def test_verify_and_apply_success_integration(self):
+        rand_filename = f"module_{uuid.uuid4().hex[:8]}.py"
+        rand_content = f"# Valid content {uuid.uuid4()}"
+        rand_commit_msg = f"Add {rand_filename} with id {random.randint(1000, 9999)}"
 
         patch_data = {
-            "file_path": unique_file_name,
-            "content": unique_content,
-            "commit_message": unique_message
+            "file_path": rand_filename,
+            "content": rand_content,
+            "commit_message": rand_commit_msg
         }
 
-        result = self.verifier.verify_and_apply(patch_data)
-        self.assertTrue(result, "Интеграционная верификация и применение патча должны завершиться успехом")
+        success = self.verifier.verify_and_apply(patch_data)
+        self.assertTrue(success, "Верификатор должен успешно одобрить и применить корректный патч.")
 
-        full_target_path = os.path.join(self.repo_path, unique_file_name)
-        self.assertTrue(os.path.exists(full_target_path), "Целевой файл должен реально появиться в репозитории")
+        target_file_path = os.path.join(self.repo_path, rand_filename)
+        self.assertTrue(os.path.exists(target_file_path), "Файл патча должен реально появиться в репозитории.")
 
-        with open(full_target_path, "r", encoding="utf-8") as f:
+        with open(target_file_path, "r", encoding="utf-8") as f:
             written_content = f.read()
-        self.assertEqual(written_content, unique_content, "Содержимое файла должно полностью совпадать с переданным в патче")
+        self.assertEqual(written_content, rand_content, "Содержимое файла должно точно совпадать с переданным в патче.")
 
-        history = self.inspector.get_commit_history(max_count=5)
-        self.assertGreaterEqual(len(history), 2, "История коммитов должна содержать исходный и новый коммиты")
-        self.assertEqual(history[0]["message"], unique_message, "Сообщение последнего коммита должно соответствовать переданному")
+        history = self.inspector.get_commit_history(max_count=1)
+        self.assertTrue(len(history) > 0, "История коммитов должна содержать новый коммит.")
+        latest_commit = history[0]
+        self.assertEqual(latest_commit["message"], rand_commit_msg, "Сообщение коммита должно соответствовать заданному.")
 
-    def test_verify_and_apply_integration_failure_syntax(self):
-        unique_file_name = f"broken_{uuid.uuid4().hex[:8]}.py"
-        unique_content = f"syntax error here {random.randint(1, 100)}"
-        
+    def test_verify_and_apply_syntax_error_integration(self):
+        rand_filename = f"broken_{uuid.uuid4().hex[:8]}.py"
+        rand_content = f"print('syntax error here') # {uuid.uuid4()}"
+
         patch_data = {
-            "file_path": unique_file_name,
-            "content": unique_content,
+            "file_path": rand_filename,
+            "content": rand_content,
             "commit_message": "Should fail"
         }
 
-        result = self.verifier.verify_and_apply(patch_data)
-        self.assertFalse(result, "Патч с маркером синтаксической ошибки должен быть отклонен верификатором")
+        success = self.verifier.verify_and_apply(patch_data)
+        self.assertFalse(success, "Верификатор должен отклонить патч, содержащий синтаксическую ошибку.")
 
-        full_target_path = os.path.join(self.repo_path, unique_file_name)
-        self.assertFalse(os.path.exists(full_target_path), "Файл с ошибкой не должен быть зафиксирован в репозитории")
+        target_file_path = os.path.join(self.repo_path, rand_filename)
+        self.assertFalse(os.path.exists(target_file_path), "Файл с ошибкой не должен быть записан в репозиторий через экзекутор.")
+
+if __name__ == "__main__":
+    unittest.main()

@@ -3,7 +3,12 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ecent call last):
+4
+- Последняя ошибка перед фиксом: ----------------------------------------------------------------------
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## digest_exporter (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: Traceback (most recent call last):
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## digest_exporter (refactor) — раундов: 4
@@ -322,8 +327,4 @@ ecent call last):
 
 ## patch_evaluator (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## patch_verifier (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/tests/test_patch_verifier.py", line 90, in test_patch_executor_apply_patch_io
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

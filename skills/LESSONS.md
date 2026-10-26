@@ -3,8 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-/runner/work/my-userbot/my-userbot/tests/test_digest_audit_pipeline_integration.py", line 27, in test_pipeline_audit_and_export_json_integration
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+татус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## audit_export_pipeline (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
@@ -316,5 +315,9 @@
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## anomaly_notification_gateway (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## anomaly_query_optimizer (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

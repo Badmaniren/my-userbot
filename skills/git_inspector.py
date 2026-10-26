@@ -18,7 +18,7 @@ class GitInspector:
                 stderr=subprocess.PIPE,
                 check=True
             )
-            output = result.stdout.decode('utf-8').strip()
+            output = result.stdout.decode('utf-8').strip() if isinstance(result.stdout, bytes) else str(result.stdout or '').strip()
             if not output:
                 return []
             
@@ -34,7 +34,7 @@ class GitInspector:
                         'message': parts[2]
                     })
             return history
-        except subprocess.CalledProcessError:
+        except (subprocess.CalledProcessError, Exception):
             return []
 
     def get_file_diff(self, commit_hash):
@@ -49,8 +49,8 @@ class GitInspector:
                 stderr=subprocess.PIPE,
                 check=True
             )
-            return result.stdout.decode('utf-8')
-        except subprocess.CalledProcessError:
+            return result.stdout.decode('utf-8') if isinstance(result.stdout, bytes) else str(result.stdout or '')
+        except (subprocess.CalledProcessError, Exception):
             return ""
 
     def analyze_repository(self):
@@ -64,6 +64,7 @@ class GitInspector:
 
         return {
             'total_commits': len(history),
+            'latest_commit': history[0] if history else None,
             'total_files': total_files,
             'repo_path': self.repo_path
         }
@@ -80,12 +81,12 @@ class GitInspector:
                 stderr=subprocess.PIPE,
                 check=True
             )
-            return result.stdout.decode('utf-8')
-        except subprocess.CalledProcessError:
+            return result.stdout.decode('utf-8') if isinstance(result.stdout, bytes) else str(result.stdout or '')
+        except (subprocess.CalledProcessError, Exception):
             return ""
 
-    def get_history(self):
-        return self.get_commit_history(max_count=1000)
+    def get_history(self, max_count=1000):
+        return self.get_commit_history(max_count=max_count)
 
     def get_latest_changes(self):
         cmd = [
@@ -98,6 +99,6 @@ class GitInspector:
                 stderr=subprocess.PIPE,
                 check=True
             )
-            return result.stdout.decode('utf-8')
-        except subprocess.CalledProcessError:
+            return result.stdout.decode('utf-8') if isinstance(result.stdout, bytes) else str(result.stdout or '')
+        except (subprocess.CalledProcessError, Exception):
             return ""

@@ -3,7 +3,12 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ередан на эскалацию
+.11/unittest/mock.py", line 939, in assert_called_with
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## digest_exporter (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## anomaly_audit_hub (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: The above exception was the direct cause of the following exception:
@@ -323,9 +328,4 @@
 
 ## patch_analyzer (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=2, errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## patch_verifier (refactor) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
-- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

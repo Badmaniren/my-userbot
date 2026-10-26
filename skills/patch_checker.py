@@ -21,8 +21,8 @@ class PatchChecker:
         self.evaluator = PatchEvaluator(repo_path=repo_path)
 
     def check_patch(self, patch_content: str, target_file: Optional[str] = None) -> Dict[str, Any]:
-        if not patch_content or not patch_content.strip():
-            raise PatchCheckerError("Пустой патч не может быть обработан.")
+        if not isinstance(patch_content, str) or not patch_content or not patch_content.strip():
+            raise PatchCheckerError("Пустой или некорректный патч не может быть обработан.")
 
         try:
             analysis_data = self.analyzer.analyze(patch_content)
@@ -44,14 +44,17 @@ class PatchChecker:
         telemetry = getattr(evaluation_result, "telemetry", {})
         was_corrected = getattr(evaluation_result, "was_corrected", False)
 
+        risk_score = analysis_data.get("risk_score", 0.0)
+
         policy_verdict = {}
         if self.policy:
             if self.policy.get("strict_safety") and not is_safe:
                 policy_verdict["disallowed_risks"] = "Strict safety policy violated"
             if self.policy.get("disallow_syntax_risks") and analysis_data.get("syntax_risks"):
                 policy_verdict["disallowed_risks"] = "Syntax risks detected"
-
-        risk_score = analysis_data.get("risk_score", 0.0)
+            max_risk = self.policy.get("max_risk_score")
+            if max_risk is not None and risk_score > max_risk:
+                policy_verdict["disallowed_risks"] = f"Risk score {risk_score} exceeds maximum allowed {max_risk}"
 
         return {
             "is_safe": is_safe,

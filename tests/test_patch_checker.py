@@ -30,11 +30,42 @@ class TestPatchCheckerInquisition(unittest.TestCase):
         self.assertIsNotNone(default_checker.evaluator)
 
     def test_check_patch_empty_content(self):
-        empty_patches = ["", "   ", "\n\t "]
+        empty_patches = ["", "   ", "\n\t ", None, 123, []]
         for patch_str in empty_patches:
             with self.subTest(patch_str=patch_str):
                 with self.assertRaises(PatchCheckerError):
                     self.checker.check_patch(patch_str)
+
+    @patch("skills.patch_checker.PatchEvaluator.evaluate")
+    @patch("skills.patch_checker.PatchAnalyzer.analyze")
+    def test_check_patch_max_risk_score_policy_violation(self, mock_analyze, mock_evaluate):
+        checker_risk = PatchChecker(policy={"max_risk_score": 0.5})
+        mock_analyze.return_value = {
+            "risk_score": 0.8,
+            "syntax_risks": []
+        }
+        eval_res = PatchEvaluationResult(
+            is_safe=True,
+            is_valid=True,
+            metrics={},
+            reasons=[],
+            telemetry={},
+            was_corrected=False
+        )
+        mock_evaluate.return_value = eval_res
+
+        patch_content = f"diff --git a/{uuid.uuid4().hex} b/{uuid.uuid4().hex}"
+        result = checker_risk.check_patch(patch_content)
+
+        self.assertIn("policy_verdict", result)
+        self.assertIn("exceeds maximum allowed 0.5", result["policy_verdict"].get("disallowed_risks", ""))
+
+    def test_check_stream_read_error(self):
+        mock_stream = MagicMock()
+        mock_stream.read.side_effect = IOError("Read failed")
+        with self.assertRaises(PatchCheckerError) as ctx:
+            self.checker.check_stream(mock_stream)
+        self.assertIn("Не удалось прочитать поток", str(ctx.exception))
 
     @patch("skills.patch_checker.PatchAnalyzer.analyze")
     def test_check_patch_analyzer_error(self, mock_analyze):

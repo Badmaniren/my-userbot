@@ -73,10 +73,16 @@ index 0000000..8304b6f
     def test_convenience_function(self):
         result = check_patch(
             patch_content=self.sample_patch,
-            policy={"strict_safety": False}
+            policy={"strict_safety": False, "max_risk_score": 1.0}
         )
         self.assertIsInstance(result, dict)
         self.assertIn("is_safe", result)
+
+    def test_integration_max_risk_score_policy(self):
+        checker = PatchChecker(policy={"max_risk_score": -0.1})
+        result = checker.check_patch(self.sample_patch)
+        self.assertIn("policy_verdict", result)
+        self.assertIn("disallowed_risks", result["policy_verdict"])
 
 if __name__ == "__main__":
     unittest.main()

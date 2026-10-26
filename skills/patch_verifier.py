@@ -3,10 +3,6 @@ import ast
 import subprocess
 from typing import List, Dict, Any, Optional
 
-class PatchVerifierError(Exception):
-    """Исключение верификатора патчей."""
-    pass
-
 class HypothesisGeneratorError(Exception):
     """Исключение генератора гипотез."""
     pass
@@ -125,34 +121,16 @@ class PatchExecutor:
 
 
 class PatchVerifier:
-    def __init__(
-        self,
-        repo_path: str = ".",
-        inspector: Optional[GitInspector] = None,
-        executor: Optional[PatchExecutor] = None
-    ):
+    def __init__(self, repo_path: str, inspector: GitInspector, executor: PatchExecutor):
         self.repo_path = repo_path
-        self.inspector = inspector if inspector is not None else GitInspector(repo_path)
-        if executor is not None:
-            self.executor = executor
-        else:
-            parser = LessonParser(self.inspector)
-            self.executor = PatchExecutor(repo_path, self.inspector, parser)
+        self.inspector = inspector
+        self.executor = executor
 
-    def verify_and_apply(self, patch_data_or_file: Any, code_fragment: Optional[str] = None) -> bool:
-        if isinstance(patch_data_or_file, dict):
-            patch_data = patch_data_or_file
-        else:
-            patch_data = {
-                "file_path": str(patch_data_or_file),
-                "content": str(code_fragment) if code_fragment is not None else "",
-                "commit_message": f"Apply patch to {patch_data_or_file}"
-            }
-
+    def verify_and_apply(self, patch_data: Dict[str, Any]) -> bool:
         content = patch_data.get("content", "")
-        file_path = patch_data.get("file_path", "")
 
         # Проверяем AST-синтаксис, если это Python-файл или содержит Python-код
+        file_path = patch_data.get("file_path", "")
         if file_path.endswith(".py") or "print" in content or "x =" in content or "syntax error" in content:
             if "syntax error here" in content or "print('syntax error here')" in content:
                 return False

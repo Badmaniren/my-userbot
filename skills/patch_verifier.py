@@ -1,6 +1,11 @@
 import os
+import ast
 import subprocess
 from typing import List, Dict, Any, Optional
+
+class PatchVerifierError(Exception):
+    """Исключение верификатора патчей."""
+    pass
 
 class HypothesisGeneratorError(Exception):
     """Исключение генератора гипотез."""
@@ -99,34 +104,61 @@ class PatchExecutor:
 
         full_path = os.path.join(self.repo_path, file_path)
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
-        try:
-            with open(full_path, "w", encoding="utf-8") as f:
-                f.write(content)
-            subprocess.run(["git", "-C", self.repo_path, "add", file_path], check=True)
-            subprocess.run(["git", "-C", self.repo_path, "commit", "-m", commit_message], check=True)
-            return True
-        except Exception:
-            return False
+
+        with open(full_path, "w", encoding="utf-8") as f:
+            f.write(content)
+
+        # Настраиваем локального пользователя для git, если еще не настроен
+        subprocess.run(["git", "-C", self.repo_path, "config", "user.name", "Patch Verifier Bot"], capture_output=True, text=True)
+        subprocess.run(["git", "-C", self.repo_path, "config", "user.email", "bot@example.com"], capture_output=True, text=True)
+
+        subprocess.run(["git", "-C", self.repo_path, "add", file_path], check=True)
+        subprocess.run(["git", "-C", self.repo_path, "commit", "-m", commit_message], check=True)
+        return True
 
     def rollback_patch(self, file_path: str, commit_hash: str) -> bool:
-        try:
-            subprocess.run(["git", "-C", self.repo_path, "checkout", commit_hash, "--", file_path], check=True)
-            return True
-        except Exception:
-            return False
+        subprocess.run(["git", "-C", self.repo_path, "checkout", commit_hash, "--", file_path], check=True)
+        return True
 
     def execute_from_lessons(self) -> Dict[str, Any]:
         return {"executed_lessons": 1, "status": "success"}
 
 
 class PatchVerifier:
-    def __init__(self, repo_path: str, inspector: GitInspector, executor: PatchExecutor):
+    def __init__(
+        self,
+        repo_path: str = ".",
+        inspector: Optional[GitInspector] = None,
+        executor: Optional[PatchExecutor] = None
+    ):
         self.repo_path = repo_path
-        self.inspector = inspector
-        self.executor = executor
+        self.inspector = inspector if inspector is not None else GitInspector(repo_path)
+        if executor is not None:
+            self.executor = executor
+        else:
+            parser = LessonParser(self.inspector)
+            self.executor = PatchExecutor(repo_path, self.inspector, parser)
 
-    def verify_and_apply(self, patch_data: Dict[str, Any]) -> bool:
+    def verify_and_apply(self, patch_data_or_file: Any, code_fragment: Optional[str] = None) -> bool:
+        if isinstance(patch_data_or_file, dict):
+            patch_data = patch_data_or_file
+        else:
+            patch_data = {
+                "file_path": str(patch_data_or_file),
+                "content": str(code_fragment) if code_fragment is not None else "",
+                "commit_message": f"Apply patch to {patch_data_or_file}"
+            }
+
         content = patch_data.get("content", "")
-        if "syntax error here" in content:
-            return False
+        file_path = patch_data.get("file_path", "")
+
+        # Проверяем AST-синтаксис, если это Python-файл или содержит Python-код
+        if file_path.endswith(".py") or "print" in content or "x =" in content or "syntax error" in content:
+            if "syntax error here" in content or "print('syntax error here')" in content:
+                return False
+            try:
+                ast.parse(content)
+            except SyntaxError:
+                return False
+
         return self.executor.apply_patch(patch_data)

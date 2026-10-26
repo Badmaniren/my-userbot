@@ -3,13 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ractor_tool_1792686109 (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## digest_exporter (refactor) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
-- Последняя ошибка перед фиксом: raise DigestExporterError(str(e))
+фиксом: raise DigestExporterError(str(e))
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## anomaly_audit_hub (refactor) — раундов: 4
@@ -323,5 +317,10 @@ ractor_tool_1792686109 (create) — раундов: 4
 
 ## extractor_tool_1793030465 (create) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Последняя ошибка перед фиксом: Traceback (most recent call last):
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## patch_validator (create) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: Traceback (most recent call last):
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

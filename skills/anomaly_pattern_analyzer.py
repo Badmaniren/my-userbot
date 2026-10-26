@@ -42,7 +42,9 @@ class AnomalyAuditHub:
             with open(self.log_path, "r", encoding="utf-8") as f:
                 content = f.read()
                 if content:
-                    data = json.loads(content)
+                    loaded = json.loads(content)
+                    if isinstance(loaded, list):
+                        data = [x if isinstance(x, dict) else {"details": str(x)} for x in loaded]
         data.append(entry)
         with open(self.log_path, "w", encoding="utf-8") as f:
             json.dump(data, f)
@@ -71,7 +73,9 @@ class AnomalyLogger:
             with open(self.log_path, "r", encoding="utf-8") as f:
                 content = f.read()
                 if content:
-                    data = json.loads(content)
+                    loaded = json.loads(content)
+                    if isinstance(loaded, list):
+                        data = [x if isinstance(x, dict) else {"details": str(x)} for x in loaded]
         data.append(entry)
         with open(self.log_path, "w", encoding="utf-8") as f:
             json.dump(data, f)
@@ -83,7 +87,10 @@ class AnomalyLogger:
             content = f.read()
             if not content:
                 return []
-            return json.loads(content)
+            loaded = json.loads(content)
+            if isinstance(loaded, list):
+                return [x if isinstance(x, dict) else {"details": str(x)} for x in loaded]
+            return []
 
     def get_structured_report(self):
         return {"structured": True, "anomalies": self.get_anomalies()}

@@ -57,6 +57,10 @@ class PatchChecker:
             "is_safe": is_safe,
             "is_valid": is_valid,
             "risk_score": risk_score,
+            "metrics": metrics,
+            "reasons": reasons,
+            "telemetry": telemetry,
+            "was_corrected": was_corrected,
             "analysis": analysis_data,
             "evaluation": {
                 "is_safe": is_safe,

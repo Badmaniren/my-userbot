@@ -68,10 +68,18 @@ class PatchEvaluator:
                 return PatchEvaluationResult(is_safe=False, is_valid=False, reasons=reasons)
 
             validator = CodeValidator()
-            val_result = validator.validate(sanitized_content)
+            try:
+                val_result = validator.validate(sanitized_content)
+            except Exception as e:
+                if isinstance(e, PatchEvaluatorError):
+                    raise
+                val_result = {"is_valid": False, "metrics": {}}
 
             verifier = PatchVerifier()
-            is_valid_verify = verifier.verify(sanitized_content)
+            try:
+                is_valid_verify = verifier.verify(sanitized_content)
+            except Exception:
+                is_valid_verify = False
 
             is_valid = val_result.get("is_valid", True) and is_valid_verify
             metrics = val_result.get("metrics", {})

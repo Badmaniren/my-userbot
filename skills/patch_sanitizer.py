@@ -9,7 +9,15 @@ class PatchSanitizerError(Exception):
 class PatchSanitizer:
     """Модуль первичной очистки и нормализации входящих патчей."""
 
+    def _to_stream(self, data):
+        if isinstance(data, str):
+            return io.StringIO(data)
+        if isinstance(data, bytes):
+            return io.BytesIO(data)
+        return data
+
     def sanitize(self, stream) -> str:
+        stream = self._to_stream(stream)
         content = stream.read()
         if not content:
             raise PatchSanitizerError("Empty stream is not allowed.")
@@ -21,8 +29,10 @@ class PatchSanitizer:
         lines = normalized.splitlines()
         cleaned_lines = []
         for line in lines:
-            # Убираем пробелы справа, сохраняя перенос
-            cleaned_lines.append(line.rstrip())
+            if line.startswith(" "):
+                cleaned_lines.append(" " + line[1:].rstrip())
+            else:
+                cleaned_lines.append(line.rstrip())
         
         return "\n".join(cleaned_lines)
 

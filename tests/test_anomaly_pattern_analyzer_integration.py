@@ -1,80 +1,85 @@
 import unittest
 import os
-import tempfile
+import json
 import uuid
 import random
-from skills.anomaly_pattern_analyzer import *
-from skills.anomaly_audit_hub import AnomalyAuditHub
-from skills.anomaly_logger import AnomalyLogger
+from skills.anomaly_pattern_analyzer import anomaly_filter, AnomalyAuditHub, AnomalyLogger
 
 class TestAnomalyPatternAnalyzerIntegration(unittest.TestCase):
     def setUp(self):
-        self.test_dir = tempfile.TemporaryDirectory()
-        self.log_path = os.path.join(self.test_dir.name, f"test_log_{uuid.uuid4()}.json")
-        self.repo_path = self.test_dir.name
-        self.threshold = random.randint(5, 15)
-        
-        self.audit_hub = AnomalyAuditHub(
-            repo_path=self.repo_path,
-            log_path=self.log_path,
-            threshold=self.threshold
-        )
-        self.logger = AnomalyLogger(log_path=self.log_path)
+        self.test_id = str(uuid.uuid4())
+        self.log_path = os.path.join("logs", f"test_anomaly_log_{self.test_id}.json")
+        self.repo_path = os.path.join("repos", f"test_repo_{self.test_id}")
+        self.metric_name = f"metric_{random.randint(1000, 9999)}"
+        self.metric_value = random.uniform(1.0, 100.0)
 
     def tearDown(self):
-        self.test_dir.cleanup()
+        if os.path.exists(self.log_path):
+            try:
+                os.remove(self.log_path)
+            except OSError:
+                pass
+        if os.path.exists(os.path.dirname(self.log_path)):
+            try:
+                os.rmdir(os.path.dirname(self.log_path))
+            except OSError:
+                pass
 
-    def test_pattern_analyzer_integration_flow(self):
-        source_id = f"service_{uuid.uuid4().hex[:8]}"
-        severity_level = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
-        metric_name = f"metric_{uuid.uuid4().hex[:6]}"
-        metric_value = random.uniform(10.0, 100.0)
-        
-        telemetry_data = {
-            "cpu_usage": random.randint(40, 99),
-            "memory_leak_detected": random.choice([True, False]),
-            "request_id": str(uuid.uuid4())
+    def test_end_to_end_anomaly_workflow(self):
+        random_source = f"source_{uuid.uuid4()}"
+        random_severity = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
+        random_details = f"Detailed error description {uuid.uuid4()}"
+        random_telemetry = {"cpu_load": random.randint(0, 100), "memory_usage": random.random()}
+
+        filter_input = {
+            "source": random_source,
+            "severity": random_severity,
+            "details": random_details,
+            "telemetry": random_telemetry
         }
+
+        filtered_result = anomaly_filter.start_new(filter_input)
         
-        details_text = f"Pattern anomaly detected with random payload ID: {uuid.uuid4()}"
+        self.assertEqual(filtered_result["status"], "processed")
+        self.assertEqual(filtered_result["filtered_data"], filter_input)
 
-        self.logger.log_anomaly(
-            source=source_id,
-            severity=severity_level,
-            details=details_text,
-            telemetry_snapshot=telemetry_data
+        audit_hub = AnomalyAuditHub(
+            repo_path=self.repo_path,
+            log_path=self.log_path,
+            threshold=random.randint(5, 50)
         )
 
-        anomalies_list = self.logger.get_anomalies()
-        self.assertGreaterEqual(len(anomalies_list), 1, "Логгер должен зафиксировать аномалию")
-
-        logged_entry = anomalies_list[-1]
-        self.assertEqual(logged_entry.get("source"), source_id)
-        self.assertEqual(logged_entry.get("severity"), severity_level)
-        self.assertEqual(logged_entry.get("details"), details_text)
-
-        self.audit_hub.log_anomaly(
-            source=source_id,
-            severity=severity_level,
-            details=details_text,
-            telemetry_snapshot=telemetry_data
+        audit_hub.log_anomaly(
+            source=filtered_result["filtered_data"]["source"],
+            severity=filtered_result["filtered_data"]["severity"],
+            details=filtered_result["filtered_data"]["details"],
+            telemetry_snapshot=filtered_result["filtered_data"]["telemetry"]
         )
 
-        self.audit_hub.aggregate_and_report(
-            metric_name=metric_name,
-            value=metric_value
-        )
+        audit_hub.aggregate_and_report(self.metric_name, self.metric_value)
+        final_report = audit_hub.generate_final_report()
+        self.assertEqual(final_report.get("status"), "success")
 
-        final_report = self.audit_hub.generate_final_report()
-        self.assertIsInstance(final_report, (dict, str, list), "Финальный отчет должен быть сформирован")
-
-        structured_report = self.logger.get_structured_report()
-        self.assertIsNotNone(structured_report, "Структурированный отчет не должен быть пустым")
-
-        self.assertTrue(os.path.exists(self.log_path), "Файл логов должен реально существовать на диске")
+        logger = AnomalyLogger(log_path=self.log_path)
+        anomalies = logger.get_anomalies()
         
-        file_size = os.path.getsize(self.log_path)
-        self.assertGreater(file_size, 0, "Файл логов не должен быть пустым после записи")
+        self.assertTrue(len(anomalies) > 0)
+        
+        found_match = False
+        for anomaly in anomalies:
+            if anomaly.get("details") == random_details:
+                found_match = True
+                self.assertEqual(anomaly.get("source"), random_source)
+                self.assertEqual(anomaly.get("severity"), random_severity)
+                self.assertEqual(anomaly.get("telemetry_snapshot"), random_telemetry)
+                break
+                
+        self.assertTrue(found_match, "Logged anomaly with random details not found via AnomalyLogger.")
+
+        structured_report = logger.get_structured_report()
+        self.assertTrue(structured_report.get("structured"))
+        self.assertIn("anomalies", structured_report)
+        self.assertGreaterEqual(len(structured_report["anomalies"]), 1)
 
 if __name__ == "__main__":
     unittest.main()

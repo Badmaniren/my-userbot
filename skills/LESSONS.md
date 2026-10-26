@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-дан на эскалацию
-
-## anomaly_audit_hub (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/unittest/mock.py", line 939, in assert_called_with
+.11/unittest/mock.py", line 939, in assert_called_with
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## digest_exporter (refactor) — раундов: 4
@@ -327,4 +324,8 @@
 
 ## patch_verifier (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: Traceback (most recent call last):
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## patch_analyzer (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=2, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

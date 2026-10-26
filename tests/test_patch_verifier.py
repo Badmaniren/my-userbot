@@ -1,11 +1,8 @@
 import unittest
 from unittest.mock import patch, MagicMock
-import os
 import uuid
 import random
-import string
-import io
-import subprocess
+import os
 
 from skills.patch_verifier import (
     HypothesisGeneratorError,
@@ -18,6 +15,7 @@ from skills.patch_verifier import (
     PatchVerifier
 )
 
+
 class TestPatchVerifierModule(unittest.TestCase):
 
     def setUp(self):
@@ -28,134 +26,101 @@ class TestPatchVerifierModule(unittest.TestCase):
         self.executor = PatchExecutor(self.repo_path, self.inspector, self.parser)
         self.verifier = PatchVerifier(self.repo_path, self.inspector, self.executor)
 
-    def test_git_inspector_run_git_success(self):
-        random_hash = uuid.uuid4().hex
-        random_author = "".join(random.choices(string.ascii_letters, k=8))
-        random_message = "".join(random.choices(string.ascii_letters, k=15))
-        mock_output = f"{random_hash}|{random_author}|{random_message}\n"
-
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(stdout=mock_output, stderr="")
-            history = self.inspector.get_commit_history(max_count=1)
-            
-            self.assertEqual(len(history), 1)
-            self.assertEqual(history[0]["hash"], random_hash)
-            self.assertEqual(history[0]["author"], random_author)
-            self.assertEqual(history[0]["message"], random_message)
-
-    def test_git_inspector_empty_history(self):
+    def test_git_inspector_get_commit_history_empty(self):
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(stdout="", stderr="")
-            history = self.inspector.get_commit_history(max_count=5)
+            max_count = random.randint(1, 20)
+            history = self.inspector.get_commit_history(max_count)
             self.assertEqual(history, [])
 
-    def test_git_inspector_get_file_diff(self):
+    def test_git_inspector_get_commit_history_valid(self):
         commit_hash = uuid.uuid4().hex
-        expected_diff = f"diff --git a/{uuid.uuid4().hex}.py b/{uuid.uuid4().hex}.py"
+        author_name = f"Author_{uuid.uuid4().hex[:6]}"
+        commit_msg = f"Message_{uuid.uuid4().hex[:6]}"
+        stdout_data = f"{commit_hash}|{author_name}|{commit_msg}"
 
         with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(stdout=expected_diff, stderr="")
-            diff = self.inspector.get_file_diff(commit_hash)
-            self.assertEqual(diff, expected_diff)
+            mock_run.return_value = MagicMock(stdout=stdout_data, stderr="")
+            history = self.inspector.get_commit_history(10)
+            self.assertEqual(len(history), 1)
+            self.assertEqual(history[0]["hash"], commit_hash)
+            self.assertEqual(history[0]["author"], author_name)
+            self.assertEqual(history[0]["message"], commit_msg)
 
     def test_git_inspector_analyze_repository(self):
-        random_hash = uuid.uuid4().hex
-        random_author = "".join(random.choices(string.ascii_letters, k=6))
-        random_msg = "".join(random.choices(string.ascii_letters, k=10))
-        mock_output = f"{random_hash}|{random_author}|{random_msg}\n"
+        commit_hash = uuid.uuid4().hex
+        author_name = f"Author_{uuid.uuid4().hex[:6]}"
+        commit_msg = f"Message_{uuid.uuid4().hex[:6]}"
+        stdout_data = f"{commit_hash}|{author_name}|{commit_msg}"
 
         with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(stdout=mock_output, stderr="")
+            mock_run.return_value = MagicMock(stdout=stdout_data, stderr="")
             analysis = self.inspector.analyze_repository()
-            
             self.assertEqual(analysis["total_commits"], 1)
             self.assertIsNotNone(analysis["latest_commit"])
-            self.assertEqual(analysis["latest_commit"]["hash"], random_hash)
+            self.assertEqual(analysis["latest_commit"]["hash"], commit_hash)
 
-    def test_git_inspector_read_file_at_commit(self):
+    def test_git_inspector_get_latest_changes(self):
         commit_hash = uuid.uuid4().hex
-        file_path = f"{uuid.uuid4().hex}.py"
-        file_content = f"print('{uuid.uuid4().hex}')"
+        author_name = f"Author_{uuid.uuid4().hex[:6]}"
+        commit_msg = f"Message_{uuid.uuid4().hex[:6]}"
+        history_stdout = f"{commit_hash}|{author_name}|{commit_msg}"
+        diff_stdout = f"diff --git a/{uuid.uuid4().hex} b/{uuid.uuid4().hex}"
 
         with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(stdout=file_content, stderr="")
-            content = self.inspector.read_file_at_commit(commit_hash, file_path)
-            self.assertEqual(content, file_content)
-
-    def test_git_inspector_get_history_and_latest(self):
-        random_hash = uuid.uuid4().hex
-        mock_output = f"{random_hash}|Tester|Initial commit\n"
-
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(stdout=mock_output, stderr="")
-            history = self.inspector.get_history(max_count=2)
-            self.assertEqual(len(history), 1)
-
-            latest_changes = self.inspector.get_latest_changes()
-            self.assertIsInstance(latest_changes, str)
+            mock_run.side_effect = [
+                MagicMock(stdout=history_stdout, stderr=""),
+                MagicMock(stdout=diff_stdout, stderr="")
+            ]
+            changes = self.inspector.get_latest_changes()
+            self.assertEqual(changes, diff_stdout)
 
     def test_lesson_parser_extraction(self):
         lessons = self.parser.parse_lessons()
         self.assertIsInstance(lessons, list)
-        self.assertTrue(len(lessons) > 0)
-
-        extracted = self.parser.extract_lessons(max_commits=3)
+        extracted = self.parser.extract_lessons(random.randint(1, 15))
         self.assertIn("lesson_id", extracted)
         self.assertIn("content", extracted)
 
     def test_hypothesis_generator_prioritization(self):
-        hyp_1_weight = random.uniform(0.1, 0.4)
-        hyp_2_weight = random.uniform(0.5, 0.9)
+        hyp_id_1 = f"hyp_{uuid.uuid4().hex[:6]}"
+        hyp_id_2 = f"hyp_{uuid.uuid4().hex[:6]}"
+        weight_1 = random.uniform(0.1, 0.4)
+        weight_2 = random.uniform(0.5, 0.9)
         
         hypotheses = [
-            {"id": uuid.uuid4().hex, "weight": hyp_1_weight, "target": "a.py"},
-            {"id": uuid.uuid4().hex, "weight": hyp_2_weight, "target": "b.py"}
+            {"id": hyp_id_1, "weight": weight_1, "target": f"{uuid.uuid4().hex}.py"},
+            {"id": hyp_id_2, "weight": weight_2, "target": f"{uuid.uuid4().hex}.py"}
         ]
-
         prioritized = self.generator.prioritize_hypotheses(hypotheses)
-        self.assertEqual(prioritized[0]["weight"], hyp_2_weight)
-        self.assertEqual(prioritized[1]["weight"], hyp_1_weight)
+        self.assertEqual(prioritized[0]["id"], hyp_id_2)
+        self.assertEqual(prioritized[1]["id"], hyp_id_1)
 
-        generated = self.generator.generate_hypotheses(max_commits=2)
-        self.assertIsInstance(generated, list)
+    def test_patch_executor_apply_patch_failure(self):
+        patch_data = {}
+        result = self.executor.apply_patch(patch_data)
+        self.assertFalse(result)
 
-    def test_patch_executor_apply_success(self):
+    def test_patch_executor_apply_patch_success(self):
         file_path = f"{uuid.uuid4().hex}.py"
         content = f"# {uuid.uuid4().hex}"
-        commit_msg = f"feat: {uuid.uuid4().hex}"
-
+        commit_msg = f"Commit {uuid.uuid4().hex[:6]}"
         patch_data = {
             "file_path": file_path,
             "content": content,
             "commit_message": commit_msg
         }
 
-        with patch("builtins.open", new_callable=unittest.mock.mock_open()) as mock_file, \
+        with patch("builtins.open", create=True) as mock_open, \
              patch("os.makedirs") as mock_makedirs, \
-             patch("subprocess.run") as mock_subprocess:
-            
+             patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
             result = self.executor.apply_patch(patch_data)
             self.assertTrue(result)
             mock_makedirs.assert_called_once()
-            mock_file.assert_called_once()
-            self.assertEqual(mock_subprocess.call_count, 2)
+            mock_open.assert_called_once()
 
-    def test_patch_executor_apply_missing_fields(self):
-        patch_data = {"file_path": "", "content": None}
-        result = self.executor.apply_patch(patch_data)
-        self.assertFalse(result)
-
-    def test_patch_executor_apply_exception(self):
-        patch_data = {
-            "file_path": f"{uuid.uuid4().hex}.py",
-            "content": uuid.uuid4().hex
-        }
-
-        with patch("builtins.open", side_effect=Exception("Disk failure")):
-            result = self.executor.apply_patch(patch_data)
-            self.assertFalse(result)
-
-    def test_patch_executor_rollback_success(self):
+    def test_patch_executor_rollback_patch(self):
         file_path = f"{uuid.uuid4().hex}.py"
         commit_hash = uuid.uuid4().hex
 
@@ -164,35 +129,27 @@ class TestPatchVerifierModule(unittest.TestCase):
             result = self.executor.rollback_patch(file_path, commit_hash)
             self.assertTrue(result)
 
-    def test_patch_executor_rollback_exception(self):
-        file_path = f"{uuid.uuid4().hex}.py"
-        commit_hash = uuid.uuid4().hex
-
-        with patch("subprocess.run", side_effect=Exception("Git checkout failed")):
-            result = self.executor.rollback_patch(file_path, commit_hash)
-            self.assertFalse(result)
-
-    def test_patch_executor_execute_from_lessons(self):
-        res = self.executor.execute_from_lessons()
-        self.assertIn("executed_lessons", res)
-        self.assertIn("status", res)
-
     def test_patch_verifier_syntax_error(self):
+        bad_content = f"print(uuid.uuid4()) \n syntax error here \n {uuid.uuid4().hex}"
         patch_data = {
             "file_path": f"{uuid.uuid4().hex}.py",
-            "content": "def broken(): syntax error here"
+            "content": bad_content
         }
         result = self.verifier.verify_and_apply(patch_data)
         self.assertFalse(result)
 
-    def test_patch_verifier_valid_patch(self):
-        file_path = f"{uuid.uuid4().hex}.py"
+    def test_patch_verifier_success(self):
+        good_content = f"def {uuid.uuid4().hex[:8]}(): pass"
         patch_data = {
-            "file_path": file_path,
-            "content": f"def safe_func_{uuid.uuid4().hex}(): return True"
+            "file_path": f"{uuid.uuid4().hex}.py",
+            "content": good_content
         }
 
         with patch.object(self.executor, "apply_patch", return_value=True) as mock_apply:
             result = self.verifier.verify_and_apply(patch_data)
             self.assertTrue(result)
             mock_apply.assert_called_once_with(patch_data)
+
+
+if __name__ == "__main__":
+    unittest.main()

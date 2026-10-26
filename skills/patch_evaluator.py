@@ -89,24 +89,34 @@ class PatchEvaluator:
         except Exception as e:
             if isinstance(e, PatchEvaluatorError):
                 raise
-            raise PatchEvaluatorError(str(e))
+            raise PatchEvaluatorError(str(e)) from e
 
     def evaluate_with_autocorrect(self, patch_content: str) -> PatchEvaluationResult:
-        sanitizer = CodeSanitizer()
-        _, is_safe = sanitizer.sanitize(patch_content)
-        
-        was_corrected = False
-        if not is_safe:
-            autocorrector = PatchAutocorrector()
-            patch_content, was_corrected = autocorrector.correct(patch_content)
+        try:
+            sanitizer = CodeSanitizer()
+            _, is_safe = sanitizer.sanitize(patch_content)
 
-        result = self.evaluate(patch_content)
-        result.was_corrected = was_corrected
-        return result
+            was_corrected = False
+            if not is_safe:
+                autocorrector = PatchAutocorrector()
+                patch_content, was_corrected = autocorrector.correct(patch_content)
+
+            result = self.evaluate(patch_content)
+            result.was_corrected = was_corrected
+            return result
+        except Exception as e:
+            if isinstance(e, PatchEvaluatorError):
+                raise
+            raise PatchEvaluatorError(str(e)) from e
 
     def evaluate_stream(self, stream: io.BytesIO) -> PatchEvaluationResult:
-        content = stream.read().decode('utf-8')
-        return self.evaluate(content)
+        try:
+            content = stream.read().decode('utf-8')
+            return self.evaluate(content)
+        except Exception as e:
+            if isinstance(e, PatchEvaluatorError):
+                raise
+            raise PatchEvaluatorError(str(e)) from e
 
 def patch_evaluator(
     repo_path: Union[str, Path],

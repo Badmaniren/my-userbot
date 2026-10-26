@@ -10,6 +10,10 @@ class PatchSanitizer:
     """Модуль первичной очистки и нормализации входящих патчей."""
 
     def sanitize(self, stream) -> str:
+        if isinstance(stream, str):
+            stream = io.StringIO(stream)
+        elif isinstance(stream, bytes):
+            stream = io.StringIO(stream.decode('utf-8', errors='ignore'))
         content = stream.read()
         if not content:
             raise PatchSanitizerError("Empty stream is not allowed.")

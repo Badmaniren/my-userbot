@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-скалацию
-
-## audit_export_pipeline (compose) — раундов: 4
-- Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/skills/anomaly_report_aggregator.py", line 37, in aggregate_and_report
+s/anomaly_report_aggregator.py", line 37, in aggregate_and_report
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## audit_export_pipeline (compose) — раундов: 4
@@ -323,4 +320,8 @@
 
 ## patch_analyzer (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## patch_checker (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

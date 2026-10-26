@@ -1,5 +1,6 @@
 import os
 import subprocess
+import ast
 from typing import List, Dict, Any, Optional
 
 class HypothesisGeneratorError(Exception):
@@ -12,6 +13,10 @@ class LessonParserError(Exception):
 
 class PatchExecutorError(Exception):
     """Исключение исполнителя патчей."""
+    pass
+
+class PatchVerifierError(Exception):
+    """Исключение верификатора патчей."""
     pass
 
 
@@ -97,9 +102,11 @@ class PatchExecutor:
         if not file_path or content is None:
             return False
 
-        full_path = os.path.join(self.repo_path, file_path)
-        os.makedirs(os.path.dirname(full_path), exist_ok=True)
         try:
+            full_path = os.path.join(self.repo_path, file_path)
+            dirname = os.path.dirname(full_path)
+            if dirname:
+                os.makedirs(dirname, exist_ok=True)
             with open(full_path, "w", encoding="utf-8") as f:
                 f.write(content)
             subprocess.run(["git", "-C", self.repo_path, "add", file_path], check=True)
@@ -120,13 +127,35 @@ class PatchExecutor:
 
 
 class PatchVerifier:
-    def __init__(self, repo_path: str, inspector: GitInspector, executor: PatchExecutor):
+    def __init__(self, repo_path: str = ".", inspector: Optional[GitInspector] = None, executor: Optional[PatchExecutor] = None):
         self.repo_path = repo_path
-        self.inspector = inspector
-        self.executor = executor
+        self.inspector = inspector if inspector is not None else GitInspector(self.repo_path)
+        if executor is not None:
+            self.executor = executor
+        else:
+            parser = LessonParser(self.inspector)
+            self.executor = PatchExecutor(self.repo_path, self.inspector, parser)
 
-    def verify_and_apply(self, patch_data: Dict[str, Any]) -> bool:
+    def verify_and_apply(self, *args, **kwargs) -> bool:
+        patch_data = {}
+        if args and isinstance(args[0], str) and len(args) >= 2 and isinstance(args[1], str):
+            patch_data = {
+                "file_path": args[0],
+                "content": args[1],
+                "commit_message": f"Apply patch to {args[0]}"
+            }
+        elif args and isinstance(args[0], dict):
+            patch_data = args[0]
+        elif "patch_data" in kwargs and isinstance(kwargs["patch_data"], dict):
+            patch_data = kwargs["patch_data"]
+        elif "file_path" in kwargs or "content" in kwargs:
+            patch_data = kwargs
+
         content = patch_data.get("content", "")
         if "syntax error here" in content:
+            return False
+        try:
+            ast.parse(content)
+        except SyntaxError:
             return False
         return self.executor.apply_patch(patch_data)

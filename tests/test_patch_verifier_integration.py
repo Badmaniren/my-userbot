@@ -1,73 +1,85 @@
 import unittest
-import tempfile
 import os
-import subprocess
+import tempfile
+import shutil
 import uuid
 import random
-
-from skills.patch_verifier import GitInspector, LessonParser, PatchExecutor, PatchVerifier
+import subprocess
+from skills.patch_verifier import (
+    GitInspector,
+    LessonParser,
+    HypothesisGenerator,
+    PatchExecutor,
+    PatchVerifier
+)
 
 class TestPatchVerifierIntegration(unittest.TestCase):
     def setUp(self):
-        self.test_dir = tempfile.TemporaryDirectory()
-        self.repo_path = self.test_dir.name
+        self.test_dir = tempfile.mkdtemp()
+        subprocess.run(["git", "-C", self.test_dir, "init"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["git", "-C", self.test_dir, "config", "user.name", "Test User"], check=True)
+        subprocess.run(["git", "-C", self.test_dir, "config", "user.email", "test@example.com"], check=True)
         
-        subprocess.run(["git", "init", self.repo_path], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        subprocess.run(["git", "-C", self.repo_path, "config", "user.name", "Test Bot"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        subprocess.run(["git", "-C", self.repo_path, "config", "user.email", "bot@test.com"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        
-        self.init_file = os.path.join(self.repo_path, "README.md")
-        with open(self.init_file, "w", encoding="utf-8") as f:
-            f.write("Initial commit")
-            
-        subprocess.run(["git", "-C", self.repo_path, "add", "README.md"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        subprocess.run(["git", "-C", self.repo_path, "commit", "-m", "Initial commit"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-        self.inspector = GitInspector(self.repo_path)
+        self.inspector = GitInspector(self.test_dir)
         self.parser = LessonParser(self.inspector)
-        self.executor = PatchExecutor(self.repo_path, self.inspector, self.parser)
-        self.verifier = PatchVerifier(self.repo_path, self.inspector, self.executor)
+        self.generator = HypothesisGenerator(self.inspector, self.parser)
+        self.executor = PatchExecutor(self.test_dir, self.inspector, self.parser)
+        self.verifier = PatchVerifier(self.test_dir, self.inspector, self.executor)
 
     def tearDown(self):
-        self.test_dir.cleanup()
+        shutil.rmtree(self.test_dir)
 
-    def test_verify_and_apply_integration_success(self):
+    def test_integration_patch_verification_and_execution(self):
         unique_file_name = f"module_{uuid.uuid4().hex[:8]}.py"
-        unique_content = f"# Random content {random.randint(1000, 9999)}\nprint('{uuid.uuid4()}')"
-        unique_message = f"Add feature {uuid.uuid4().hex[:6]}"
+        random_content = f"# Random payload {uuid.uuid4()}\nprint('{random.randint(1000, 9999)}')\n"
+        random_commit_msg = f"Commit message {uuid.uuid4().hex[:6]}"
 
         patch_data = {
             "file_path": unique_file_name,
-            "content": unique_content,
-            "commit_message": unique_message
+            "content": random_content,
+            "commit_message": random_commit_msg
         }
 
-        result = self.verifier.verify_and_apply(patch_data)
-        self.assertTrue(result, "Интеграционная верификация и применение патча должны завершиться успехом")
+        is_verified = self.verifier.verify_and_apply(patch_data)
+        self.assertTrue(is_verified, "Patch verification and application should succeed.")
 
-        full_target_path = os.path.join(self.repo_path, unique_file_name)
-        self.assertTrue(os.path.exists(full_target_path), "Целевой файл должен реально появиться в репозитории")
+        full_file_path = os.path.join(self.test_dir, unique_file_name)
+        self.assertTrue(os.path.exists(full_file_path), "The patched file must exist on disk.")
 
-        with open(full_target_path, "r", encoding="utf-8") as f:
+        with open(full_file_path, "r", encoding="utf-8") as f:
             written_content = f.read()
-        self.assertEqual(written_content, unique_content, "Содержимое файла должно полностью совпадать с переданным в патче")
+        self.assertEqual(written_content, random_content, "Content written to file must match patch data.")
 
-        history = self.inspector.get_commit_history(max_count=5)
-        self.assertGreaterEqual(len(history), 2, "История коммитов должна содержать исходный и новый коммиты")
-        self.assertEqual(history[0]["message"], unique_message, "Сообщение последнего коммита должно соответствовать переданному")
+        history = self.inspector.get_commit_history(max_count=1)
+        self.assertTrue(len(history) > 0, "Git history should contain at least one commit.")
+        latest_commit = history[0]
+        self.assertEqual(latest_commit["message"], random_commit_msg, "Latest git commit message must match.")
 
-    def test_verify_and_apply_integration_failure_syntax(self):
-        unique_file_name = f"broken_{uuid.uuid4().hex[:8]}.py"
-        unique_content = f"syntax error here {random.randint(1, 100)}"
-        
+    def test_integration_patch_syntax_error_rejection(self):
+        unique_file_name = f"error_module_{uuid.uuid4().hex[:8]}.py"
+        bad_content = f"syntax error here {uuid.uuid4()}"
+
         patch_data = {
             "file_path": unique_file_name,
-            "content": unique_content,
-            "commit_message": "Should fail"
+            "content": bad_content,
+            "commit_message": "Bad patch"
         }
 
-        result = self.verifier.verify_and_apply(patch_data)
-        self.assertFalse(result, "Патч с маркером синтаксической ошибки должен быть отклонен верификатором")
+        is_verified = self.verifier.verify_and_apply(patch_data)
+        self.assertFalse(is_verified, "Patch with syntax error trigger must be rejected.")
 
-        full_target_path = os.path.join(self.repo_path, unique_file_name)
-        self.assertFalse(os.path.exists(full_target_path), "Файл с ошибкой не должен быть зафиксирован в репозитории")
+        full_file_path = os.path.join(self.test_dir, unique_file_name)
+        self.assertFalse(os.path.exists(full_file_path), "Rejected patch file should not be created.")
+
+    def test_integration_hypothesis_and_execution_chain(self):
+        hypotheses = self.generator.generate_hypotheses()
+        self.assertIsInstance(hypotheses, list)
+        prioritized = self.generator.prioritize_hypotheses(hypotheses)
+        self.assertIsInstance(prioritized, list)
+
+        execution_result = self.executor.execute_from_lessons()
+        self.assertIsInstance(execution_result, dict)
+        self.assertIn("status", execution_result)
+
+if __name__ == "__main__":
+    unittest.main()

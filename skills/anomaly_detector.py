@@ -45,6 +45,10 @@ class AnomalyDetector:
         
         mean_val = sum(history) / len(history)
         
+        if len(history) == 1:
+            if target_value > self.threshold:
+                return True
+
         if abs(target_value - mean_val) > self.threshold or target_value > self.threshold * 2:
             return True
             

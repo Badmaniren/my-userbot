@@ -1,6 +1,4 @@
-import io
 import re
-import os
 import subprocess
 
 
@@ -10,7 +8,7 @@ class PatchAnalyzerError(Exception):
 
 
 class GitInspector:
-    """Инспектора репозитория для получения diff через git."""
+    """Инспектор репозитория для получения diff через git."""
     def __init__(self, repo_dir: str):
         self.repo_dir = repo_dir
 
@@ -62,13 +60,6 @@ class PatchAnalyzer:
             elif line.startswith("@@"):
                 if current_file is None:
                     current_file = {"target_file": "unknown", "chunks": []}
-                # Парсим заголовок ханка: @@ -old_start,old_count +new_start,new_count @@
-                match = re.search(r"@@\s*-(\d+)(?:,\d+)?\s+\+(\d+)(?:,\d+)?\s*@@", line)
-                old_count = 0
-                new_count = 0
-                if match:
-                    # Подсчитываем строки ханка далее, но здесь зафиксируем базовую структуру
-                    pass
                 current_chunk = {
                     "header": line,
                     "old_count": 0,
@@ -96,6 +87,8 @@ class PatchAnalyzer:
         lines = diff_text.splitlines()
         hunk_header_pattern = re.compile(r"^@@\s*-\d+(?:,\d+)?\s+\+\d+(?:,\d+)?\s*@@")
 
+        has_file_header = False
+        has_hunk = False
         in_hunk = False
         declared_old = 0
         declared_new = 0
@@ -103,7 +96,10 @@ class PatchAnalyzer:
         actual_new = 0
 
         for line in lines:
-            if line.startswith("@@"):
+            if line.startswith("--- ") or line.startswith("+++ "):
+                has_file_header = True
+            elif line.startswith("@@"):
+                has_hunk = True
                 if in_hunk:
                     if actual_old != declared_old or actual_new != declared_new:
                         raise PatchAnalyzerError("Hunk line count mismatch")
@@ -111,8 +107,9 @@ class PatchAnalyzer:
                 if not match:
                     raise PatchAnalyzerError("Corrupted hunk header")
                 
-                # Извлекаем ожидаемые количества
                 parts = line.split("@@")[1].strip().split()
+                if len(parts) < 2:
+                    raise PatchAnalyzerError("Corrupted hunk header")
                 old_part = parts[0]
                 new_part = parts[1]
                 
@@ -130,6 +127,12 @@ class PatchAnalyzer:
                 elif line.startswith(" "):
                     actual_old += 1
                     actual_new += 1
+
+        if not has_file_header:
+            raise PatchAnalyzerError("Missing file header")
+
+        if not has_hunk:
+            raise PatchAnalyzerError("Missing hunk header")
 
         if in_hunk:
             if actual_old != declared_old or actual_new != declared_new:
@@ -170,14 +173,12 @@ class PatchAnalyzer:
             if line.startswith("+") and not line.startswith("+++"):
                 content = line[1:]
                 
-                # Проверка конфликтных маркеров
                 if "<<<<<<<" in content or "=======" in content or ">>>>>>>" in content:
                     risks.append({
                         "type": "merge_conflict_marker",
                         "details": f"Merge conflict marker found: {content}"
                     })
 
-                # Проверка опасных вызовов
                 for dangerous in ["eval", "exec", "os.system"]:
                     if dangerous in content:
                         risks.append({
@@ -185,12 +186,9 @@ class PatchAnalyzer:
                             "details": f"Dangerous call '{dangerous}' found in line: {content}"
                         })
 
-                # Проверка несогласованных разделителей (скобок)
-                # Упрощенный подсчет открывающих и закрывающих скобок/квадратных скобок
                 open_brackets = content.count('(') + content.count('[') + content.count('{')
                 close_brackets = content.count(')') + content.count(']') + content.count('}')
                 if open_brackets != close_brackets:
-                    # Дополнительная проверка на незакрытые элементы в конце строки
                     if content.strip().endswith(',') or content.strip().endswith('(') or content.strip().endswith('['):
                         risks.append({
                             "type": "unbalanced_delimiter",
@@ -227,12 +225,18 @@ class PatchAnalyzer:
                 "errors": []
             }
         except Exception as e:
-            return {
-                "is_valid": False,
-                "errors": [str(e)],
-                "syntax_risks": [],
-                "statistics": {"files_changed": 0, "additions": 0, "deletions": 0, "total_changes": 0}
-            }
+            if not isinstance(diff_text, str) or not diff_text.strip():
+                raise PatchAnalyzerError(str(e))
+            try:
+                self.validate_structure(diff_text)
+            except Exception as val_e:
+                return {
+                    "is_valid": False,
+                    "errors": [str(val_e)],
+                    "syntax_risks": [],
+                    "statistics": {"files_changed": 0, "additions": 0, "deletions": 0, "total_changes": 0}
+                }
+            raise e
 
     def analyze_stream(self, stream):
         content = stream.read()

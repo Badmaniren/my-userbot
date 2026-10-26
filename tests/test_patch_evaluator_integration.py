@@ -1,76 +1,73 @@
 import unittest
+import io
 import uuid
 import random
-import os
-import tempfile
-import shutil
-
-from skills.patch_evaluator import patch_evaluator
-from skills.git_inspector import GitInspector
-from skills.anomaly_logger import AnomalyLogger
-
+from pathlib import Path
+from skills.patch_evaluator import (
+    PatchEvaluator,
+    PatchEvaluatorError,
+    PatchEvaluationResult,
+    patch_evaluator
+)
 
 class TestPatchEvaluatorIntegration(unittest.TestCase):
-
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp()
-        self.repo_path = self.test_dir
-        
-        # Инициализируем реальный репозиторий через GitInspector или базовые файлы
-        os.makedirs(os.path.join(self.repo_path, ".git"), exist_ok=True)
-        
-        self.target_file = os.path.join(self.repo_path, f"module_{uuid.uuid4().hex[:8]}.py")
-        self.initial_content = f"# Initial content {uuid.uuid4()}\nx = {random.randint(1, 100)}\n"
-        with open(self.target_file, "w", encoding="utf-8") as f:
-            f.write(self.initial_content)
-
-        self.log_path = os.path.join(self.test_dir, f"anomaly_log_{uuid.uuid4().hex}.json")
-        self.logger = AnomalyLogger(log_path=self.log_path)
-        self.git_inspector = GitInspector(repo_path=self.repo_path)
+        self.random_repo_name = f"test_repo_{uuid.uuid4().hex[:8]}"
+        self.repo_path = Path(self.random_repo_name)
+        self.repo_path.mkdir(exist_ok=True)
+        self.evaluator = PatchEvaluator(repo_path=self.repo_path)
 
     def tearDown(self):
-        shutil.rmtree(self.test_dir, ignore_errors=True)
+        if self.repo_path.exists():
+            for item in self.repo_path.iterdir():
+                try:
+                    item.unlink()
+                except Exception:
+                    pass
+            try:
+                self.repo_path.rmdir()
+            except Exception:
+                pass
 
-    def test_patch_evaluator_real_integration(self):
-        # Генерируем уникальные данные для патча
-        random_id = uuid.uuid4().hex
-        patch_content = f"# Patch update {random_id}\nx = {random.randint(101, 1000)}\n"
+    def test_evaluate_standard_flow(self):
+        unique_marker = uuid.uuid4().hex
+        patch_content = f"print('{unique_marker}')\n"
         
-        # Записываем изменения в файл (симуляция применения патча)
-        with open(self.target_file, "w", encoding="utf-8") as f:
-            f.write(patch_content)
+        result = self.evaluator.evaluate(patch_content, collect_telemetry=True)
 
-        # Проверяем работу git_inspector в связке с модулем
-        history = self.git_inspector.get_history()
-        self.assertIsNotNone(history)
+        self.assertIsInstance(result, PatchEvaluationResult)
+        self.assertTrue(result.is_safe)
+        self.assertTrue(result.is_valid)
+        self.assertIn("snapshot_id", result.telemetry)
 
-        # Логируем телеметрию/аномалию для проверки взаимодействия с логгером
-        severity_levels = ["INFO", "WARNING", "ERROR", "CRITICAL"]
-        chosen_severity = random.choice(severity_levels)
-        self.logger.log_anomaly(
-            source="patch_evaluator_test",
-            severity=chosen_severity,
-            details=f"Evaluating patch {random_id}",
-            telemetry_snapshot={"file": self.target_file, "random_val": random_id}
-        )
+    def test_evaluate_stream_flow(self):
+        unique_content = f"x = {random.randint(1, 100)}\n"
+        stream = io.BytesIO(unique_content.encode('utf-8'))
 
-        reports = self.logger.get_anomalies()
-        self.assertTrue(any(random_id in str(rep) for rep in reports))
+        result = self.evaluator.evaluate_stream(stream)
 
-        # Вызываем тестируемый модуль patch_evaluator для оценки изменений
-        # Передаем реальные пути и контекст без моков
-        evaluation_result = patch_evaluator(
-            repo_path=self.repo_path,
-            patch_data=patch_content,
-            target_file=self.target_file
-        )
+        self.assertIsInstance(result, PatchEvaluationResult)
+        self.assertTrue(result.is_safe)
+        self.assertTrue(result.is_valid)
 
-        self.assertIsNotNone(evaluation_result)
+    def test_convenience_function(self):
+        random_value = random.random()
+        patch_data = f"val = {random_value}\n"
+
+        result = patch_evaluator(repo_path=self.repo_path, patch_data=patch_data)
         
-        # Проверяем структурированный отчет логгера
-        structured_report = self.logger.get_structured_report()
-        self.assertIsNotNone(structured_report)
+        self.assertIsInstance(result, PatchEvaluationResult)
+        self.assertTrue(result.is_safe)
 
+    def test_exception_handling_no_silent_swallowing(self):
+        from unittest.mock import patch
+        err_id = uuid.uuid4().hex
+        with patch('skills.patch_evaluator.CodeSanitizer.sanitize', side_effect=ValueError(f"Forced error {err_id}")):
+            with self.assertRaises(PatchEvaluatorError) as context:
+                self.evaluator.evaluate("test content")
+
+        self.assertIn("Forced error", str(context.exception))
+        self.assertIsInstance(context.exception.__cause__, ValueError)
 
 if __name__ == "__main__":
     unittest.main()

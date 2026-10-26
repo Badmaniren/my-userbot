@@ -9,7 +9,18 @@ class PatchSanitizerError(Exception):
 class PatchSanitizer:
     """Модуль первичной очистки и нормализации входящих патчей."""
 
-    def sanitize(self, stream) -> str:
+    def sanitize(self, stream):
+        if isinstance(stream, dict):
+            res = dict(stream)
+            for key in ("content", "payload"):
+                if key in res and isinstance(res[key], str):
+                    res[key] = self.sanitize(res[key])
+            return res
+        if isinstance(stream, bytes):
+            stream = stream.decode("utf-8")
+        if isinstance(stream, str):
+            stream = io.StringIO(stream)
+
         content = stream.read()
         if not content:
             raise PatchSanitizerError("Empty stream is not allowed.")

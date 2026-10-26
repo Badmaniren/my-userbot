@@ -66,6 +66,21 @@ class CodeSanitizer:
         if pattern not in self.forbidden_patterns:
             self.forbidden_patterns.append(pattern)
 
+    def sanitize(self, code_content: str) -> str:
+        return self.sanitize_patch(code_content)
+
+    def is_safe(self, code_content: str) -> bool:
+        try:
+            self.sanitize_patch(code_content)
+            from skills.code_validator import CodeValidator
+            validator = CodeValidator(repo_path=".")
+            for word in ("exec", "eval", "system", "__import__", "rm -rf"):
+                validator.add_forbidden_construct(word)
+            validator.validate_code(code_content)
+            return True
+        except Exception:
+            return False
+
     def sanitize_patch(self, code_content: str) -> str:
         try:
             tree = ast.parse(code_content)

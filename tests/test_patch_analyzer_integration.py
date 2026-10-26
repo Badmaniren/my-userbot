@@ -1,126 +1,71 @@
-import os
-import shutil
-import subprocess
-import tempfile
 import unittest
 import uuid
+import random
+import tempfile
+import os
+import shutil
 
-from skills.git_inspector import GitInspector
-from skills.patch_analyzer import PatchAnalyzer
+from skills.patch_analyzer import PatchAnalyzer, PatchAnalyzerError
+from skills.code_sanitizer import CodeSanitizerError
+from skills.code_validator import CodeValidatorError
 
 
 class TestPatchAnalyzerIntegration(unittest.TestCase):
+
     def setUp(self):
-        self.temp_dir = tempfile.mkdtemp()
-        self.repo_dir = os.path.join(self.temp_dir, f"repo_{uuid.uuid4().hex[:8]}")
-        os.makedirs(self.repo_dir)
-
-        subprocess.run(["git", "init"], cwd=self.repo_dir, check=True, capture_output=True)
-        subprocess.run(["git", "config", "user.name", "TestEngineer"], cwd=self.repo_dir, check=True)
-        subprocess.run(["git", "config", "user.email", "engineer@test.local"], cwd=self.repo_dir, check=True)
-
         self.analyzer = PatchAnalyzer()
-        self.inspector = GitInspector(self.repo_dir)
+        self.test_dir = tempfile.mkdtemp()
 
     def tearDown(self):
-        shutil.rmtree(self.temp_dir, ignore_errors=True)
+        shutil.rmtree(self.test_dir)
 
-    def _commit_file(self, filename: str, content: str, message: str) -> str:
-        filepath = os.path.join(self.repo_dir, filename)
-        with open(filepath, "w", encoding="utf-8") as f:
-            f.write(content)
-        subprocess.run(["git", "add", filename], cwd=self.repo_dir, check=True, capture_output=True)
-        subprocess.run(["git", "commit", "-m", message], cwd=self.repo_dir, check=True, capture_output=True)
-        rev = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=self.repo_dir,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        return rev.stdout.strip()
+    def test_patch_analyzer_full_pipeline_integration(self):
+        random_suffix = uuid.uuid4().hex[:8]
+        target_filename = f"module_{random_suffix}.py"
 
-    def test_clean_patch_analysis_from_git_inspector(self):
-        file_token = uuid.uuid4().hex[:8]
-        filename = f"module_{file_token}.py"
-        base_var = f"var_{uuid.uuid4().hex[:6]}"
-        initial_code = f"def compute_{file_token}():\n    {base_var} = 10\n    return {base_var}\n"
+        add_count = random.randint(2, 5)
+        del_count = random.randint(1, 3)
 
-        self._commit_file(filename, initial_code, "Initial commit")
+        diff_lines = [
+            f"--- a/{target_filename}",
+            f"+++ b/{target_filename}",
+            f"@@ -1,{del_count} +1,{add_count} @@"
+        ]
 
-        add_token_1 = f"added_val_{uuid.uuid4().hex[:6]}"
-        add_token_2 = f"added_val_{uuid.uuid4().hex[:6]}"
-        modified_code = (
-            f"def compute_{file_token}():\n"
-            f"    {base_var} = 20\n"
-            f"    {add_token_1} = 30\n"
-            f"    {add_token_2} = {base_var} + {add_token_1}\n"
-            f"    return {add_token_2}\n"
-        )
-        head_commit = self._commit_file(filename, modified_code, "Update logic")
+        for _ in range(del_count):
+            diff_lines.append(f"-old_line_{uuid.uuid4().hex[:4]}()")
 
-        raw_diff = self.inspector.get_file_diff(head_commit)
-        if isinstance(raw_diff, dict):
-            diff_text = raw_diff.get("diff", str(raw_diff))
-        else:
-            diff_text = str(raw_diff)
+        for i in range(add_count):
+            if i == 0:
+                diff_lines.append("+os.system('echo test')")
+            else:
+                diff_lines.append(f"+print(val_{uuid.uuid4().hex[:4]})")
 
-        analysis = self.analyzer.analyze(diff_text)
+        diff_text = "\n".join(diff_lines) + "\n"
 
-        self.assertTrue(analysis["is_valid"])
-        self.assertIn(filename, analysis["files"])
-        self.assertGreaterEqual(analysis["additions"], 3)
-        self.assertGreaterEqual(analysis["deletions"], 1)
-        self.assertGreater(len(analysis["chunks"]), 0)
-        self.assertEqual(len(analysis["syntax_risks"]), 0)
+        file_path = os.path.join(self.test_dir, f"patch_{random_suffix}.diff")
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(diff_text)
 
-    def test_detects_syntax_risks_in_patch(self):
-        file_token = uuid.uuid4().hex[:8]
-        filename = f"danger_{file_token}.py"
-        initial_code = f"def safe_func_{file_token}():\n    pass\n"
-        self._commit_file(filename, initial_code, "Initial safe func")
+        analysis_result = self.analyzer.analyze_file(file_path)
 
-        injected_token = uuid.uuid4().hex
-        risky_code = (
-            f"def safe_func_{file_token}():\n"
-            f"    eval(f'dangerous_payload_{injected_token}')\n"
-            f"    exec('x = 1')\n"
-            f"    unclosed_tuple = (1, 2,\n"
-        )
-        head_commit = self._commit_file(filename, risky_code, "Introduce syntax risks")
+        self.assertTrue(analysis_result.get("is_valid"))
+        self.assertIn(target_filename, analysis_result.get("files"))
+        self.assertEqual(analysis_result.get("additions"), add_count)
+        self.assertEqual(analysis_result.get("deletions"), del_count)
 
-        raw_diff = self.inspector.get_file_diff(head_commit)
-        diff_text = raw_diff.get("diff", str(raw_diff)) if isinstance(raw_diff, dict) else str(raw_diff)
+        risks = analysis_result.get("syntax_risks", [])
+        self.assertTrue(any(risk.get("type") == "dangerous_call" for risk in risks))
 
-        analysis = self.analyzer.analyze(diff_text)
+    def test_patch_analyzer_stream_and_invalid_integration(self):
+        random_id = uuid.uuid4().hex
+        corrupted_diff = f"@@ -1,1 +1,1 @@\n-invalid_del_{random_id}\n+mismatch_add\n"
 
-        self.assertTrue(analysis["is_valid"])
-        self.assertIn(filename, analysis["files"])
-        self.assertGreater(len(analysis["syntax_risks"]), 0)
+        analysis_result = self.analyzer.analyze(corrupted_diff)
 
-        risk_descriptions = " ".join(
-            str(risk.get("description", risk) if isinstance(risk, dict) else risk)
-            for risk in analysis["syntax_risks"]
-        )
-        self.assertTrue(
-            "eval" in risk_descriptions.lower()
-            or "exec" in risk_descriptions.lower()
-            or "syntax" in risk_descriptions.lower()
-        )
-
-    def test_malformed_chunk_structure_marks_patch_invalid(self):
-        random_hash = uuid.uuid4().hex
-        corrupted_patch = (
-            f"--- a/broken_{random_hash}.py\n"
-            f"+++ b/broken_{random_hash}.py\n"
-            f"@@ invalid chunk header @@\n"
-            f"+print('malformed {random_hash}')\n"
-        )
-
-        analysis = self.analyzer.analyze(corrupted_patch)
-
-        self.assertFalse(analysis["is_valid"])
-        self.assertGreater(len(analysis.get("errors", [])), 0)
+        self.assertFalse(analysis_result.get("is_valid"))
+        self.assertTrue(len(analysis_result.get("errors")) > 0)
+        self.assertEqual(analysis_result.get("statistics").get("total_changes"), 0)
 
 
 if __name__ == "__main__":

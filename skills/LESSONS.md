@@ -3,7 +3,11 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-/runner/work/my-userbot/my-userbot/tests/test_digest_audit_pipeline_integration.py", line 27, in test_pipeline_audit_and_export_json_integration
+LED (errors=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## digest_audit_pipeline (compose) — раундов: 4
+- Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/tests/test_digest_audit_pipeline_integration.py", line 27, in test_pipeline_audit_and_export_json_integration
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## audit_export_pipeline (compose) — раундов: 4
@@ -313,8 +317,4 @@
 ## anomaly_pattern_analyzer (start_new) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено перекрывать системный модуль 'anomaly_filter' глобальной переменной!; АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## anomaly_notification_gateway (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

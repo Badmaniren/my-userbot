@@ -3,15 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ck (most recent call last):
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## digest_exporter (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: Traceback (most recent call last):
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## digest_exporter (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: Traceback (most recent call last):
+д фиксом: Traceback (most recent call last):
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## anomaly_pipeline (create) — раундов: 4
@@ -331,4 +323,9 @@ ck (most recent call last):
 
 ## patch_verifier (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## patch_verifier (refactor) — раундов: 4
+- Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
+- Последняя ошибка перед фиксом: FAILED (errors=3)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

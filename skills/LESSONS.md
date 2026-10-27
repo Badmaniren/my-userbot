@@ -3,7 +3,11 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ck (most recent call last):
+, line 1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## digest_exporter (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: Traceback (most recent call last):
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## digest_exporter (refactor) — раундов: 4
@@ -327,8 +331,4 @@ ck (most recent call last):
 
 ## patch_verifier (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: Traceback (most recent call last):
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## patch_verifier (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

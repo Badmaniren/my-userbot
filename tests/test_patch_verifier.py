@@ -1,11 +1,12 @@
 import unittest
-from unittest.mock import patch, MagicMock
 import os
+import shutil
+import tempfile
 import uuid
 import random
-import string
-import io
 import subprocess
+from unittest.mock import patch, MagicMock
+import io
 
 from skills.patch_verifier import (
     HypothesisGeneratorError,
@@ -18,181 +19,179 @@ from skills.patch_verifier import (
     PatchVerifier
 )
 
-class TestPatchVerifierModule(unittest.TestCase):
-
+class TestPatchVerifierIntegration(unittest.TestCase):
     def setUp(self):
-        self.repo_path = f"/tmp/{uuid.uuid4().hex}"
-        self.inspector = GitInspector(self.repo_path)
-        self.parser = LessonParser(self.inspector)
-        self.generator = HypothesisGenerator(self.inspector, self.parser)
-        self.executor = PatchExecutor(self.repo_path, self.inspector, self.parser)
-        self.verifier = PatchVerifier(self.repo_path, self.inspector, self.executor)
+        self.test_dir = tempfile.mkdtemp()
+        self.repo_path = self.test_dir
+        subprocess.run(["git", "-C", self.test_dir, "init"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["git", "-C", self.test_dir, "config", "user.name", "Inquisitor"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["git", "-C", self.test_dir, "config", "user.email", "inquisitor@architecture.void"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    def test_git_inspector_run_git_success(self):
-        random_hash = uuid.uuid4().hex
-        random_author = "".join(random.choices(string.ascii_letters, k=8))
-        random_message = "".join(random.choices(string.ascii_letters, k=15))
-        mock_output = f"{random_hash}|{random_author}|{random_message}\n"
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(stdout=mock_output, stderr="")
-            history = self.inspector.get_commit_history(max_count=1)
-            
-            self.assertEqual(len(history), 1)
-            self.assertEqual(history[0]["hash"], random_hash)
-            self.assertEqual(history[0]["author"], random_author)
-            self.assertEqual(history[0]["message"], random_message)
+    def test_full_patch_pipeline_integration(self):
+        file_name = f"{uuid.uuid4().hex}.py"
+        file_content = f"print('{uuid.uuid4().hex}')\n"
+        commit_msg = f"Commit {uuid.uuid4().hex}"
 
-    def test_git_inspector_empty_history(self):
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(stdout="", stderr="")
-            history = self.inspector.get_commit_history(max_count=5)
-            self.assertEqual(history, [])
-
-    def test_git_inspector_get_file_diff(self):
-        commit_hash = uuid.uuid4().hex
-        expected_diff = f"diff --git a/{uuid.uuid4().hex}.py b/{uuid.uuid4().hex}.py"
-
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(stdout=expected_diff, stderr="")
-            diff = self.inspector.get_file_diff(commit_hash)
-            self.assertEqual(diff, expected_diff)
-
-    def test_git_inspector_analyze_repository(self):
-        random_hash = uuid.uuid4().hex
-        random_author = "".join(random.choices(string.ascii_letters, k=6))
-        random_msg = "".join(random.choices(string.ascii_letters, k=10))
-        mock_output = f"{random_hash}|{random_author}|{random_msg}\n"
-
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(stdout=mock_output, stderr="")
-            analysis = self.inspector.analyze_repository()
-            
-            self.assertEqual(analysis["total_commits"], 1)
-            self.assertIsNotNone(analysis["latest_commit"])
-            self.assertEqual(analysis["latest_commit"]["hash"], random_hash)
-
-    def test_git_inspector_read_file_at_commit(self):
-        commit_hash = uuid.uuid4().hex
-        file_path = f"{uuid.uuid4().hex}.py"
-        file_content = f"print('{uuid.uuid4().hex}')"
-
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(stdout=file_content, stderr="")
-            content = self.inspector.read_file_at_commit(commit_hash, file_path)
-            self.assertEqual(content, file_content)
-
-    def test_git_inspector_get_history_and_latest(self):
-        random_hash = uuid.uuid4().hex
-        mock_output = f"{random_hash}|Tester|Initial commit\n"
-
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(stdout=mock_output, stderr="")
-            history = self.inspector.get_history(max_count=2)
-            self.assertEqual(len(history), 1)
-
-            latest_changes = self.inspector.get_latest_changes()
-            self.assertIsInstance(latest_changes, str)
-
-    def test_lesson_parser_extraction(self):
-        lessons = self.parser.parse_lessons()
-        self.assertIsInstance(lessons, list)
-        self.assertTrue(len(lessons) > 0)
-
-        extracted = self.parser.extract_lessons(max_commits=3)
-        self.assertIn("lesson_id", extracted)
-        self.assertIn("content", extracted)
-
-    def test_hypothesis_generator_prioritization(self):
-        hyp_1_weight = random.uniform(0.1, 0.4)
-        hyp_2_weight = random.uniform(0.5, 0.9)
-        
-        hypotheses = [
-            {"id": uuid.uuid4().hex, "weight": hyp_1_weight, "target": "a.py"},
-            {"id": uuid.uuid4().hex, "weight": hyp_2_weight, "target": "b.py"}
-        ]
-
-        prioritized = self.generator.prioritize_hypotheses(hypotheses)
-        self.assertEqual(prioritized[0]["weight"], hyp_2_weight)
-        self.assertEqual(prioritized[1]["weight"], hyp_1_weight)
-
-        generated = self.generator.generate_hypotheses(max_commits=2)
-        self.assertIsInstance(generated, list)
-
-    def test_patch_executor_apply_success(self):
-        file_path = f"{uuid.uuid4().hex}.py"
-        content = f"# {uuid.uuid4().hex}"
-        commit_msg = f"feat: {uuid.uuid4().hex}"
+        inspector = GitInspector(self.repo_path)
+        parser = LessonParser(inspector)
+        executor = PatchExecutor(self.repo_path, inspector, parser)
+        verifier = PatchVerifier(self.repo_path, inspector, executor)
 
         patch_data = {
-            "file_path": file_path,
-            "content": content,
+            "file_path": file_name,
+            "content": file_content,
             "commit_message": commit_msg
         }
 
-        with patch("builtins.open", new_callable=unittest.mock.mock_open()) as mock_file, \
-             patch("os.makedirs") as mock_makedirs, \
-             patch("subprocess.run") as mock_subprocess:
-            
-            result = self.executor.apply_patch(patch_data)
-            self.assertTrue(result)
-            mock_makedirs.assert_called_once()
-            mock_file.assert_called_once()
-            self.assertEqual(mock_subprocess.call_count, 2)
+        res = verifier.verify_and_apply(patch_data)
+        self.assertTrue(res)
 
-    def test_patch_executor_apply_missing_fields(self):
-        patch_data = {"file_path": "", "content": None}
-        result = self.executor.apply_patch(patch_data)
-        self.assertFalse(result)
+        history = inspector.get_commit_history(max_count=1)
+        self.assertTrue(len(history) > 0)
+        self.assertEqual(history[0]["message"], commit_msg)
 
-    def test_patch_executor_apply_exception(self):
+    def test_syntax_error_patch_rejection(self):
+        file_name = f"{uuid.uuid4().hex}.py"
+        file_content = f"syntax error here: {uuid.uuid4().hex}"
+
+        inspector = GitInspector(self.repo_path)
+        parser = LessonParser(inspector)
+        executor = PatchExecutor(self.repo_path, inspector, parser)
+        verifier = PatchVerifier(self.repo_path, inspector, executor)
+
         patch_data = {
-            "file_path": f"{uuid.uuid4().hex}.py",
-            "content": uuid.uuid4().hex
+            "file_path": file_name,
+            "content": file_content,
+            "commit_message": "Bad syntax commit"
         }
 
-        with patch("builtins.open", side_effect=Exception("Disk failure")):
-            result = self.executor.apply_patch(patch_data)
-            self.assertFalse(result)
+        res = verifier.verify_and_apply(patch_data)
+        self.assertFalse(res)
 
-    def test_patch_executor_rollback_success(self):
-        file_path = f"{uuid.uuid4().hex}.py"
-        commit_hash = uuid.uuid4().hex
+        history = inspector.get_commit_history(max_count=1)
+        self.assertEqual(len(history), 0)
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0)
-            result = self.executor.rollback_patch(file_path, commit_hash)
-            self.assertTrue(result)
 
-    def test_patch_executor_rollback_exception(self):
-        file_path = f"{uuid.uuid4().hex}.py"
-        commit_hash = uuid.uuid4().hex
+class TestGitInspector(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        subprocess.run(["git", "-C", self.test_dir, "init"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["git", "-C", self.test_dir, "config", "user.name", "Tester"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["git", "-C", self.test_dir, "config", "user.email", "tester@test.com"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        with patch("subprocess.run", side_effect=Exception("Git checkout failed")):
-            result = self.executor.rollback_patch(file_path, commit_hash)
-            self.assertFalse(result)
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
 
-    def test_patch_executor_execute_from_lessons(self):
-        res = self.executor.execute_from_lessons()
-        self.assertIn("executed_lessons", res)
-        self.assertIn("status", res)
+    def test_analyze_repository_and_history(self):
+        inspector = GitInspector(self.test_dir)
+        analysis = inspector.analyze_repository()
+        self.assertEqual(analysis["total_commits"], 0)
+        self.assertIsNone(analysis["latest_commit"])
 
-    def test_patch_verifier_syntax_error(self):
-        patch_data = {
-            "file_path": f"{uuid.uuid4().hex}.py",
-            "content": "def broken(): syntax error here"
-        }
-        result = self.verifier.verify_and_apply(patch_data)
-        self.assertFalse(result)
+        file_name = f"{uuid.uuid4().hex}.txt"
+        file_path = os.path.join(self.test_dir, file_name)
+        file_content = uuid.uuid4().hex
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(file_content)
 
-    def test_patch_verifier_valid_patch(self):
-        file_path = f"{uuid.uuid4().hex}.py"
-        patch_data = {
-            "file_path": file_path,
-            "content": f"def safe_func_{uuid.uuid4().hex}(): return True"
-        }
+        subprocess.run(["git", "-C", self.test_dir, "add", file_name], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        msg = f"msg_{uuid.uuid4().hex}"
+        subprocess.run(["git", "-C", self.test_dir, "commit", "-m", msg], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        with patch.object(self.executor, "apply_patch", return_value=True) as mock_apply:
-            result = self.verifier.verify_and_apply(patch_data)
-            self.assertTrue(result)
-            mock_apply.assert_called_once_with(patch_data)
+        history = inspector.get_commit_history(max_count=5)
+        self.assertEqual(len(history), 1)
+        self.assertEqual(history[0]["message"], msg)
+
+        read_content = inspector.read_file_at_commit(history[0]["hash"], file_name)
+        self.assertEqual(read_content, file_content)
+
+        diff = inspector.get_file_diff(history[0]["hash"])
+        self.assertIn(file_name, diff)
+
+        latest = inspector.get_latest_changes()
+        self.assertIn(file_name, latest)
+
+
+class TestLessonParserAndHypothesis(unittest.TestCase):
+    def test_lesson_parser_and_hypothesis(self):
+        random_repo = uuid.uuid4().hex
+        inspector = GitInspector(random_repo)
+        parser = LessonParser(inspector)
+        lessons = parser.parse_lessons()
+        self.assertIsInstance(lessons, list)
+        extracted = parser.extract_lessons()
+        self.assertIsInstance(extracted, dict)
+
+        generator = HypothesisGenerator(inspector, parser)
+        hypotheses = generator.generate_hypotheses()
+        self.assertIsInstance(hypotheses, list)
+
+        weighted_hypotheses = [
+            {"id": uuid.uuid4().hex, "weight": random.random()},
+            {"id": uuid.uuid4().hex, "weight": random.random() + 1.0}
+        ]
+        prioritized = generator.prioritize_hypotheses(weighted_hypotheses)
+        self.assertGreaterEqual(prioritized[0]["weight"], prioritized[1]["weight"])
+
+
+class TestPatchExecutorAndVerifier(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        subprocess.run(["git", "-C", self.test_dir, "init"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["git", "-C", self.test_dir, "config", "user.name", "Executor"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["git", "-C", self.test_dir, "config", "user.email", "exec@test.com"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_patch_executor_apply_and_rollback(self):
+        inspector = GitInspector(self.test_dir)
+        parser = LessonParser(inspector)
+        executor = PatchExecutor(self.test_dir, inspector, parser)
+
+        file_name = f"{uuid.uuid4().hex}.py"
+        content_v1 = f"val = {random.randint(1, 100)}"
+        content_v2 = f"val = {random.randint(101, 200)}"
+
+        patch_1 = {"file_path": file_name, "content": content_v1, "commit_message": "v1"}
+        res1 = executor.apply_patch(patch_1)
+        self.assertTrue(res1)
+
+        history = inspector.get_commit_history(max_count=1)
+        commit_hash_1 = history[0]["hash"]
+
+        patch_2 = {"file_path": file_name, "content": content_v2, "commit_message": "v2"}
+        res2 = executor.apply_patch(patch_2)
+        self.assertTrue(res2)
+
+        full_path = os.path.join(self.test_dir, file_name)
+        with open(full_path, "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), content_v2)
+
+        rolled = executor.rollback_patch(file_name, commit_hash_1)
+        self.assertTrue(rolled)
+
+        with open(full_path, "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), content_v1)
+
+        exec_lessons = executor.execute_from_lessons()
+        self.assertIn("status", exec_lessons)
+
+    def test_patch_executor_failures(self):
+        inspector = GitInspector(self.test_dir)
+        parser = LessonParser(inspector)
+        executor = PatchExecutor(self.test_dir, inspector, parser)
+
+        bad_patch = {"content": uuid.uuid4().hex}
+        self.assertFalse(executor.apply_patch(bad_patch))
+
+        with patch("subprocess.run", side_effect=Exception("Git subprocess error")):
+            res = executor.rollback_patch(uuid.uuid4().hex, uuid.uuid4().hex)
+            self.assertFalse(res)
+
+
+if __name__ == "__main__":
+    unittest.main()

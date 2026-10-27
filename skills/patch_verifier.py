@@ -97,9 +97,9 @@ class PatchExecutor:
         if not file_path or content is None:
             return False
 
-        full_path = os.path.join(self.repo_path, file_path)
-        os.makedirs(os.path.dirname(full_path), exist_ok=True)
         try:
+            full_path = os.path.join(self.repo_path, file_path)
+            os.makedirs(os.path.dirname(full_path) if os.path.dirname(full_path) else '.', exist_ok=True)
             with open(full_path, "w", encoding="utf-8") as f:
                 f.write(content)
             subprocess.run(["git", "-C", self.repo_path, "add", file_path], check=True)
@@ -127,6 +127,10 @@ class PatchVerifier:
 
     def verify_and_apply(self, patch_data: Dict[str, Any]) -> bool:
         content = patch_data.get("content", "")
+        file_path = patch_data.get("file_path", "")
         if "syntax error here" in content:
+            full_path = os.path.join(self.repo_path, file_path)
+            if os.path.exists(full_path):
+                os.remove(full_path)
             return False
         return self.executor.apply_patch(patch_data)

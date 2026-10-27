@@ -1,6 +1,11 @@
 import os
 import subprocess
+import ast
 from typing import List, Dict, Any, Optional
+
+class PatchVerifierError(Exception):
+    """Исключение верификатора патчей."""
+    pass
 
 class HypothesisGeneratorError(Exception):
     """Исключение генератора гипотез."""
@@ -99,14 +104,11 @@ class PatchExecutor:
 
         full_path = os.path.join(self.repo_path, file_path)
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
-        try:
-            with open(full_path, "w", encoding="utf-8") as f:
-                f.write(content)
-            subprocess.run(["git", "-C", self.repo_path, "add", file_path], check=True)
-            subprocess.run(["git", "-C", self.repo_path, "commit", "-m", commit_message], check=True)
-            return True
-        except Exception:
-            return False
+        with open(full_path, "w", encoding="utf-8") as f:
+            f.write(content)
+        subprocess.run(["git", "-C", self.repo_path, "add", file_path], check=True)
+        subprocess.run(["git", "-C", self.repo_path, "commit", "-m", commit_message], check=True)
+        return True
 
     def rollback_patch(self, file_path: str, commit_hash: str) -> bool:
         try:
@@ -120,13 +122,43 @@ class PatchExecutor:
 
 
 class PatchVerifier:
-    def __init__(self, repo_path: str, inspector: GitInspector, executor: PatchExecutor):
+    def __init__(
+        self,
+        repo_path: str = ".",
+        inspector: Optional[GitInspector] = None,
+        executor: Optional[PatchExecutor] = None
+    ):
         self.repo_path = repo_path
-        self.inspector = inspector
-        self.executor = executor
+        self.inspector = inspector if inspector is not None else GitInspector(self.repo_path)
+        if executor is not None:
+            self.executor = executor
+        else:
+            parser = LessonParser(self.inspector)
+            self.executor = PatchExecutor(self.repo_path, self.inspector, parser)
 
-    def verify_and_apply(self, patch_data: Dict[str, Any]) -> bool:
+    def _normalize_patch_data(self, patch_data_or_file: Any, code_fragment: Optional[str] = None) -> Dict[str, Any]:
+        if isinstance(patch_data_or_file, dict):
+            return dict(patch_data_or_file)
+        return {
+            "file_path": str(patch_data_or_file),
+            "content": str(code_fragment or "")
+        }
+
+    def verify(self, patch_data_or_file: Any, code_fragment: Optional[str] = None) -> bool:
+        patch_data = self._normalize_patch_data(patch_data_or_file, code_fragment)
         content = patch_data.get("content", "")
-        if "syntax error here" in content:
+        if content is None:
+            return False
+        if "syntax error here" in str(content):
+            return False
+        try:
+            ast.parse(str(content))
+        except Exception:
+            return False
+        return True
+
+    def verify_and_apply(self, patch_data_or_file: Any, code_fragment: Optional[str] = None) -> bool:
+        patch_data = self._normalize_patch_data(patch_data_or_file, code_fragment)
+        if not self.verify(patch_data):
             return False
         return self.executor.apply_patch(patch_data)

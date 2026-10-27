@@ -97,14 +97,17 @@ class PatchExecutor:
         if not file_path or content is None:
             return False
 
-        full_path = os.path.join(self.repo_path, file_path)
-        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        try:
+            full_path = os.path.join(self.repo_path, file_path)
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
 
-        with open(full_path, "w", encoding="utf-8") as f:
-            f.write(content)
-        subprocess.run(["git", "-C", self.repo_path, "add", file_path], check=True)
-        subprocess.run(["git", "-C", self.repo_path, "commit", "-m", commit_message], check=True)
-        return True
+            with open(full_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            subprocess.run(["git", "-C", self.repo_path, "add", file_path], check=True)
+            subprocess.run(["git", "-C", self.repo_path, "commit", "-m", commit_message], check=True)
+            return True
+        except (subprocess.SubprocessError, OSError, Exception):
+            return False
 
     def rollback_patch(self, file_path: str, commit_hash: str) -> bool:
         try:

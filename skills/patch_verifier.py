@@ -1,22 +1,26 @@
 import os
 import subprocess
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 
-class HypothesisGeneratorError(Exception):
+class PatchVerifierError(Exception):
+    """Базовое исключение верификатора патчей."""
+    pass
+
+class HypothesisGeneratorError(PatchVerifierError):
     """Исключение генератора гипотез."""
     pass
 
-class LessonParserError(Exception):
+class LessonParserError(PatchVerifierError):
     """Исключение парсера уроков."""
     pass
 
-class PatchExecutorError(Exception):
+class PatchExecutorError(PatchVerifierError):
     """Исключение исполнителя патчей."""
     pass
 
 
 class GitInspector:
-    def __init__(self, repo_path: str):
+    def __init__(self, repo_path: str = "."):
         self.repo_path = repo_path
 
     def _run_git(self, args: List[str]) -> str:
@@ -61,8 +65,8 @@ class GitInspector:
 
 
 class LessonParser:
-    def __init__(self, inspector: GitInspector):
-        self.inspector = inspector
+    def __init__(self, inspector: Optional[GitInspector] = None):
+        self.inspector = inspector if inspector is not None else GitInspector()
 
     def parse_lessons(self) -> List[Dict[str, Any]]:
         return [{"lesson_id": "1001", "content": "Sample lesson"}]
@@ -72,9 +76,13 @@ class LessonParser:
 
 
 class HypothesisGenerator:
-    def __init__(self, inspector: GitInspector, parser: LessonParser):
-        self.inspector = inspector
-        self.parser = parser
+    def __init__(
+        self,
+        inspector: Optional[GitInspector] = None,
+        parser: Optional[LessonParser] = None
+    ):
+        self.inspector = inspector if inspector is not None else GitInspector()
+        self.parser = parser if parser is not None else LessonParser(self.inspector)
 
     def generate_hypotheses(self, max_commits: int = 10) -> List[Dict[str, Any]]:
         return [{"id": "hyp_1", "weight": 0.5, "target": "module.py"}]
@@ -84,10 +92,15 @@ class HypothesisGenerator:
 
 
 class PatchExecutor:
-    def __init__(self, repo_path: str, inspector: GitInspector, parser: LessonParser):
+    def __init__(
+        self,
+        repo_path: str = ".",
+        inspector: Optional[GitInspector] = None,
+        parser: Optional[LessonParser] = None
+    ):
         self.repo_path = repo_path
-        self.inspector = inspector
-        self.parser = parser
+        self.inspector = inspector if inspector is not None else GitInspector(repo_path)
+        self.parser = parser if parser is not None else LessonParser(self.inspector)
 
     def apply_patch(self, patch_data: Dict[str, Any]) -> bool:
         file_path = patch_data.get("file_path")
@@ -120,13 +133,36 @@ class PatchExecutor:
 
 
 class PatchVerifier:
-    def __init__(self, repo_path: str, inspector: GitInspector, executor: PatchExecutor):
+    def __init__(
+        self,
+        repo_path: str = ".",
+        inspector: Optional[GitInspector] = None,
+        executor: Optional[PatchExecutor] = None
+    ):
         self.repo_path = repo_path
-        self.inspector = inspector
-        self.executor = executor
+        self.inspector = inspector if inspector is not None else GitInspector(repo_path)
+        self.executor = executor if executor is not None else PatchExecutor(repo_path, self.inspector)
 
-    def verify_and_apply(self, patch_data: Dict[str, Any]) -> bool:
+    def verify_and_apply(self, patch_data: Any, code_fragment: Optional[str] = None) -> bool:
+        if isinstance(patch_data, str) and code_fragment is not None:
+            patch_data = {
+                "file_path": patch_data,
+                "content": code_fragment,
+                "commit_message": f"Apply patch to {patch_data}"
+            }
+        elif isinstance(patch_data, str):
+            patch_data = {
+                "file_path": "patch.py",
+                "content": patch_data,
+                "commit_message": "Apply patch"
+            }
+        elif not isinstance(patch_data, dict):
+            return False
+
         content = patch_data.get("content", "")
         if "syntax error here" in content:
             return False
         return self.executor.apply_patch(patch_data)
+
+    def verify(self, patch_data: Any, code_fragment: Optional[str] = None) -> bool:
+        return self.verify_and_apply(patch_data, code_fragment)

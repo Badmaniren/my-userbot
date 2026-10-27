@@ -1,22 +1,31 @@
 import os
 import subprocess
-from typing import List, Dict, Any, Optional
+import ast
+from typing import List, Dict, Any, Optional, Union
 
-class HypothesisGeneratorError(Exception):
+
+class PatchVerifierError(Exception):
+    """Базовое исключение для верификатора патчей."""
+    pass
+
+
+class HypothesisGeneratorError(PatchVerifierError):
     """Исключение генератора гипотез."""
     pass
 
-class LessonParserError(Exception):
+
+class LessonParserError(PatchVerifierError):
     """Исключение парсера уроков."""
     pass
 
-class PatchExecutorError(Exception):
+
+class PatchExecutorError(PatchVerifierError):
     """Исключение исполнителя патчей."""
     pass
 
 
 class GitInspector:
-    def __init__(self, repo_path: str):
+    def __init__(self, repo_path: str = "."):
         self.repo_path = repo_path
 
     def _run_git(self, args: List[str]) -> str:
@@ -61,8 +70,8 @@ class GitInspector:
 
 
 class LessonParser:
-    def __init__(self, inspector: GitInspector):
-        self.inspector = inspector
+    def __init__(self, inspector: Optional[GitInspector] = None):
+        self.inspector = inspector if inspector is not None else GitInspector()
 
     def parse_lessons(self) -> List[Dict[str, Any]]:
         return [{"lesson_id": "1001", "content": "Sample lesson"}]
@@ -72,9 +81,9 @@ class LessonParser:
 
 
 class HypothesisGenerator:
-    def __init__(self, inspector: GitInspector, parser: LessonParser):
-        self.inspector = inspector
-        self.parser = parser
+    def __init__(self, inspector: Optional[GitInspector] = None, parser: Optional[LessonParser] = None):
+        self.inspector = inspector if inspector is not None else GitInspector()
+        self.parser = parser if parser is not None else LessonParser(self.inspector)
 
     def generate_hypotheses(self, max_commits: int = 10) -> List[Dict[str, Any]]:
         return [{"id": "hyp_1", "weight": 0.5, "target": "module.py"}]
@@ -84,12 +93,20 @@ class HypothesisGenerator:
 
 
 class PatchExecutor:
-    def __init__(self, repo_path: str, inspector: GitInspector, parser: LessonParser):
+    def __init__(
+        self,
+        repo_path: str = ".",
+        inspector: Optional[GitInspector] = None,
+        parser: Optional[LessonParser] = None
+    ):
         self.repo_path = repo_path
-        self.inspector = inspector
-        self.parser = parser
+        self.inspector = inspector if inspector is not None else GitInspector(self.repo_path)
+        self.parser = parser if parser is not None else LessonParser(self.inspector)
 
     def apply_patch(self, patch_data: Dict[str, Any]) -> bool:
+        if not isinstance(patch_data, dict):
+            return False
+
         file_path = patch_data.get("file_path")
         content = patch_data.get("content")
         commit_message = patch_data.get("commit_message", "Apply patch")
@@ -99,34 +116,71 @@ class PatchExecutor:
 
         full_path = os.path.join(self.repo_path, file_path)
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
-        try:
-            with open(full_path, "w", encoding="utf-8") as f:
-                f.write(content)
-            subprocess.run(["git", "-C", self.repo_path, "add", file_path], check=True)
-            subprocess.run(["git", "-C", self.repo_path, "commit", "-m", commit_message], check=True)
-            return True
-        except Exception:
-            return False
+        with open(full_path, "w", encoding="utf-8") as f:
+            f.write(content)
+        subprocess.run(["git", "-C", self.repo_path, "add", file_path], check=True)
+        subprocess.run(["git", "-C", self.repo_path, "commit", "-m", commit_message], check=True)
+        return True
 
     def rollback_patch(self, file_path: str, commit_hash: str) -> bool:
-        try:
-            subprocess.run(["git", "-C", self.repo_path, "checkout", commit_hash, "--", file_path], check=True)
-            return True
-        except Exception:
-            return False
+        subprocess.run(["git", "-C", self.repo_path, "checkout", commit_hash, "--", file_path], check=True)
+        return True
 
     def execute_from_lessons(self) -> Dict[str, Any]:
         return {"executed_lessons": 1, "status": "success"}
 
 
 class PatchVerifier:
-    def __init__(self, repo_path: str, inspector: GitInspector, executor: PatchExecutor):
+    def __init__(
+        self,
+        repo_path: str = ".",
+        inspector: Optional[GitInspector] = None,
+        executor: Optional[PatchExecutor] = None
+    ):
         self.repo_path = repo_path
-        self.inspector = inspector
-        self.executor = executor
+        self.inspector = inspector if inspector is not None else GitInspector(self.repo_path)
+        if executor is not None:
+            self.executor = executor
+        else:
+            parser = LessonParser(self.inspector)
+            self.executor = PatchExecutor(self.repo_path, self.inspector, parser)
 
-    def verify_and_apply(self, patch_data: Dict[str, Any]) -> bool:
-        content = patch_data.get("content", "")
-        if "syntax error here" in content:
+    def _normalize_patch_data(self, patch_data: Union[Dict[str, Any], str], code_fragment: Optional[str] = None) -> Dict[str, Any]:
+        if isinstance(patch_data, str):
+            return {
+                "file_path": patch_data,
+                "content": code_fragment if code_fragment is not None else "",
+                "commit_message": f"Apply patch to {patch_data}"
+            }
+        elif isinstance(patch_data, dict):
+            norm = dict(patch_data)
+            if "content" not in norm and "code" in norm:
+                norm["content"] = norm["code"]
+            elif "content" not in norm and code_fragment is not None:
+                norm["content"] = code_fragment
+            return norm
+        return {}
+
+    def verify(self, patch_data: Union[Dict[str, Any], str], code_fragment: Optional[str] = None) -> bool:
+        normalized = self._normalize_patch_data(patch_data, code_fragment)
+        content = normalized.get("content", "")
+
+        if not content and not normalized.get("file_path"):
             return False
-        return self.executor.apply_patch(patch_data)
+
+        if isinstance(content, str) and "syntax error here" in content:
+            return False
+
+        if isinstance(content, str) and content.strip():
+            try:
+                ast.parse(content)
+            except SyntaxError:
+                return False
+
+        return True
+
+    def verify_and_apply(self, patch_data: Union[Dict[str, Any], str], code_fragment: Optional[str] = None) -> bool:
+        normalized = self._normalize_patch_data(patch_data, code_fragment)
+        if not self.verify(normalized):
+            return False
+        return self.executor.apply_patch(normalized)

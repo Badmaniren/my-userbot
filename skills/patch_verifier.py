@@ -1,6 +1,11 @@
 import os
 import subprocess
+import ast
 from typing import List, Dict, Any, Optional
+
+class PatchVerifierError(Exception):
+    """Базовое исключение модуля verifier патчей."""
+    pass
 
 class HypothesisGeneratorError(Exception):
     """Исключение генератора гипотез."""
@@ -16,7 +21,7 @@ class PatchExecutorError(Exception):
 
 
 class GitInspector:
-    def __init__(self, repo_path: str):
+    def __init__(self, repo_path: str = "."):
         self.repo_path = repo_path
 
     def _run_git(self, args: List[str]) -> str:
@@ -61,7 +66,7 @@ class GitInspector:
 
 
 class LessonParser:
-    def __init__(self, inspector: GitInspector):
+    def __init__(self, inspector: Optional[GitInspector] = None):
         self.inspector = inspector
 
     def parse_lessons(self) -> List[Dict[str, Any]]:
@@ -72,7 +77,7 @@ class LessonParser:
 
 
 class HypothesisGenerator:
-    def __init__(self, inspector: GitInspector, parser: LessonParser):
+    def __init__(self, inspector: Optional[GitInspector] = None, parser: Optional[LessonParser] = None):
         self.inspector = inspector
         self.parser = parser
 
@@ -84,12 +89,14 @@ class HypothesisGenerator:
 
 
 class PatchExecutor:
-    def __init__(self, repo_path: str, inspector: GitInspector, parser: LessonParser):
+    def __init__(self, repo_path: str = ".", inspector: Optional[GitInspector] = None, parser: Optional[LessonParser] = None):
         self.repo_path = repo_path
-        self.inspector = inspector
-        self.parser = parser
+        self.inspector = inspector or GitInspector(repo_path)
+        self.parser = parser or LessonParser(self.inspector)
 
     def apply_patch(self, patch_data: Dict[str, Any]) -> bool:
+        if not isinstance(patch_data, dict):
+            return False
         file_path = patch_data.get("file_path")
         content = patch_data.get("content")
         commit_message = patch_data.get("commit_message", "Apply patch")
@@ -98,8 +105,8 @@ class PatchExecutor:
             return False
 
         full_path = os.path.join(self.repo_path, file_path)
-        os.makedirs(os.path.dirname(full_path), exist_ok=True)
         try:
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
             with open(full_path, "w", encoding="utf-8") as f:
                 f.write(content)
             subprocess.run(["git", "-C", self.repo_path, "add", file_path], check=True)
@@ -120,13 +127,37 @@ class PatchExecutor:
 
 
 class PatchVerifier:
-    def __init__(self, repo_path: str, inspector: GitInspector, executor: PatchExecutor):
+    def __init__(self, repo_path: str = ".", inspector: Optional[GitInspector] = None, executor: Optional[PatchExecutor] = None):
         self.repo_path = repo_path
-        self.inspector = inspector
-        self.executor = executor
+        self.inspector = inspector or GitInspector(repo_path)
+        self.executor = executor or PatchExecutor(repo_path, self.inspector, LessonParser(self.inspector))
 
-    def verify_and_apply(self, patch_data: Dict[str, Any]) -> bool:
-        content = patch_data.get("content", "")
+    def verify(self, patch_data_or_path: Any, code_fragment: Optional[str] = None) -> bool:
+        if isinstance(patch_data_or_path, dict):
+            content = patch_data_or_path.get("content", "")
+        elif isinstance(patch_data_or_path, str) and code_fragment is not None:
+            content = code_fragment
+        elif isinstance(patch_data_or_path, str):
+            content = patch_data_or_path
+        else:
+            return False
+
         if "syntax error here" in content:
+            return False
+        try:
+            ast.parse(content)
+            return True
+        except SyntaxError:
+            return False
+
+    def verify_and_apply(self, patch_data_or_path: Any, code_fragment: Optional[str] = None) -> bool:
+        if isinstance(patch_data_or_path, dict):
+            patch_data = patch_data_or_path
+        elif isinstance(patch_data_or_path, str) and code_fragment is not None:
+            patch_data = {"file_path": patch_data_or_path, "content": code_fragment}
+        else:
+            return False
+
+        if not self.verify(patch_data):
             return False
         return self.executor.apply_patch(patch_data)

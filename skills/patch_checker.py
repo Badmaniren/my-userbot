@@ -73,20 +73,13 @@ class PatchChecker:
         if not os.path.exists(file_path):
             raise PatchCheckerError(f"Файл не найден: {file_path}")
 
-        try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                content = f.read()
-        except Exception as e:
-            raise PatchCheckerError(f"Не удалось прочитать файл {file_path}: {e}") from e
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read()
 
         return self.check_patch(patch_content=content, target_file=target_file)
 
     def check_stream(self, stream: io.TextIOBase, target_file: Optional[str] = None) -> Dict[str, Any]:
-        try:
-            content = stream.read()
-        except Exception as e:
-            raise PatchCheckerError(f"Не удалось прочитать поток: {e}") from e
-
+        content = stream.read()
         return self.check_patch(patch_content=content, target_file=target_file)
 
     def check(self, patch_content: str, repo_path: Optional[str] = None, target_file: Optional[str] = None) -> Dict[str, Any]:

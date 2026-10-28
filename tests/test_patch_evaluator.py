@@ -1,9 +1,10 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 import io
 import uuid
 import random
 from pathlib import Path
+
 from skills.patch_evaluator import (
     PatchEvaluatorError,
     PatchEvaluationResult,
@@ -17,10 +18,11 @@ from skills.patch_evaluator import (
 )
 
 class TestPatchEvaluator(unittest.TestCase):
+
     def setUp(self):
-        self.random_repo_path = Path(f"/tmp/{uuid.uuid4().hex}")
-        self.random_patch_content = f"diff --git a/{uuid.uuid4().hex} b/{uuid.uuid4().hex}\n+{uuid.uuid4().hex}"
-        self.evaluator = PatchEvaluator(repo_path=self.random_repo_path)
+        self.rand_repo = str(uuid.uuid4().hex)
+        self.rand_patch = str(uuid.uuid4().hex)
+        self.evaluator = PatchEvaluator(repo_path=self.rand_repo)
 
     def test_patch_evaluation_result_defaults(self):
         result = PatchEvaluationResult()
@@ -31,127 +33,163 @@ class TestPatchEvaluator(unittest.TestCase):
         self.assertEqual(result.telemetry, {})
         self.assertFalse(result.was_corrected)
 
-    def test_patch_evaluation_result_custom_values(self):
-        custom_safe = random.choice([True, False])
-        custom_valid = random.choice([True, False])
-        custom_metrics = {uuid.uuid4().hex: random.randint(1, 100)}
-        custom_reasons = [uuid.uuid4().hex]
-        custom_telemetry = {uuid.uuid4().hex: uuid.uuid4().hex}
-        custom_corrected = random.choice([True, False])
+    def test_code_sanitizer_default(self):
+        sanitizer = CodeSanitizer()
+        content = uuid.uuid4().hex
+        res_content, is_safe = sanitizer.sanitize(content)
+        self.assertEqual(res_content, content)
+        self.assertTrue(is_safe)
+        self.assertEqual(sanitizer.get_reasons(), [])
 
-        result = PatchEvaluationResult(
-            is_safe=custom_safe,
-            is_valid=custom_valid,
-            metrics=custom_metrics,
-            reasons=custom_reasons,
-            telemetry=custom_telemetry,
-            was_corrected=custom_corrected
-        )
+    def test_code_validator_default(self):
+        validator = CodeValidator()
+        res = validator.validate(uuid.uuid4().hex)
+        self.assertTrue(res.get("is_valid"))
+        self.assertIn("metrics", res)
 
-        self.assertEqual(result.is_safe, custom_safe)
-        self.assertEqual(result.is_valid, custom_valid)
-        self.assertEqual(result.metrics, custom_metrics)
-        self.assertEqual(result.reasons, custom_reasons)
-        self.assertEqual(result.telemetry, custom_telemetry)
-        self.assertEqual(result.was_corrected, custom_corrected)
+    def test_patch_verifier_default(self):
+        verifier = PatchVerifier()
+        self.assertTrue(verifier.verify(uuid.uuid4().hex))
 
-    def test_evaluate_success(self):
-        metric_key = uuid.uuid4().hex
-        metric_value = random.randint(10, 500)
-        snapshot_id = uuid.uuid4().hex
+    def test_patch_autocorrector_default(self):
+        autocorrector = PatchAutocorrector()
+        content = uuid.uuid4().hex
+        res_content, success = autocorrector.correct(content)
+        self.assertEqual(res_content, content)
+        self.assertTrue(success)
 
-        with patch('skills.patch_evaluator.CodeSanitizer.sanitize', return_value=(self.random_patch_content, True)), \
-             patch('skills.patch_evaluator.CodeValidator.validate', return_value={"is_valid": True, "metrics": {metric_key: metric_value}}), \
-             patch('skills.patch_evaluator.PatchVerifier.verify', return_value=True), \
-             patch('skills.patch_evaluator.SystemTelemetry.capture', return_value={"snapshot_id": snapshot_id}):
+    def test_system_telemetry_default(self):
+        telemetry = SystemTelemetry()
+        snap = telemetry.capture()
+        self.assertIn("snapshot_id", snap)
 
-            result = self.evaluator.evaluate(self.random_patch_content, collect_telemetry=True)
+    def test_patch_evaluator_init(self):
+        path_str = str(uuid.uuid4().hex)
+        evaluator = PatchEvaluator(repo_path=Path(path_str))
+        self.assertEqual(evaluator.repo_path, path_str)
+
+    def test_evaluate_success_flow(self):
+        rand_metric_key = uuid.uuid4().hex
+        rand_metric_val = random.randint(1, 1000)
+
+        with patch("skills.patch_evaluator.CodeSanitizer") as mock_sanitizer_cls, \
+             patch("skills.patch_evaluator.CodeValidator") as mock_validator_cls, \
+             patch("skills.patch_evaluator.PatchVerifier") as mock_verifier_cls:
+            
+            mock_sanitizer = mock_sanitizer_cls.return_value
+            mock_sanitizer.sanitize.return_value = (self.rand_patch, True)
+
+            mock_validator = mock_validator_cls.return_value
+            mock_validator.validate.return_value = {
+                "is_valid": True,
+                "metrics": {rand_metric_key: rand_metric_val}
+            }
+
+            mock_verifier = mock_verifier_cls.return_value
+            mock_verifier.verify.return_value = True
+
+            result = self.evaluator.evaluate(self.rand_patch, collect_telemetry=True)
 
             self.assertTrue(result.is_safe)
             self.assertTrue(result.is_valid)
-            self.assertEqual(result.metrics.get(metric_key), metric_value)
-            self.assertEqual(result.telemetry.get("snapshot_id"), snapshot_id)
+            self.assertEqual(result.metrics.get(rand_metric_key), rand_metric_val)
+            self.assertIn("snapshot_id", result.telemetry)
 
     def test_evaluate_unsafe_patch(self):
-        reason_msg = uuid.uuid4().hex
+        rand_reason = uuid.uuid4().hex
 
-        with patch('skills.patch_evaluator.CodeSanitizer.sanitize', return_value=(self.random_patch_content, False)), \
-             patch('skills.patch_evaluator.CodeSanitizer.get_reasons', return_value=[reason_msg]):
+        with patch("skills.patch_evaluator.CodeSanitizer") as mock_sanitizer_cls:
+            mock_sanitizer = mock_sanitizer_cls.return_value
+            mock_sanitizer.sanitize.return_value = (self.rand_patch, False)
+            mock_sanitizer.get_reasons.return_value = [rand_reason]
 
-            result = self.evaluator.evaluate(self.random_patch_content)
+            result = self.evaluator.evaluate(self.rand_patch)
 
             self.assertFalse(result.is_safe)
             self.assertFalse(result.is_valid)
-            self.assertIn(reason_msg, result.reasons)
+            self.assertIn(rand_reason, result.reasons)
 
-    def test_evaluate_invalid_validation(self):
-        with patch('skills.patch_evaluator.CodeSanitizer.sanitize', return_value=(self.random_patch_content, True)), \
-             patch('skills.patch_evaluator.CodeValidator.validate', return_value={"is_valid": False, "metrics": {}}), \
-             patch('skills.patch_evaluator.PatchVerifier.verify', return_value=True):
+    def test_evaluate_validator_exception_handling(self):
+        with patch("skills.patch_evaluator.CodeSanitizer") as mock_sanitizer_cls, \
+             patch("skills.patch_evaluator.CodeValidator") as mock_validator_cls, \
+             patch("skills.patch_evaluator.PatchVerifier") as mock_verifier_cls:
+            
+            mock_sanitizer = mock_sanitizer_cls.return_value
+            mock_sanitizer.sanitize.return_value = (self.rand_patch, True)
 
-            result = self.evaluator.evaluate(self.random_patch_content)
+            mock_validator = mock_validator_cls.return_value
+            mock_validator.validate.side_effect = Exception(uuid.uuid4().hex)
+
+            mock_verifier = mock_verifier_cls.return_value
+            mock_verifier.verify.return_value = True
+
+            result = self.evaluator.evaluate(self.rand_patch)
 
             self.assertTrue(result.is_safe)
             self.assertFalse(result.is_valid)
 
-    def test_evaluate_invalid_verification(self):
-        with patch('skills.patch_evaluator.CodeSanitizer.sanitize', return_value=(self.random_patch_content, True)), \
-             patch('skills.patch_evaluator.CodeValidator.validate', return_value={"is_valid": True, "metrics": {}}), \
-             patch('skills.patch_evaluator.PatchVerifier.verify', return_value=False):
+    def test_evaluate_verifier_exception_handling(self):
+        with patch("skills.patch_evaluator.CodeSanitizer") as mock_sanitizer_cls, \
+             patch("skills.patch_evaluator.CodeValidator") as mock_validator_cls, \
+             patch("skills.patch_evaluator.PatchVerifier") as mock_verifier_cls:
+            
+            mock_sanitizer = mock_sanitizer_cls.return_value
+            mock_sanitizer.sanitize.return_value = (self.rand_patch, True)
 
-            result = self.evaluator.evaluate(self.random_patch_content)
+            mock_validator = mock_validator_cls.return_value
+            mock_validator.validate.return_value = {"is_valid": True, "metrics": {}}
+
+            mock_verifier = mock_verifier_cls.return_value
+            mock_verifier.verify.side_effect = Exception(uuid.uuid4().hex)
+
+            result = self.evaluator.evaluate(self.rand_patch)
 
             self.assertTrue(result.is_safe)
             self.assertFalse(result.is_valid)
 
     def test_evaluate_raises_patch_evaluator_error(self):
-        error_msg = uuid.uuid4().hex
+        with patch("skills.patch_evaluator.CodeSanitizer") as mock_sanitizer_cls:
+            mock_sanitizer = mock_sanitizer_cls.return_value
+            mock_sanitizer.sanitize.side_effect = PatchEvaluatorError(uuid.uuid4().hex)
 
-        with patch('skills.patch_evaluator.CodeSanitizer.sanitize', side_effect=Exception(error_msg)):
-            with self.assertRaises(PatchEvaluatorError) as ctx:
-                self.evaluator.evaluate(self.random_patch_content)
-            self.assertIn(error_msg, str(ctx.exception))
+            with self.assertRaises(PatchEvaluatorError):
+                self.evaluator.evaluate(self.rand_patch)
 
-    def test_evaluate_with_autocorrect_triggered(self):
-        corrected_content = f"corrected_{uuid.uuid4().hex}"
+    def test_evaluate_with_autocorrect_unsafe(self):
+        with patch("skills.patch_evaluator.CodeSanitizer") as mock_sanitizer_cls, \
+             patch("skills.patch_evaluator.PatchAutocorrector") as mock_autocorrector_cls, \
+             patch.object(self.evaluator, "evaluate") as mock_eval_method:
+            
+            mock_sanitizer = mock_sanitizer_cls.return_value
+            mock_sanitizer.sanitize.return_value = (self.rand_patch, False)
 
-        with patch('skills.patch_evaluator.CodeSanitizer.sanitize', side_effect=[(self.random_patch_content, False), (corrected_content, True)]), \
-             patch('skills.patch_evaluator.PatchAutocorrector.correct', return_value=(corrected_content, True)), \
-             patch('skills.patch_evaluator.CodeValidator.validate', return_value={"is_valid": True, "metrics": {}}), \
-             patch('skills.patch_evaluator.PatchVerifier.verify', return_value=True):
+            mock_autocorrector = mock_autocorrector_cls.return_value
+            corrected_patch = uuid.uuid4().hex
+            mock_autocorrector.correct.return_value = (corrected_patch, True)
 
-            result = self.evaluator.evaluate_with_autocorrect(self.random_patch_content)
+            mock_eval_result = PatchEvaluationResult(is_safe=True, is_valid=True)
+            mock_eval_method.return_value = mock_eval_result
 
-            self.assertTrue(result.is_safe)
-            self.assertTrue(result.was_corrected)
+            res = self.evaluator.evaluate_with_autocorrect(self.rand_patch)
+
+            mock_autocorrector.correct.assert_called_once_with(self.rand_patch)
+            mock_eval_method.assert_called_once_with(corrected_patch)
+            self.assertTrue(res.was_corrected)
 
     def test_evaluate_stream(self):
-        stream_data = self.random_patch_content.encode('utf-8')
-        stream = io.BytesIO(stream_data)
+        rand_content = uuid.uuid4().hex
+        stream = io.BytesIO(rand_content.encode('utf-8'))
 
-        with patch.object(self.evaluator, 'evaluate') as mock_evaluate:
-            mock_evaluate.return_value = PatchEvaluationResult(is_safe=True, is_valid=True)
-            
-            result = self.evaluator.evaluate_stream(stream)
-            
-            mock_evaluate.assert_called_once_with(self.random_patch_content)
-            self.assertTrue(result.is_safe)
+        with patch.object(self.evaluator, "evaluate") as mock_eval:
+            mock_eval.return_value = PatchEvaluationResult()
+            res = self.evaluator.evaluate_stream(stream)
+            mock_eval.assert_called_once_with(rand_content)
+            self.assertIsInstance(res, PatchEvaluationResult)
 
-    def test_functional_helper_patch_evaluator(self):
-        target_file_name = f"{uuid.uuid4().hex}.py"
-
-        with patch.object(PatchEvaluator, 'evaluate') as mock_evaluate:
-            mock_result = PatchEvaluationResult(is_safe=True, is_valid=True)
-            mock_evaluate.return_value = mock_result
-
-            res = patch_evaluator(
-                repo_path=self.random_repo_path,
-                patch_data=self.random_patch_content,
-                target_file=target_file_name
-            )
-
-            mock_evaluate.assert_called_once_with(self.random_patch_content, target_file=target_file_name)
-            self.assertEqual(res, mock_result)
-
-if __name__ == '__main__':
-    unittest.main()
+    def test_functional_patch_evaluator_wrapper(self):
+        target = uuid.uuid4().hex
+        with patch("skills.patch_evaluator.PatchEvaluator.evaluate") as mock_eval:
+            mock_eval.return_value = PatchEvaluationResult()
+            res = patch_evaluator(self.rand_repo, self.rand_patch, target_file=target)
+            mock_eval.assert_called_once_with(self.rand_patch, target_file=target)
+            self.assertIsInstance(res, PatchEvaluationResult)

@@ -3,57 +3,64 @@ import uuid
 import random
 import io
 from pathlib import Path
-from skills.patch_evaluator import (
-    PatchEvaluator,
-    PatchEvaluationResult,
-    PatchEvaluatorError,
-    patch_evaluator
-)
+from skills.patch_evaluator import PatchEvaluator, patch_evaluator, PatchEvaluationResult, PatchEvaluatorError
+from skills.code_sanitizer import CodeSanitizer
+from skills.code_validator import CodeValidator
+from skills.patch_verifier import PatchVerifier
+from skills.patch_autocorrector import PatchAutocorrector
+from skills.system_telemetry import SystemTelemetry
 
 class TestPatchEvaluatorIntegration(unittest.TestCase):
     def setUp(self):
-        self.repo_path = str(Path("test_repo_" + uuid.uuid4().hex))
+        self.repo_path = Path(f"./test_repo_{uuid.uuid4().hex}")
+        self.repo_path.mkdir(parents=True, exist_ok=True)
         self.evaluator = PatchEvaluator(repo_path=self.repo_path)
 
-    def test_patch_evaluator_lifecycle_and_random_input(self):
-        random_suffix = uuid.uuid4().hex
-        random_metric_val = random.randint(1, 1000)
+    def tearDown(self):
+        if self.repo_path.exists():
+            for p in self.repo_path.glob("*"):
+                p.unlink()
+            self.repo_path.rmdir()
+
+    def test_evaluate_integration_real_flow(self):
+        random_str = uuid.uuid4().hex
+        patch_content = f"print('{random_str}')"
         
-        patch_content = f"print('Integration test {random_suffix}: {random_metric_val}')"
-        
-        result = self.evaluator.evaluate(
-            patch_content=patch_content,
-            collect_telemetry=True,
-            target_file=f"file_{random_suffix}.py"
-        )
+        result = self.evaluator.evaluate(patch_content, collect_telemetry=True)
         
         self.assertIsInstance(result, PatchEvaluationResult)
         self.assertTrue(result.is_safe)
         self.assertTrue(result.is_valid)
         self.assertIn("snapshot_id", result.telemetry)
 
-    def test_patch_evaluator_stream_and_autocorrect(self):
-        random_token = uuid.uuid4().hex
-        stream_content = f"# Stream test content {random_token}".encode('utf-8')
-        stream = io.BytesIO(stream_content)
-
-        result = self.evaluator.evaluate_stream(stream)
+    def test_evaluate_stream_integration(self):
+        random_str = uuid.uuid4().hex
+        stream_data = io.BytesIO(f"def test_{random_str}(): pass".encode('utf-8'))
+        
+        result = self.evaluator.evaluate_stream(stream_data)
+        
         self.assertIsInstance(result, PatchEvaluationResult)
         self.assertTrue(result.is_safe)
+        self.assertTrue(result.is_valid)
 
-        autocorrect_result = self.evaluator.evaluate_with_autocorrect(f"content_{random_token}")
-        self.assertIsInstance(autocorrect_result, PatchEvaluationResult)
-        self.assertIsInstance(autocorrect_result.was_corrected, bool)
+    def test_function_wrapper_integration(self):
+        random_str = uuid.uuid4().hex
+        patch_data = f"# {random_str}"
+        
+        result = patch_evaluator(repo_path=self.repo_path, patch_data=patch_data)
+        
+        self.assertIsInstance(result, PatchEvaluationResult)
+        self.assertTrue(result.is_safe)
+        self.assertTrue(result.is_valid)
 
-    def test_functional_helper_wrapper(self):
-        random_data = f"data_{uuid.uuid4().hex}"
-        res = patch_evaluator(
-            repo_path=self.repo_path,
-            patch_data=random_data,
-            target_file="dummy.py"
-        )
-        self.assertIsInstance(res, PatchEvaluationResult)
-        self.assertTrue(res.is_safe)
+    def test_evaluate_with_autocorrect_integration(self):
+        random_str = uuid.uuid4().hex
+        patch_content = f"malicious_code_{random_str} = True"
+        
+        result = self.evaluator.evaluate_with_autocorrect(patch_content)
+        
+        self.assertIsInstance(result, PatchEvaluationResult)
+        self.assertIsInstance(result.was_corrected, bool)
 
 if __name__ == "__main__":
     unittest.main()

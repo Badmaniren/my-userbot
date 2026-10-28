@@ -1,6 +1,6 @@
 import io
 import os
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional
 
 from skills.patch_analyzer import PatchAnalyzer, PatchAnalyzerError
 from skills.patch_evaluator import PatchEvaluationResult, PatchEvaluator, PatchEvaluatorError
@@ -67,6 +67,10 @@ class PatchChecker:
                 "was_corrected": was_corrected,
             },
             "policy_verdict": policy_verdict,
+            "metrics": metrics,
+            "reasons": reasons,
+            "telemetry": telemetry,
+            "was_corrected": was_corrected,
         }
 
     def check_file(self, file_path: str, target_file: Optional[str] = None) -> Dict[str, Any]:
@@ -97,8 +101,8 @@ class PatchChecker:
         
         result = self.check_patch(patch_content=patch_content, target_file=target_file)
         
-        if "evaluation" in result and "metrics" in result["evaluation"]:
-            result["metrics"] = result["evaluation"]["metrics"]
+        if "metrics" in result and isinstance(result["metrics"], dict):
+            result.update(result["metrics"])
             
         return result
 

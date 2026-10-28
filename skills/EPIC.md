@@ -7,3 +7,4 @@
 - patch_analyzer: Stabilizing the analyzer is the critical bridge between sanitization and verification; without a robust analyzer, the pipeline cannot reliably pass the patch to the validator.
 - patch_evaluator: Исправление и стабилизация patch_evaluator для завершения шага оценки в безопасном пайплайне патчей.
 - patch_verifier: Рефакторинг patch_verifier для прохождения всех провальных тестов и замыкания этапа проверки в конвейере.
+- patch_analyzer: Создание отсутствующего модуля patch_analyzer устраняет ImportError в patch_checker и обеспечивает компонент анализа структуры патчей.

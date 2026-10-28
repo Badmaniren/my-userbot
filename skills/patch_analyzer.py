@@ -39,7 +39,6 @@ class PatchAnalyzer:
                 if len(parts) > 1:
                     current_file = parts[1]
                     if current_file == "dev/null":
-                        # Look at a/ part for deletion
                         a_parts = line.split(" a/")
                         if len(a_parts) > 1:
                             sub = a_parts[1].split(" b/")[0]
@@ -93,7 +92,6 @@ class PatchAnalyzer:
                 total_removed += 1
                 details_list.append(line[1:])
 
-        # Ensure correct classification for new/deleted files based on lists
         for nf in new_files:
             if nf not in affected_files:
                 affected_files.append(nf)
@@ -109,7 +107,8 @@ class PatchAnalyzer:
             "deleted_files": deleted_files,
             "total_added": total_added,
             "total_removed": total_removed,
-            "added_lines": "\n".join(added_lines_list),
+            "added_lines": total_added,
+            "deleted_lines": total_removed,
             "details": "\n".join(details_list),
             "complexity": complexity,
             "files": affected_files,

@@ -1,4 +1,5 @@
 import unittest
+import io
 import uuid
 import random
 from skills.patch_sanitizer import PatchSanitizer, PatchSanitizerError, sanitize_patch
@@ -6,39 +7,41 @@ from skills.patch_sanitizer import PatchSanitizer, PatchSanitizerError, sanitize
 
 class TestPatchSanitizerIntegration(unittest.TestCase):
 
-    def test_patch_sanitizer_integration_flow(self):
-        random_id = str(uuid.uuid4())
-        trailing_spaces_patch = f"diff --git a/file.py b/file.py   \n+print('{random_id}')    \r\n-old_line   \r"
-        
-        sanitizer = PatchSanitizer()
-        
-        # Интеграционная проверка через публичный метод с потоком
-        stream_result = sanitizer.sanitize(sanitize_patch.__globals__['io'].StringIO(trailing_spaces_patch))
-        
-        # Проверка отсутствия \r и правых пробелов, сохранение содержимого со случайным ID
-        self.assertNotIn("\r", stream_result)
-        self.assertIn(f"+print('{random_id}')", stream_result)
-        
-        for line in stream_result.splitlines():
-            self.assertEqual(line, line.rstrip())
+    def setUp(self):
+        self.sanitizer = PatchSanitizer()
 
-        # Интеграционная проверка функции-обертки
-        wrapper_result = sanitize_patch(trailing_spaces_patch)
-        self.assertEqual(stream_result, wrapper_result)
+    def test_integration_pipeline_success(self):
+        rand_id = str(uuid.uuid4())
+        random_suffix = f"data_{random.randint(1000, 9999)}"
 
-        # Проверка удаления бинарных дифов
-        binary_patch = f"Binary files a/bin_{random_id} and b/bin_{random_id} differ\nIndex: file.py\n+content_{random_id}"
-        cleaned_binary = sanitizer.remove_binary_diffs(sanitize_patch.__globals__['io'].StringIO(binary_patch))
-        self.assertNotIn("Binary files", cleaned_binary)
-        self.assertIn(f"+content_{random_id}", cleaned_binary)
+        raw_patch = (
+            f"diff --git a/file_{rand_id}.py b/file_{rand_id}.py\r\n"
+            f"index 1234567..89abcdef 100644\r\n"
+            f"--- a/file_{rand_id}.py\r\n"
+            f"+++ b/file_{rand_id}.py\r\n"
+            f"@@ -1,3 +1,3 @@\r\n"
+            f"-def old_func():   \r\n"
+            f"+    # {random_suffix}\r\n"
+            f"     Binary files a/bin_file and b/bin_file differ\r\n"
+        )
 
-        # Проверка исключения при пустом потоке
+        cleaned = sanitize_patch(raw_patch)
+
+        self.assertNotIn("\r", cleaned)
+        self.assertNotIn("Binary files", cleaned)
+        self.assertIn(random_suffix, cleaned)
+        self.assertTrue(all(not line.endswith(" ") for line in cleaned.splitlines()))
+
+    def test_integration_empty_stream_raises(self):
+        stream = io.StringIO("")
         with self.assertRaises(PatchSanitizerError):
-            sanitizer.sanitize(sanitize_patch.__globals__['io'].StringIO(""))
+            self.sanitizer.sanitize(stream)
 
-        # Проверка исключения при наличии нулевых байтов
+    def test_integration_null_bytes_raises(self):
+        rand_str = f"content_{uuid.uuid4()}\x00binary"
+        stream = io.StringIO(rand_str)
         with self.assertRaises(PatchSanitizerError):
-            sanitizer.sanitize(sanitize_patch.__globals__['io'].StringIO(f"test\x00{random_id}"))
+            self.sanitizer.sanitize(stream)
 
 
 if __name__ == "__main__":

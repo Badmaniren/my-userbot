@@ -16,9 +16,14 @@ class PatchSanitizer:
         if "\x00" in content:
             raise PatchSanitizerError("Null bytes detected in patch.")
         
-        # Нормализация окончаний строк и удаление лишних пробелов на концах строк
-        normalized = self.normalize_endings(io.StringIO(content))
-        lines = normalized.splitlines()
+        # Интеграционный пайплайн должен исключать бинарные диффы и нормализовать окончания строк
+        normalized_stream = io.StringIO(content)
+        normalized = self.normalize_endings(normalized_stream)
+
+        no_binary_stream = io.StringIO(normalized)
+        no_binary = self.remove_binary_diffs(no_binary_stream)
+
+        lines = no_binary.splitlines()
         cleaned_lines = []
         for line in lines:
             # Убираем пробелы справа, сохраняя перенос
@@ -37,7 +42,8 @@ class PatchSanitizer:
 
     def remove_binary_diffs(self, stream) -> str:
         content = stream.read()
-        lines = content.splitlines()
+        normalized = content.replace("\r\n", "\n").replace("\r", "\n")
+        lines = normalized.splitlines()
         filtered_lines = []
         for line in lines:
             if "Binary files" in line and "differ" in line:

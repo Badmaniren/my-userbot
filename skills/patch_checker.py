@@ -1,6 +1,6 @@
 import io
 import os
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional
 
 from skills.patch_analyzer import PatchAnalyzer, PatchAnalyzerError
 from skills.patch_evaluator import PatchEvaluationResult, PatchEvaluator, PatchEvaluatorError

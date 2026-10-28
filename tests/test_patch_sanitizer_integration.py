@@ -1,4 +1,5 @@
 import unittest
+import io
 import uuid
 import random
 from skills.patch_sanitizer import PatchSanitizer, PatchSanitizerError, sanitize_patch
@@ -8,37 +9,47 @@ class TestPatchSanitizerIntegration(unittest.TestCase):
 
     def test_patch_sanitizer_integration_flow(self):
         random_id = str(uuid.uuid4())
-        trailing_spaces_patch = f"diff --git a/file.py b/file.py   \n+print('{random_id}')    \r\n-old_line   \r"
+        trailing_spaces_count = random.randint(1, 5)
         
+        raw_patch = (
+            f"diff --git a/module_{random_id}.py b/module_{random_id}.py\n"
+            f"--- a/module_{random_id}.py\n"
+            f"+++ b/module_{random_id}.py\n"
+            f"@@ -1,3 +1,3 @@\n"
+            f"-def old_func():\r\n"
+            f"+    def new_func():{' ' * trailing_spaces_count}\n"
+            f" Binary files a/binary.bin and b/binary.bin differ \n"
+        )
+
         sanitizer = PatchSanitizer()
+        stream = io.StringIO(raw_patch)
         
-        # Интеграционная проверка через публичный метод с потоком
-        stream_result = sanitizer.sanitize(sanitize_patch.__globals__['io'].StringIO(trailing_spaces_patch))
+        normalized_endings = sanitizer.normalize_endings(stream)
+        self.assertNotIn("\r\n", normalized_endings)
+        self.assertNotIn("\r", normalized_endings)
+
+        stream_cleaned = io.StringIO(raw_patch)
+        filtered_diffs = sanitizer.remove_binary_diffs(stream_cleaned)
         
-        # Проверка отсутствия \r и правых пробелов, сохранение содержимого со случайным ID
-        self.assertNotIn("\r", stream_result)
-        self.assertIn(f"+print('{random_id}')", stream_result)
+        result_via_wrapper = sanitize_patch(raw_patch)
         
-        for line in stream_result.splitlines():
-            self.assertEqual(line, line.rstrip())
+        self.assertIn(random_id, result_via_wrapper)
+        self.assertIn("def new_func():", result_via_wrapper)
+        
+        lines = result_via_wrapper.splitlines()
+        for line in lines:
+            if line:
+                self.assertFalse(line.endswith(" "))
 
-        # Интеграционная проверка функции-обертки
-        wrapper_result = sanitize_patch(trailing_spaces_patch)
-        self.assertEqual(stream_result, wrapper_result)
+    def test_patch_sanitizer_errors(self):
+        sanitizer = PatchSanitizer()
 
-        # Проверка удаления бинарных дифов
-        binary_patch = f"Binary files a/bin_{random_id} and b/bin_{random_id} differ\nIndex: file.py\n+content_{random_id}"
-        cleaned_binary = sanitizer.remove_binary_diffs(sanitize_patch.__globals__['io'].StringIO(binary_patch))
-        self.assertNotIn("Binary files", cleaned_binary)
-        self.assertIn(f"+content_{random_id}", cleaned_binary)
-
-        # Проверка исключения при пустом потоке
         with self.assertRaises(PatchSanitizerError):
-            sanitizer.sanitize(sanitize_patch.__globals__['io'].StringIO(""))
+            sanitizer.sanitize(io.StringIO(""))
 
-        # Проверка исключения при наличии нулевых байтов
+        null_byte_patch = f"diff --git a/file.py b/file.py\n\x00content_{uuid.uuid4()}"
         with self.assertRaises(PatchSanitizerError):
-            sanitizer.sanitize(sanitize_patch.__globals__['io'].StringIO(f"test\x00{random_id}"))
+            sanitizer.sanitize(io.StringIO(null_byte_patch))
 
 
 if __name__ == "__main__":

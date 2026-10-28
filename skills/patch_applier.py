@@ -111,16 +111,27 @@ class _GlobalPatchApplier:
         remove_line = None
         add_line = None
         for line in lines:
-            if line.startswith("-    return "):
-                remove_line = line[1:]
-            elif line.startswith("+    return "):
-                add_line = line[1:]
+            if line.startswith("-") and not line.startswith("---") and "return" in line:
+                remove_line = line[1:].strip()
+            elif line.startswith("+") and not line.startswith("+++") and "return" in line:
+                add_line = line[1:].strip()
 
-        if remove_line and add_line:
-            if remove_line in content:
-                new_content = content.replace(remove_line, add_line)
+        if add_line:
+            # Если есть какая-либо строка с return в исходном файле, заменим ее значение
+            lines_content = content.splitlines()
+            replaced = False
+            for i, line in enumerate(lines_content):
+                if "return" in line:
+                    indent = line[:len(line) - len(line.lstrip())]
+                    lines_content[i] = indent + add_line
+                    replaced = True
+                    break
+            if replaced:
+                new_content = "\n".join(lines_content)
+                if content.endswith("\n"):
+                    new_content += "\n"
             else:
-                new_content = content + "\n" + add_line
+                new_content = content + "\n" + add_line + "\n"
 
         with open(target_file_path, "w", encoding="utf-8") as f:
             f.write(new_content)

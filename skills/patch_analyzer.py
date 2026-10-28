@@ -38,21 +38,52 @@ class PatchAnalyzer:
                 parts = line.split(" b/")
                 if len(parts) > 1:
                     current_file = parts[1]
-                    if current_file not in affected_files:
-                        affected_files.append(current_file)
-            elif line.startswith("+++ b/"):
-                fname = line[6:].strip()
-                if fname and fname != "dev/null":
-                    current_file = fname
-                    if current_file not in affected_files:
+                    if current_file == "dev/null":
+                        # Look at a/ part for deletion
+                        a_parts = line.split(" a/")
+                        if len(a_parts) > 1:
+                            sub = a_parts[1].split(" b/")[0]
+                            current_file = sub
+                            if current_file and current_file not in deleted_files:
+                                deleted_files.append(current_file)
+                    else:
+                        parts_a = line.split(" a/")
+                        if len(parts_a) > 1:
+                            a_file = parts_a[1].split(" b/")[0]
+                            if a_file == "dev/null":
+                                if current_file and current_file not in new_files:
+                                    new_files.append(current_file)
+
+                    if current_file and current_file != "dev/null" and current_file not in affected_files:
                         affected_files.append(current_file)
             elif line.startswith("--- a/"):
                 fname = line[6:].strip()
-                if fname == "dev/null" and current_file:
-                    if current_file not in new_files:
-                        new_files.append(current_file)
-            elif line.startswith("+++ /dev/null") and current_file:
-                if current_file not in deleted_files:
+                if fname == "dev/null":
+                    pass
+                else:
+                    if current_file is None or current_file == "dev/null":
+                        current_file = fname
+                    if current_file and current_file not in affected_files:
+                        affected_files.append(current_file)
+            elif line.startswith("+++ b/"):
+                fname = line[6:].strip()
+                if fname == "dev/null":
+                    if current_file and current_file not in deleted_files:
+                        deleted_files.append(current_file)
+                else:
+                    current_file = fname
+                    if current_file and current_file not in affected_files:
+                        affected_files.append(current_file)
+            elif line.startswith("--- /dev/null"):
+                pass
+            elif line.startswith("+++ /dev/null"):
+                if current_file and current_file not in deleted_files:
+                    deleted_files.append(current_file)
+            elif line.startswith("new file mode"):
+                if current_file and current_file not in new_files:
+                    new_files.append(current_file)
+            elif line.startswith("deleted file mode"):
+                if current_file and current_file not in deleted_files:
                     deleted_files.append(current_file)
             elif line.startswith("+") and not line.startswith("+++"):
                 total_added += 1
@@ -61,6 +92,14 @@ class PatchAnalyzer:
             elif line.startswith("-") and not line.startswith("---"):
                 total_removed += 1
                 details_list.append(line[1:])
+
+        # Ensure correct classification for new/deleted files based on lists
+        for nf in new_files:
+            if nf not in affected_files:
+                affected_files.append(nf)
+        for df in deleted_files:
+            if df not in affected_files:
+                affected_files.append(df)
 
         complexity = float(total_added + total_removed)
 

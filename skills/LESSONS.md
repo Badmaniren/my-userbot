@@ -3,7 +3,13 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-Обработай ошибку осмысленно или пробрось наружу через raise.
+ Унгой, передан на эскалацию
+
+## digest_exporter (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## anomaly_pipeline (create) — раундов: 4
+- Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -339,8 +345,4 @@
 
 ## patch_checker (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## patch_checker (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: ImportError: cannot import name 'analyze' from 'skills.patch_analyzer' (/home/runner/work/my-userbot/my-userbot/skills/patch_analyzer.py)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

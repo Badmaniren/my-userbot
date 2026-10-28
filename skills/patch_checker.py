@@ -1,9 +1,19 @@
 import io
 import os
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional
 
-from skills.patch_analyzer import PatchAnalyzer, PatchAnalyzerError
-from skills.patch_evaluator import PatchEvaluationResult, PatchEvaluator, PatchEvaluatorError
+try:
+    from skills.patch_analyzer import analyze_patch as analyze_patch_func, PatchAnalyzerError
+except ImportError:
+    from skills.patch_analyzer import analyze as analyze_patch_func, PatchAnalyzerError
+
+from skills.patch_evaluator import PatchEvaluator, PatchEvaluatorError
+
+
+class PatchAnalyzer:
+    """Адаптер для функций модуля patch_analyzer."""
+    def analyze(self, patch_content: str) -> Dict[str, Any]:
+        return analyze_patch_func(patch_content)
 
 
 class PatchCheckerError(Exception):

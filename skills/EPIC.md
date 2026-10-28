@@ -10,3 +10,4 @@
 - patch_analyzer: Создание отсутствующего модуля patch_analyzer устраняет ImportError в patch_checker и обеспечивает компонент анализа структуры патчей.
 - patch_analyzer: Рефакторинг patch_analyzer добавляет функцию analyze() и класс PatchAnalyzer, что устраняет ImportError в patch_checker и стабилизирует этап анализа в конвейере патчей.
 - patch_checker: Рефакторинг patch_checker использует новые функции patch_analyzer (включая analyze), устраняя ошибки импорта и обеспечивая корректную проверку патчей.
+- patch_sanitizer: Рефакторим patch_sanitizer, чтобы гарантировать первичную очистку и нормализацию патчей перед их дальнейшей проверкой и применением в конвейере.

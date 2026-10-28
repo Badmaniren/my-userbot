@@ -1,5 +1,7 @@
-import os
 import io
+import os
+import re
+
 
 class PatchAnalyzerError(Exception):
     """Custom exception for patch analysis errors."""
@@ -16,7 +18,7 @@ class PatchAnalyzer:
         if isinstance(raw_patch, bytes):
             try:
                 raw_patch = raw_patch.decode("utf-8")
-            except Exception:
+            except UnicodeDecodeError:
                 raw_patch = ""
 
         if not isinstance(raw_patch, str):
@@ -57,9 +59,7 @@ class PatchAnalyzer:
                         affected_files.append(current_file)
             elif line.startswith("--- a/"):
                 fname = line[6:].strip()
-                if fname == "dev/null":
-                    pass
-                else:
+                if fname != "dev/null":
                     if current_file is None or current_file == "dev/null":
                         current_file = fname
                     if current_file and current_file not in affected_files:
@@ -73,8 +73,6 @@ class PatchAnalyzer:
                     current_file = fname
                     if current_file and current_file not in affected_files:
                         affected_files.append(current_file)
-            elif line.startswith("--- /dev/null"):
-                pass
             elif line.startswith("+++ /dev/null"):
                 if current_file and current_file not in deleted_files:
                     deleted_files.append(current_file)
@@ -84,6 +82,16 @@ class PatchAnalyzer:
             elif line.startswith("deleted file mode"):
                 if current_file and current_file not in deleted_files:
                     deleted_files.append(current_file)
+            elif line.startswith("@@"):
+                hunk_match = re.match(r"^@@\s*-[0-9,]+\s+\+[0-9,]+\s*(?:@@)?\s*", line)
+                remainder = line[hunk_match.end():] if hunk_match else line
+                if remainder.startswith("+") and not remainder.startswith("+++"):
+                    total_added += 1
+                    added_lines_list.append(remainder[1:])
+                    details_list.append(remainder[1:])
+                elif remainder.startswith("-") and not remainder.startswith("---"):
+                    total_removed += 1
+                    details_list.append(remainder[1:])
             elif line.startswith("+") and not line.startswith("+++"):
                 total_added += 1
                 added_lines_list.append(line[1:])
@@ -136,3 +144,7 @@ class PatchAnalyzer:
 
     def __call__(self, raw_patch: str) -> dict:
         return self.analyze(raw_patch)
+
+
+def analyze(raw_patch: str) -> dict:
+    return PatchAnalyzer().analyze(raw_patch)

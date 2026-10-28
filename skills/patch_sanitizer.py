@@ -16,12 +16,14 @@ class PatchSanitizer:
         if "\x00" in content:
             raise PatchSanitizerError("Null bytes detected in patch.")
         
-        # Нормализация окончаний строк и удаление лишних пробелов на концах строк
-        normalized = self.normalize_endings(io.StringIO(content))
+        # Сначала убираем бинарные диффы, затем нормализуем окончания строк и убираем лишние пробелы
+        cleaned_stream = io.StringIO(content)
+        without_binary = self.remove_binary_diffs(cleaned_stream)
+        
+        normalized = self.normalize_endings(io.StringIO(without_binary))
         lines = normalized.splitlines()
         cleaned_lines = []
         for line in lines:
-            # Убираем пробелы справа, сохраняя перенос
             cleaned_lines.append(line.rstrip())
         
         return "\n".join(cleaned_lines)

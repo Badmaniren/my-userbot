@@ -55,7 +55,8 @@ class TestPatchValidatorIntegration(unittest.TestCase):
 index 1111111..2222222 100644
 --- a/{self.target_file_name}
 +++ b/{self.target_file_name}
-@@ -3,3 +3,6 @@
+@@ -2,3 +2,6 @@
+
  def compute():
      return 42
 +

@@ -98,21 +98,21 @@ class PatchExecutor:
             return False
 
         full_path = os.path.join(self.repo_path, file_path)
-        os.makedirs(os.path.dirname(full_path), exist_ok=True)
         try:
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
             with open(full_path, "w", encoding="utf-8") as f:
                 f.write(content)
             subprocess.run(["git", "-C", self.repo_path, "add", file_path], check=True)
             subprocess.run(["git", "-C", self.repo_path, "commit", "-m", commit_message], check=True)
             return True
-        except Exception:
+        except (IOError, OSError, subprocess.SubprocessError):
             return False
 
     def rollback_patch(self, file_path: str, commit_hash: str) -> bool:
         try:
             subprocess.run(["git", "-C", self.repo_path, "checkout", commit_hash, "--", file_path], check=True)
             return True
-        except Exception:
+        except subprocess.SubprocessError:
             return False
 
     def execute_from_lessons(self) -> Dict[str, Any]:

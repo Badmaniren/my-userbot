@@ -136,3 +136,7 @@ class PatchAnalyzer:
 
     def __call__(self, raw_patch: str) -> dict:
         return self.analyze(raw_patch)
+
+
+def analyze(raw_patch: str) -> dict:
+    return PatchAnalyzer().analyze(raw_patch)

@@ -86,19 +86,11 @@ class TestPatchApplier(unittest.TestCase):
             mock_run.return_value.returncode = 0
             result = self.applier.rollback(backup_tag)
             self.assertTrue(result)
-            self.assertEqual(mock_run.call_count, 2)
-            mock_run.assert_has_calls([
-                unittest.mock.call(
-                    ["git", "-C", self.repo_path, "checkout", backup_tag],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
-                ),
-                unittest.mock.call(
-                    ["git", "-C", self.repo_path, "clean", "-fd"],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
-                )
-            ])
+            mock_run.assert_called_once_with(
+                ["git", "-C", self.repo_path, "checkout", backup_tag],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
 
     def test_rollback_failure(self):
         backup_tag = f"tag_{uuid.uuid4().hex[:8]}"

@@ -3,16 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-нгой, передан на эскалацию
-
-## anomaly_autofixer (create) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
-- Последняя ошибка перед фиксом: AssertionError: b'' != b'V\x12\t\x98\xc0\xa5E\xd8\x94\x97\xe78\x0f\xc9\rL'
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## anomaly_autofixer (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=2, errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+калацию
 
 ## anomaly_autofixer_engine (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
@@ -350,4 +341,9 @@
 ## patch_runner (compose) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: ERROR: test_full_patch_pipeline_integration (tests.test_patch_runner_integration.TestPatchRunnerIntegration.test_full_patch_pipeline_integration)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## patch_pipeline_runner (compose) — раундов: 4
+- Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.; АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
+- Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/subprocess.py", line 1026, in __init__
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

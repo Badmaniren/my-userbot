@@ -9,8 +9,23 @@ class PatchApplierError(Exception):
 
 
 class PatchApplier:
-    def __init__(self, repo_path: str):
-        self.repo_path = repo_path
+    def __init__(self, repo_path: str = "."):
+        self.repo_path = repo_path or "."
+
+    def apply(self, patch_data: Any, repo_path: str = None) -> bool:
+        """Применяет патч, который может быть путем к файлу или содержимым патча (строкой/байтами)."""
+        target_repo = repo_path or self.repo_path or "."
+        if isinstance(patch_data, str) and (os.path.exists(patch_data) or os.path.exists(os.path.join(target_repo, patch_data))):
+            return self.apply_patch(patch_data)
+
+        # Если patch_data - это строка патча, применяем её через git apply
+        patch_bytes = patch_data.encode("utf-8") if isinstance(patch_data, str) else patch_data
+        cmd = ["git", "-C", target_repo, "apply"]
+        res = subprocess.run(cmd, input=patch_bytes, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if res.returncode != 0:
+            err_msg = res.stderr.decode("utf-8", errors="ignore")
+            raise PatchApplierError(f"Failed to apply patch: {err_msg}")
+        return True
 
     def create_recovery_point(self, backup_tag: str) -> bool:
         """Создает точку восстановления (ветку) в репозитории."""

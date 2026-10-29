@@ -13,3 +13,4 @@
 - patch_sanitizer: Рефакторим patch_sanitizer, чтобы гарантировать первичную очистку и нормализацию патчей перед их дальнейшей проверкой и применением в конвейере.
 - patch_evaluator: Рефакторинг patch_evaluator закрывает следующий этап оценки в безопасном пайплайне патчей после санитизации и проверки.
 - patch_applier: Создаем недостающий финальный модуль конвейера patch_applier для завершения шага применения патчей после их санитизации, проверки и оценки
+- patch_applier: Fixing the final module in the pipeline to ensure it can successfully apply patches after they have been sanitized, checked, and evaluated, resolving the previous test failures.

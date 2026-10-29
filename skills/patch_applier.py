@@ -23,29 +23,34 @@ class PatchApplier:
 
     def apply_patch(self, patch_source: str) -> bool:
         """Применяет патч из файла или словаря/пути."""
-        # Поддержка вызова из интеграционного теста, где передается путь или словарь/содержимое
-        # Если patch_source — это путь к файлу патча или имя файла:
         patch_file_path = patch_source
-        if not os.path.isabs(patch_file_path):
+        if isinstance(patch_source, str) and not os.path.isabs(patch_file_path):
             potential_path = os.path.join(self.repo_path, patch_file_path)
             if os.path.exists(potential_path):
                 patch_file_path = potential_path
 
-        if os.path.exists(patch_file_path) and os.path.isfile(patch_file_path):
-            with open(patch_file_path, "rb") as f:
-                patch_content = f.read()
-            cmd = ["git", "-C", self.repo_path, "apply"]
-            res = subprocess.run(cmd, input=patch_content, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if isinstance(patch_file_path, str) and os.path.exists(patch_file_path) and os.path.isfile(patch_file_path):
+            try:
+                with open(patch_file_path, "rb") as f:
+                    patch_content = f.read()
+            except Exception as e:
+                raise PatchApplierError(f"Failed to read patch file '{patch_file_path}': {e}") from e
         else:
-            # Если это содержимое диффа или имя файла, переданное в юниб-тесте (mock_open вернет file-like)
             try:
                 with open(patch_source, "rb") as f:
                     patch_content = f.read()
-                cmd = ["git", "-C", self.repo_path, "apply"]
-                res = subprocess.run(cmd, input=patch_content, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            except Exception:
-                # Если это не файл, а возможно строка с патчем или вызов через apply_patch (интеграционный)
-                raise PatchApplierError("Patch source not found or invalid.")
+            except (FileNotFoundError, OSError, ValueError):
+                if isinstance(patch_source, bytes):
+                    patch_content = patch_source
+                elif isinstance(patch_source, str) and ("\n" in patch_source or patch_source.startswith("---") or patch_source.startswith("diff")):
+                    patch_content = patch_source.encode("utf-8")
+                else:
+                    raise PatchApplierError(f"Patch source not found or invalid: {patch_source}")
+            except Exception as e:
+                raise PatchApplierError(f"Failed to read patch source '{patch_source}': {e}") from e
+
+        cmd = ["git", "-C", self.repo_path, "apply"]
+        res = subprocess.run(cmd, input=patch_content, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         if res.returncode != 0:
             err_msg = res.stderr.decode("utf-8", errors="ignore")
@@ -53,12 +58,20 @@ class PatchApplier:
         return True
 
     def rollback(self, backup_tag: str) -> bool:
-        """Откатывает изменения к точке восстановления."""
+        """Откатывает изменения к точке восстановления с очисткой не отслеживаемых файлов."""
         cmd = ["git", "-C", self.repo_path, "checkout", backup_tag]
         res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if res.returncode != 0:
             err_msg = res.stderr.decode("utf-8", errors="ignore")
             raise PatchApplierError(f"Failed to rollback: {err_msg}")
+
+        # Очищаем не отслеживаемые файлы и сбрасываем индекс, чтобы соответствовать состоянию ветки
+        clean_cmd = ["git", "-C", self.repo_path, "clean", "-fd"]
+        subprocess.run(clean_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        reset_cmd = ["git", "-C", self.repo_path, "reset", "--hard"]
+        subprocess.run(reset_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
         return True
 
     def verify_repository_state(self) -> bool:
@@ -90,7 +103,6 @@ def apply_patch(repo_path: str, patch_data: Dict[str, Any]) -> bool:
 
     target_full_path = os.path.join(repo_path, file_path)
     
-    # Записываем контент напрямую в файл целевого репозитория для интеграционного теста
     with open(target_full_path, "w", encoding="utf-8") as f:
         f.write(content)
 

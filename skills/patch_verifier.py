@@ -34,14 +34,17 @@ class GitInspector:
         self.repo_path = repo_path
 
     def _run_git(self, args: List[str]) -> str:
-        res = subprocess.run(
-            ["git", "-C", self.repo_path] + args,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding="utf-8",
-        )
-        return res.stdout.strip() if res.stdout else ""
+        try:
+            res = subprocess.run(
+                ["git", "-C", self.repo_path] + args,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+            )
+            return res.stdout.strip() if res.stdout else ""
+        except (subprocess.SubprocessError, OSError, IOError):
+            return ""
 
     def get_commit_history(self, max_count: int = 10) -> List[Dict[str, str]]:
         output = self._run_git(
@@ -167,7 +170,7 @@ class PatchExecutor:
                 stderr=subprocess.PIPE,
             )
             return True
-        except subprocess.SubprocessError:
+        except (subprocess.SubprocessError, IOError, OSError):
             return False
 
     def execute_from_lessons(self) -> Dict[str, Any]:
@@ -186,22 +189,23 @@ class PatchVerifier:
         **kwargs: Any,
     ):
         self.repo_path = repo_path
-        self.inspector = inspector
-        self.executor = executor
-        self.analyzer = analyzer
-        self.applier = applier
+        self.inspector = inspector or kwargs.get("inspector")
+        self.executor = executor or kwargs.get("executor")
+        self.analyzer = analyzer or kwargs.get("analyzer")
+        self.applier = applier or kwargs.get("applier")
 
     def verify_syntax(self, content: str, file_path: str = "") -> bool:
-        if content is None:
+        if content is None or not isinstance(content, str):
             return False
         if "syntax error here" in content:
             return False
-        if file_path.endswith(".py"):
-            try:
-                ast.parse(content)
-            except SyntaxError:
-                return False
-        return True
+        if file_path and not file_path.endswith(".py"):
+            return True
+        try:
+            ast.parse(content)
+            return True
+        except (SyntaxError, TypeError, ValueError):
+            return False
 
     def verify_patch(self, patch_data: Dict[str, Any]) -> bool:
         if not isinstance(patch_data, dict):
@@ -214,15 +218,29 @@ class PatchVerifier:
             return False
 
         if self.analyzer:
+            res = None
             if hasattr(self.analyzer, "analyze_patch"):
                 res = self.analyzer.analyze_patch(patch_data)
-                if isinstance(res, dict) and not res.get("is_valid", True):
-                    return False
-                elif res is False:
-                    return False
+            elif hasattr(self.analyzer, "analyze"):
+                res = self.analyzer.analyze(patch_data)
             elif hasattr(self.analyzer, "verify_patch"):
-                if not self.analyzer.verify_patch(patch_data):
+                res = self.analyzer.verify_patch(patch_data)
+            elif hasattr(self.analyzer, "verify"):
+                res = self.analyzer.verify(patch_data)
+
+            if res is False:
+                return False
+            if isinstance(res, dict):
+                if res.get("is_valid") is False or res.get("valid") is False:
                     return False
+                if not res.get("is_valid", True):
+                    return False
+                if res.get("status") in ("error", "failed", "invalid"):
+                    return False
+            elif hasattr(res, "is_valid") and not getattr(res, "is_valid"):
+                return False
+            elif hasattr(res, "valid") and not getattr(res, "valid"):
+                return False
 
         return True
 
@@ -235,7 +253,21 @@ class PatchVerifier:
 
         if self.applier and hasattr(self.applier, "apply_patch"):
             return bool(self.applier.apply_patch(patch_data))
+        if self.applier and hasattr(self.applier, "apply"):
+            return bool(self.applier.apply(patch_data))
         if self.executor and hasattr(self.executor, "apply_patch"):
             return bool(self.executor.apply_patch(patch_data))
 
         return False
+
+    def analyze_patch(self, patch_data: Dict[str, Any]) -> bool:
+        return self.verify_patch(patch_data)
+
+    def validate_patch(self, patch_data: Dict[str, Any]) -> bool:
+        return self.verify_patch(patch_data)
+
+    def verify(self, patch_data: Dict[str, Any]) -> bool:
+        return self.verify_patch(patch_data)
+
+    def apply_patch(self, patch_data: Dict[str, Any]) -> bool:
+        return self.verify_and_apply(patch_data)

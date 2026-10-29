@@ -3,6 +3,9 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
+ки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## anomaly_notification_hub (create) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено перекрывать системный модуль 'anomaly_alert_dispatcher' глобальной переменной!; АНТИЧИТ: Запрещено перекрывать системный модуль 'anomaly_alert_dispatcher' глобальной переменной!
@@ -334,8 +337,4 @@
 ## patch_pipeline_executor (compose) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: Traceback (most recent call last):
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## patch_runner (create) — раундов: 4
-- Последняя ошибка перед фиксом: skills.patch_runner.PatchRunnerError: Sanitization failed: 'str' object has no attribute 'read'
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

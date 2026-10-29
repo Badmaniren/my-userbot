@@ -1,21 +1,35 @@
+import ast
 import os
 import subprocess
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
 
 class HypothesisGeneratorError(Exception):
     """Исключение генератора гипотез."""
+
     pass
+
 
 class LessonParserError(Exception):
     """Исключение парсера уроков."""
+
     pass
+
 
 class PatchExecutorError(Exception):
     """Исключение исполнителя патчей."""
+
+    pass
+
+
+class PatchVerifierError(Exception):
+    """Исключение верификатора патчей."""
+
     pass
 
 
 class GitInspector:
+
     def __init__(self, repo_path: str):
         self.repo_path = repo_path
 
@@ -25,19 +39,23 @@ class GitInspector:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            encoding="utf-8"
+            encoding="utf-8",
         )
-        return res.stdout.strip()
+        return res.stdout.strip() if res.stdout else ""
 
     def get_commit_history(self, max_count: int = 10) -> List[Dict[str, str]]:
-        output = self._run_git(["log", f"-n {max_count}", "--pretty=format:%H|%an|%s"])
+        output = self._run_git(
+            ["log", "-n", str(max_count), "--pretty=format:%H|%an|%s"]
+        )
         history = []
         if not output:
             return history
         for line in output.split("\n"):
             parts = line.split("|", 2)
             if len(parts) == 3:
-                history.append({"hash": parts[0], "author": parts[1], "message": parts[2]})
+                history.append(
+                    {"hash": parts[0], "author": parts[1], "message": parts[2]}
+                )
         return history
 
     def get_file_diff(self, commit_hash: str) -> str:
@@ -45,7 +63,10 @@ class GitInspector:
 
     def analyze_repository(self) -> Dict[str, Any]:
         commits = self.get_commit_history()
-        return {"total_commits": len(commits), "latest_commit": commits[0] if commits else None}
+        return {
+            "total_commits": len(commits),
+            "latest_commit": commits[0] if commits else None,
+        }
 
     def read_file_at_commit(self, commit_hash: str, file_path: str) -> str:
         return self._run_git(["show", f"{commit_hash}:{file_path}"])
@@ -61,7 +82,8 @@ class GitInspector:
 
 
 class LessonParser:
-    def __init__(self, inspector: GitInspector):
+
+    def __init__(self, inspector: Optional[GitInspector] = None):
         self.inspector = inspector
 
     def parse_lessons(self) -> List[Dict[str, Any]]:
@@ -72,24 +94,42 @@ class LessonParser:
 
 
 class HypothesisGenerator:
-    def __init__(self, inspector: GitInspector, parser: LessonParser):
+
+    def __init__(
+        self,
+        inspector: Optional[GitInspector] = None,
+        parser: Optional[LessonParser] = None,
+    ):
         self.inspector = inspector
         self.parser = parser
 
     def generate_hypotheses(self, max_commits: int = 10) -> List[Dict[str, Any]]:
         return [{"id": "hyp_1", "weight": 0.5, "target": "module.py"}]
 
-    def prioritize_hypotheses(self, hypotheses: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def prioritize_hypotheses(
+        self, hypotheses: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        if not hypotheses:
+            return []
         return sorted(hypotheses, key=lambda x: x.get("weight", 0), reverse=True)
 
 
 class PatchExecutor:
-    def __init__(self, repo_path: str, inspector: GitInspector, parser: LessonParser):
+
+    def __init__(
+        self,
+        repo_path: str,
+        inspector: Optional[GitInspector] = None,
+        parser: Optional[LessonParser] = None,
+    ):
         self.repo_path = repo_path
         self.inspector = inspector
         self.parser = parser
 
     def apply_patch(self, patch_data: Dict[str, Any]) -> bool:
+        if not isinstance(patch_data, dict):
+            return False
+
         file_path = patch_data.get("file_path")
         content = patch_data.get("content")
         commit_message = patch_data.get("commit_message", "Apply patch")
@@ -102,15 +142,30 @@ class PatchExecutor:
             os.makedirs(os.path.dirname(full_path), exist_ok=True)
             with open(full_path, "w", encoding="utf-8") as f:
                 f.write(content)
-            subprocess.run(["git", "-C", self.repo_path, "add", file_path], check=True)
-            subprocess.run(["git", "-C", self.repo_path, "commit", "-m", commit_message], check=True)
+            subprocess.run(
+                ["git", "-C", self.repo_path, "add", file_path],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            subprocess.run(
+                ["git", "-C", self.repo_path, "commit", "-m", commit_message],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
             return True
         except (IOError, OSError, subprocess.SubprocessError):
             return False
 
     def rollback_patch(self, file_path: str, commit_hash: str) -> bool:
         try:
-            subprocess.run(["git", "-C", self.repo_path, "checkout", commit_hash, "--", file_path], check=True)
+            subprocess.run(
+                ["git", "-C", self.repo_path, "checkout", commit_hash, "--", file_path],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
             return True
         except subprocess.SubprocessError:
             return False
@@ -120,13 +175,67 @@ class PatchExecutor:
 
 
 class PatchVerifier:
-    def __init__(self, repo_path: str, inspector: GitInspector, executor: PatchExecutor):
+
+    def __init__(
+        self,
+        repo_path: str,
+        inspector: Optional[GitInspector] = None,
+        executor: Optional[PatchExecutor] = None,
+        analyzer: Optional[Any] = None,
+        applier: Optional[Any] = None,
+        **kwargs: Any,
+    ):
         self.repo_path = repo_path
         self.inspector = inspector
         self.executor = executor
+        self.analyzer = analyzer
+        self.applier = applier
 
-    def verify_and_apply(self, patch_data: Dict[str, Any]) -> bool:
-        content = patch_data.get("content", "")
+    def verify_syntax(self, content: str, file_path: str = "") -> bool:
+        if content is None:
+            return False
         if "syntax error here" in content:
             return False
-        return self.executor.apply_patch(patch_data)
+        if file_path.endswith(".py"):
+            try:
+                ast.parse(content)
+            except SyntaxError:
+                return False
+        return True
+
+    def verify_patch(self, patch_data: Dict[str, Any]) -> bool:
+        if not isinstance(patch_data, dict):
+            return False
+
+        content = patch_data.get("content", "")
+        file_path = patch_data.get("file_path", "")
+
+        if not self.verify_syntax(content, file_path):
+            return False
+
+        if self.analyzer:
+            if hasattr(self.analyzer, "analyze_patch"):
+                res = self.analyzer.analyze_patch(patch_data)
+                if isinstance(res, dict) and not res.get("is_valid", True):
+                    return False
+                elif res is False:
+                    return False
+            elif hasattr(self.analyzer, "verify_patch"):
+                if not self.analyzer.verify_patch(patch_data):
+                    return False
+
+        return True
+
+    def verify_and_apply(self, patch_data: Dict[str, Any]) -> bool:
+        if not isinstance(patch_data, dict):
+            return False
+
+        if not self.verify_patch(patch_data):
+            return False
+
+        if self.applier and hasattr(self.applier, "apply_patch"):
+            return bool(self.applier.apply_patch(patch_data))
+        if self.executor and hasattr(self.executor, "apply_patch"):
+            return bool(self.executor.apply_patch(patch_data))
+
+        return False

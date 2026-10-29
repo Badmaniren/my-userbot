@@ -163,3 +163,9 @@ class CodeSanitizer:
                     'error': str(e)
                 }
         return results
+
+    def sanitize(self, code_content: str) -> str:
+        return self.sanitize_patch(code_content)
+
+
+code_sanitizer = CodeSanitizer()

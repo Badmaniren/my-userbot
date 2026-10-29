@@ -98,3 +98,9 @@ class CodeValidator:
             "passed": passed,
             "failed": failed
         }
+
+    def validate(self, code: str) -> bool:
+        return self.validate_code(code)
+
+
+code_validator = CodeValidator(".")

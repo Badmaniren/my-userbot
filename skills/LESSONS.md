@@ -3,7 +3,22 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-нгой, передан на эскалацию
+ацию
+
+## digest_exporter (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## stability_digest (complete) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## anomaly_alert_dispatcher (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## anomaly_autofixer (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## anomaly_autofixer (create) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
@@ -345,9 +360,4 @@
 ## patch_pipeline_controller (compose) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: self.target = self.getter()
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## patch_runner (compose) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
-- Последняя ошибка перед фиксом: ERROR: test_full_patch_pipeline_integration (tests.test_patch_runner_integration.TestPatchRunnerIntegration.test_full_patch_pipeline_integration)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

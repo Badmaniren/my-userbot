@@ -207,7 +207,12 @@ class PatchVerifier:
         except (SyntaxError, TypeError, ValueError):
             return False
 
-    def verify_patch(self, patch_data: Dict[str, Any]) -> bool:
+    def verify_patch(self, patch_data: Any) -> bool:
+        if isinstance(patch_data, str):
+            if not patch_data or "\x00" in patch_data:
+                return False
+            return True
+
         if not isinstance(patch_data, dict):
             return False
 

@@ -3,7 +3,11 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-нтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## anomaly_audit_hub (refactor) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -354,8 +358,4 @@
 
 ## patch_applier (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## patch_applier (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/skills/patch_applier.py", line 93, in apply_patch
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

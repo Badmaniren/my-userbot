@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-Н Унгой, передан на эскалацию
-
-## anomaly_autofixer_worker (create) — раундов: 2
-- Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/tests/test_anomaly_autofixer_worker.py", line 86, in test_verify_fix_failure
+-userbot/my-userbot/tests/test_anomaly_autofixer_worker.py", line 86, in test_verify_fix_failure
 - Статус: успешно прошёл тесты и влит в main
 
 ## anomaly_verifier (create) — раундов: 4
@@ -342,4 +339,8 @@
 
 ## patch_pipeline_orchestrator (compose) — раундов: 4
 - Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/tests/test_patch_pipeline_orchestrator_integration.py", line 43, in test_pipeline_success_flow
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## patch_applier (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

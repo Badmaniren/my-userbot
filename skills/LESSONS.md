@@ -3,15 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-калацию
-
-## anomaly_autofixer_engine (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## anomaly_autofixer_engine (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+Н Унгой, передан на эскалацию
 
 ## anomaly_autofixer_worker (create) — раундов: 2
 - Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/tests/test_anomaly_autofixer_worker.py", line 86, in test_verify_fix_failure
@@ -346,4 +338,8 @@
 ## patch_pipeline_runner (compose) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.; АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/subprocess.py", line 1026, in __init__
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## patch_pipeline_orchestrator (compose) — раундов: 4
+- Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/tests/test_patch_pipeline_orchestrator_integration.py", line 43, in test_pipeline_success_flow
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

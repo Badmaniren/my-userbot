@@ -57,15 +57,19 @@ class PatchAnalyzer:
 
                     if current_file and current_file != "dev/null" and current_file not in affected_files:
                         affected_files.append(current_file)
-            elif line.startswith("--- a/"):
-                fname = line[6:].strip()
-                if fname != "dev/null":
+            elif line.startswith("--- "):
+                fname = line[4:].strip()
+                if fname.startswith("a/"):
+                    fname = fname[2:]
+                if fname != "dev/null" and fname:
                     if current_file is None or current_file == "dev/null":
                         current_file = fname
                     if current_file and current_file not in affected_files:
                         affected_files.append(current_file)
-            elif line.startswith("+++ b/"):
-                fname = line[6:].strip()
+            elif line.startswith("+++ "):
+                fname = line[4:].strip()
+                if fname.startswith("b/"):
+                    fname = fname[2:]
                 if fname == "dev/null":
                     if current_file and current_file not in deleted_files:
                         deleted_files.append(current_file)

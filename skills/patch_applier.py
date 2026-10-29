@@ -22,26 +22,29 @@ class PatchApplier:
         return True
 
     def apply_patch(self, patch_source: str) -> bool:
-        """Применяет патч из файла или словаря/пути."""
-        patch_file_path = patch_source
-        if not os.path.isabs(patch_file_path):
+        """Применяет патч из файла или словаря/пути/строки."""
+        patch_file_path = patch_source if isinstance(patch_source, str) else ""
+        if patch_file_path and not os.path.isabs(patch_file_path):
             potential_path = os.path.join(self.repo_path, patch_file_path)
             if os.path.exists(potential_path):
                 patch_file_path = potential_path
 
-        if os.path.exists(patch_file_path) and os.path.isfile(patch_file_path):
+        if patch_file_path and os.path.exists(patch_file_path) and os.path.isfile(patch_file_path):
             with open(patch_file_path, "rb") as f:
                 patch_content = f.read()
-            cmd = ["git", "-C", self.repo_path, "apply"]
-            res = subprocess.run(cmd, input=patch_content, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        elif isinstance(patch_source, str) and ("\n" in patch_source or patch_source.startswith(("diff", "---", "+++"))):
+            patch_content = patch_source.encode("utf-8")
+        elif isinstance(patch_source, bytes):
+            patch_content = patch_source
         else:
             try:
                 with open(patch_source, "rb") as f:
                     patch_content = f.read()
-                cmd = ["git", "-C", self.repo_path, "apply"]
-                res = subprocess.run(cmd, input=patch_content, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             except Exception:
                 raise PatchApplierError("Patch source not found or invalid.")
+
+        cmd = ["git", "-C", self.repo_path, "apply"]
+        res = subprocess.run(cmd, input=patch_content, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         if res.returncode != 0:
             err_msg = res.stderr.decode("utf-8", errors="ignore")

@@ -10,7 +10,14 @@ class PatchSanitizer:
     """Модуль первичной очистки и нормализации входящих патчей."""
 
     def sanitize(self, stream) -> str:
-        content = stream.read()
+        if isinstance(stream, str):
+            content = stream
+        elif hasattr(stream, "read"):
+            content = stream.read()
+        elif isinstance(stream, bytes):
+            content = stream.decode("utf-8", errors="ignore")
+        else:
+            content = str(stream)
         if not content:
             raise PatchSanitizerError("Empty stream is not allowed.")
         if "\x00" in content:
@@ -26,7 +33,10 @@ class PatchSanitizer:
         for line in lines:
             cleaned_lines.append(line.rstrip())
         
-        return "\n".join(cleaned_lines)
+        result = "\n".join(cleaned_lines)
+        if content.endswith("\n") and not result.endswith("\n"):
+            result += "\n"
+        return result
 
     def normalize_endings(self, stream) -> str:
         content = stream.read()

@@ -37,6 +37,7 @@ class PatchChecker:
         except Exception as e:
             raise PatchCheckerError(f"Ошибка анализатора: {e}") from e
 
+
         try:
             evaluation_result = self.evaluator.evaluate(
                 patch_content=patch_content,
@@ -59,11 +60,35 @@ class PatchChecker:
         if risk_score is None:
             risk_score = 0.0
 
+        affected = analysis_data.get("affected_files", [])
+        if target_file and affected:
+            target_base = os.path.basename(target_file)
+            affected_bases = [os.path.basename(f) for f in affected]
+            if target_base not in affected_bases and target_file not in affected:
+                return {
+                    "is_safe": False,
+                    "is_valid": False,
+                    "risk_score": 1.0,
+                    "analysis": analysis_data,
+                    "evaluation": {
+                        "is_safe": False,
+                        "is_valid": False,
+                        "reasons": [f"Target file mismatch: {target_file} not in {affected}"],
+                    },
+                    "policy_verdict": {"disallowed_risks": f"Target file mismatch: {target_file}"},
+                }
+
         policy_verdict = {}
-        if self.policy:
-            if self.policy.get("strict_safety") and not is_safe:
+        policy_obj = self.policy
+        if isinstance(policy_obj, str):
+            if policy_obj == "strict":
+                policy_obj = {"strict_safety": True, "disallow_syntax_risks": True}
+            else:
+                policy_obj = {}
+        if isinstance(policy_obj, dict) and policy_obj:
+            if policy_obj.get("strict_safety") and not is_safe:
                 policy_verdict["disallowed_risks"] = "Strict safety policy violated"
-            if self.policy.get("disallow_syntax_risks") and syntax_risks:
+            if policy_obj.get("disallow_syntax_risks") and syntax_risks:
                 policy_verdict["disallowed_risks"] = "Syntax risks detected"
 
         return {

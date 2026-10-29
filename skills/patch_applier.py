@@ -23,8 +23,6 @@ class PatchApplier:
 
     def apply_patch(self, patch_source: str) -> bool:
         """Применяет патч из файла или словаря/пути."""
-        # Поддержка вызова из интеграционного теста, где передается путь или словарь/содержимое
-        # Если patch_source — это путь к файлу патча или имя файла:
         patch_file_path = patch_source
         if not os.path.isabs(patch_file_path):
             potential_path = os.path.join(self.repo_path, patch_file_path)
@@ -37,14 +35,12 @@ class PatchApplier:
             cmd = ["git", "-C", self.repo_path, "apply"]
             res = subprocess.run(cmd, input=patch_content, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         else:
-            # Если это содержимое диффа или имя файла, переданное в юниб-тесте (mock_open вернет file-like)
             try:
                 with open(patch_source, "rb") as f:
                     patch_content = f.read()
                 cmd = ["git", "-C", self.repo_path, "apply"]
                 res = subprocess.run(cmd, input=patch_content, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             except Exception:
-                # Если это не файл, а возможно строка с патчем или вызов через apply_patch (интеграционный)
                 raise PatchApplierError("Patch source not found or invalid.")
 
         if res.returncode != 0:
@@ -90,7 +86,6 @@ def apply_patch(repo_path: str, patch_data: Dict[str, Any]) -> bool:
 
     target_full_path = os.path.join(repo_path, file_path)
     
-    # Записываем контент напрямую в файл целевого репозитория для интеграционного теста
     with open(target_full_path, "w", encoding="utf-8") as f:
         f.write(content)
 

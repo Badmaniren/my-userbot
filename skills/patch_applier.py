@@ -47,6 +47,9 @@ class PatchApplier:
 
     def rollback(self, backup_tag: str) -> bool:
         """Откатывает изменения к точке восстановления."""
+        subprocess.run(["git", "-C", self.repo_path, "reset", "--hard"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        subprocess.run(["git", "-C", self.repo_path, "clean", "-fd"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
         cmd = ["git", "-C", self.repo_path, "checkout", backup_tag]
         res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if res.returncode != 0:
@@ -56,7 +59,7 @@ class PatchApplier:
 
     def verify_repository_state(self) -> bool:
         """Проверяет, что репозиторий находится в корректном состоянии."""
-        cmd = ["git", "-C", self.repo_path, "status", "--porcelain"]
+        cmd = ["git", "-C", self.repo_path, "status", "--porcelain", "-uno"]
         res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if res.returncode != 0 or len(res.stdout.strip()) > 0:
             output = res.stdout.decode("utf-8", errors="ignore")

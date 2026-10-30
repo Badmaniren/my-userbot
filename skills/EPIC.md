@@ -16,3 +16,4 @@
 - patch_applier: Fixing the final module in the pipeline to ensure it can successfully apply patches after they have been sanitized, checked, and evaluated, resolving the previous test failures.
 - patch_verifier: Замыкаем контур проверки: после стабилизации анализатора и аппликатора, patch_verifier должен стать финальным фильтром перед вливанием изменений.
 - patch_applier: Исправление patch_applier критически важно для завершения безопасного пайплайна исправления патчей, так как именно этот модуль выполняет финальное применение изменений.
+- patch_applier: Устранение частых сбоев в patch_applier для завершения безопасного пайплайна исправления патчей.

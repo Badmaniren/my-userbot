@@ -7,7 +7,7 @@ from skills.patch_evaluator import PatchEvaluationResult, PatchEvaluator, PatchE
 
 
 class PatchCheckerError(Exception):
-    """Исключение, возникающее при ошибках проверки патча."""
+    """Исключение, возникающее при ошибках проверки патчей."""
     pass
 
 
@@ -20,13 +20,32 @@ def _get_val(obj: Any, key: str, default: Any = None) -> Any:
 class PatchChecker:
     """Интегрированный модуль проверки патчей."""
 
-    def __init__(self, repo_path: Optional[str] = None, policy: Optional[Dict[str, Any]] = None):
+    def __init__(self, repo_path: Optional[str] = None, policy: Optional[Union[Dict[str, Any], str]] = None):
         self.repo_path = repo_path
-        self.policy = policy or {}
+        if isinstance(policy, str):
+            self.policy = {"policy": policy}
+        else:
+            self.policy = policy or {}
         self.analyzer = PatchAnalyzer()
         self.evaluator = PatchEvaluator(repo_path=repo_path)
 
-    def check_patch(self, patch_content: str, target_file: Optional[str] = None) -> Dict[str, Any]:
+    def check_patch(
+        self,
+        patch_content: str,
+        repo_path: Optional[str] = None,
+        target_file: Optional[str] = None,
+        policy: Optional[Union[Dict[str, Any], str]] = None,
+    ) -> Dict[str, Any]:
+        if repo_path and repo_path != self.repo_path:
+            self.repo_path = repo_path
+            self.evaluator = PatchEvaluator(repo_path=repo_path)
+
+        if policy is not None:
+            if isinstance(policy, str):
+                self.policy = {"policy": policy}
+            else:
+                self.policy = policy
+
         if not patch_content or not str(patch_content).strip():
             raise PatchCheckerError("Пустой патч не может быть обработан.")
 
@@ -80,6 +99,7 @@ class PatchChecker:
                 "was_corrected": was_corrected,
             },
             "policy_verdict": policy_verdict,
+            "status": "ok",
         }
 
     def check_file(self, file_path: str, target_file: Optional[str] = None) -> Dict[str, Any]:
@@ -111,18 +131,21 @@ class PatchChecker:
         patch_content: str,
         repo_path: Optional[str] = None,
         target_file: Optional[str] = None,
-        policy: Optional[Dict[str, Any]] = None,
+        policy: Optional[Union[Dict[str, Any], str]] = None,
     ) -> Dict[str, Any]:
         """Интеграционный метод проверки, поддерживающий передачу repo_path и policy на лету."""
         if policy is not None:
-            self.policy = policy
+            if isinstance(policy, str):
+                self.policy = {"policy": policy}
+            else:
+                self.policy = policy
         if repo_path and repo_path != self.repo_path:
             self.repo_path = repo_path
             self.evaluator = PatchEvaluator(repo_path=repo_path)
 
         result = self.check_patch(patch_content=patch_content, target_file=target_file)
 
-        if "evaluation" in result and "metrics" in result["evaluation"]:
+        if isinstance(result, dict) and "evaluation" in result and "metrics" in result["evaluation"]:
             result["metrics"] = result["evaluation"]["metrics"]
 
         return result
@@ -132,7 +155,7 @@ def check_patch(
     patch_content: str,
     repo_path: Optional[str] = None,
     target_file: Optional[str] = None,
-    policy: Optional[Dict[str, Any]] = None,
+    policy: Optional[Union[Dict[str, Any], str]] = None,
 ) -> Dict[str, Any]:
     checker = PatchChecker(repo_path=repo_path, policy=policy)
-    return checker.check_patch(patch_content=patch_content, target_file=target_file)
+    return checker.check_patch(patch_content=patch_content, repo_path=repo_path, target_file=target_file, policy=policy)

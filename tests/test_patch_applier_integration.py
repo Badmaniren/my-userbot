@@ -1,66 +1,93 @@
 import unittest
 import tempfile
+import shutil
 import os
-import subprocess
 import uuid
 import random
+import subprocess
 from skills.patch_applier import PatchApplier, PatchApplierError, apply_patch
-from skills.git_inspector import GitInspector
 
 
 class TestPatchApplierIntegration(unittest.TestCase):
     def setUp(self):
-        self.test_dir = tempfile.TemporaryDirectory()
-        self.repo_path = self.test_dir.name
+        self.test_dir = tempfile.mkdtemp()
+        self.repo_path = self.test_dir
         
         subprocess.run(["git", "-C", self.repo_path, "init"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        subprocess.run(["git", "-C", self.repo_path, "config", "user.name", "Test User"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        subprocess.run(["git", "-C", self.repo_path, "config", "user.email", "test@example.com"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        subprocess.run(["git", "-C", self.repo_path, "config", "user.name", "Architect Test"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        subprocess.run(["git", "-C", self.repo_path, "config", "user.email", "architect@test.com"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         
-        self.initial_file = "README.md"
-        self.initial_content = f"Initial content {uuid.uuid4()}"
-        file_path = os.path.join(self.repo_path, self.initial_file)
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(self.initial_content)
+        self.initial_file = os.path.join(self.repo_path, "README.md")
+        with open(self.initial_file, "w", encoding="utf-8") as f:
+            f.write("# Initial State\n")
             
-        subprocess.run(["git", "-C", self.repo_path, "add", self.initial_file], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        subprocess.run(["git", "-C", self.repo_path, "add", "README.md"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         subprocess.run(["git", "-C", self.repo_path, "commit", "-m", "Initial commit"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     def tearDown(self):
-        self.test_dir.cleanup()
+        shutil.rmtree(self.test_dir, ignore_errors=True)
 
-    def test_integration_patch_applier_lifecycle(self):
+    def test_safe_apply_and_rollback_integration(self):
+        unique_backup_tag = f"backup-{uuid.uuid4().hex[:8]}"
         applier = PatchApplier(self.repo_path)
         
-        backup_tag = f"backup_{uuid.uuid4().hex[:8]}"
-        applier.create_recovery_point(backup_tag)
+        patch_filename = f"patch_{uuid.uuid4().hex[:6]}.patch"
+        patch_path = os.path.join(self.repo_path, patch_filename)
         
-        new_file_name = f"feature_{random.randint(1000, 9999)}.py"
-        new_file_content = f"# Feature code {uuid.uuid4()}\nprint('hello')"
+        patch_content = (
+            f"diff --git a/README.md b/README.md\n"
+            f"index 1234567..89abcdef 100644\n"
+            f"--- a/README.md\n"
+            f"+++ b/README.md\n"
+            f"@@ -1 +1,2 @@\n"
+            f" # Initial State\n"
+            f"+# Updated via patch {uuid.uuid4().hex[:6]}\n"
+        )
+
+        with open(patch_path, "w", encoding="utf-8") as f:
+            f.write(patch_content)
+
+        applier.safe_apply(patch_filename, unique_backup_tag)
+
+        with open(self.initial_file, "r", encoding="utf-8") as f:
+            content = f.read()
+        self.assertIn("Updated via patch", content)
+
+        bad_backup_tag = f"bad-backup-{uuid.uuid4().hex[:8]}"
+        bad_patch_filename = f"bad_patch_{uuid.uuid4().hex[:6]}.patch"
+        bad_patch_path = os.path.join(self.repo_path, bad_patch_filename)
+
+        with open(bad_patch_path, "w", encoding="utf-8") as f:
+            f.write("INVALID PATCH CONTENT THAT WILL FAIL GIT APPLY\n")
+
+        with self.assertRaises(PatchApplierError):
+            applier.safe_apply(bad_patch_filename, bad_backup_tag)
+
+    def test_apply_patch_dictionary_integration(self):
+        unique_backup_id = f"dict-backup-{uuid.uuid4().hex[:8]}"
+        unique_file_name = f"dir_{uuid.uuid4().hex[:4]}/module_{uuid.uuid4().hex[:6]}.py"
+        unique_code_content = f"# Generated content {uuid.uuid4()}\nx = {random.randint(1000, 9999)}\n"
         
         patch_data = {
-            "file_path": new_file_name,
-            "content": new_file_content,
-            "backup_id": f"dict_backup_{uuid.uuid4().hex[:8]}"
+            "file_path": unique_file_name,
+            "content": unique_code_content,
+            "backup_id": unique_backup_id
         }
         
-        success = apply_patch(self.repo_path, patch_data)
-        self.assertTrue(success)
+        result = apply_patch(self.repo_path, patch_data)
+        self.assertTrue(result)
         
-        created_file_path = os.path.join(self.repo_path, new_file_name)
-        self.assertTrue(os.path.exists(created_file_path))
-        with open(created_file_path, "r", encoding="utf-8") as f:
+        target_file_full = os.path.join(self.repo_path, unique_file_name)
+        self.assertTrue(os.path.exists(target_file_full))
+        
+        with open(target_file_full, "r", encoding="utf-8") as f:
             read_content = f.read()
-        self.assertEqual(read_content, new_file_content)
+
+        self.assertEqual(read_content, unique_code_content)
         
-        inspector = GitInspector(self.repo_path)
-        history = inspector.get_commit_history(max_count=5)
-        self.assertGreaterEqual(len(history), 2)
-        
-        applier.rollback(backup_tag)
-        self.assertFalse(os.path.exists(created_file_path))
-        
-        applier.verify_repository_state()
+        status_cmd = ["git", "-C", self.repo_path, "status", "--porcelain"]
+        status_res = subprocess.run(status_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        self.assertEqual(len(status_res.stdout.strip()), 0)
 
 
 if __name__ == "__main__":

@@ -3,15 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-h_sanitizer (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: успешно прошёл тесты и влит в main
-
-## patch_verifier (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## patch_validator_core (create) — раундов: 4
+аундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -346,4 +338,8 @@ h_sanitizer (create) — раундов: 4
 
 ## patch_applier (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## patch_applier (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: ERROR: test_patch_applier_safe_apply_and_rollback_integration (tests.test_patch_applier_integration.TestPatchApplierIntegration.test_patch_applier_safe_apply_and_rollback_integration)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

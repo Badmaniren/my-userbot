@@ -35,6 +35,8 @@ class PatchApplier:
             cmd = ["git", "-C", self.repo_path, "apply"]
             res = subprocess.run(cmd, input=patch_content, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         else:
+            if not os.path.exists(patch_source):
+                raise PatchApplierError(f"Failed to apply patch: file not found {patch_source}")
             with open(patch_source, "rb") as f:
                 patch_content = f.read()
             cmd = ["git", "-C", self.repo_path, "apply"]
@@ -47,11 +49,13 @@ class PatchApplier:
 
     def rollback(self, backup_tag: str) -> bool:
         """Откатывает изменения к точке восстановления."""
-        cmd = ["git", "-C", self.repo_path, "checkout", backup_tag]
+        cmd = ["git", "-C", self.repo_path, "checkout", "-f", backup_tag]
         res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if res.returncode != 0:
             err_msg = res.stderr.decode("utf-8", errors="ignore")
             raise PatchApplierError(f"Failed to rollback: {err_msg}")
+        clean_cmd = ["git", "-C", self.repo_path, "clean", "-fd"]
+        subprocess.run(clean_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return True
 
     def verify_repository_state(self) -> bool:

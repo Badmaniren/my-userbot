@@ -10,7 +10,17 @@ class PatchSanitizer:
     """Модуль первичной очистки и нормализации входящих патчей."""
 
     def sanitize(self, stream) -> str:
+        if isinstance(stream, str):
+            stream = io.StringIO(stream)
+        elif isinstance(stream, bytes):
+            stream = io.BytesIO(stream)
+
         content = stream.read()
+        if isinstance(content, bytes):
+            if b"\x00" in content:
+                raise PatchSanitizerError("Null bytes detected in patch.")
+            content = content.decode("utf-8", errors="ignore")
+
         if not content:
             raise PatchSanitizerError("Empty stream is not allowed.")
         if "\x00" in content:
@@ -30,15 +40,21 @@ class PatchSanitizer:
 
     def normalize_endings(self, stream) -> str:
         content = stream.read()
+        if isinstance(content, bytes):
+            content = content.decode("utf-8", errors="ignore")
         return content.replace("\r\n", "\n").replace("\r", "\n")
 
     def strip_whitespace(self, stream) -> str:
         content = stream.read()
+        if isinstance(content, bytes):
+            content = content.decode("utf-8", errors="ignore")
         normalized = content.replace("\r\n", "\n").replace("\r", "\n")
         return normalized.rstrip() + ("\n" if normalized.endswith("\n") else "")
 
     def remove_binary_diffs(self, stream) -> str:
         content = stream.read()
+        if isinstance(content, bytes):
+            content = content.decode("utf-8", errors="ignore")
         lines = content.splitlines()
         filtered_lines = []
         for line in lines:

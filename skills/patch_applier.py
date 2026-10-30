@@ -32,13 +32,12 @@ class PatchApplier:
         if os.path.exists(patch_file_path) and os.path.isfile(patch_file_path):
             with open(patch_file_path, "rb") as f:
                 patch_content = f.read()
-            cmd = ["git", "-C", self.repo_path, "apply"]
-            res = subprocess.run(cmd, input=patch_content, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         else:
             with open(patch_source, "rb") as f:
                 patch_content = f.read()
-            cmd = ["git", "-C", self.repo_path, "apply"]
-            res = subprocess.run(cmd, input=patch_content, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        cmd = ["git", "-C", self.repo_path, "apply"]
+        res = subprocess.run(cmd, input=patch_content, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         if res.returncode != 0:
             err_msg = res.stderr.decode("utf-8", errors="ignore")
@@ -46,12 +45,15 @@ class PatchApplier:
         return True
 
     def rollback(self, backup_tag: str) -> bool:
-        """Откатывает изменения к точке восстановления."""
+        """Откатывает изменения к точке восстановления и сбрасывает неотслеживаемые файлы."""
         cmd = ["git", "-C", self.repo_path, "checkout", backup_tag]
         res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if res.returncode != 0:
             err_msg = res.stderr.decode("utf-8", errors="ignore")
             raise PatchApplierError(f"Failed to rollback: {err_msg}")
+
+        clean_cmd = ["git", "-C", self.repo_path, "clean", "-fd"]
+        subprocess.run(clean_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return True
 
     def verify_repository_state(self) -> bool:
@@ -91,10 +93,10 @@ def apply_patch(repo_path: str, patch_data: Dict[str, Any]) -> bool:
         f.write(content)
     
     add_cmd = ["git", "-C", repo_path, "add", file_path]
-    subprocess.run(add_cmd, check=True)
+    subprocess.run(add_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     
     commit_cmd = ["git", "-C", repo_path, "commit", "-m", "Apply patch via PatchApplier"]
-    subprocess.run(commit_cmd, check=True)
+    subprocess.run(commit_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     applier.verify_repository_state()
     return True

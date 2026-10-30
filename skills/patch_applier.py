@@ -40,8 +40,8 @@ class PatchApplier:
                     patch_content = f.read()
                 cmd = ["git", "-C", self.repo_path, "apply"]
                 res = subprocess.run(cmd, input=patch_content, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            except Exception:
-                raise PatchApplierError("Patch source not found or invalid.")
+            except FileNotFoundError as e:
+                raise PatchApplierError(f"Failed to apply patch: {e}") from e
 
         if res.returncode != 0:
             err_msg = res.stderr.decode("utf-8", errors="ignore")
@@ -49,12 +49,27 @@ class PatchApplier:
         return True
 
     def rollback(self, backup_tag: str) -> bool:
-        """Откатывает изменения к точке восстановления."""
+        """Откатывает изменения к точке восстановления и сбрасывает рабочий каталог."""
         cmd = ["git", "-C", self.repo_path, "checkout", backup_tag]
         res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if res.returncode != 0:
             err_msg = res.stderr.decode("utf-8", errors="ignore")
             raise PatchApplierError(f"Failed to rollback: {err_msg}")
+
+        # Сбрасываем изменения в рабочей директории и индексе до состояния бэкапа
+        reset_cmd = ["git", "-C", self.repo_path, "reset", "--hard", backup_tag]
+        res_reset = subprocess.run(reset_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if res_reset.returncode != 0:
+            err_msg = res_reset.stderr.decode("utf-8", errors="ignore")
+            raise PatchApplierError(f"Failed to rollback (reset): {err_msg}")
+
+        # Удаляем неотслеживаемые файлы, созданные после бэкапа
+        clean_cmd = ["git", "-C", self.repo_path, "clean", "-fd"]
+        res_clean = subprocess.run(clean_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if res_clean.returncode != 0:
+            err_msg = res_clean.stderr.decode("utf-8", errors="ignore")
+            raise PatchApplierError(f"Failed to rollback (clean): {err_msg}")
+
         return True
 
     def verify_repository_state(self) -> bool:

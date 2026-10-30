@@ -21,7 +21,7 @@ class TestPatchCheckerInquisition(unittest.TestCase):
     def setUp(self):
         self.rand_repo = f"/tmp/{uuid.uuid4().hex}"
         self.rand_file = f"{uuid.uuid4().hex}.py"
-        self.rand_content = f"class {uuid.uuid4().hex[:8]}:\n    pass\n"
+        self.rand_content = f"class Cls_{uuid.uuid4().hex[:8]}:\n    pass\n"
         self.checker = PatchChecker(repo_path=self.rand_repo)
 
     def test_get_val_helper(self):

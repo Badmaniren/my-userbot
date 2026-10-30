@@ -21,7 +21,7 @@ class TestPatchEvaluatorInquisition(unittest.TestCase):
 
     def setUp(self):
         self.rand_repo = f"/tmp/repo_{uuid.uuid4().hex}"
-        self.rand_patch = f"def {uuid.uuid4().hex}(): pass\n"
+        self.rand_patch = f"def func_{uuid.uuid4().hex}(): pass\n"
         self.evaluator = PatchEvaluator(repo_path=self.rand_repo)
 
     def test_patch_evaluation_result_defaults(self):
@@ -109,7 +109,7 @@ class TestPatchEvaluatorInquisition(unittest.TestCase):
             self.assertFalse(result.was_corrected)
 
     def test_evaluate_with_autocorrect_unsafe(self):
-        rand_corrected_patch = f"def {uuid.uuid4().hex}(): return True\n"
+        rand_corrected_patch = f"def func_{uuid.uuid4().hex}(): return True\n"
         with patch("skills.patch_evaluator.CodeSanitizer.sanitize", side_effect=[(self.rand_patch, False), (rand_corrected_patch, True)]), \
              patch("skills.patch_evaluator.PatchAutocorrector.correct", return_value=(rand_corrected_patch, True)):
             

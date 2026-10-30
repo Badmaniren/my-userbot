@@ -35,13 +35,10 @@ class PatchApplier:
             cmd = ["git", "-C", self.repo_path, "apply"]
             res = subprocess.run(cmd, input=patch_content, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         else:
-            try:
-                with open(patch_source, "rb") as f:
-                    patch_content = f.read()
-                cmd = ["git", "-C", self.repo_path, "apply"]
-                res = subprocess.run(cmd, input=patch_content, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            except Exception:
-                raise PatchApplierError("Patch source not found or invalid.")
+            with open(patch_source, "rb") as f:
+                patch_content = f.read()
+            cmd = ["git", "-C", self.repo_path, "apply"]
+            res = subprocess.run(cmd, input=patch_content, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         if res.returncode != 0:
             err_msg = res.stderr.decode("utf-8", errors="ignore")
@@ -61,7 +58,7 @@ class PatchApplier:
         """Проверяет, что репозиторий находится в корректном состоянии."""
         cmd = ["git", "-C", self.repo_path, "status", "--porcelain"]
         res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if res.returncode != 0:
+        if res.returncode != 0 or len(res.stdout.strip()) > 0:
             output = res.stdout.decode("utf-8", errors="ignore")
             raise PatchApplierError(f"Repository verification failed: {output}")
         return True
@@ -84,13 +81,14 @@ def apply_patch(repo_path: str, patch_data: Dict[str, Any]) -> bool:
     content = patch_data.get("content")
     backup_id = patch_data.get("backup_id", "backup")
 
+    applier = PatchApplier(repo_path)
+    applier.create_recovery_point(backup_id)
+
     target_full_path = os.path.join(repo_path, file_path)
+    os.makedirs(os.path.dirname(target_full_path), exist_ok=True)
     
     with open(target_full_path, "w", encoding="utf-8") as f:
         f.write(content)
-
-    applier = PatchApplier(repo_path)
-    applier.create_recovery_point(backup_id)
     
     add_cmd = ["git", "-C", repo_path, "add", file_path]
     subprocess.run(add_cmd, check=True)

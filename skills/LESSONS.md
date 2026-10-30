@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-rs=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## anomaly_telemetry_analyzer (create) — раундов: 4
-- Последняя ошибка перед фиксом: SyntaxError: invalid decimal literal
+yntaxError: invalid decimal literal
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## anomaly_pattern_matcher (create) — раундов: 4
@@ -344,3 +340,7 @@ rs=2)
 ## patch_applier (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: return func(*newargs, **newkeywargs)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## patch_applier (refactor) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: успешно прошёл тесты и влит в main

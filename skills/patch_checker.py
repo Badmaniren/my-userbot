@@ -20,9 +20,12 @@ def _get_val(obj: Any, key: str, default: Any = None) -> Any:
 class PatchChecker:
     """Интегрированный модуль проверки патчей."""
 
-    def __init__(self, repo_path: Optional[str] = None, policy: Optional[Dict[str, Any]] = None):
+    def __init__(self, repo_path: Optional[str] = None, policy: Optional[Union[Dict[str, Any], str]] = None):
         self.repo_path = repo_path
-        self.policy = policy or {}
+        if isinstance(policy, str):
+            self.policy = {"name": policy, "strict_safety": (policy == "strict")}
+        else:
+            self.policy = policy or {}
         self.analyzer = PatchAnalyzer()
         self.evaluator = PatchEvaluator(repo_path=repo_path)
 
@@ -115,7 +118,10 @@ class PatchChecker:
     ) -> Dict[str, Any]:
         """Интеграционный метод проверки, поддерживающий передачу repo_path и policy на лету."""
         if policy is not None:
-            self.policy = policy
+            if isinstance(policy, str):
+                self.policy = {"name": policy, "strict_safety": (policy == "strict")}
+            else:
+                self.policy = policy
         if repo_path and repo_path != self.repo_path:
             self.repo_path = repo_path
             self.evaluator = PatchEvaluator(repo_path=repo_path)

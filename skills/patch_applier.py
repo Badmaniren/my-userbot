@@ -21,26 +21,41 @@ class PatchApplier:
             raise PatchApplierError(f"Failed to create recovery point: {err_msg}")
         return True
 
-    def apply_patch(self, patch_source: str) -> bool:
-        """Применяет патч из файла или словаря/пути."""
-        patch_file_path = patch_source
-        if not os.path.isabs(patch_file_path):
-            potential_path = os.path.join(self.repo_path, patch_file_path)
-            if os.path.exists(potential_path):
-                patch_file_path = potential_path
+    def apply_patch(self, patch_source: Any) -> bool:
+        """Применяет патч из файла или содержимого (строки/байтов)."""
+        if isinstance(patch_source, (str, bytes)):
+            patch_file_path = str(patch_source)
+            if not os.path.isabs(patch_file_path):
+                potential_path = os.path.join(self.repo_path, patch_file_path)
+                if os.path.exists(potential_path):
+                    patch_file_path = potential_path
 
-        if os.path.exists(patch_file_path) and os.path.isfile(patch_file_path):
-            with open(patch_file_path, "rb") as f:
-                patch_content = f.read()
-            cmd = ["git", "-C", self.repo_path, "apply"]
-            res = subprocess.run(cmd, input=patch_content, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if os.path.exists(patch_file_path) and os.path.isfile(patch_file_path):
+                with open(patch_file_path, "rb") as f:
+                    patch_content = f.read()
+            else:
+                if isinstance(patch_source, str):
+                    patch_content = patch_source.encode("utf-8")
+                else:
+                    patch_content = patch_source
+                if not patch_content.endswith(b"\n"):
+                    patch_content += b"\n"
         else:
-            with open(patch_source, "rb") as f:
-                patch_content = f.read()
-            cmd = ["git", "-C", self.repo_path, "apply"]
-            res = subprocess.run(cmd, input=patch_content, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if hasattr(patch_source, "read"):
+                patch_content = patch_source.read()
+                if isinstance(patch_content, str):
+                    patch_content = patch_content.encode("utf-8")
+            else:
+                patch_content = str(patch_source).encode("utf-8")
+
+        cmd = ["git", "-C", self.repo_path, "apply"]
+        res = subprocess.run(cmd, input=patch_content, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         if res.returncode != 0:
+            cmd_p0 = ["git", "-C", self.repo_path, "apply", "-p0"]
+            res_p0 = subprocess.run(cmd_p0, input=patch_content, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if res_p0.returncode == 0:
+                return True
             err_msg = res.stderr.decode("utf-8", errors="ignore")
             raise PatchApplierError(f"Failed to apply patch: {err_msg}")
         return True
@@ -75,26 +90,30 @@ class PatchApplier:
         return True
 
 
-def apply_patch(repo_path: str, patch_data: Dict[str, Any]) -> bool:
-    """Интеграционная функция для применения патча из словаря."""
-    file_path = patch_data.get("file_path")
-    content = patch_data.get("content")
-    backup_id = patch_data.get("backup_id", "backup")
+def apply_patch(repo_path: str, patch_data: Any) -> bool:
+    """Интеграционная функция для применения патча из словаря, файла или строки/байтов."""
+    if isinstance(patch_data, dict):
+        file_path = patch_data.get("file_path")
+        content = patch_data.get("content")
+        backup_id = patch_data.get("backup_id", "backup")
 
-    applier = PatchApplier(repo_path)
-    applier.create_recovery_point(backup_id)
+        applier = PatchApplier(repo_path)
+        applier.create_recovery_point(backup_id)
 
-    target_full_path = os.path.join(repo_path, file_path)
-    os.makedirs(os.path.dirname(target_full_path), exist_ok=True)
-    
-    with open(target_full_path, "w", encoding="utf-8") as f:
-        f.write(content)
-    
-    add_cmd = ["git", "-C", repo_path, "add", file_path]
-    subprocess.run(add_cmd, check=True)
-    
-    commit_cmd = ["git", "-C", repo_path, "commit", "-m", "Apply patch via PatchApplier"]
-    subprocess.run(commit_cmd, check=True)
+        target_full_path = os.path.join(repo_path, file_path)
+        os.makedirs(os.path.dirname(target_full_path), exist_ok=True)
 
-    applier.verify_repository_state()
-    return True
+        with open(target_full_path, "w", encoding="utf-8") as f:
+            f.write(content)
+
+        add_cmd = ["git", "-C", repo_path, "add", file_path]
+        subprocess.run(add_cmd, check=True)
+
+        commit_cmd = ["git", "-C", repo_path, "commit", "-m", "Apply patch via PatchApplier"]
+        subprocess.run(commit_cmd, check=True)
+
+        applier.verify_repository_state()
+        return True
+    else:
+        applier = PatchApplier(repo_path)
+        return applier.apply_patch(patch_data)

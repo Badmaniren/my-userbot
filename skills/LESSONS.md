@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-toolcache/Python/3.11.17/x64/lib/python3.11/unittest/mock.py", line 1378, in patched
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## patch_sanitizer (create) — раундов: 4
+h_sanitizer (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main
 
@@ -346,3 +343,7 @@ toolcache/Python/3.11.17/x64/lib/python3.11/unittest/mock.py", line 1378, in pat
 ## patch_applier (refactor) — раундов: 2
 - Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
 - Статус: успешно прошёл тесты и влит в main
+
+## patch_applier (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

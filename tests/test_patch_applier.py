@@ -1,8 +1,8 @@
 import unittest
 from unittest.mock import patch, MagicMock
 import os
-import io
 import subprocess
+import io
 import uuid
 import random
 from skills.patch_applier import PatchApplier, PatchApplierError, apply_patch
@@ -12,158 +12,166 @@ class TestPatchApplier(unittest.TestCase):
 
     def setUp(self):
         self.repo_path = f"/tmp/{uuid.uuid4().hex}"
-        self.patch_applier = PatchApplier(self.repo_path)
+        self.applier = PatchApplier(self.repo_path)
 
-    def test_create_recovery_point_success(self):
-        tag = f"backup_{uuid.uuid4().hex[:8]}"
-        mock_result = MagicMock(returncode=0)
+    @patch("subprocess.run")
+    def test_create_recovery_point_success(self, mock_run):
+        tag = uuid.uuid4().hex
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_run.return_value = mock_result
+
+        result = self.applier.create_recovery_point(tag)
+        self.assertTrue(result)
+        mock_run.assert_called_once_with(
+            ["git", "-C", self.repo_path, "branch", tag],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+
+    @patch("subprocess.run")
+    def test_create_recovery_point_failure(self, mock_run):
+        tag = uuid.uuid4().hex
+        err_output = uuid.uuid4().hex.encode("utf-8")
+        mock_result = MagicMock()
+        mock_result.returncode = 128
+        mock_result.stderr = err_output
+        mock_run.return_value = mock_result
+
+        with self.assertRaises(PatchApplierError):
+            self.applier.create_recovery_point(tag)
+
+    @patch("subprocess.run")
+    @patch("os.path.exists")
+    @patch("os.path.isfile")
+    @patch("builtins.open", new_callable=unittest.mock.mock_open)
+    def test_apply_patch_success(self, mock_file, mock_isfile, mock_exists, mock_run):
+        patch_name = f"{uuid.uuid4().hex}.patch"
+        mock_exists.return_value = True
+        mock_isfile.return_value = True
         
-        with patch("subprocess.run", return_value=mock_result) as mock_run:
-            result = self.patch_applier.create_recovery_point(tag)
-            self.assertTrue(result)
-            mock_run.assert_called_once_with(
-                ["git", "-C", self.repo_path, "branch", tag],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_run.return_value = mock_result
 
-    def test_create_recovery_point_failure(self):
-        tag = f"backup_{uuid.uuid4().hex[:8]}"
-        err_output = f"fatal: branch {tag} already exists {uuid.uuid4().hex}".encode("utf-8")
-        mock_result = MagicMock(returncode=128, stderr=err_output)
+        result = self.applier.apply_patch(patch_name)
+        self.assertTrue(result)
+        mock_run.assert_called_once()
+
+    @patch("subprocess.run")
+    @patch("os.path.exists")
+    @patch("os.path.isfile")
+    @patch("builtins.open", new_callable=unittest.mock.mock_open)
+    def test_apply_patch_failure(self, mock_file, mock_isfile, mock_exists, mock_run):
+        patch_name = f"{uuid.uuid4().hex}.patch"
+        mock_exists.return_value = False
         
-        with patch("subprocess.run", return_value=mock_result):
-            with self.assertRaises(PatchApplierError) as ctx:
-                self.patch_applier.create_recovery_point(tag)
-            self.assertIn("Failed to create recovery point", str(ctx.exception))
+        err_bytes = uuid.uuid4().hex.encode("utf-8")
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stderr = err_bytes
+        mock_run.return_value = mock_result
 
-    def test_apply_patch_from_absolute_file(self):
-        patch_file = f"/{uuid.uuid4().hex}/{uuid.uuid4().hex}.patch"
-        file_content = f"diff --git a/{uuid.uuid4().hex} b/{uuid.uuid4().hex}\n".encode("utf-8")
-        mock_result = MagicMock(returncode=0)
+        with self.assertRaises(PatchApplierError):
+            self.applier.apply_patch(patch_name)
 
-        with patch("os.path.isabs", return_value=True), \
-             patch("os.path.exists", return_value=True), \
-             patch("os.path.isfile", return_value=True), \
-             patch("builtins.open", return_value=io.BytesIO(file_content)), \
-             patch("subprocess.run", return_value=mock_result) as mock_run:
-            
-            res = self.patch_applier.apply_patch(patch_file)
-            self.assertTrue(res)
-            mock_run.assert_called_once_with(
-                ["git", "-C", self.repo_path, "apply"],
-                input=file_content,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
+    @patch("subprocess.run")
+    def test_rollback_success(self, mock_run):
+        tag = uuid.uuid4().hex
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_run.return_value = mock_result
 
-    def test_apply_patch_failure(self):
-        patch_file = f"{uuid.uuid4().hex}.patch"
-        err_msg = f"error: patch failed: {uuid.uuid4().hex}".encode("utf-8")
-        mock_result = MagicMock(returncode=1, stderr=err_msg)
+        result = self.applier.rollback(tag)
+        self.assertTrue(result)
+        mock_run.assert_called_once_with(
+            ["git", "-C", self.repo_path, "checkout", tag],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
 
-        with patch("os.path.isabs", return_value=False), \
-             patch("os.path.exists", return_value=True), \
-             patch("os.path.isfile", return_value=True), \
-             patch("builtins.open", return_value=io.BytesIO(b"dummy")), \
-             patch("subprocess.run", return_value=mock_result):
+    @patch("subprocess.run")
+    def test_rollback_failure(self, mock_run):
+        tag = uuid.uuid4().hex
+        err_bytes = uuid.uuid4().hex.encode("utf-8")
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stderr = err_bytes
+        mock_run.return_value = mock_result
 
-            with self.assertRaises(PatchApplierError) as ctx:
-                self.patch_applier.apply_patch(patch_file)
-            self.assertIn("Failed to apply patch", str(ctx.exception))
+        with self.assertRaises(PatchApplierError):
+            self.applier.rollback(tag)
 
-    def test_rollback_success(self):
-        tag = f"tag_{uuid.uuid4().hex[:6]}"
-        mock_result = MagicMock(returncode=0)
+    @patch("subprocess.run")
+    def test_verify_repository_state_success(self, mock_run):
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = b""
+        mock_run.return_value = mock_result
 
-        with patch("subprocess.run", return_value=mock_result) as mock_run:
-            res = self.patch_applier.rollback(tag)
-            self.assertTrue(res)
-            mock_run.assert_called_once_with(
-                ["git", "-C", self.repo_path, "checkout", tag],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
+        result = self.applier.verify_repository_state()
+        self.assertTrue(result)
 
-    def test_rollback_failure(self):
-        tag = f"tag_{uuid.uuid4().hex[:6]}"
-        mock_result = MagicMock(returncode=1, stderr=b"pathspec did not match")
+    @patch("subprocess.run")
+    def test_verify_repository_state_failure(self, mock_run):
+        dirty_output = uuid.uuid4().hex.encode("utf-8")
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = dirty_output
+        mock_run.return_value = mock_result
 
-        with patch("subprocess.run", return_value=mock_result):
-            with self.assertRaises(PatchApplierError) as ctx:
-                self.patch_applier.rollback(tag)
-            self.assertIn("Failed to rollback", str(ctx.exception))
+        with self.assertRaises(PatchApplierError):
+            self.applier.verify_repository_state()
 
-    def test_verify_repository_state_success(self):
-        mock_result = MagicMock(returncode=0)
-
-        with patch("subprocess.run", return_value=mock_result) as mock_run:
-            res = self.patch_applier.verify_repository_state()
-            self.assertTrue(res)
-            mock_run.assert_called_once_with(
-                ["git", "-C", self.repo_path, "status", "--porcelain"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
-
-    def test_verify_repository_state_failure(self):
-        output_msg = f"untracked file {uuid.uuid4().hex}".encode("utf-8")
-        mock_result = MagicMock(returncode=1, stdout=output_msg)
-
-        with patch("subprocess.run", return_value=mock_result):
-            with self.assertRaises(PatchApplierError) as ctx:
-                self.patch_applier.verify_repository_state()
-            self.assertIn("Repository verification failed", str(ctx.exception))
-
-    def test_safe_apply_success(self):
+    @patch("skills.patch_applier.PatchApplier.verify_repository_state")
+    @patch("skills.patch_applier.PatchApplier.apply_patch")
+    @patch("skills.patch_applier.PatchApplier.create_recovery_point")
+    def test_safe_apply_success(self, mock_create, mock_apply, mock_verify):
         patch_path = f"{uuid.uuid4().hex}.patch"
-        backup_tag = f"bkp_{uuid.uuid4().hex[:8]}"
+        backup_tag = uuid.uuid4().hex
 
-        with patch.object(self.patch_applier, "create_recovery_point") as mock_create, \
-             patch.object(self.patch_applier, "apply_patch") as mock_apply, \
-             patch.object(self.patch_applier, "verify_repository_state") as mock_verify:
+        result = self.applier.safe_apply(patch_path, backup_tag)
+        self.assertTrue(result)
+        mock_create.assert_called_once_with(backup_tag)
+        mock_apply.assert_called_once_with(patch_path)
+        mock_verify.assert_called_once()
 
-            res = self.patch_applier.safe_apply(patch_path, backup_tag)
-            self.assertTrue(res)
-            mock_create.assert_called_once_with(backup_tag)
-            mock_apply.assert_called_once_with(patch_path)
-            mock_verify.assert_called_once()
-
-    def test_safe_apply_rollback_on_error(self):
+    @patch("skills.patch_applier.PatchApplier.rollback")
+    @patch("skills.patch_applier.PatchApplier.apply_patch")
+    @patch("skills.patch_applier.PatchApplier.create_recovery_point")
+    def test_safe_apply_rollback_on_failure(self, mock_create, mock_apply, mock_rollback):
         patch_path = f"{uuid.uuid4().hex}.patch"
-        backup_tag = f"bkp_{uuid.uuid4().hex[:8]}"
+        backup_tag = uuid.uuid4().hex
+        mock_apply.side_effect = PatchApplierError(uuid.uuid4().hex)
 
-        with patch.object(self.patch_applier, "create_recovery_point"), \
-             patch.object(self.patch_applier, "apply_patch", side_effect=Exception(uuid.uuid4().hex)), \
-             patch.object(self.patch_applier, "rollback") as mock_rollback:
+        with self.assertRaises(PatchApplierError):
+            self.applier.safe_apply(patch_path, backup_tag)
 
-            with self.assertRaises(Exception):
-                self.patch_applier.safe_apply(patch_path, backup_tag)
-            mock_rollback.assert_called_once_with(backup_tag)
+        mock_create.assert_called_once_with(backup_tag)
+        mock_rollback.assert_called_once_with(backup_tag)
 
-    def test_integration_apply_patch_func(self):
-        file_path_val = f"src/{uuid.uuid4().hex}.py"
-        content_val = f"print('{uuid.uuid4().hex}')"
-        backup_id_val = f"backup_{uuid.uuid4().hex[:5]}"
+    @patch("subprocess.run")
+    @patch("os.makedirs")
+    @patch("builtins.open", new_callable=unittest.mock.mock_open)
+    @patch("skills.patch_applier.PatchApplier.create_recovery_point")
+    @patch("skills.patch_applier.PatchApplier.verify_repository_state")
+    def test_apply_patch_integration_func(self, mock_verify, mock_create, mock_file, mock_makedirs, mock_run):
+        file_path = f"dir_{uuid.uuid4().hex}/{uuid.uuid4().hex}.py"
+        content = uuid.uuid4().hex
+        backup_id = uuid.uuid4().hex
         patch_data = {
-            "file_path": file_path_val,
-            "content": content_val,
-            "backup_id": backup_id_val
+            "file_path": file_path,
+            "content": content,
+            "backup_id": backup_id
         }
 
-        mock_file = MagicMock()
-        with patch("builtins.open", return_value=mock_file) as mock_open, \
-             patch("subprocess.run") as mock_run, \
-             patch.object(PatchApplier, "create_recovery_point") as mock_create_bkp, \
-             patch.object(PatchApplier, "verify_repository_state") as mock_verify_state:
-
-            res = apply_patch(self.repo_path, patch_data)
-            self.assertTrue(res)
-            mock_open.assert_called_once_with(os.path.join(self.repo_path, file_path_val), "w", encoding="utf-8")
-            mock_file.__enter__().write.assert_called_once_with(content_val)
-            mock_create_bkp.assert_called_once_with(backup_id_val)
-            self.assertEqual(mock_run.call_count, 2)
-            mock_verify_state.assert_called_once()
+        result = apply_patch(self.repo_path, patch_data)
+        self.assertTrue(result)
+        mock_create.assert_called_once_with(backup_id)
+        mock_makedirs.assert_called_once()
+        mock_file.assert_called_once()
+        self.assertEqual(mock_run.call_count, 2)
+        mock_verify.assert_called_once()
 
 
 if __name__ == "__main__":

@@ -1,95 +1,140 @@
 import unittest
-from unittest.mock import patch, MagicMock
-import uuid
-import random
-import string
+from unittest.mock import MagicMock, patch
 import io
-import sys
-
+import random
+import uuid
 from skills.anomaly_detector import AnomalyDetector, AnomalyDetectorError
 
 class TestAnomalyDetector(unittest.TestCase):
-    
-    def setUp(self):
-        self.random_repo_path = f"/var/repo/{uuid.uuid4().hex}"
-        self.metric_name = f"metric_{uuid.uuid4().hex[:8]}"
+    def setUp(self) -> None:
+        self.repo_path = f"/tmp/{uuid.uuid4().hex}"
         self.threshold = random.uniform(1.0, 10.0)
-        self.detector = AnomalyDetector(repo_path=self.random_repo_path, threshold=self.threshold)
+        self.detector = AnomalyDetector(repo_path=self.repo_path, threshold=self.threshold)
 
-    def test_init_sets_attributes(self):
-        self.assertEqual(self.detector.repo_path, self.random_repo_path)
+    def test_init_state(self) -> None:
+        self.assertEqual(self.detector.repo_path, self.repo_path)
         self.assertEqual(self.detector.threshold, self.threshold)
-        self.assertIsInstance(self.detector.history, list)
+        self.assertIsNone(self.detector.git_inspector)
+        self.assertIsNone(self.detector.patch_verifier)
+        self.assertEqual(self.detector.history, [])
+        self.assertEqual(self.detector._metric_history_dict, {})
 
-    def test_detect_anomaly_normal_behavior(self):
-        normal_values = [random.uniform(0.1, self.threshold) for _ in range(10)]
-        target_value = random.uniform(0.1, self.threshold)
-        
-        for val in normal_values:
-            self.detector.record_metric(self.metric_name, val)
-            
-        is_anomaly = self.detector.detect_anomaly(self.metric_name, target_value)
-        self.assertFalse(is_anomaly)
+    def test_record_metric_and_get_history(self) -> None:
+        metric_name = f"metric_{uuid.uuid4().hex[:6]}"
+        val1 = random.uniform(0.0, 50.0)
+        val2 = random.uniform(51.0, 100.0)
 
-    def test_detect_anomaly_triggered(self):
-        normal_values = [random.uniform(0.1, 2.0) for _ in range(10)]
-        for val in normal_values:
-            self.detector.record_metric(self.metric_name, val)
-            
-        extreme_value = self.threshold + random.uniform(5.0, 50.0)
-        is_anomaly = self.detector.detect_anomaly(self.metric_name, extreme_value)
-        self.assertTrue(is_anomaly)
+        self.detector.record_metric(metric_name, val1)
+        self.detector.record_metric(metric_name, val2)
 
-    def test_analyze_execution_metrics_returns_dict(self):
-        execution_id = uuid.uuid4().hex
-        mock_metrics = {
-            f"cpu_usage_{uuid.uuid4().hex[:4]}": random.uniform(10, 90),
-            f"memory_usage_{uuid.uuid4().hex[:4]}": random.uniform(100, 500)
+        history = self.detector.get_metric_history(metric_name)
+        self.assertEqual(history, [val1, val2])
+        self.assertEqual(self.detector.history, [val1, val2])
+
+        non_existent = f"metric_{uuid.uuid4().hex[:6]}"
+        self.assertEqual(self.detector.get_metric_history(non_existent), [])
+
+    def test_detect_anomaly_no_history(self) -> None:
+        metric_name = f"metric_{uuid.uuid4().hex[:6]}"
+        target_val = random.uniform(1.0, 100.0)
+        with self.assertRaises(AnomalyDetectorError):
+            self.detector.detect_anomaly(metric_name, target_val)
+
+    def test_detect_anomaly_normal_and_abnormal(self) -> None:
+        metric_name = f"metric_{uuid.uuid4().hex[:6]}"
+        base_val = 10.0
+        self.detector.record_metric(metric_name, base_val)
+        self.detector.record_metric(metric_name, base_val)
+
+        normal_val = base_val + (self.threshold / 2)
+        self.assertFalse(self.detector.detect_anomaly(metric_name, normal_val))
+
+        anomaly_val_diff = base_val + self.threshold + random.uniform(1.0, 10.0)
+        self.assertTrue(self.detector.detect_anomaly(metric_name, anomaly_val_diff))
+
+        anomaly_val_mult = (self.threshold * 2) + random.uniform(1.0, 10.0)
+        self.assertTrue(self.detector.detect_anomaly(metric_name, anomaly_val_mult))
+
+    def test_fetch_execution_logs(self) -> None:
+        exec_id = uuid.uuid4().hex
+        log_bytes = self.detector._fetch_execution_logs(exec_id)
+        self.assertIsInstance(log_bytes, io.BytesIO)
+        self.assertIn(exec_id.encode('utf-8'), log_bytes.getvalue())
+
+    def test_analyze_execution_metrics(self) -> None:
+        exec_id = uuid.uuid4().hex
+        metric_name = f"exec_metric_{uuid.uuid4().hex[:6]}"
+        high_val = self.threshold * 5 + random.uniform(1.0, 10.0)
+        low_val = self.threshold
+
+        metrics = {
+            metric_name: high_val,
+            f"other_{metric_name}": low_val
         }
-        
-        with patch('skills.anomaly_detector.AnomalyDetector._fetch_execution_logs') as mock_fetch:
-            mock_fetch.return_value = io.BytesIO(f"execution_id: {execution_id}".encode('utf-8'))
-            result = self.detector.analyze_execution_metrics(execution_id, mock_metrics)
-            
-        self.assertIsInstance(result, dict)
-        self.assertIn("anomalies_detected", result)
-        self.assertIn("execution_id", result)
-        self.assertEqual(result["execution_id"], execution_id)
 
-    def test_custom_exception_inheritance(self):
-        self.assertTrue(issubclass(AnomalyDetectorError, Exception))
-        err_msg = "".join(random.choices(string.ascii_letters, k=15))
-        with self.assertRaises(AnomalyDetectorError):
-            raise AnomalyDetectorError(err_msg)
+        with patch.object(self.detector, '_fetch_execution_logs') as mock_fetch:
+            random_log_data = uuid.uuid4().bytes
+            mock_fetch.return_value = io.BytesIO(random_log_data)
 
-    def test_record_and_retrieve_history(self):
-        metric_key = f"key_{uuid.uuid4().hex[:6]}"
-        metric_val = random.uniform(5.0, 100.0)
-        
-        self.detector.record_metric(metric_key, metric_val)
-        history = self.detector.get_metric_history(metric_key)
-        
-        self.assertIn(metric_VAL := metric_val, history)
+            result = self.detector.analyze_execution_metrics(exec_id, metrics)
 
-    def test_analyze_empty_metric_raises_error(self):
-        non_existent_metric = f"ghost_{uuid.uuid4().hex}"
-        target = random.uniform(1.0, 10.0)
-        
-        with self.assertRaises(AnomalyDetectorError):
-            self.detector.detect_anomaly(non_existent_metric, target)
+            self.assertEqual(result["execution_id"], exec_id)
+            self.assertIn(metric_name, result["anomalies_detected"])
+            self.assertNotIn(f"other_{metric_name}", result["anomalies_detected"])
+            self.assertEqual(result["logs_size"], len(random_log_data))
 
-    def test_batch_analyze_patches(self):
+    def test_batch_analyze_patches(self) -> None:
         batch_id = uuid.uuid4().hex
-        patch_metrics = [
-            {"patch_hash": uuid.uuid4().hex, "duration": random.uniform(0.1, 5.0)}
-            for _ in range(random.randint(3, 8))
-        ]
+        dur1 = self.threshold + random.uniform(1.0, 5.0)
+        dur2 = self.threshold - random.uniform(0.1, self.threshold if self.threshold > 0.1 else 0.05)
         
-        analysis = self.detector.batch_analyze_patches(batch_id, patch_metrics)
-        self.assertIsInstance(analysis, dict)
-        self.assertEqual(analysis.get("batch_id"), batch_id)
-        self.assertIn("total_analyzed", analysis)
-        self.assertEqual(analysis["total_analyzed"], len(patch_metrics))
+        patch_metrics = [
+            {"duration": dur1},
+            {"duration": dur2},
+            {}
+        ]
 
-if __name__ == '__main__':
-    unittest.main()
+        result = self.detector.batch_analyze_patches(batch_id, patch_metrics)
+
+        self.assertEqual(result["batch_id"], batch_id)
+        self.assertEqual(result["total_analyzed"], 3)
+        self.assertEqual(result["anomalies_count"], 1)
+
+    def test_detect_anomalies_with_git_inspector(self) -> None:
+        mock_inspector = MagicMock()
+        commit_count = random.randint(1, 15)
+        mock_inspector.get_commit_history.return_value = [uuid.uuid4().hex for _ in range(commit_count)]
+
+        detector_with_git = AnomalyDetector(
+            repo_path=self.repo_path,
+            threshold=self.threshold,
+            git_inspector=mock_inspector
+        )
+
+        res = detector_with_git.detect_anomalies()
+        self.assertEqual(res["status"], "analyzed")
+        self.assertEqual(res["repo_path"], self.repo_path)
+        self.assertEqual(res["commits_inspected"], commit_count)
+        self.assertEqual(res["anomalies_found"], [])
+        mock_inspector.get_commit_history.assert_called_once_with(max_count=10)
+
+    def test_detect_anomalies_git_inspector_exception(self) -> None:
+        mock_inspector = MagicMock()
+        mock_inspector.get_commit_history.side_effect = Exception(uuid.uuid4().hex)
+
+        detector_with_git = AnomalyDetector(
+            repo_path=self.repo_path,
+            threshold=self.threshold,
+            git_inspector=mock_inspector
+        )
+
+        res = detector_with_git.detect_anomalies()
+        self.assertEqual(res["status"], "analyzed")
+        self.assertEqual(res["commits_inspected"], 0)
+        self.assertEqual(res["anomalies_found"], [])
+
+    def test_detect_anomalies_without_git_inspector(self) -> None:
+        res = self.detector.detect_anomalies()
+        self.assertEqual(res["status"], "analyzed")
+        self.assertEqual(res["commits_inspected"], 0)
+        self.assertEqual(res["anomalies_found"], [])

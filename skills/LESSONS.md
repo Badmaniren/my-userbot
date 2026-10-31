@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-аундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## patch_analyzer (refactor) — раундов: 4
+ундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -342,4 +338,8 @@
 
 ## patch_applier (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: ERROR: test_patch_applier_safe_apply_and_rollback_integration (tests.test_patch_applier_integration.TestPatchApplierIntegration.test_patch_applier_safe_apply_and_rollback_integration)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## patch_applier (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

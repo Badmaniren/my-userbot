@@ -1,12 +1,10 @@
 import unittest
 import os
-import tempfile
 import uuid
 import random
 from skills.anomaly_pipeline import (
     AnomalyLogger,
     AnomalyAuditHub,
-    start_new,
     start_pipeline,
     ExtractorTool,
     GitInspector
@@ -14,68 +12,79 @@ from skills.anomaly_pipeline import (
 
 class TestAnomalyPipelineIntegration(unittest.TestCase):
     def setUp(self):
-        self.test_dir = tempfile.TemporaryDirectory()
-        self.log_filename = f"test_anomaly_{uuid.uuid4()}.log"
-        self.log_path = os.path.join(self.test_dir.name, self.log_filename)
-        self.repo_path = os.path.join(self.test_dir.name, "mock_repo")
-        os.makedirs(self.repo_path, exist_ok=True)
+        self.unique_id = uuid.uuid4().hex
+        self.log_path = f"test_logs_{self.unique_id}/anomaly.log"
+        self.repo_path = f"/tmp/repo_{self.unique_id}"
+        self.threshold = random.uniform(0.1, 0.9)
 
     def tearDown(self):
-        self.test_dir.cleanup()
+        if os.path.exists(self.log_path):
+            try:
+                os.remove(self.log_path)
+                os.rmdir(os.path.dirname(self.log_path))
+            except OSError:
+                pass
 
-    def test_end_to_end_anomaly_pipeline(self):
-        rand_source = f"source_{uuid.uuid4().hex[:8]}"
-        rand_severity = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
-        rand_details = f"details_{uuid.uuid4().hex}"
-        rand_telemetry = {"cpu_load": random.random(), "memory": random.randint(100, 9999)}
-        
-        threshold = random.randint(10, 100)
-        hub = AnomalyAuditHub(repo_path=self.repo_path, log_path=self.log_path, threshold=threshold)
-        
-        hub.log_anomaly(rand_source, rand_severity, rand_details, rand_telemetry)
-        
-        self.assertTrue(os.path.exists(self.log_path), "Лог-файл должен быть создан при логировании аномалии")
+    def test_pipeline_and_audit_hub_integration(self):
+        source = f"service_{uuid.uuid4().hex[:6]}"
+        severity = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
+        details = {"error_code": random.randint(500, 599), "message": uuid.uuid4().hex}
+        telemetry_snapshot = {"cpu_usage": random.uniform(10.0, 99.9), "memory_mb": random.randint(1024, 8192)}
 
-        metric_name = f"metric_{uuid.uuid4().hex[:6]}"
-        metric_value = random.uniform(0.0, 100.0)
-        aggregation_result = hub.aggregate_and_report(metric_name, metric_value)
-        self.assertTrue(aggregation_result, "Агрегация метрики должна завершиться успешно")
-
-        report = hub.generate_final_report()
-        self.assertIn("report_id", report)
-        self.assertIn(self.log_filename, report["report_id"])
-        self.assertIn("metrics", report)
-        self.assertIn("anomalies", report)
+        audit_hub = AnomalyAuditHub(self.repo_path, self.log_path, self.threshold)
         
-        logged_anomalies = report["anomalies"]
-        self.assertEqual(len(logged_anomalies), 1)
-        self.assertEqual(logged_anomalies[0]["source"], rand_source)
-        self.assertEqual(logged_anomalies[0]["severity"], rand_severity)
-        self.assertEqual(logged_anomalies[0]["details"], rand_details)
-        self.assertEqual(logged_anomalies[0]["telemetry"], rand_telemetry)
+        audit_hub.log_anomaly(source, severity, details, telemetry_snapshot)
+        
+        metric_name = f"metric_{uuid.uuid4().hex[:4]}"
+        metric_value = random.randint(1, 100)
+        aggregation_result = audit_hub.aggregate_and_report(metric_name, metric_value)
+        self.assertTrue(aggregation_result)
 
-        pipeline_input = {"test_key": uuid.uuid4().hex}
-        filtered_res = start_pipeline(pipeline_input)
-        self.assertTrue(filtered_res.get("filtered"))
-        self.assertEqual(filtered_res.get("test_key"), pipeline_input["test_key"])
+        final_report = audit_hub.generate_final_report()
+        self.assertIn("report_id", final_report)
+        self.assertTrue(final_report["report_id"].endswith(os.path.basename(self.log_path)))
+        self.assertEqual(len(final_report["metrics"]), 1)
+        self.assertEqual(final_report["metrics"][0]["name"], metric_name)
+        self.assertEqual(final_report["metrics"][0]["value"], metric_value)
+
+        anomalies = final_report["anomalies"]
+        self.assertEqual(len(anomalies), 1)
+        self.assertEqual(anomalies[0]["source"], source)
+        self.assertEqual(anomalies[0]["severity"], severity)
+        self.assertEqual(anomalies[0]["details"], details)
+        self.assertEqual(anomalies[0]["telemetry"], telemetry_snapshot)
+
+        logger = AnomalyLogger(self.log_path)
+        structured_report = logger.get_structured_report()
+        self.assertIn("anomalies", structured_report)
+        self.assertEqual(len(structured_report["anomalies"]), 1)
+
+        input_payload = {str(uuid.uuid4()): random.randint(1, 1000)}
+        pipeline_res = start_pipeline(input_payload)
+        self.assertTrue(pipeline_res.get("filtered"))
+        for k, v in input_payload.items():
+            self.assertEqual(pipeline_res.get(k), v)
 
         extractor = ExtractorTool()
-        rand_tag_val = uuid.uuid4().hex[:8]
-        tag_str = f'id="{rand_tag_val}" class="test-class"'
-        parsed_attrs = extractor.parse_attributes(tag_str)
-        self.assertEqual(parsed_attrs.get("id"), rand_tag_val)
+        tag_name = f"tag_{uuid.uuid4().hex[:4]}"
+        attr_key = f"key_{uuid.uuid4().hex[:4]}"
+        attr_val = uuid.uuid4().hex[:8]
+        tag_string = f'<{tag_name} {attr_key}="{attr_val}"></{tag_name}>'
         
-        extraction_res = extractor.extract(tag_str)
-        self.assertTrue(extraction_res.get("parsed"))
-        self.assertEqual(extraction_res.get("markup"), tag_str)
+        parsed_attrs = extractor.parse_attributes(tag_string)
+        self.assertEqual(parsed_attrs.get(attr_key), attr_val)
+
+        extracted_data = extractor.extract(tag_string)
+        self.assertTrue(extracted_data.get("parsed"))
+        self.assertEqual(extracted_data.get("markup"), tag_string)
 
         inspector = GitInspector(self.repo_path)
-        history = inspector.get_commit_history(max_count=5)
-        self.assertIsInstance(history, list)
-        self.assertTrue(len(history) > 0)
+        commits = inspector.get_commit_history(max_count=5)
+        self.assertIsInstance(commits, list)
+        self.assertTrue(len(commits) > 0)
+        commit_hash = commits[0].get("commit")
         
-        commit_hash = history[0].get("commit")
-        file_content = inspector.read_file_at_commit(commit_hash, "any_file.py")
+        file_content = inspector.read_file_at_commit(commit_hash, "some_path.py")
         self.assertIsInstance(file_content, bytes)
 
         repo_analysis = inspector.analyze_repository()

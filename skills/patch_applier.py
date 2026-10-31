@@ -87,7 +87,11 @@ def apply_patch(repo_path: str, patch_data: Dict[str, Any]) -> bool:
     backup_id = patch_data.get("backup_id", "backup")
 
     applier = PatchApplier(repo_path)
-    applier.create_recovery_point(backup_id)
+    try:
+        applier.create_recovery_point(backup_id)
+    except PatchApplierError as err:
+        if "already exists" not in str(err):
+            raise
 
     target_full_path = os.path.join(repo_path, file_path)
     os.makedirs(os.path.dirname(target_full_path), exist_ok=True)

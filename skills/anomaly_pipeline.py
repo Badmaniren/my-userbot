@@ -28,14 +28,25 @@ class AnomalyLogger:
         anomalies = []
         if not os.path.exists(self.log_path):
             return anomalies
-        with open(self.log_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    try:
-                        anomalies.append(json.loads(line))
-                    except json.JSONDecodeError:
-                        pass
+        
+        content = ""
+        try:
+            with open(self.log_path, "r", encoding="utf-8") as f:
+                content = f.read()
+        except Exception:
+            return anomalies
+
+        if not content:
+            return anomalies
+
+        lines = content.splitlines()
+        for line in lines:
+            line = line.strip()
+            if line:
+                try:
+                    anomalies.append(json.loads(line))
+                except json.JSONDecodeError:
+                    pass
         return anomalies
 
     def get_structured_report(self):

@@ -87,13 +87,13 @@ class AnomalyRemediator:
                 return {"status": "success"}
             else:
                 self.rollback_controller.execute_rollback(anomaly_id, source)
-                return {"status": "failed_verification_rolled_back"}
+                return {"status": "failed_verification_rolled_back", "rollback": True}
         except (PatchApplicationError, AutofixerWorkerError) as e:
             try:
                 self.rollback_controller.execute_rollback(anomaly_id, source)
             except AnomalyRollbackControllerError as rbe:
                 raise AnomalyRemediatorError(f"Rollback failed: {rbe}") from rbe
-            return {"status": "failed_verification_rolled_back"}
+            return {"status": "failed_verification_rolled_back", "rollback": True}
 
     def force_rollback(self, anomaly_id: str, source: str) -> dict:
         try:
@@ -115,6 +115,13 @@ class AnomalyRemediator:
         verification_command: str,
         source: str,
     ) -> dict:
+        target_file_path = f"{self.repo_path}/{target_file}" if not target_file.startswith(self.repo_path) else target_file
+        try:
+            with open(target_file_path, "w", encoding="utf-8") as f:
+                f.write(patch_content)
+        except IOError:
+            pass
+
         try:
             res = self.apply_and_verify(
                 anomaly_id=anomaly_id,

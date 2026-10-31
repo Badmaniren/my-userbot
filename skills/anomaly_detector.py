@@ -97,8 +97,11 @@ class AnomalyDetector:
         """Интеграционный метод для обнаружения аномалий в репозитории."""
         commits_count = 0
         if self.git_inspector:
-            history = self.git_inspector.get_commit_history(max_count=10)
-            commits_count = len(history)
+            try:
+                history = self.git_inspector.get_commit_history(max_count=10)
+                commits_count = len(history)
+            except Exception:
+                commits_count = 0
 
         return {
             "status": "analyzed",

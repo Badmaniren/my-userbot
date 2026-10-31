@@ -1,73 +1,79 @@
 import unittest
 import tempfile
 import os
+
 from patch_sanitizer import patch_sanitizer
-from patch_analyzer import patch_analyzer
 from patch_checker import patch_checker
+from patch_analyzer import patch_analyzer
 from patch_evaluator import patch_evaluator
 from patch_verifier import patch_verifier
 from patch_applier import patch_applier
 
-class TestPatchPipelineEpicPractical(unittest.TestCase):
+class TestPatchPipelineEpicPracticalCheck(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.TemporaryDirectory()
-        self.target_file = os.path.join(self.test_dir.name, "target_code.py")
+        self.test_file_path = os.path.join(self.test_dir.name, "target_module.py")
         
-        # Создаем исходный файл для применения патча
-        with open(self.target_file, "w", encoding="utf-8") as f:
-            f.write("def calculate_sum(a, b):\n    return a + b\n")
+        original_code = (
+            "def calculate_sum(a, b):\n"
+            "    # TODO: implement sum\n"
+            "    return 0\n"
+        )
+        with open(self.test_file_path, "w", encoding="utf-8") as f:
+            f.write(original_code)
 
     def tearDown(self):
         self.test_dir.cleanup()
 
     def test_safe_patch_pipeline_end_to_end(self):
-        print("\n=== НАЧАЛО ПРАКТИЧЕСКОЙ ПРОВЕРКИ ЭПИКА: Безопасный пайплайн исправления патчей ===")
-        
-        # Сырой патч с лишними пробелами и потенциально опасными конструкциями
-        raw_patch = """
-        --- target_code.py
-        +++ target_code.py
-        @@ -1,2 +1,2 @@
-         def calculate_sum(a, b):
-        -    return a + b
-        +    return a + b # Fixed implementation with comment
-        """
-        print(f"[1] Сырой патч создан (длина: {len(raw_patch)} символов).")
+        raw_patch = (
+            f"--- {self.test_file_path}\n"
+            f"+++ {self.test_file_path}\n"
+            "@@ -1,3 +1,3 @@\n"
+            " def calculate_sum(a, b):\n"
+            "-    return 0\n"
+            "+    return a + b\n"
+        )
 
-        # Шаг 1: Санитизация (patch_sanitizer)
-        sanitized_patch = patch_sanitizer.sanitize(raw_patch)
-        print(f"[2] Шаг санитизации (patch_sanitizer) выполнен успешно. Нормализованный патч:\n{sanitized_patch}")
+        print("\n[STEP 1] Sanitizing raw patch...")
+        sanitized = patch_sanitizer.sanitize(raw_patch)
+        print(f"Sanitized patch result length: {len(sanitized)} chars")
+        self.assertTrue(len(sanitized) > 0)
 
-        # Шаг 2: Анализ структуры патча (patch_analyzer)
-        analysis_result = patch_analyzer.analyze(sanitized_patch)
-        print(f"[3] Шаг анализа (patch_analyzer) завершен. Результат структуры: {analysis_result}")
-        self.assertIsNotNone(analysis_result)
+        print("\n[STEP 2] Analyzing patch structure...")
+        analysis = patch_analyzer.analyze(sanitized)
+        print(f"Patch analysis result: {analysis}")
+        self.assertIsNotNone(analysis)
 
-        # Шаг 3: Проверка патча (patch_checker)
-        check_result = patch_checker.check(sanitized_patch, self.target_file)
-        print(f"[4] Шаг проверки (patch_checker) завершен. Статус проверки: {check_result}")
+        print("\n[STEP 3] Checking patch validity...")
+        is_checked = patch_checker.check(sanitized)
+        print(f"Patch check status: {is_checked}")
+        self.assertTrue(is_checked)
 
-        # Шаг 4: Оценка патча (patch_evaluator)
-        evaluation_result = patch_evaluator.evaluate(sanitized_patch)
-        print(f"[5] Шаг оценки (patch_evaluator) завершен. Оценка безопасности/качества: {evaluation_result}")
+        print("\n[STEP 4] Evaluating patch safety and metrics...")
+        evaluation = patch_evaluator.evaluate(sanitized)
+        print(f"Patch evaluation score/status: {evaluation}")
+        self.assertIsNotNone(evaluation)
 
-        # Шаг 5: Финальная верификация (patch_verifier)
-        verification_passed = patch_verifier.verify(sanitized_patch, self.target_file)
-        print(f"[6] Шаг верификации (patch_verifier) пройден: {verification_passed}")
-        self.assertTrue(verification_passed)
+        print("\n[STEP 5] Final verification before application...")
+        is_verified = patch_verifier.verify(sanitized)
+        print(f"Patch verification status: {is_verified}")
+        self.assertTrue(is_verified)
 
-        # Шаг 6: Применение патча (patch_applier)
-        apply_success = patch_applier.apply(sanitized_patch, self.target_file)
-        print(f"[7] Шаг применения (patch_applier) завершен. Успех: {apply_success}")
-        self.assertTrue(apply_success)
+        print("\n[STEP 6] Applying patch to target repository/file...")
+        applied_status = patch_applier.apply(sanitized)
+        print(f"Patch apply status: {applied_status}")
+        self.assertTrue(applied_status)
 
-        # Проверяем реальное содержимое файла после применения патча
-        with open(self.target_file, "r", encoding="utf-8") as f:
+        with open(self.test_file_path, "r", encoding="utf-8") as f:
             updated_content = f.read()
-        print(f"[8] Итоговое содержимое файла на диске после пайплайна:\n{updated_content}")
-        
-        self.assertIn("Fixed implementation", updated_content)
-        print("=== ПРАКТИЧЕСКАЯ ПРОВЕРКА ЭПИКА УСПЕШНО ЗАВЕРШЕНА ===")
+
+        print("\n[RESULT] Final file content after successful pipeline execution:")
+        print("----------------------------------------")
+        print(updated_content.strip())
+        print("----------------------------------------")
+
+        self.assertIn("return a + b", updated_content)
 
 if __name__ == "__main__":
     unittest.main()

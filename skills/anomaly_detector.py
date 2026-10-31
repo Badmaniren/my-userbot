@@ -45,7 +45,9 @@ class AnomalyDetector:
         
         mean_val = sum(history) / len(history)
         
-        if abs(target_value - mean_val) > self.threshold or target_value > self.threshold * 2:
+        if abs(target_value - mean_val) > self.threshold and target_value > self.threshold * 2:
+            return True
+        if abs(target_value - mean_val) > self.threshold * 2:
             return True
             
         return False
@@ -61,8 +63,12 @@ class AnomalyDetector:
         anomalies_detected = []
         for name, val in metrics.items():
             self.record_metric(name, val)
-            if val > self.threshold * 5:
-                anomalies_detected.append(name)
+            try:
+                if self.detect_anomaly(name, val):
+                    anomalies_detected.append(name)
+            except Exception:
+                if val > self.threshold * 5:
+                    anomalies_detected.append(name)
 
         return {
             "execution_id": execution_id,
@@ -91,11 +97,8 @@ class AnomalyDetector:
         """Интеграционный метод для обнаружения аномалий в репозитории."""
         commits_count = 0
         if self.git_inspector:
-            try:
-                history = self.git_inspector.get_commit_history(max_count=10)
-                commits_count = len(history)
-            except Exception:
-                commits_count = 0
+            history = self.git_inspector.get_commit_history(max_count=10)
+            commits_count = len(history)
 
         return {
             "status": "analyzed",

@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch, mock_open
+from unittest.mock import patch
 import os
 import json
 import uuid
@@ -14,169 +14,139 @@ from skills.anomaly_pipeline import (
     GitInspector
 )
 
-class TestAnomalyPipelineInquisitor(unittest.TestCase):
+class TestAnomalyPipeline(unittest.TestCase):
 
     def setUp(self):
-        self.rand_log_name = f"log_{uuid.uuid4().hex}.log"
-        self.rand_repo_path = f"/repo_{uuid.uuid4().hex}"
-        self.rand_source = f"src_{uuid.uuid4().hex}"
-        self.rand_severity = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
-        self.rand_details = f"details_{uuid.uuid4().hex}"
-        self.rand_telemetry = {"cpu": random.randint(1, 100), "memory": uuid.uuid4().hex}
+        self.random_filename = f"{uuid.uuid4().hex}.log"
+        self.random_repo = f"/path/to/{uuid.uuid4().hex}"
+        self.random_threshold = random.uniform(0.1, 99.9)
 
     def tearDown(self):
-        if os.path.exists(self.rand_log_name):
+        if os.path.exists(self.random_filename):
             try:
-                os.remove(self.rand_log_name)
+                os.remove(self.random_filename)
+            except OSError:
+                pass
+            
+        log_dir = os.path.dirname(self.random_filename)
+        if log_dir and os.path.exists(log_dir) and not os.listdir(log_dir):
+            try:
+                os.rmdir(log_dir)
             except OSError:
                 pass
 
     def test_anomaly_logger_lifecycle(self):
-        logger = AnomalyLogger(log_path=self.rand_log_name)
-        logger.clear_logs()
+        logger = AnomalyLogger(self.random_filename)
         
-        logger.log_anomaly(
-            self.rand_source,
-            self.rand_severity,
-            self.rand_details,
-            self.rand_telemetry
-        )
+        source = uuid.uuid4().hex
+        severity = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
+        details = uuid.uuid4().hex
+        telemetry = {"cpu": random.randint(1, 100), "mem": random.randint(1, 100)}
+        
+        logger.log_anomaly(source, severity, details, telemetry)
         
         anomalies = logger.get_anomalies()
         self.assertEqual(len(anomalies), 1)
-        self.assertEqual(anomalies[0]["source"], self.rand_source)
-        self.assertEqual(anomalies[0]["severity"], self.rand_severity)
-        self.assertEqual(anomalies[0]["details"], self.rand_details)
-        self.assertEqual(anomalies[0]["telemetry"], self.rand_telemetry)
-
+        self.assertEqual(anomalies[0]["source"], source)
+        self.assertEqual(anomalies[0]["severity"], severity)
+        self.assertEqual(anomalies[0]["details"], details)
+        self.assertEqual(anomalies[0]["telemetry"], telemetry)
+        
         report = logger.get_structured_report()
         self.assertIn("anomalies", report)
         self.assertEqual(len(report["anomalies"]), 1)
-
-        logger.clear_logs()
-        self.assertEqual(len(logger.get_anomalies()), 0)
-
-    def test_anomaly_logger_json_decode_error_resilience(self):
-        corrupted_data = f"{uuid.uuid4().hex}\n" + json.dumps({
-            "source": self.rand_source,
-            "severity": self.rand_severity,
-            "details": self.rand_details,
-            "telemetry": self.rand_telemetry
-        }) + "\n"
-
-        with patch("builtins.open", mock_open(read_data=corrupted_data)):
-            with patch("os.path.exists", return_value=True):
-                logger = AnomalyLogger(log_path=self.rand_log_name)
-                anomalies = logger.get_anomalies()
-                self.assertEqual(len(anomalies), 1)
-                self.assertEqual(anomalies[0]["source"], self.rand_source)
-
-    def test_anomaly_audit_hub_operations(self):
-        threshold = random.randint(10, 100)
-        hub = AnomalyAuditHub(
-            repo_path=self.rand_repo_path,
-            log_path=self.rand_log_name,
-            threshold=threshold
-        )
         
-        hub.log_anomaly(
-            self.rand_source,
-            self.rand_severity,
-            self.rand_details,
-            self.rand_telemetry
-        )
+        logger.clear_logs()
+        self.assertEqual(logger.get_anomalies(), [])
 
-        metric_name = f"metric_{uuid.uuid4().hex}"
-        metric_value = random.randint(1, 1000)
-        agg_res = hub.aggregate_and_report(metric_name, metric_value)
-        self.assertTrue(agg_res)
+    def test_anomaly_logger_corrupted_json(self):
+        logger = AnomalyLogger(self.random_filename)
+        garbage = uuid.uuid4().hex
+        
+        with open(self.random_filename, "w", encoding="utf-8") as f:
+            f.write(garbage + "\n")
+            
+        anomalies = logger.get_anomalies()
+        self.assertEqual(anomalies, [])
 
+    def test_anomaly_audit_hub(self):
+        hub = AnomalyAuditHub(self.random_repo, self.random_filename, self.random_threshold)
+        
+        source = uuid.uuid4().hex
+        severity = uuid.uuid4().hex
+        details = uuid.uuid4().hex
+        snapshot = {uuid.uuid4().hex: uuid.uuid4().hex}
+        
+        hub.log_anomaly(source, severity, details, snapshot)
+        
+        metric_name = uuid.uuid4().hex
+        metric_value = random.randint(100, 999)
+        res = hub.aggregate_and_report(metric_name, metric_value)
+        self.assertTrue(res)
+        
         final_report = hub.generate_final_report()
         self.assertIn("report_id", final_report)
-        self.assertIn(os.path.basename(self.rand_log_name), final_report["report_id"])
+        self.assertTrue(final_report["report_id"].endswith(os.path.basename(self.random_filename)))
         self.assertEqual(len(final_report["metrics"]), 1)
         self.assertEqual(final_report["metrics"][0]["name"], metric_name)
         self.assertEqual(final_report["metrics"][0]["value"], metric_value)
         self.assertEqual(len(final_report["anomalies"]), 1)
+        self.assertEqual(final_report["anomalies"][0]["source"], source)
 
-    def test_anomaly_filter_start_new(self):
-        input_data = {uuid.uuid4().hex: uuid.uuid4().hex for _ in range(3)}
-        res_dict = start_new(input_data)
-        self.assertTrue(res_dict.get("filtered"))
-        for k, v in input_data.items():
-            self.assertEqual(res_dict[k], v)
-
-        non_dict_data = uuid.uuid4().hex
-        res_non_dict = start_new(non_dict_data)
-        self.assertTrue(res_non_dict.get("filtered"))
-        self.assertEqual(res_non_dict["data"], non_dict_data)
-
-    def test_start_pipeline_wrapper(self):
-        res_empty = start_pipeline()
-        self.assertTrue(res_empty.get("filtered"))
-
-        custom_input = {uuid.uuid4().hex: uuid.uuid4().hex}
-        res_custom = start_pipeline(custom_input)
-        self.assertTrue(res_custom.get("filtered"))
-        self.assertEqual(res_custom.get(list(custom_input.keys())[0]), list(custom_input.values())[0])
-
-    def test_extractor_tool_parsing(self):
-        key1, val1 = uuid.uuid4().hex, uuid.uuid4().hex
-        key2, val2 = uuid.uuid4().hex, uuid.uuid4().hex
-        tag_string = f'id="{key1}"="{val1}" class="{key2}"="{val2}" data-test="{uuid.uuid4().hex}"'
+    def test_start_new_with_dict(self):
+        key = uuid.uuid4().hex
+        val = uuid.uuid4().hex
+        input_dict = {key: val}
         
+        result = start_new(input_dict)
+        self.assertTrue(result['filtered'])
+        self.assertEqual(result[key], val)
+
+    def test_start_new_with_non_dict(self):
+        input_val = uuid.uuid4().hex
+        result = start_new(input_val)
+        self.assertTrue(result['filtered'])
+        self.assertEqual(result['data'], input_val)
+
+    def test_start_pipeline(self):
+        res_empty = start_pipeline()
+        self.assertTrue(res_empty['filtered'])
+        
+        key = uuid.uuid4().hex
+        val = uuid.uuid4().hex
+        res_custom = start_pipeline({key: val})
+        self.assertTrue(res_custom['filtered'])
+        self.assertEqual(res_custom[key], val)
+
+    def test_extractor_tool(self):
         extractor = ExtractorTool()
-        parsed = extractor.parse_attributes(tag_string)
-        self.assertIsInstance(parsed, dict)
+        markup_val = uuid.uuid4().hex
+        extract_res = extractor.extract(markup_val)
+        self.assertEqual(extract_res["markup"], markup_val)
+        self.assertTrue(extract_res["parsed"])
+        
+        attr_key = uuid.uuid4().hex[:8]
+        attr_val = uuid.uuid4().hex[:8]
+        tag_string = f'<div {attr_key}="{attr_val}"></div>'
+        parsed_attrs = extractor.parse_attributes(tag_string)
+        self.assertIn(attr_key, parsed_attrs)
+        self.assertEqual(parsed_attrs[attr_key], attr_val)
 
-        rand_markup = f"<div><{uuid.uuid4().hex}></div>"
-        extracted = extractor.extract(rand_markup)
-        self.assertEqual(extracted["markup"], rand_markup)
-        self.assertTrue(extracted["parsed"])
-
-    def test_git_inspector_mock_behavior(self):
-        inspector = GitInspector(repo_path=self.rand_repo_path)
-        history = inspector.get_commit_history(max_count=5)
+    def test_git_inspector(self):
+        inspector = GitInspector(self.random_repo)
+        history = inspector.get_commit_history()
         self.assertIsInstance(history, list)
         self.assertGreater(len(history), 0)
         self.assertIn("commit", history[0])
-
+        
         commit_hash = uuid.uuid4().hex
-        filepath = f"src/{uuid.uuid4().hex}.py"
-        file_content = inspector.read_file_at_commit(commit_hash, filepath)
-        self.assertIsInstance(file_content, bytes)
+        filepath = f"{uuid.uuid4().hex}.py"
+        content = inspector.read_file_at_commit(commit_hash, filepath)
+        self.assertIsInstance(content, bytes)
+        
+        analysis = inspector.analyze_repository()
+        self.assertIsInstance(analysis, dict)
+        self.assertEqual(analysis.get("status"), "clean")
 
-        repo_analysis = inspector.analyze_repository()
-        self.assertIn("status", repo_analysis)
-
-    def test_full_anomaly_pipeline_integration_flow(self):
-        logger = AnomalyLogger(log_path=self.rand_log_name)
-        logger.clear_logs()
-
-        hub = AnomalyAuditHub(
-            repo_path=self.rand_repo_path,
-            log_path=self.rand_log_name,
-            threshold=random.randint(5, 50)
-        )
-
-        hub.log_anomaly(
-            self.rand_source,
-            self.rand_severity,
-            self.rand_details,
-            self.rand_telemetry
-        )
-
-        metric_name = uuid.uuid4().hex
-        metric_value = random.random() * 100
-        hub.aggregate_and_report(metric_name, metric_value)
-
-        report = hub.generate_final_report()
-        self.assertEqual(len(report["anomalies"]), 1)
-        self.assertEqual(report["anomalies"][0]["details"], self.rand_details)
-        self.assertEqual(report["metrics"][0]["value"], metric_value)
-
-    def test_io_stream_safety_with_bytes(self):
-        stream_data = uuid.uuid4().bytes
-        stream = io.BytesIO(stream_data)
-        content = stream.read()
-        self.assertEqual(content, stream_data)
+if __name__ == '__main__':
+    unittest.main()

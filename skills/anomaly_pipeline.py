@@ -68,6 +68,9 @@ class AnomalyAuditHub:
         self.metrics.append({"name": metric_name, "value": metric_value})
         return True
 
+    def correlate_metric(self, metric_value):
+        return metric_value > self.threshold
+
     def generate_final_report(self):
         return {
             "report_id": "report_" + os.path.basename(self.log_path),

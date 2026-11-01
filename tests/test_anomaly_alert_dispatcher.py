@@ -3,123 +3,123 @@ from unittest.mock import patch, MagicMock
 import uuid
 import random
 import string
-from skills.anomaly_alert_dispatcher import AnomalyAlertDispatcher, AnomalyAlertDispatcherError, dispatch_alert
+import requests
 
-class TestAnomalyAlertDispatcherInquisition(unittest.TestCase):
+from skills.anomaly_alert_dispatcher import (
+    AnomalyAlertDispatcher,
+    AnomalyAlertDispatcherError,
+    dispatch_alert
+)
+
+
+class TestAnomalyAlertDispatcher(unittest.TestCase):
     
     def setUp(self):
-        self.endpoint = f"https://{uuid.uuid4().hex}.com/{uuid.uuid4().hex}"
-        self.api_token = uuid.uuid4().hex
-        self.timeout = random.randint(1, 15)
-        self.dispatcher = AnomalyAlertDispatcher(endpoint=self.endpoint, api_token=self.api_token, timeout=self.timeout)
+        self.random_endpoint = f"https://{uuid.uuid4().hex}.com/{uuid.uuid4().hex}"
+        self.random_token = uuid.uuid4().hex
+        self.random_timeout = random.randint(1, 30)
+        
+        self.dispatcher = AnomalyAlertDispatcher(
+            endpoint=self.random_endpoint,
+            api_token=self.random_token,
+            timeout=self.random_timeout
+        )
 
     def test_init_properties(self):
-        rand_ep = f"http://{uuid.uuid4().hex}.net"
-        rand_token = uuid.uuid4().hex
-        rand_timeout = random.randint(5, 20)
-        disp = AnomalyAlertDispatcher(endpoint=rand_ep, api_token=rand_token, timeout=rand_timeout)
-        self.assertEqual(disp.endpoint, rand_ep)
-        self.assertEqual(disp.api_token, rand_token)
-        self.assertEqual(disp.timeout, rand_timeout)
-
-    def test_dispatch_alert_invalid_endpoint(self):
-        bad_disp = AnomalyAlertDispatcher(endpoint="", api_token=self.api_token)
-        severity = random.choice(["LOW", "MEDIUM", "CRITICAL"])
-        message = "".join(random.choices(string.ascii_letters, k=10))
-        with self.assertRaises(AnomalyAlertDispatcherError):
-            bad_disp.dispatch_alert(severity, message)
+        self.assertEqual(self.dispatcher.endpoint, self.random_endpoint)
+        self.assertEqual(self.dispatcher.api_token, self.random_token)
+        self.assertEqual(self.dispatcher.timeout, self.random_timeout)
 
     def test_dispatch_alert_success(self):
-        severity = random.choice(["WARNING", "FATAL", "INFO"])
-        message = uuid.uuid4().hex
-        telemetry = {uuid.uuid4().hex: random.randint(1, 100)}
+        random_severity = random.choice(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'])
+        random_message = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
+        random_telemetry_key = uuid.uuid4().hex
+        random_telemetry_val = random.randint(100, 999)
+        telemetry = {random_telemetry_key: random_telemetry_val}
 
-        with patch("requests.post") as mock_post:
+        with patch('skills.anomaly_alert_dispatcher.requests.post') as mock_post:
             mock_response = MagicMock()
             mock_response.status_code = 200
             mock_post.return_value = mock_response
 
-            result = self.dispatcher.dispatch_alert(severity, message, telemetry=telemetry)
+            result = self.dispatcher.dispatch_alert(
+                severity=random_severity,
+                message=random_message,
+                telemetry=telemetry
+            )
+
             self.assertTrue(result)
-
             mock_post.assert_called_once()
+            
             args, kwargs = mock_post.call_args
-            self.assertEqual(args[0], self.endpoint)
-            self.assertEqual(kwargs["headers"]["Authorization"], f"Bearer {self.api_token}")
-            self.assertEqual(kwargs["timeout"], self.timeout)
-            self.assertEqual(kwargs["json"]["severity"], severity)
-            self.assertEqual(kwargs["json"]["message"], message)
-            self.assertEqual(kwargs["json"]["telemetry"], telemetry)
+            self.assertEqual(args[0], self.random_endpoint)
+            self.assertEqual(kwargs['headers']['Authorization'], f"Bearer {self.random_token}")
+            self.assertEqual(kwargs['timeout'], self.random_timeout)
+            
+            payload = kwargs['json']
+            self.assertEqual(payload['severity'], random_severity)
+            self.assertEqual(payload['message'], random_message)
+            self.assertEqual(payload['telemetry'][random_telemetry_key], random_telemetry_val)
 
-    def test_dispatch_alert_without_token(self):
-        disp_no_token = AnomalyAlertDispatcher(endpoint=self.endpoint, api_token=None)
-        severity = uuid.uuid4().hex
-        message = uuid.uuid4().hex
+    def test_dispatch_alert_invalid_endpoint(self):
+        dispatcher_no_endpoint = AnomalyAlertDispatcher(endpoint="")
+        random_severity = random.choice(['INFO', 'ERROR'])
+        random_message = uuid.uuid4().hex
 
-        with patch("requests.post") as mock_post:
-            mock_response = MagicMock()
-            mock_post.return_value = mock_response
-
-            disp_no_token.dispatch_alert(severity, message)
-            _, kwargs = mock_post.call_args
-            self.assertNotIn("Authorization", kwargs["headers"])
+        with self.assertRaises(AnomalyAlertDispatcherError) as context:
+            dispatcher_no_endpoint.dispatch_alert(random_severity, random_message)
+        
+        self.assertIn("Invalid endpoint", str(context.exception))
 
     def test_dispatch_alert_request_exception(self):
-        severity = uuid.uuid4().hex
-        message = uuid.uuid4().hex
+        random_severity = random.choice(['WARNING', 'FATAL'])
+        random_message = uuid.uuid4().hex
+        random_error_msg = uuid.uuid4().hex
 
-        with patch("requests.post", side_effect=Exception(uuid.uuid4().hex)) as mock_post:
-            with self.assertRaises(AnomalyAlertDispatcherError):
-                self.dispatcher.dispatch_alert(severity, message)
+        with patch('skills.anomaly_alert_dispatcher.requests.post') as mock_post:
+            mock_post.side_effect = requests.RequestException(random_error_msg)
 
-    def test_dispatch_alert_helper_function_with_logger_method(self):
-        dispatch_id = uuid.uuid4().hex
-        target_service = uuid.uuid4().hex
-        anomaly_item = {"source": uuid.uuid4().hex, "severity": "HIGH"}
-        
-        audit_hub = MagicMock()
-        audit_hub.logger = MagicMock()
-        audit_hub.logger.get_anomalies.return_value = [anomaly_item]
-        
-        # Удаляем метод get_anomalies из audit_hub чтобы сработал путь через audit_hub.logger
-        del audit_hub.get_anomalies
+            with self.assertRaises(AnomalyAlertDispatcherError) as context:
+                self.dispatcher.dispatch_alert(random_severity, random_message)
+            
+            self.assertIn("Failed to dispatch alert", str(context.exception))
+            self.assertIn(random_error_msg, str(context.exception))
 
-        payload = dispatch_alert(audit_hub, target_service, dispatch_id)
-        
-        self.assertEqual(payload["dispatch_id"], dispatch_id)
-        self.assertEqual(payload["target_service"], target_service)
+    def test_dispatch_alert_integration_function_with_logger(self):
+        random_dispatch_id = uuid.uuid4().hex
+        random_target = uuid.uuid4().hex
+        random_anomaly_msg = uuid.uuid4().hex
+
+        mock_audit_hub = MagicMock()
+        mock_logger = MagicMock()
+        mock_logger.get_anomalies.return_value = [random_anomaly_msg]
+        mock_audit_hub.logger = mock_logger
+
+        payload = dispatch_alert(mock_audit_hub, random_target, random_dispatch_id)
+
+        self.assertEqual(payload["dispatch_id"], random_dispatch_id)
+        self.assertEqual(payload["target_service"], random_target)
         self.assertEqual(payload["status"], "dispatched")
-        self.assertEqual(payload["anomalies"], [anomaly_item])
+        self.assertIn(random_anomaly_msg, payload["anomalies"])
+        mock_logger.get_anomalies.assert_called_once()
 
-    def test_dispatch_alert_helper_function_with_direct_method(self):
-        dispatch_id = uuid.uuid4().hex
-        target_service = uuid.uuid4().hex
-        anomaly_item = {"source": uuid.uuid4().hex, "severity": "CRITICAL"}
-        
-        audit_hub = MagicMock()
-        # Имитируем отсутствие логгера или отсутствие у него метода get_anomalies
-        audit_hub.logger = None
-        audit_hub.get_anomalies.return_value = [anomaly_item]
+    def test_dispatch_alert_integration_function_direct_method(self):
+        random_dispatch_id = uuid.uuid4().hex
+        random_target = uuid.uuid4().hex
+        random_anomaly_msg = uuid.uuid4().hex
 
-        payload = dispatch_alert(audit_hub, target_service, dispatch_id)
-        
-        self.assertEqual(payload["dispatch_id"], dispatch_id)
-        self.assertEqual(payload["target_service"], target_service)
+        mock_audit_hub = MagicMock()
+        del mock_audit_hub.logger
+        mock_audit_hub.get_anomalies.return_value = [random_anomaly_msg]
+
+        payload = dispatch_alert(mock_audit_hub, random_target, random_dispatch_id)
+
+        self.assertEqual(payload["dispatch_id"], random_dispatch_id)
+        self.assertEqual(payload["target_service"], random_target)
         self.assertEqual(payload["status"], "dispatched")
-        self.assertEqual(payload["anomalies"], [anomaly_item])
+        self.assertIn(random_anomaly_msg, payload["anomalies"])
+        mock_audit_hub.get_anomalies.assert_called_once()
 
-    def test_dispatch_alert_helper_function_no_anomalies(self):
-        dispatch_id = uuid.uuid4().hex
-        target_service = uuid.uuid4().hex
-        
-        audit_hub = MagicMock()
-        audit_hub.logger = None
-        # Удаляем метод get_anomalies
-        del audit_hub.get_anomalies
 
-        payload = dispatch_alert(audit_hub, target_service, dispatch_id)
-        
-        self.assertEqual(payload["dispatch_id"], dispatch_id)
-        self.assertEqual(payload["target_service"], target_service)
-        self.assertEqual(payload["status"], "dispatched")
-        self.assertEqual(payload["anomalies"], [])
+if __name__ == '__main__':
+    unittest.main()

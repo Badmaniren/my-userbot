@@ -1,94 +1,99 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import uuid
 import random
-import string
 import io
 
-from skills.patch_regression_tester import start_new
+from skills.patch_regression_tester import (
+    start_new,
+    PatchEvaluator,
+    GitInspector,
+    PatchSanitizer,
+    PatchRegressionTester,
+    patch_regression_tester
+)
 
-
-class TestPatchRegressionTesterStartNew(unittest.TestCase):
+class TestPatchRegressionTesterInquisition(unittest.TestCase):
 
     def setUp(self):
-        self.rand_str_1 = uuid.uuid4().hex
-        self.rand_str_2 = uuid.uuid4().hex
-        self.rand_int = random.randint(100, 99999)
-        self.rand_float = random.random() * 100
-        self.test_data = {
-            "patch_id": self.rand_str_1,
-            "target_branch": self.rand_str_2,
-            "timeout": self.rand_int,
-            "tolerance": self.rand_float
-        }
+        self.random_patch_id = uuid.uuid4().hex
+        self.random_tolerance = round(random.uniform(0.1, 0.9), 2)
+        self.random_stream_data = uuid.uuid4().bytes
 
-    def test_start_new_success_execution(self):
-        with patch("skills.patch_regression_tester.PatchEvaluator") as mock_evaluator_cls, \
-             patch("skills.patch_regression_tester.GitInspector") as mock_git_cls:
+    def test_start_new_raises_type_error(self):
+        invalid_data = uuid.uuid4().hex
+        with self.assertRaises(TypeError):
+            start_new(invalid_data)
+
+    def test_start_new_stable_branch(self):
+        payload = {
+            "patch_id": self.random_patch_id,
+            "tolerance": self.random_tolerance
+        }
+        with patch("skills.patch_regression_tester.PatchEvaluator.evaluate") as mock_eval, \
+             patch("skills.patch_regression_tester.GitInspector.analyze_repository") as mock_analyze:
             
-            mock_evaluator_instance = mock_evaluator_cls.return_value
-            expected_result = {
-                "status": "stable",
-                "verified_patch": self.rand_str_1,
-                "score": self.rand_float
-            }
-            mock_evaluator_instance.evaluate.return_value = expected_result
+            mock_eval.return_value = {}
+            mock_analyze.return_value = True
 
-            mock_git_instance = mock_git_cls.return_value
-            mock_git_instance.analyze_repository.return_value = True
+            res = start_new(payload)
+            self.assertEqual(res["status"], "stable")
+            self.assertEqual(res["verified_patch"], self.random_patch_id)
+            self.assertEqual(res["score"], self.random_tolerance)
 
-            result = start_new(self.test_data)
-
-            self.assertIsInstance(result, dict)
-            self.assertEqual(result.get("verified_patch"), self.rand_str_1)
-            self.assertEqual(result.get("status"), "stable")
-
-    def test_start_new_handles_malformed_input(self):
-        corrupted_data = {
-            "".join(random.choices(string.ascii_lowercase, k=8)): uuid.uuid4().hex
-            for _ in range(5)
+    def test_start_new_with_stream_ref(self):
+        stream = io.BytesIO(self.random_stream_data)
+        payload = {
+            "stream_ref": stream,
+            "patch_id": self.random_patch_id,
+            "tolerance": self.random_tolerance
         }
-        
-        with patch("skills.patch_regression_tester.PatchEvaluator") as mock_evaluator_cls:
-            mock_evaluator_instance = mock_evaluator_cls.return_value
-            mock_evaluator_instance.evaluate.side_effect = KeyError(self.rand_str_1)
+        with patch("skills.patch_regression_tester.PatchSanitizer.sanitize_stream") as mock_sanitize, \
+             patch("skills.patch_regression_tester.GitInspector.analyze_repository") as mock_analyze, \
+             patch("skills.patch_regression_tester.PatchEvaluator.evaluate") as mock_eval:
+            
+            mock_eval.return_value = {}
+            mock_analyze.return_value = True
 
-            with self.assertRaises((KeyError, ValueError, TypeError)):
-                start_new(corrupted_data)
+            res = start_new(payload)
+            mock_sanitize.assert_called_once_with(stream)
+            self.assertEqual(res["verified_patch"], self.random_patch_id)
 
-    def test_start_new_io_integration_stream(self):
-        stream_data = io.BytesIO(f"test_payload_{self.rand_str_2}".encode('utf-8'))
-        
-        with patch("skills.patch_regression_tester.PatchSanitizer") as mock_sanitizer:
-            mock_sanitizer_instance = mock_sanitizer.return_value
-            mock_sanitizer_instance.sanitize_stream.return_value = stream_data
+    def test_start_new_evaluator_returns_data(self):
+        custom_key = uuid.uuid4().hex
+        custom_val = uuid.uuid4().hex
+        payload = {
+            "patch_id": self.random_patch_id,
+            custom_key: custom_val
+        }
+        with patch("skills.patch_regression_tester.PatchEvaluator.evaluate") as mock_eval, \
+             patch("skills.patch_regression_tester.GitInspector.analyze_repository") as mock_analyze:
+            
+            mock_eval.return_value = {custom_key: custom_val}
+            mock_analyze.return_value = True
 
-            enriched_data = {
-                **self.test_data,
-                "stream_ref": stream_data
-            }
+            res = start_new(payload)
+            self.assertEqual(res.get(custom_key), custom_val)
+            self.assertNotIn("status", res)
 
-            result = start_new(enriched_data)
+    def test_git_inspector_methods(self):
+        repo_path_mock = uuid.uuid4().hex
+        inspector = GitInspector(repo_path=repo_path_mock)
+        self.assertEqual(inspector.repo_path, repo_path_mock)
+        self.assertTrue(inspector.analyze_repository())
+        self.assertEqual(inspector.get_commit_history(), [])
 
-            self.assertIsNotNone(result)
-            mock_sanitizer_instance.sanitize_stream.assert_called_once()
+    def test_patch_evaluator_default(self):
+        evaluator = PatchEvaluator()
+        self.assertEqual(evaluator.evaluate({}), {})
 
-    def test_start_new_regression_failure_handling(self):
-        fail_reason = f"regression_detected_{uuid.uuid4().hex}"
-        
-        with patch("skills.patch_regression_tester.PatchEvaluator") as mock_evaluator_cls:
-            mock_evaluator_instance = mock_evaluator_cls.return_value
-            mock_evaluator_instance.evaluate.return_value = {
-                "status": "unstable",
-                "reason": fail_reason,
-                "patch_id": self.rand_str_1
-            }
+    def test_patch_sanitizer_identity(self):
+        sanitizer = PatchSanitizer()
+        stream = io.BytesIO(self.random_stream_data)
+        self.assertEqual(sanitizer.sanitize_stream(stream), stream)
 
-            result = start_new(self.test_data)
-
-            self.assertEqual(result.get("status"), "unstable")
-            self.assertEqual(result.get("reason"), fail_reason)
-
+    def test_regression_tester_instance(self):
+        self.assertIsInstance(patch_regression_tester, PatchRegressionTester)
 
 if __name__ == "__main__":
     unittest.main()

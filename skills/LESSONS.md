@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- ошибка перед фиксом: Traceback (most recent call last):
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## patch_checker (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: Traceback (most recent call last):
+следняя ошибка перед фиксом: Traceback (most recent call last):
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## patch_analyzer (create) — раундов: 3
@@ -339,4 +335,8 @@
 
 ## patch_regression_notificator (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## patch_regression_notifier (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

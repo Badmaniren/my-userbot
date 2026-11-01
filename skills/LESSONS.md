@@ -3,8 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-r (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/tests/test_patch_verifier.py", line 90, in test_patch_executor_apply_patch_io
+xecutor_apply_patch_io
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## patch_evaluator (refactor) — раундов: 3
@@ -344,4 +343,8 @@ r (refactor) — раундов: 4
 
 ## patch_regression_suite (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## patch_regression_tester (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

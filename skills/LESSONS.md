@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-home/runner/work/my-userbot/my-userbot/skills/patch_analyzer.py)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## patch_checker (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: Traceback (most recent call last):
+ ошибка перед фиксом: Traceback (most recent call last):
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## patch_checker (refactor) — раундов: 4
@@ -340,3 +336,7 @@ home/runner/work/my-userbot/my-userbot/skills/patch_analyzer.py)
 ## patch_evaluator (refactor) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: успешно прошёл тесты и влит в main
+
+## patch_regression_notificator (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

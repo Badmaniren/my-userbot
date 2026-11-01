@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-xecutor_apply_patch_io
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## patch_evaluator (refactor) — раундов: 3
-- Последняя ошибка перед фиксом: FAILED (failures=1)
+ FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main
 
 ## patch_verifier (refactor) — раундов: 4
@@ -348,3 +344,7 @@ xecutor_apply_patch_io
 ## patch_regression_tester (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## patch_regression_hub (start_new) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main

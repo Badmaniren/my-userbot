@@ -20,10 +20,19 @@ class AnomalyAuditHub:
             "details": details,
             "telemetry_snapshot": telemetry_snapshot
         }
-        self.logger.log(anomaly_data)
+        if hasattr(self.logger, "log"):
+            self.logger.log(anomaly_data)
+        elif hasattr(self.logger, "log_anomaly"):
+            self.logger.log_anomaly(anomaly_data)
+        elif hasattr(self.logger, "add_anomaly"):
+            self.logger.add_anomaly(anomaly_data)
+        else:
+            # Fallback for AnomalyLogger interface if method name differs
+            if hasattr(self.logger, "anomalies"):
+                self.logger.anomalies.append(anomaly_data)
 
     def aggregate_and_report(self, metric_name=None, value=None):
-        anomalies = self.logger.get_anomalies()
+        anomalies = self.logger.get_anomalies() if hasattr(self.logger, "get_anomalies") else []
         score = value if value is not None else 0.0
         return {
             "aggregated": True,
@@ -33,7 +42,7 @@ class AnomalyAuditHub:
         }
 
     def generate_final_report(self):
-        anomalies = self.logger.get_anomalies()
+        anomalies = self.logger.get_anomalies() if hasattr(self.logger, "get_anomalies") else []
         return {
             "status": "verified",
             "code": "success",

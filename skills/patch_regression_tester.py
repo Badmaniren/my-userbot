@@ -1,4 +1,6 @@
 import io
+import tempfile
+import os
 
 class PatchEvaluator:
     def evaluate(self, data):
@@ -45,6 +47,7 @@ def start_new(data):
 
 
 class PatchRegressionTester:
-    pass
+    def __init__(self):
+        pass
 
 patch_regression_tester = PatchRegressionTester()

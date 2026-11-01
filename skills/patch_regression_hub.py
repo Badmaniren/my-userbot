@@ -57,7 +57,7 @@ def start_new(dynamic_input_data):
     hub = AnomalyAuditHub(repo_path=repo_path, log_path=log_path, threshold=threshold)
 
     if "stream_source" in dynamic_input_data:
-        inspector = GitInspector(repo_path=repo_path)
+        inspector = GitInspector(repo_path=repo_path) if repo_path else GitInspector()
         analysis = inspector.analyze_repository()
         if isinstance(analysis, dict) and "token" in dynamic_input_data:
             analysis["token"] = dynamic_input_data["token"]
@@ -72,7 +72,7 @@ def start_new(dynamic_input_data):
     target = dynamic_input_data.get("target", "metric")
     numeric_metric = dynamic_input_data.get("numeric_metric", 1.0)
     for k, v in dynamic_input_data.items():
-        if isinstance(v, str):
+        if isinstance(v, str) and k not in ["repo_path", "log_path", "target"]:
             hub.log_anomaly(source=k, severity="LOW", details=v)
 
     hub.aggregate_and_report(metric_name=target, value=numeric_metric)

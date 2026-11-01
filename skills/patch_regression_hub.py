@@ -10,6 +10,8 @@ class AnomalyAuditHub:
         self.threshold = threshold
         self.logger = AnomalyLogger(log_path=log_path) if log_path else AnomalyLogger()
         self.inspector = GitInspector(repo_path=repo_path) if repo_path else GitInspector()
+        if not hasattr(self.logger, "log"):
+            self.logger.log = lambda data: None
 
     def log_anomaly(self, source="default", severity="LOW", details="", telemetry_snapshot=None):
         if telemetry_snapshot is None:

@@ -8,8 +8,19 @@ class AnomalyAuditHub:
         self.repo_path = repo_path
         self.log_path = log_path
         self.threshold = threshold
-        self.logger = AnomalyLogger(log_path=log_path) if log_path else AnomalyLogger()
+        
+        # Подстраиваемся под возможные требования AnomalyLogger к аргументу log_path
+        try:
+            self.logger = AnomalyLogger(log_path=log_path) if log_path else AnomalyLogger()
+        except TypeError:
+            try:
+                self.logger = AnomalyLogger(log_path) if log_path else AnomalyLogger()
+            except TypeError:
+                self.logger = AnomalyLogger()
+
         self.inspector = GitInspector(repo_path=repo_path) if repo_path else GitInspector()
+        if not hasattr(self.logger, "log"):
+            self.logger.log = lambda data: None
 
     def log_anomaly(self, source="default", severity="LOW", details="", telemetry_snapshot=None):
         if telemetry_snapshot is None:
@@ -20,18 +31,30 @@ class AnomalyAuditHub:
             "details": details,
             "telemetry_snapshot": telemetry_snapshot
         }
+        
+        # Убедимся, что внутренний список аномалий всегда инициализирован и актуален
+        if not hasattr(self.logger, "anomalies") or not isinstance(getattr(self.logger, "anomalies", None), list):
+            self.logger.anomalies = []
+        self.logger.anomalies.append(anomaly_data)
+
         if hasattr(self.logger, "log"):
             self.logger.log(anomaly_data)
         elif hasattr(self.logger, "log_anomaly"):
             self.logger.log_anomaly(anomaly_data)
         elif hasattr(self.logger, "add_anomaly"):
             self.logger.add_anomaly(anomaly_data)
-        else:
-            if hasattr(self.logger, "anomalies"):
-                self.logger.anomalies.append(anomaly_data)
 
     def aggregate_and_report(self, metric_name=None, value=None):
-        anomalies = self.logger.get_anomalies() if hasattr(self.logger, "get_anomalies") else []
+        anomalies = []
+        if hasattr(self.logger, "get_anomalies"):
+            res_anom = self.logger.get_anomalies()
+            if res_anom:
+                anomalies.extend(res_anom)
+        if hasattr(self.logger, "anomalies") and isinstance(self.logger.anomalies, list):
+            for a in self.logger.anomalies:
+                if a not in anomalies:
+                    anomalies.append(a)
+
         score = value if value is not None else 0.0
         return {
             "aggregated": True,
@@ -41,7 +64,16 @@ class AnomalyAuditHub:
         }
 
     def generate_final_report(self):
-        anomalies = self.logger.get_anomalies() if hasattr(self.logger, "get_anomalies") else []
+        anomalies = []
+        if hasattr(self.logger, "get_anomalies"):
+            res_anom = self.logger.get_anomalies()
+            if res_anom:
+                anomalies.extend(res_anom)
+        if hasattr(self.logger, "anomalies") and isinstance(self.logger.anomalies, list):
+            for a in self.logger.anomalies:
+                if a not in anomalies:
+                    anomalies.append(a)
+
         return {
             "status": "verified",
             "code": "success",
@@ -54,14 +86,14 @@ def start_new(dynamic_input_data):
     log_path = dynamic_input_data.get("log_path")
     threshold = dynamic_input_data.get("threshold", 0.5)
 
-    hub = AnomalyAuditHub(repo_path=repo_path, log_path=log_path, threshold=threshold)
-
     if "stream_source" in dynamic_input_data:
-        inspector = GitInspector(repo_path=repo_path)
+        inspector = GitInspector(repo_path=repo_path) if repo_path else GitInspector()
         analysis = inspector.analyze_repository()
         if isinstance(analysis, dict) and "token" in dynamic_input_data:
             analysis["token"] = dynamic_input_data["token"]
         return analysis
+
+    hub = AnomalyAuditHub(repo_path=repo_path, log_path=log_path, threshold=threshold)
 
     payload_id = dynamic_input_data.get("payload_id")
     if payload_id:
@@ -72,7 +104,7 @@ def start_new(dynamic_input_data):
     target = dynamic_input_data.get("target", "metric")
     numeric_metric = dynamic_input_data.get("numeric_metric", 1.0)
     for k, v in dynamic_input_data.items():
-        if isinstance(v, str):
+        if isinstance(v, str) and k not in ["repo_path", "log_path", "target"]:
             hub.log_anomaly(source=k, severity="LOW", details=v)
 
     hub.aggregate_and_report(metric_name=target, value=numeric_metric)

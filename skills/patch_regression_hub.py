@@ -27,7 +27,6 @@ class AnomalyAuditHub:
         elif hasattr(self.logger, "add_anomaly"):
             self.logger.add_anomaly(anomaly_data)
         else:
-            # Fallback for AnomalyLogger interface if method name differs
             if hasattr(self.logger, "anomalies"):
                 self.logger.anomalies.append(anomaly_data)
 
@@ -68,7 +67,7 @@ def start_new(dynamic_input_data):
     if payload_id:
         severity = dynamic_input_data.get("severity_level", "LOW")
         hub.log_anomaly(source=payload_id, severity=severity, details="Payload anomaly logged")
-        return hub.aggregate_and_report()
+        return hub.aggregate_and_report(metric_name=dynamic_input_data.get("target"), value=dynamic_input_data.get("error_rate"))
 
     target = dynamic_input_data.get("target", "metric")
     numeric_metric = dynamic_input_data.get("numeric_metric", 1.0)

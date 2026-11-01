@@ -32,11 +32,10 @@ class AnomalyAuditHub:
             "telemetry_snapshot": telemetry_snapshot
         }
         
-        # Пробуем сохранить аномалию во внутренний список, если он есть или нужен для тестов
-        if not hasattr(self.logger, "anomalies"):
+        # Убедимся, что внутренний список аномалий всегда инициализирован и актуален
+        if not hasattr(self.logger, "anomalies") or not isinstance(getattr(self.logger, "anomalies", None), list):
             self.logger.anomalies = []
-        if isinstance(getattr(self.logger, "anomalies", None), list):
-            self.logger.anomalies.append(anomaly_data)
+        self.logger.anomalies.append(anomaly_data)
 
         if hasattr(self.logger, "log"):
             self.logger.log(anomaly_data)
@@ -48,9 +47,13 @@ class AnomalyAuditHub:
     def aggregate_and_report(self, metric_name=None, value=None):
         anomalies = []
         if hasattr(self.logger, "get_anomalies"):
-            anomalies = self.logger.get_anomalies()
-        elif hasattr(self.logger, "anomalies"):
-            anomalies = self.logger.anomalies
+            res_anom = self.logger.get_anomalies()
+            if res_anom:
+                anomalies.extend(res_anom)
+        if hasattr(self.logger, "anomalies") and isinstance(self.logger.anomalies, list):
+            for a in self.logger.anomalies:
+                if a not in anomalies:
+                    anomalies.append(a)
 
         score = value if value is not None else 0.0
         return {
@@ -63,9 +66,13 @@ class AnomalyAuditHub:
     def generate_final_report(self):
         anomalies = []
         if hasattr(self.logger, "get_anomalies"):
-            anomalies = self.logger.get_anomalies()
-        elif hasattr(self.logger, "anomalies"):
-            anomalies = self.logger.anomalies
+            res_anom = self.logger.get_anomalies()
+            if res_anom:
+                anomalies.extend(res_anom)
+        if hasattr(self.logger, "anomalies") and isinstance(self.logger.anomalies, list):
+            for a in self.logger.anomalies:
+                if a not in anomalies:
+                    anomalies.append(a)
 
         return {
             "status": "verified",

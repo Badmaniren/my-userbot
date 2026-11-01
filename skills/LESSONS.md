@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-гой, передан на эскалацию
-
-## patch_checker (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+цию
 
 ## patch_checker (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: ImportError: cannot import name 'analyze' from 'skills.patch_analyzer' (/home/runner/work/my-userbot/my-userbot/skills/patch_analyzer.py)
@@ -337,5 +333,9 @@
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## patch_regression_hub (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## patch_regression_notifier (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

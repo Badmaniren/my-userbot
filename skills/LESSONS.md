@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-aluator (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## patch_verifier (refactor) — раундов: 4
+r (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/tests/test_patch_verifier.py", line 90, in test_patch_executor_apply_patch_io
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -343,5 +339,9 @@ aluator (refactor) — раундов: 4
 - Статус: успешно прошёл тесты и влит в main
 
 ## patch_regression_tester (start_new) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## patch_regression_suite (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

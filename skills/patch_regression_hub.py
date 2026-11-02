@@ -9,16 +9,16 @@ class AnomalyAuditHub:
         self.log_path = log_path
         self.threshold = threshold
         
-        # Подстраиваемся под возможные требования AnomalyLogger к аргументу log_path
-        try:
-            self.logger = AnomalyLogger(log_path=log_path) if log_path else AnomalyLogger()
-        except TypeError:
-            try:
-                self.logger = AnomalyLogger(log_path) if log_path else AnomalyLogger()
-            except TypeError:
-                self.logger = AnomalyLogger()
+        if log_path:
+            self.logger = AnomalyLogger(log_path=log_path)
+        else:
+            self.logger = AnomalyLogger(log_path="default_audit.log")
 
-        self.inspector = GitInspector(repo_path=repo_path) if repo_path else GitInspector()
+        if repo_path:
+            self.inspector = GitInspector(repo_path=repo_path)
+        else:
+            self.inspector = GitInspector(repo_path=".")
+
         if not hasattr(self.logger, "log"):
             self.logger.log = lambda data: None
 
@@ -32,7 +32,6 @@ class AnomalyAuditHub:
             "telemetry_snapshot": telemetry_snapshot
         }
         
-        # Убедимся, что внутренний список аномалий всегда инициализирован и актуален
         if not hasattr(self.logger, "anomalies") or not isinstance(getattr(self.logger, "anomalies", None), list):
             self.logger.anomalies = []
         self.logger.anomalies.append(anomaly_data)
@@ -87,7 +86,10 @@ def start_new(dynamic_input_data):
     threshold = dynamic_input_data.get("threshold", 0.5)
 
     if "stream_source" in dynamic_input_data:
-        inspector = GitInspector(repo_path=repo_path) if repo_path else GitInspector()
+        if repo_path:
+            inspector = GitInspector(repo_path=repo_path)
+        else:
+            inspector = GitInspector(repo_path=".")
         analysis = inspector.analyze_repository()
         if isinstance(analysis, dict) and "token" in dynamic_input_data:
             analysis["token"] = dynamic_input_data["token"]

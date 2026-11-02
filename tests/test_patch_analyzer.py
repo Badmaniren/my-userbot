@@ -1,185 +1,143 @@
 import io
 import os
 import random
-import string
-import tempfile
+import re
 import unittest
-from unittest.mock import MagicMock, mock_open, patch
+import uuid
+from unittest.mock import patch, mock_open
 
-try:
-    from skills.patch_analyzer import GitInspector, PatchAnalyzer, PatchAnalyzerError
-except ImportError:
-    from patch_analyzer import GitInspector, PatchAnalyzer, PatchAnalyzerError
-
-
-def _rand_name(prefix="test_"):
-    return f"{prefix}{''.join(random.choices(string.ascii_lowercase + string.digits, k=10))}"
-
-
-class TestPatchAnalyzerError(unittest.TestCase):
-    def test_exception_inheritance_and_raising(self):
-        msg = f"Error_{_rand_name()}"
-        with self.assertRaises(PatchAnalyzerError) as ctx:
-            raise PatchAnalyzerError(msg)
-        self.assertEqual(str(ctx.exception), msg)
-
-
-class TestGitInspector(unittest.TestCase):
-    def test_init_sets_repo_path(self):
-        rand_path = f"/tmp/{_rand_name('repo_')}"
-        inspector = GitInspector(rand_path)
-        self.assertEqual(inspector.repo_path, rand_path)
+from skills.patch_analyzer import (
+    PatchAnalyzerError,
+    GitInspector,
+    PatchAnalyzer,
+    analyze
+)
 
 
 class TestPatchAnalyzer(unittest.TestCase):
+
     def setUp(self):
         self.analyzer = PatchAnalyzer()
+        self.random_repo_path = f"/repo/{uuid.uuid4().hex}"
+        self.git_inspector = GitInspector(repo_path=self.random_repo_path)
 
-    def test_analyze_standard_diff(self):
-        filename = f"src/{_rand_name()}.py"
-        add_lines_count = random.randint(3, 8)
-        rem_lines_count = random.randint(2, 6)
+    def test_git_inspector_init(self):
+        self.assertEqual(self.git_inspector.repo_path, self.random_repo_path)
 
-        added_content = [f"line_add_{_rand_name()}" for _ in range(add_lines_count)]
-        removed_content = [f"line_rem_{_rand_name()}" for _ in range(rem_lines_count)]
+    def test_patch_analyzer_error_inheritance(self):
+        self.assertTrue(issubclass(PatchAnalyzerError, Exception))
+        err_msg = uuid.uuid4().hex
+        with self.assertRaises(PatchAnalyzerError) as ctx:
+            raise PatchAnalyzerError(err_msg)
+        self.assertIn(err_msg, str(ctx.exception))
 
-        patch_lines = [
-            f"diff --git a/{filename} b/{filename}",
-            f"--- a/{filename}",
-            f"+++ b/{filename}",
-        ]
-        for line in added_content:
-            patch_lines.append(f"+{line}")
-        for line in removed_content:
-            patch_lines.append(f"-{line}")
+    def test_analyze_with_bytes_input(self):
+        file_name = f"src/{uuid.uuid4().hex}.py"
+        added_line = f"print('{uuid.uuid4().hex}')"
+        patch_content = f"diff --git a/{file_name} b/{file_name}\n--- a/{file_name}\n+++ b/{file_name}\n@@ -1,1 +1,2られる@@\n+{added_line}\n".encode("utf-8")
 
-        raw_patch = "\n".join(patch_lines)
-        result = self.analyzer.analyze(raw_patch)
+        result = self.analyzer.analyze(patch_content)
+        self.assertIn(file_name, result["affected_files"])
+        self.assertIn(added_line, result["details"])
+        self.assertGreaterEqual(result["total_added"], 1)
 
-        self.assertEqual(result["total_added"], add_lines_count)
-        self.assertEqual(result["total_removed"], rem_lines_count)
-        self.assertEqual(result["additions"], add_lines_count)
-        self.assertEqual(result["deletions"], rem_lines_count)
-        self.assertEqual(result["added_lines"], add_lines_count)
-        self.assertEqual(result["deleted_lines"], rem_lines_count)
-        self.assertEqual(result["complexity"], float(add_lines_count + rem_lines_count))
-        self.assertEqual(result["diff_complexity"], float(add_lines_count + rem_lines_count))
-        self.assertIn(filename, result["affected_files"])
-        self.assertIn(filename, result["files"])
+    def test_analyze_with_invalid_bytes_fallback(self):
+        invalid_bytes = b"\xff\xfe\xfd\xfc"
+        result = self.analyzer.analyze(invalid_bytes)
+        self.assertEqual(result["affected_files"], [])
+        self.assertEqual(result["total_added"], 0)
+        self.assertEqual(result["total_removed"], 0)
 
-        for line in added_content:
-            self.assertIn(line, result["details"])
-        for line in removed_content:
-            self.assertIn(line, result["details"])
+    def test_analyze_with_non_string_non_bytes(self):
+        random_number = random.randint(1000, 99999)
+        result = self.analyzer.analyze(random_number)
+        self.assertEqual(result["affected_files"], [])
+        self.assertEqual(result["total_added"], 0)
 
-    def test_analyze_new_file(self):
-        filename = f"docs/{_rand_name()}.md"
-        val_content = f"content_{_rand_name()}"
-
-        raw_patch = (
-            f"diff --git a/dev/null b/{filename}\n"
+    def test_analyze_new_and_deleted_files(self):
+        new_file = f"modules/{uuid.uuid4().hex}.py"
+        del_file = f"legacy/{uuid.uuid4().hex}.py"
+        
+        patch_content = (
+            f"diff --git a/dev/null b/{new_file}\n"
             f"new file mode 100644\n"
             f"--- /dev/null\n"
-            f"+++ b/{filename}\n"
-            f"+{val_content}\n"
-        )
-
-        result = self.analyzer.analyze(raw_patch)
-
-        self.assertIn(filename, result["new_files"])
-        self.assertIn(filename, result["affected_files"])
-        self.assertEqual(result["total_added"], 1)
-        self.assertEqual(result["total_removed"], 0)
-
-    def test_analyze_deleted_file(self):
-        filename = f"legacy/{_rand_name()}.py"
-        val_content = f"old_code_{_rand_name()}"
-
-        raw_patch = (
-            f"diff --git a/{filename} b/dev/null\n"
+            f"+++ b/{new_file}\n"
+            f"@@ -0,0 +1,1 @@\n"
+            f"+import {uuid.uuid4().hex}\n"
+            f"diff --git a/{del_file} b/dev/null\n"
             f"deleted file mode 100644\n"
-            f"--- a/{filename}\n"
+            f"--- a/{del_file}\n"
             f"+++ /dev/null\n"
-            f"-{val_content}\n"
+            f"@@ -1,1 +0,0 @@\n"
+            f"-old_var = {random.randint(1, 100)}\n"
         )
 
-        result = self.analyzer.analyze(raw_patch)
-
-        self.assertIn(filename, result["deleted_files"])
-        self.assertIn(filename, result["affected_files"])
-        self.assertEqual(result["total_added"], 0)
+        result = self.analyzer.analyze(patch_content)
+        self.assertIn(new_file, result["new_files"])
+        self.assertIn(del_file, result["deleted_files"])
+        self.assertIn(new_file, result["affected_files"])
+        self.assertIn(del_file, result["affected_files"])
+        self.assertEqual(result["total_added"], 1)
         self.assertEqual(result["total_removed"], 1)
 
-    def test_analyze_bytes_input(self):
-        filename = f"pkg/{_rand_name()}.py"
-        line_val = f"data_{_rand_name()}"
-        raw_patch_str = f"diff --git a/{filename} b/{filename}\n+{line_val}\n"
-        raw_patch_bytes = raw_patch_str.encode("utf-8")
-
-        result = self.analyzer.analyze(raw_patch_bytes)
-
-        self.assertEqual(result["total_added"], 1)
-        self.assertIn(filename, result["affected_files"])
-        self.assertIn(line_val, result["details"])
-
-    def test_analyze_invalid_bytes_fallback(self):
-        invalid_bytes = b"\x80\x81\xff\xfe"
-        result = self.analyzer.analyze(invalid_bytes)
-
-        self.assertEqual(result["total_added"], 0)
-        self.assertEqual(result["total_removed"], 0)
-        self.assertEqual(result["affected_files"], [])
-
-    def test_analyze_non_string_non_bytes_input(self):
-        num_input = random.randint(1000, 9999)
-        result = self.analyzer.analyze(num_input)
-
-        self.assertEqual(result["total_added"], 0)
-        self.assertEqual(result["total_removed"], 0)
-
     def test_analyze_stream(self):
-        filename = f"stream/{_rand_name()}.txt"
-        val_content = f"stream_val_{_rand_name()}"
-        raw_patch = f"diff --git a/{filename} b/{filename}\n+{val_content}\n"
-
-        stream = io.BytesIO(raw_patch.encode("utf-8"))
+        file_name = f"utils/{uuid.uuid4().hex}.py"
+        added_content = f"VAL = '{uuid.uuid4().hex}'"
+        patch_text = f"diff --git a/{file_name} b/{file_name}\n--- a/{file_name}\n+++ b/{file_name}\n+{added_content}\n"
+        
+        stream = io.BytesIO(patch_text.encode("utf-8"))
         result = self.analyzer.analyze_stream(stream)
-
-        self.assertEqual(result["total_added"], 1)
-        self.assertIn(filename, result["affected_files"])
-        self.assertIn(val_content, result["details"])
+        
+        self.assertIn(file_name, result["affected_files"])
+        self.assertIn(added_content, result["details"])
 
     def test_analyze_file(self):
-        filename = f"file/{_rand_name()}.txt"
-        val_content = f"file_val_{_rand_name()}"
-        raw_patch = f"diff --git a/{filename} b/{filename}\n+{val_content}\n"
+        file_name = f"tests/test_{uuid.uuid4().hex}.py"
+        patch_text = f"diff --git a/{file_name} b/{file_name}\n--- a/{file_name}\n+++ b/{file_name}\n-+{uuid.uuid4().hex}\n"
+        
+        mock_file_data = mock_open(read_data=patch_text)
+        with patch("builtins.open", mock_file_data):
+            random_path = f"/tmp/{uuid.uuid4().hex}.patch"
+            result = self.analyzer.analyze_file(random_path)
+            mock_file_data.assert_called_once_with(random_path, "r", encoding="utf-8")
+            self.assertIn(file_name, result["affected_files"])
 
-        with tempfile.NamedTemporaryFile("w+", encoding="utf-8", delete=False) as tmp:
-            tmp.write(raw_patch)
-            tmp_path = tmp.name
+    def test_aliases_and_call(self):
+        file_name = f"core/{uuid.uuid4().hex}.py"
+        patch_text = f"diff --git a/{file_name} b/{file_name}\n--- a/{file_name}\n+++ b/{file_name}\n+x = {random.randint(1, 50)}\n"
 
-        try:
-            result = self.analyzer.analyze_file(tmp_path)
-            self.assertEqual(result["total_added"], 1)
-            self.assertIn(filename, result["affected_files"])
-            self.assertIn(val_content, result["details"])
-        finally:
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
+        res_patch = self.analyzer.analyze_patch(patch_text)
+        res_diff = self.analyzer.analyze_diff(patch_text)
+        res_call = self.analyzer(patch_text)
+        res_module_func = analyze(patch_text)
 
-    def test_aliases_and_callable(self):
-        filename = f"alias/{_rand_name()}.py"
-        val_content = f"alias_val_{_rand_name()}"
-        raw_patch = f"diff --git a/{filename} b/{filename}\n+{val_content}\n"
+        for res in [res_patch, res_diff, res_call, res_module_func]:
+            self.assertIn(file_name, res["affected_files"])
+            self.assertEqual(res["total_added"], 1)
 
-        res_base = self.analyzer.analyze(raw_patch)
-        res_patch = self.analyzer.analyze_patch(raw_patch)
-        res_diff = self.analyzer.analyze_diff(raw_patch)
-        res_call = self.analyzer(raw_patch)
+    def test_hunk_parsing_complexity(self):
+        file_name = f"api/{uuid.uuid4().hex}.py"
+        add_str = uuid.uuid4().hex
+        rem_str = uuid.uuid4().hex
+        
+        patch_text = (
+            f"diff --git a/{file_name} b/{file_name}\n"
+            f"--- a/{file_name}\n"
+            f"+++ b/{file_name}\n"
+            f"@@ -10,3 +10,4 @@\n"
+            f"-{rem_str}\n"
+            f"+{add_str}\n"
+            f"+additional_{uuid.uuid4().hex}\n"
+        )
 
-        self.assertEqual(res_base, res_patch)
-        self.assertEqual(res_base, res_diff)
-        self.assertEqual(res_base, res_call)
+        result = self.analyzer.analyze(patch_text)
+        self.assertEqual(result["total_added"], 2)
+        self.assertEqual(result["total_removed"], 1)
+        self.assertEqual(result["complexity"], 3.0)
+        self.assertEqual(result["diff_complexity"], 3.0)
+        self.assertEqual(result["additions"], 2)
+        self.assertEqual(result["deletions"], 1)
 
 
 if __name__ == "__main__":

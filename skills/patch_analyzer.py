@@ -2,15 +2,13 @@ import io
 import os
 import re
 
+from skills.anomaly_audit_hub import AnomalyAuditHub
+from skills.git_inspector import GitInspector
+
 
 class PatchAnalyzerError(Exception):
     """Custom exception for patch analysis errors."""
     pass
-
-
-class GitInspector:
-    def __init__(self, repo_path: str):
-        self.repo_path = repo_path
 
 
 class PatchAnalyzer:

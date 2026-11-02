@@ -1,114 +1,106 @@
 import unittest
-from unittest.mock import patch, MagicMock
-import random
+from unittest.mock import patch, mock_open
 import uuid
-import string
+import random
+import os
 import io
-import sys
-import types
 
-try:
-    from skills.patch_regression_listener import (
-        PatchRegressionListener,
-        PatchRegressionListenerError,
-        listen_for_patches
-    )
-except ImportError:
-    mod = types.ModuleType("skills.patch_regression_listener")
-    class PatchRegressionListenerError(Exception):
-        pass
-    
-    class PatchRegressionListener:
-        def __init__(self, watch_dir, callback=None):
-            self.watch_dir = watch_dir
-            self.callback = callback
-            self.is_running = False
-
-        def start_listening(self):
-            self.is_running = True
-            return True
-
-        def stop_listening(self):
-            self.is_running = False
-            return False
-
-        def trigger_regression(self, patch_data):
-            if not patch_data:
-                raise PatchRegressionListenerError("Empty patch data")
-            if self.callback:
-                return self.callback(patch_data)
-            return True
-
-    def listen_for_patches(target_path):
-        return [uuid.uuid4().hex, target_path]
-
-    mod.PatchRegressionListenerError = PatchRegressionListenerError
-    mod.PatchRegressionListener = PatchRegressionListener
-    mod.listen_for_patches = listen_for_patches
-    sys.modules["skills.patch_regression_listener"] = mod
-    from skills.patch_regression_listener import (
-        PatchRegressionListener,
-        PatchRegressionListenerError,
-        listen_for_patches
-    )
-
+from skills.patch_regression_listener import (
+    PatchRegressionListenerError,
+    PatchRegressionListener,
+    listen_for_patches,
+    start_regression_listening
+)
 
 class TestPatchRegressionListener(unittest.TestCase):
 
     def setUp(self):
-        self.rand_dir = f"/var/patches/{uuid.uuid4().hex}"
-        self.rand_callback_result = uuid.uuid4().hex
-        self.mock_callback = MagicMock(return_value=self.rand_callback_result)
-        self.listener = PatchRegressionListener(watch_dir=self.rand_dir, callback=self.mock_callback)
+        self.watch_dir = uuid.uuid4().hex
+        self.callback_arg = uuid.uuid4().hex
+        self.mock_callback = lambda data: f"processed_{data}_{uuid.uuid4().hex}"
+        self.listener = PatchRegressionListener(self.watch_dir, callback=self.mock_callback)
 
-    def test_listener_initialization_random(self):
-        self.assertEqual(self.listener.watch_dir, self.rand_dir)
-        self.assertEqual(self.listener.callback, self.mock_callback)
+    def test_listener_lifecycle(self):
         self.assertFalse(self.listener.is_running)
-
-    def test_start_and_stop_listening(self):
-        res_start = self.listener.start_listening()
-        self.assertTrue(res_start)
+        start_res = self.listener.start_listening()
         self.assertTrue(self.listener.is_running)
+        self.assertTrue(start_res)
 
-        res_stop = self.listener.stop_listening()
-        self.assertFalse(res_stop)
+        stop_res = self.listener.stop_listening()
         self.assertFalse(self.listener.is_running)
+        self.assertFalse(stop_res)
 
     def test_trigger_regression_success(self):
-        rand_patch_id = uuid.uuid4().hex
-        rand_content = ''.join(random.choices(string.ascii_letters, k=15))
-        patch_payload = {"id": rand_patch_id, "content": rand_content}
-
-        result = self.listener.trigger_regression(patch_payload)
-        self.assertEqual(result, self.rand_callback_result)
-        self.mock_callback.assert_called_once_with(patch_payload)
+        patch_data = uuid.uuid4().hex
+        result = self.listener.trigger_regression(patch_data)
+        self.assertIn(patch_data, result)
+        self.assertTrue(result.startswith("processed_"))
 
     def test_trigger_regression_empty_data_raises_error(self):
-        with self.assertRaises(PatchRegressionListenerError):
-            self.listener.trigger_regression({})
+        for empty_val in ["", None, [], {}]:
+            with self.subTest(empty_val=empty_val):
+                with self.assertRaises(PatchRegressionListenerError):
+                    self.listener.trigger_regression(empty_val)
 
-    def test_listen_for_patches_function(self):
-        rand_target = f"/opt/system/{uuid.uuid4().hex}"
-        result = listen_for_patches(rand_target)
-        self.assertIsInstance(result, list)
-        self.assertIn(rand_target, result)
-        self.assertEqual(len(result), 2)
-        self.assertIsInstance(result[0], str)
+    def test_trigger_regression_no_callback(self):
+        listener_no_cb = PatchRegressionListener(self.watch_dir)
+        patch_data = uuid.uuid4().hex
+        res = listener_no_cb.trigger_regression(patch_data)
+        self.assertTrue(res)
 
-    def test_listener_with_file_stream_mock(self):
-        rand_filename = f"{uuid.uuid4().hex}.patch"
-        rand_file_content = f"diff --git a/{uuid.uuid4().hex} b/{uuid.uuid4().hex}".encode('utf-8')
-        
-        mock_file = io.BytesIO(rand_file_content)
-        
-        with patch('builtins.open', return_value=mock_file) as mock_open:
-            with open(rand_filename, 'rb') as f:
-                content = f.read()
-            
-            self.assertEqual(content, rand_file_content)
-            mock_open.assert_called_once_with(rand_filename, 'rb')
+    def test_listen_for_patches(self):
+        target_path = uuid.uuid4().hex
+        res = listen_for_patches(target_path)
+        self.assertIsInstance(res, list)
+        self.assertEqual(len(res), 2)
+        self.assertEqual(res[1], target_path)
+        self.assertIsInstance(res[0], str)
+        self.assertEqual(len(res[0]), 32)
 
+    def test_start_regression_listening_with_log(self):
+        patch_id = uuid.uuid4().hex
+        repo_path = uuid.uuid4().hex
+        log_path = f"{uuid.uuid4().hex}.log"
+        file_target = uuid.uuid4().hex
 
-if __name__ == '__main__':
+        payload = {
+            "patch_id": patch_id,
+            "repo_path": repo_path,
+            "log_path": log_path,
+            "file_target": file_target
+        }
+
+        m_open = mock_open()
+        with patch("builtins.open", m_open):
+            result = start_regression_listening(payload)
+
+        m_open.assert_called_once_with(log_path, "w", encoding="utf-8")
+        handle = m_open()
+        expected_log_content = f"Processed patch {patch_id} for repo {repo_path}\n"
+        handle.write.assert_called_once_with(expected_log_content)
+
+        self.assertEqual(result.get("status"), "success")
+        self.assertEqual(result.get("patch_id"), patch_id)
+        self.assertEqual(result.get("file_target"), file_target)
+
+    def test_start_regression_listening_without_log(self):
+        patch_id = uuid.uuid4().hex
+        repo_path = uuid.uuid4().hex
+        file_target = uuid.uuid4().hex
+
+        payload = {
+            "patch_id": patch_id,
+            "repo_path": repo_path,
+            "file_target": file_target
+        }
+
+        with patch("builtins.open") as m_open:
+            result = start_regression_listening(payload)
+            m_open.assert_not_called()
+
+        self.assertEqual(result.get("status"), "success")
+        self.assertEqual(result.get("patch_id"), patch_id)
+        self.assertEqual(result.get("file_target"), file_target)
+
+if __name__ == "__main__":
     unittest.main()

@@ -9,37 +9,15 @@ class AnomalyAuditHub:
         self.log_path = log_path
         self.threshold = threshold
         
-        # Инициализация логгера с fallback для обязательного аргумента log_path
         if log_path:
-            try:
-                self.logger = AnomalyLogger(log_path=log_path)
-            except TypeError:
-                try:
-                    self.logger = AnomalyLogger(log_path)
-                except TypeError:
-                    self.logger = AnomalyLogger()
+            self.logger = AnomalyLogger(log_path=log_path)
         else:
-            try:
-                self.logger = AnomalyLogger(log_path="default_audit.log")
-            except TypeError:
-                try:
-                    self.logger = AnomalyLogger("default_audit.log")
-                except TypeError:
-                    self.logger = AnomalyLogger()
+            self.logger = AnomalyLogger(log_path="default_audit.log")
 
         if repo_path:
-            try:
-                self.inspector = GitInspector(repo_path=repo_path)
-            except TypeError:
-                self.inspector = GitInspector(repo_path)
+            self.inspector = GitInspector(repo_path=repo_path)
         else:
-            try:
-                self.inspector = GitInspector(repo_path=".")
-            except TypeError:
-                try:
-                    self.inspector = GitInspector(".")
-                except TypeError:
-                    self.inspector = GitInspector()
+            self.inspector = GitInspector(repo_path=".")
 
         if not hasattr(self.logger, "log"):
             self.logger.log = lambda data: None
@@ -109,18 +87,9 @@ def start_new(dynamic_input_data):
 
     if "stream_source" in dynamic_input_data:
         if repo_path:
-            try:
-                inspector = GitInspector(repo_path=repo_path)
-            except TypeError:
-                inspector = GitInspector(repo_path)
+            inspector = GitInspector(repo_path=repo_path)
         else:
-            try:
-                inspector = GitInspector(repo_path=".")
-            except TypeError:
-                try:
-                    inspector = GitInspector(".")
-                except TypeError:
-                    inspector = GitInspector()
+            inspector = GitInspector(repo_path=".")
         analysis = inspector.analyze_repository()
         if isinstance(analysis, dict) and "token" in dynamic_input_data:
             analysis["token"] = dynamic_input_data["token"]

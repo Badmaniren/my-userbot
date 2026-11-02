@@ -9,14 +9,23 @@ class AnomalyAuditHub:
         self.log_path = log_path
         self.threshold = threshold
         
-        # Инициализация логгера в соответствии с сигнатурой
+        # Инициализация логгера с fallback для обязательного аргумента log_path
         if log_path:
             try:
                 self.logger = AnomalyLogger(log_path=log_path)
             except TypeError:
-                self.logger = AnomalyLogger(log_path)
+                try:
+                    self.logger = AnomalyLogger(log_path)
+                except TypeError:
+                    self.logger = AnomalyLogger()
         else:
-            self.logger = AnomalyLogger()
+            try:
+                self.logger = AnomalyLogger(log_path="default_audit.log")
+            except TypeError:
+                try:
+                    self.logger = AnomalyLogger("default_audit.log")
+                except TypeError:
+                    self.logger = AnomalyLogger()
 
         self.inspector = GitInspector(repo_path=repo_path) if repo_path else GitInspector()
         if not hasattr(self.logger, "log"):

@@ -9,14 +9,14 @@ class AnomalyAuditHub:
         self.log_path = log_path
         self.threshold = threshold
         
-        # Подстраиваемся под возможные требования AnomalyLogger к аргументу log_path
-        try:
-            self.logger = AnomalyLogger(log_path=log_path) if log_path else AnomalyLogger()
-        except TypeError:
+        # Инициализация логгера в соответствии с сигнатурой
+        if log_path:
             try:
-                self.logger = AnomalyLogger(log_path) if log_path else AnomalyLogger()
+                self.logger = AnomalyLogger(log_path=log_path)
             except TypeError:
-                self.logger = AnomalyLogger()
+                self.logger = AnomalyLogger(log_path)
+        else:
+            self.logger = AnomalyLogger()
 
         self.inspector = GitInspector(repo_path=repo_path) if repo_path else GitInspector()
         if not hasattr(self.logger, "log"):
@@ -32,7 +32,6 @@ class AnomalyAuditHub:
             "telemetry_snapshot": telemetry_snapshot
         }
         
-        # Убедимся, что внутренний список аномалий всегда инициализирован и актуален
         if not hasattr(self.logger, "anomalies") or not isinstance(getattr(self.logger, "anomalies", None), list):
             self.logger.anomalies = []
         self.logger.anomalies.append(anomaly_data)

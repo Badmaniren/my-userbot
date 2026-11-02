@@ -3,19 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ошибка перед фиксом: FAILED (failures=1, errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## patch_applier (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## patch_applier (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## patch_applier (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/skills/patch_applier.py", line 93, in apply_patch
+ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/skills/patch_applier.py", line 93, in apply_patch
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## patch_applier (refactor) — раундов: 4
@@ -331,3 +319,8 @@
 
 ## patch_regression_runner (create) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## patch_regression_collector (create) — раундов: 4
+- Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.; Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 1)
+- Последняя ошибка перед фиксом: ----------------------------------------------------------------------
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

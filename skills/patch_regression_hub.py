@@ -27,7 +27,20 @@ class AnomalyAuditHub:
                 except TypeError:
                     self.logger = AnomalyLogger()
 
-        self.inspector = GitInspector(repo_path=repo_path) if repo_path else GitInspector()
+        if repo_path:
+            try:
+                self.inspector = GitInspector(repo_path=repo_path)
+            except TypeError:
+                self.inspector = GitInspector(repo_path)
+        else:
+            try:
+                self.inspector = GitInspector(repo_path=".")
+            except TypeError:
+                try:
+                    self.inspector = GitInspector(".")
+                except TypeError:
+                    self.inspector = GitInspector()
+
         if not hasattr(self.logger, "log"):
             self.logger.log = lambda data: None
 
@@ -95,7 +108,19 @@ def start_new(dynamic_input_data):
     threshold = dynamic_input_data.get("threshold", 0.5)
 
     if "stream_source" in dynamic_input_data:
-        inspector = GitInspector(repo_path=repo_path) if repo_path else GitInspector()
+        if repo_path:
+            try:
+                inspector = GitInspector(repo_path=repo_path)
+            except TypeError:
+                inspector = GitInspector(repo_path)
+        else:
+            try:
+                inspector = GitInspector(repo_path=".")
+            except TypeError:
+                try:
+                    inspector = GitInspector(".")
+                except TypeError:
+                    inspector = GitInspector()
         analysis = inspector.analyze_repository()
         if isinstance(analysis, dict) and "token" in dynamic_input_data:
             analysis["token"] = dynamic_input_data["token"]

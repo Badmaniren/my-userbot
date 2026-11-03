@@ -28,7 +28,7 @@ class GitCommitter:
                 check=True
             )
             return commit_result.returncode == 0
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError, FileNotFoundError, NotADirectoryError):
             return False
 
     def commit_changes(self, file_path: str, message: str) -> bool:
@@ -56,5 +56,5 @@ class GitCommitter:
                 check=True
             )
             return commit_result.returncode == 0
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError, FileNotFoundError, NotADirectoryError):
             return False

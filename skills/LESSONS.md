@@ -60,3 +60,8 @@
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_notifier (compose) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid character '—' (U+2014) (<unknown>, line 3); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Последняя ошибка перед фиксом: Ran 38 tests in 0.249s
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

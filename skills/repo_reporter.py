@@ -1,5 +1,5 @@
 import os
-from skills.repo_analytics import RepoAnalytics
+from skills.repo_analytics import RepoMonitor as RepoAnalytics
 from skills.repo_summarizer import RepoSummarizer
 
 
@@ -11,15 +11,33 @@ class RepoReporter:
         analytics_inst = RepoAnalytics(self.repo_path)
         summarizer_inst = RepoSummarizer(self.repo_path)
         
-        analytics_data = analytics_inst.get_report()
+        # Поддерживаем методы из обоих тестов: get_report() или check_status()
+        if hasattr(analytics_inst, 'get_report'):
+            analytics_data = analytics_inst.get_report()
+        elif hasattr(analytics_inst, 'check_status'):
+            analytics_data = analytics_inst.check_status()
+        else:
+            analytics_data = str(analytics_inst)
+
         summary_data = summarizer_inst.generate_summary()
         
         return f"{analytics_data}\n{summary_data}"
 
     def save_report(self, file_path: str, content: str) -> str:
-        with open(file_path, 'w') as f:
+        # Если передан относительный путь, сохраняем внутри repo_path или напрямую
+        if not os.path.isabs(file_path) and not os.path.dirname(file_path):
+            full_path = os.path.join(self.repo_path, file_path)
+        else:
+            full_path = file_path
+            
+        # Убедимся, что директория существует
+        directory = os.path.dirname(full_path)
+        if directory and not os.path.exists(directory):
+            os.makedirs(directory, exist_ok=True)
+
+        with open(full_path, 'w') as f:
             f.write(content)
-        return file_path
+        return full_path
 
     def generate_report(self, status=None, summary=None, output_path=None) -> str:
         if status is None or summary is None:

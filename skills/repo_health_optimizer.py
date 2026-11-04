@@ -1,3 +1,4 @@
+import os
 from skills.repo_health_restorer import RepoHealthRestorer
 from skills.vulnerability_analyzer import VulnerabilityAnalyzer
 
@@ -14,6 +15,14 @@ class RepoHealthOptimizer:
         self.vulnerability_analyzer = VulnerabilityAnalyzer(self.repo_path)
 
     def optimize_repository(self) -> dict:
+        # Убедимся, что директория для отчетов уязвимостей существует на случай реального вызова
+        if hasattr(self.vulnerability_analyzer, 'report_path'):
+            report_dir = os.path.dirname(self.vulnerability_analyzer.report_path)
+            if report_dir:
+                os.makedirs(report_dir, exist_ok=True)
+        else:
+            os.makedirs(self.repo_path, exist_ok=True)
+
         restoration_result = self.restorer.restore_and_protect()
         vulnerability_result = self.vulnerability_analyzer.run()
         return {

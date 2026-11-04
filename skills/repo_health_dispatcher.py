@@ -1,3 +1,4 @@
+import io
 from skills.repo_health_dashboard import RepoHealthDashboard
 from skills.repo_notifier import RepoNotifier
 
@@ -21,6 +22,8 @@ class RepoHealthDispatcher:
 
     def process_stream_and_dispatch(self, stream, file_path: str) -> bool:
         dashboard = RepoHealthDashboard(self.repo_path)
+        if isinstance(stream, str):
+            stream = io.BytesIO(stream.encode('utf-8'))
         dashboard.process_stream(stream)
         dashboard.export_dashboard(file_path)
 

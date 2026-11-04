@@ -11,7 +11,7 @@ class RepoSecurityGateway:
     def start_new(self) -> dict:
         try:
             scanner = DependencyScanner(self.repo_path)
-            stream_data = scanner.run()
+            scanner.run()
 
             analyzer = VulnerabilityAnalyzer(self.repo_path)
             analysis_result = analyzer.run()

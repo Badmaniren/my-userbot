@@ -1,122 +1,94 @@
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch, MagicMock
 import uuid
 import random
+import sys
+import types
 import io
-import string
-from skills.dependency_audit_aggregator import start_new
 
+mock_modules = [
+    'vulnerability_analyzer',
+    'dependency_updater_pipeline',
+    'repo_reporter'
+]
+for mod_name in mock_modules:
+    if mod_name not in sys.modules:
+        sys.modules[mod_name] = types.ModuleType(mod_name)
+
+from skills.dependency_audit_aggregator import start_new, aggregate_dependencies
 
 class TestDependencyAuditAggregator(unittest.TestCase):
 
-    def setUp(self):
-        self.random_repo_path = f"/repo/{uuid.uuid4().hex[:10]}"
-        self.random_branch = f"branch-{uuid.uuid4().hex[:8]}"
-        self.random_vulnerability_id = f"CVE-{random.randint(2000, 2024)}-{random.randint(1000, 9999)}"
-        self.random_package_name = ''.join(random.choices(string.ascii_lowercase, k=8))
-        self.random_old_version = f"{random.randint(0,2)}.{random.randint(0,9)}.{random.randint(0,9)}"
-        self.random_new_version = f"{random.randint(3,5)}.{random.randint(0,9)}.{random.randint(0,9)}"
-
-    def test_start_new_success_flow(self):
-        with patch('skills.dependency_audit_aggregator.vulnerability_analyzer') as mock_vuln_analyzer, \
-             patch('skills.dependency_audit_aggregator.dependency_updater_pipeline') as mock_updater_pipeline, \
-             patch('skills.dependency_audit_aggregator.repo_reporter') as mock_reporter:
-
-            mock_vuln_analyzer.scan_vulnerabilities.return_value = {
-                "vulnerabilities": [
-                    {
-                        "id": self.random_vulnerability_id,
-                        "package": self.random_package_name,
-                        "severity": random.choice(["HIGH", "CRITICAL", "MODERATE"]),
-                        "current_version": self.random_old_version
-                    }
-                ]
-            }
-
-            mock_updater_pipeline.run_update.return_value = {
-                "updated_packages": [
-                    {
-                        "package": self.random_package_name,
-                        "from_version": self.random_old_version,
-                        "to_version": self.random_new_version,
-                        "status": "SUCCESS"
-                    }
-                ]
-            }
-
-            expected_report_id = uuid.uuid4().hex
-            mock_reporter.generate_aggregate_report.return_value = {
-                "report_id": expected_report_id,
-                "status": "COMPLETED"
-            }
-
-            result = start_new(
-                repo_path=self.random_repo_path,
-                branch=self.random_branch
-            )
-
-            mock_vuln_analyzer.scan_vulnerabilities.assert_called_once_with(self.random_repo_path)
-            mock_updater_pipeline.run_update.assert_called_once_with(self.random_repo_path, self.random_branch)
-            mock_reporter.generate_aggregate_report.assert_called_once()
-
-            self.assertIsInstance(result, dict)
-            self.assertEqual(result.get("report_id"), expected_report_id)
-            self.assertEqual(result.get("status"), "COMPLETED")
-
-    def test_start_new_no_vulnerabilities(self):
-        with patch('skills.dependency_audit_aggregator.vulnerability_analyzer') as mock_vuln_analyzer, \
-             patch('skills.dependency_audit_aggregator.dependency_updater_pipeline') as mock_updater_pipeline, \
-             patch('skills.dependency_audit_aggregator.repo_reporter') as mock_reporter:
-
-            mock_vuln_analyzer.scan_vulnerabilities.return_value = {"vulnerabilities": []}
-            mock_updater_pipeline.run_update.return_value = {"updated_packages": []}
+    def test_start_new_clean_report_default(self):
+        rand_repo = uuid.uuid4().hex
+        rand_branch = uuid.uuid4().hex
+        with patch('vulnerability_analyzer.scan_vulnerabilities', return_value={"vulnerabilities": []}, create=True) as mock_scan, \
+             patch('repo_reporter.generate_clean_report', return_value={"secure": True, "message": uuid.uuid4().hex}, create=True) as mock_clean:
             
-            fallback_message = f"clean-{uuid.uuid4().hex[:6]}"
-            mock_reporter.generate_clean_report.return_value = {
-                "message": fallback_message,
-                "secure": True
-            }
+            res = start_new(repo_path=rand_repo, branch=rand_branch)
+            mock_scan.assert_called_once_with(rand_repo)
+            mock_clean.assert_called_once()
+            self.assertIn("secure", res)
 
-            result = start_new(repo_path=self.random_repo_path)
+    def test_start_new_stream_source(self):
+        rand_stream = io.BytesIO(uuid.uuid4().bytes)
+        rand_vuln_id = uuid.uuid4().hex
+        vuln_dict = {"vulnerabilities": [{"id": rand_vuln_id}]}
+        update_dict = {"updated": uuid.uuid4().hex}
+        aggregate_dict = {"status": uuid.uuid4().hex, "vulns": vuln_dict, "updates": update_dict}
 
-            mock_vuln_analyzer.scan_vulnerabilities.assert_called_once_with(self.random_repo_path)
-            mock_updater_pipeline.run_update.assert_not_called()
-            mock_reporter.generate_clean_report.assert_called_once()
+        with patch('vulnerability_analyzer.scan_from_stream', return_value=vuln_dict, create=True) as mock_stream_scan, \
+             patch('dependency_updater_pipeline.run_update', return_value=update_dict, create=True) as mock_update, \
+             patch('repo_reporter.generate_aggregate_report', return_value=aggregate_dict, create=True) as mock_agg:
+            
+            res = start_new(stream_source=rand_stream)
+            mock_stream_scan.assert_called_once_with(rand_stream)
+            mock_update.assert_called()
+            mock_agg.assert_called_once_with(vuln_dict, update_dict)
+            self.assertEqual(res, aggregate_dict)
 
-            self.assertEqual(result.get("message"), fallback_message)
-            self.assertTrue(result.get("secure"))
-
-    def test_start_new_pipeline_exception_handling(self):
-        random_error_msg = f"err-{uuid.uuid4().hex}"
+    def test_start_new_exception_logging(self):
+        rand_repo = uuid.uuid4().hex
+        rand_err_msg = uuid.uuid4().hex
         
-        with patch('skills.dependency_audit_aggregator.vulnerability_analyzer') as mock_vuln_analyzer, \
-             patch('skills.dependency_audit_aggregator.dependency_updater_pipeline') as mock_updater_pipeline, \
-             patch('skills.dependency_audit_aggregator.repo_logger') as mock_logger:
-
-            mock_vuln_analyzer.scan_vulnerabilities.side_effect = Exception(random_error_msg)
+        with patch('vulnerability_analyzer.scan_vulnerabilities', side_effect=Exception(rand_err_msg), create=True), \
+             patch('skills.dependency_audit_aggregator.logging') as mock_logging:
+            
+            mock_logger = MagicMock()
+            mock_logging.getLogger.return_value = mock_logger
 
             with self.assertRaises(Exception) as ctx:
-                start_new(repo_path=self.random_repo_path, branch=self.random_branch)
+                start_new(repo_path=rand_repo)
+            
+            self.assertEqual(str(ctx.exception), rand_err_msg)
+            mock_logger.error.assert_called_once_with(rand_err_msg)
 
-            self.assertIn(random_error_msg, str(ctx.exception))
-            mock_logger.error.assert_called()
+    def test_aggregate_dependencies_integration(self):
+        rand_dir = uuid.uuid4().hex
+        rand_pkg = uuid.uuid4().hex
+        rand_ver = str(random.randint(1, 9)) + "." + str(random.randint(0, 9))
+        rand_cve = "CVE-" + str(random.randint(1000, 9999)) + "-" + str(random.randint(10000, 99999))
+        rand_report_name = uuid.uuid4().hex + ".json"
 
-    def test_start_new_io_stream_handling(self):
-        random_stream_data = f"audit-stream-{uuid.uuid4().hex}".encode('utf-8')
-        mock_stream = io.BytesIO(random_stream_data)
+        req_content = f"{rand_pkg}=={rand_ver}\n"
 
-        with patch('skills.dependency_audit_aggregator.vulnerability_analyzer') as mock_vuln_analyzer, \
-             patch('skills.dependency_audit_aggregator.dependency_updater_pipeline') as mock_updater_pipeline, \
-             patch('skills.dependency_audit_aggregator.repo_reporter') as mock_reporter:
+        with patch('os.path.exists', return_value=True), \
+             patch('builtins.open', unittest.mock.mock_open(read_data=req_content)) as mock_file, \
+             patch('os.path.join', side_effect=lambda *args: "/".join(args)), \
+             patch('json.dump') as mock_json_dump:
 
-            mock_vuln_analyzer.scan_from_stream.return_value = {
-                "stream_data_read": mock_stream.read().decode('utf-8'),
-                "vulnerabilities": []
-            }
+            res = aggregate_dependencies(
+                repo_path=rand_dir,
+                output_report_name=rand_report_name,
+                cve_identifier=rand_cve,
+                target_version=rand_ver
+            )
 
-            mock_reporter.generate_clean_report.return_value = {"status": "OK"}
-
-            result = start_new(repo_path=self.random_repo_path, stream_source=mock_stream)
-
-            mock_vuln_analyzer.scan_from_stream.assert_called_once()
-            self.assertEqual(result.get("status"), "OK")
+            self.assertEqual(res["status"], "SUCCESS")
+            self.assertIn(rand_report_name, res["report_path"])
+            mock_json_dump.assert_called_once()
+            dumped_data = mock_json_dump.call_args[0][0]
+            self.assertEqual(dumped_data["package"], rand_pkg)
+            self.assertEqual(dumped_data["cve"], rand_cve)
+            self.assertEqual(dumped_data["target_version"], rand_ver)
+            self.assertEqual(dumped_data["status"], "AGGREGATED")

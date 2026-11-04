@@ -20,7 +20,7 @@ class RepoSecurityGateway:
 
             if risk_score >= 85:
                 logger = RepoLogger(self.repo_path)
-                logger.log_error(f"High vulnerability risk score detected: {risk_score}")
+                logger.log_error("ERR_HIGH_RISK", f"High vulnerability risk score detected: {risk_score}")
                 
                 result = {
                     "risk_score": risk_score,
@@ -41,7 +41,7 @@ class RepoSecurityGateway:
 
         except Exception as e:
             logger = RepoLogger(self.repo_path)
-            logger.log_error(str(e))
+            logger.log_error("ERR_GATEWAY", str(e))
 
             return {
                 "status": "failed",

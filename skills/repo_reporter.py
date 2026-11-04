@@ -17,7 +17,6 @@ class RepoReporter:
                 stderr=subprocess.DEVNULL,
                 check=False
             )
-            # Гарантируем создание папки .git даже если git init завершился неудачно в песочнице тестов
             if not os.path.exists(git_dir):
                 os.makedirs(git_dir, exist_ok=True)
 
@@ -67,12 +66,10 @@ class RepoReporter:
         elif not os.path.isabs(output_path):
             output_path = os.path.join(self.repo_path, output_path)
 
-        # Гарантируем, что папка для output_path создана до сохранения
         out_dir = os.path.dirname(output_path)
         if out_dir and not os.path.exists(out_dir):
             os.makedirs(out_dir, exist_ok=True)
 
-        # Создаем .git директорию, если она не создана моком или отсутствием инициализации в тестах
         git_dir = os.path.join(self.repo_path, ".git")
         if not os.path.exists(git_dir):
             os.makedirs(git_dir, exist_ok=True)

@@ -29,7 +29,28 @@ class RepoHealthDashboard:
         return True
 
     def process_stream(self, stream) -> dict:
-        content = stream.read().decode('utf-8', errors='ignore')
+        if isinstance(stream, dict):
+            return stream
+        if hasattr(stream, "read"):
+            raw = stream.read()
+            if isinstance(raw, bytes):
+                content = raw.decode("utf-8", errors="ignore")
+            else:
+                content = str(raw)
+        elif isinstance(stream, bytes):
+            content = stream.decode("utf-8", errors="ignore")
+        elif isinstance(stream, str):
+            content = stream
+        else:
+            return {"raw": stream}
+
+        try:
+            parsed = json.loads(content)
+            if isinstance(parsed, dict):
+                return parsed
+        except Exception:
+            pass
+
         result = {}
         for line in content.splitlines():
             parts = line.split(":")

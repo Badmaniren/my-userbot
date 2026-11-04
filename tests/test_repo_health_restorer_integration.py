@@ -5,66 +5,57 @@ import os
 import uuid
 import random
 from skills.repo_health_restorer import RepoHealthRestorer
-from skills.repo_health_guardian import RepoHealthGuardian
-from skills.repo_recovery import RepoRecovery
 
 class TestRepoHealthRestorerIntegration(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
         os.system(f"git -C {self.test_dir} init -b main")
-        os.system(f"git -C {self.test_dir} config user.name 'Architect Bot'")
-        os.system(f"git -C {self.test_dir} config user.email 'architect@bot.com'")
+        os.system(f"git -C {self.test_dir} config user.name 'Architect Test'")
+        os.system(f"git -C {self.test_dir} config user.email 'architect@test.com'")
         
-        self.unique_msg = f"Initial commit {uuid.uuid4()}"
-        self.test_file = os.path.join(self.test_dir, "README.md")
-        
-        with open(self.test_file, "w") as f:
-            f.write(f"# {uuid.uuid4()}\n")
-            
-        os.system(f"git -C {self.test_dir} add README.md")
-        os.system(f"git -C {self.test_dir} commit -m '{self.unique_msg}'")
+        self.restorer = RepoHealthRestorer(self.test_dir)
 
     def tearDown(self):
-        shutil.rmtree(self.test_dir)
+        shutil.rmtree(self.test_dir, ignore_errors=True)
 
-    def test_composition_and_restoration_integration(self):
-        restorer = RepoHealthRestorer(self.test_dir)
+    def test_restore_and_protect_integration(self):
+        unique_file = f"file_{uuid.uuid4().hex}.txt"
+        file_path = os.path.join(self.test_dir, unique_file)
+        random_content = f"content_{random.randint(1000, 9999)}"
         
-        self.assertIsInstance(restorer, RepoHealthRestorer)
-        
-        has_guardian = any(isinstance(attr, RepoHealthGuardian) for attr in restorer.__dict__.values()) or hasattr(restorer, 'guardian') or hasattr(restorer, 'health_guardian')
-        has_recovery = any(isinstance(attr, RepoRecovery) for attr in restorer.__dict__.values()) or hasattr(restorer, 'recovery') or hasattr(restorer, 'repo_recovery')
-        
-        corrupted_file = os.path.join(self.test_dir, f"corrupted_{uuid.uuid4()}.txt")
-        with open(corrupted_file, "w") as f:
-            f.write(str(uuid.uuid4()))
+        with open(file_path, "w") as f:
+            f.write(random_content)
             
-        if hasattr(restorer, 'restore_repository'):
-            result = restorer.restore_repository()
-        elif hasattr(restorer, 'run'):
-            result = restorer.run()
-        elif hasattr(restorer, 'full_restoration'):
-            result = restorer.full_restoration()
-        else:
-            try:
-                result = restorer.restore()
-            except AttributeError:
-                result = False
+        os.system(f"git -C {self.test_dir} add {unique_file}")
+        os.system(f"git -C {self.test_dir} commit -m 'Initial commit {uuid.uuid4().hex}'")
 
-        self.assertIsNotNone(result)
+        result = self.restorer.restore_and_protect()
 
-        health_result = None
-        if hasattr(restorer, 'guardian') and hasattr(restorer.guardian, 'check_health_and_audit'):
-            health_result = restorer.guardian.check_health_and_audit()
-        elif hasattr(restorer, 'health_guardian') and hasattr(restorer.health_guardian, 'check_health_and_audit'):
-            health_result = restorer.health_guardian.check_health_and_audit()
+        self.assertIsInstance(result, dict)
+        self.assertIn("recovery_status", result)
+        self.assertIn("maintenance_report", result)
+        self.assertIsInstance(result["recovery_status"], bool)
+        self.assertIsInstance(result["maintenance_report"], dict)
+
+    def test_comprehensive_health_restoration_integration(self):
+        stream_data = f"stream_payload_{uuid.uuid4().hex}"
         
-        if health_result is not None:
-            self.assertIsInstance(health_result, dict)
+        result = self.restorer.comprehensive_health_restoration(stream_data)
 
-        recovery_instance = RepoRecovery(self.test_dir)
-        recovery_status = recovery_instance.recover_repository()
-        self.assertIsInstance(recovery_status, bool)
+        self.assertIsInstance(result, dict)
+        self.assertIn("restored", result)
+        self.assertIn("structure_analysis", result)
+        self.assertIsInstance(result["restored"], bool)
+        self.assertIsInstance(result["structure_analysis"], dict)
 
-if __name__ == '__main__':
+    def test_execute_restoration_routine_integration(self):
+        dummy_file = os.path.join(self.test_dir, f"dummy_{uuid.uuid4().hex}.py")
+        with open(dummy_file, "w") as f:
+            f.write(f"print('{uuid.uuid4().hex}')\n")
+
+        status = self.restorer.execute_restoration_routine()
+
+        self.assertIsInstance(status, bool)
+
+if __name__ == "__main__":
     unittest.main()

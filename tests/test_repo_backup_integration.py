@@ -1,64 +1,72 @@
 import unittest
 import tempfile
-import shutil
 import os
+import subprocess
 import uuid
-import random
-from skills.repo_backup import RepoBackup
-from skills.repo_analytics import RepoMonitor, RepoSummarizer
-from skills.repo_reporter import RepoReporter
-from skills.git_committer import GitCommitter
+from skills.repo_backup import (
+    GitCommitter,
+    RepoAutoCommitter,
+    RepoMonitor,
+    RepoSummarizer,
+    RepoNotifier,
+    RepoReporter,
+    RepoBackup
+)
 
 class TestRepoBackupIntegration(unittest.TestCase):
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp()
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.repo_path = self.temp_dir.name
         
-        # Initialize git repo for testing real interactions
-        os.system(f"git -C {self.test_dir} init -b main")
-        os.system(f"git -C {self.test_dir} config user.name 'Arch Test'")
-        os.system(f"git -C {self.test_dir} config user.email 'arch@test.com'")
+        subprocess.run(["git", "init", self.repo_path], capture_output=True, check=True)
+        subprocess.run(["git", "-C", self.repo_path, "config", "user.name", "Test Architect"], capture_output=True, check=True)
+        subprocess.run(["git", "-C", self.repo_path, "config", "user.email", "architect@test.com"], capture_output=True, check=True)
         
-        # Generate random initial content
-        self.unique_id = str(uuid.uuid4())
-        self.file_name = f"file_{uuid.uuid4().hex[:6]}.txt"
-        self.file_path = os.path.join(self.test_dir, self.file_name)
+        self.random_filename = f"file_{uuid.uuid4().hex[:8]}.txt"
+        self.file_path = os.path.join(self.repo_path, self.random_filename)
+        self.file_content = f"content_{uuid.uuid4().hex}"
         
         with open(self.file_path, "w", encoding="utf-8") as f:
-            f.write(f"Initial content: {self.unique_id}\nRandom value: {random.randint(1, 100000)}")
-            
-        committer = GitCommitter(self.test_dir)
-        committer.commit_changes(self.file_path, f"Initial commit {self.unique_id}")
+            f.write(self.file_content)
 
     def tearDown(self):
-        shutil.rmtree(self.test_dir)
+        self.temp_dir.cleanup()
 
-    def test_repo_backup_full_lifecycle(self):
-        # Modify file with new random data
-        new_random_data = f"Updated content: {uuid.uuid4()}"
-        with open(self.file_path, "a", encoding="utf-8") as f:
-            f.write(new_random_data + "\n")
+    def test_full_backup_and_reporting_pipeline(self):
+        committer = GitCommitter(self.repo_path)
+        commit_message = f"Commit message {uuid.uuid4().hex[:6]}"
+        commit_success = committer.commit_changes(self.random_filename, commit_message)
+        self.assertTrue(commit_success, "GitCommitter should successfully commit changes.")
 
-        # Instantiate real related modules to ensure integration without mocks
-        monitor = RepoMonitor(self.test_dir)
-        status = monitor.check_status()
-        self.assertIsInstance(status, str)
+        auto_committer = RepoAutoCommitter(self.repo_path)
+        auto_result = auto_committer.run()
+        self.assertTrue(auto_result, "RepoAutoCommitter should run successfully.")
 
-        summarizer = RepoSummarizer(self.test_dir)
+        monitor = RepoMonitor(self.repo_path)
+        status_output = monitor.check_status()
+        self.assertIsInstance(status_output, str, "RepoMonitor status should be a string.")
+
+        summarizer = RepoSummarizer(self.repo_path)
         summary = summarizer.generate_summary()
-        self.assertIsInstance(summary, str)
+        self.assertIn(commit_message, summary, "RepoSummarizer summary should contain the recent commit message.")
 
-        reporter = RepoReporter(self.test_dir)
+        reporter = RepoReporter(self.repo_path)
+        final_report = reporter.generate_final_report()
+        self.assertNotEqual(final_report, "Error", "RepoReporter should generate a valid final report.")
+        self.assertNotEqual(final_report, "No commits", "RepoReporter should find at least one commit.")
+
         report_filename = f"report_{uuid.uuid4().hex[:8]}.txt"
-        report_path = os.path.join(self.test_dir, report_filename)
-        saved_report = reporter.save_report(report_path, f"Status: {status}\nSummary: {summary}")
-        self.assertTrue(os.path.exists(saved_report))
+        report_path = os.path.join(self.repo_path, report_filename)
+        saved_path = reporter.generate_report(status=status_output, summary=summary, out_path=report_path)
+        self.assertTrue(os.path.exists(saved_path), "Report file must be physically created on disk.")
 
-        # Test RepoBackup core functionality
-        backup_manager = RepoBackup(self.test_dir)
-        
-        # Assuming backup creates a snapshot or archive
-        backup_result = backup_manager.create_backup() if hasattr(backup_manager, "create_backup") else backup_manager.backup()
-        self.assertTrue(backup_result)
+        notifier = RepoNotifier(self.repo_path)
+        notify_result = notifier.notify(saved_path)
+        self.assertTrue(notify_result, "RepoNotifier should successfully process the generated report.")
+
+        backup_module = RepoBackup(self.repo_path)
+        backup_res = backup_module.backup()
+        self.assertTrue(backup_res, "RepoBackup should execute backup successfully.")
 
 if __name__ == "__main__":
     unittest.main()

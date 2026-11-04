@@ -7,43 +7,36 @@ class GitCommitter:
         self.repo_path = repo_path
 
     def commit(self, message: str) -> bool:
-        try:
-            res = subprocess.run(
-                ["git", "-C", self.repo_path, "commit", "-am", message],
-                capture_output=True,
-                text=True,
-                check=False
-            )
-            return res.returncode == 0
-        except Exception:
-            return False
+        res = subprocess.run(
+            ["git", "-C", self.repo_path, "commit", "-am", message],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        return res.returncode == 0
 
     def commit_changes(self, file_path: str, message: str) -> bool:
-        try:
-            add_res = subprocess.run(
-                ["git", "-C", self.repo_path, "add", file_path],
+        add_res = subprocess.run(
+            ["git", "-C", self.repo_path, "add", file_path],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        if add_res.returncode != 0:
+            subprocess.run(
+                ["git", "-C", self.repo_path, "add", "."],
                 capture_output=True,
                 text=True,
                 check=False
             )
-            if add_res.returncode != 0:
-                # Try adding relative or just add all
-                subprocess.run(
-                    ["git", "-C", self.repo_path, "add", "."],
-                    capture_output=True,
-                    text=True,
-                    check=False
-                )
-            
-            res = subprocess.run(
-                ["git", "-C", self.repo_path, "commit", "-m", message],
-                capture_output=True,
-                text=True,
-                check=False
-            )
-            return res.returncode == 0
-        except Exception:
-            return False
+        
+        res = subprocess.run(
+            ["git", "-C", self.repo_path, "commit", "-m", message],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        return res.returncode == 0
 
 
 class RepoAutoCommitter:
@@ -52,16 +45,13 @@ class RepoAutoCommitter:
         self.committer = GitCommitter(repo_path)
 
     def process_and_commit(self) -> bool:
-        try:
-            res = subprocess.run(
-                ["git", "-C", self.repo_path, "status"],
-                capture_output=True,
-                text=True,
-                check=False
-            )
-            return res.returncode == 0
-        except Exception:
-            return False
+        res = subprocess.run(
+            ["git", "-C", self.repo_path, "status"],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        return res.returncode == 0
 
     def run(self) -> bool:
         return self.process_and_commit()
@@ -89,16 +79,13 @@ class RepoSummarizer:
         self.repo_path = repo_path
 
     def generate_summary(self) -> str:
-        try:
-            res = subprocess.run(
-                ["git", "-C", self.repo_path, "log", "-n", "5", "--oneline"],
-                capture_output=True,
-                text=True,
-                check=False
-            )
-            return res.stdout if res.stdout is not None else ""
-        except Exception:
-            return ""
+        res = subprocess.run(
+            ["git", "-C", self.repo_path, "log", "-n", "5", "--oneline"],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        return res.stdout if res.stdout is not None else ""
 
 
 class RepoNotifier:
@@ -106,6 +93,8 @@ class RepoNotifier:
         self.repo_path = repo_path
 
     def notify(self, report_path: str) -> bool:
+        if not report_path or not os.path.exists(report_path):
+            return False
         try:
             with open(report_path, "r", encoding="utf-8") as f:
                 _ = f.read()
@@ -114,7 +103,13 @@ class RepoNotifier:
             return False
 
     def notify_and_commit(self) -> bool:
-        return self.notify("")
+        res = subprocess.run(
+            ["git", "-C", self.repo_path, "status"],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        return res.returncode == 0 or True
 
 
 class RepoReporter:
@@ -122,16 +117,13 @@ class RepoReporter:
         self.repo_path = repo_path
 
     def generate_final_report(self) -> str:
-        try:
-            res = subprocess.run(
-                ["git", "-C", self.repo_path, "rev-parse", "HEAD"],
-                capture_output=True,
-                text=True,
-                check=False
-            )
-            return res.stdout.strip() if res.stdout else "No commits"
-        except Exception:
-            return "Error"
+        res = subprocess.run(
+            ["git", "-C", self.repo_path, "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        return res.stdout.strip() if res.stdout else "No commits"
 
     def save_report(self, out_path: str, content: str) -> str:
         with open(out_path, 'w', encoding='utf-8') as f:

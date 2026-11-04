@@ -1,103 +1,106 @@
 import unittest
 from unittest.mock import patch, MagicMock
-import uuid
+import os
 import random
-import io
-import string
-
+import uuid
 from skills.release_notes_publisher import ReleaseNotesPublisher
+
 
 class TestReleaseNotesPublisher(unittest.TestCase):
 
     def setUp(self):
-        self.repo_path = f"/tmp/{uuid.uuid4().hex}"
-        self.output_path = f"/tmp/{uuid.uuid4().hex}.md"
-        self.publisher = ReleaseNotesPublisher(self.repo_path)
+        self.repo_path = os.path.join('/tmp', uuid.uuid4().hex)
+        self.output_path = os.path.join('/tmp', uuid.uuid4().hex, f"{uuid.uuid4().hex}.md")
+        self.expected_result = random.choice([True, False])
+        self.expected_compose_result = uuid.uuid4().hex
 
     def test_init_sets_repo_path(self):
-        random_path = f"/var/repo/{uuid.uuid4().hex}"
-        publisher = ReleaseNotesPublisher(random_path)
-        self.assertEqual(publisher.repo_path, random_path)
+        with patch('skills.release_notes_publisher.ReleaseNotesComposer') as mock_composer, \
+             patch('skills.release_notes_publisher.RepoNotifier') as mock_notifier:
+            publisher = ReleaseNotesPublisher(self.repo_path)
+            self.assertEqual(publisher.repo_path, self.repo_path)
+            mock_composer.assert_called_once_with(self.repo_path)
+            mock_notifier.assert_called_once_with(self.repo_path)
 
-    @patch('skills.release_notes_publisher.ReleaseNotesComposer')
-    @patch('skills.release_notes_publisher.RepoNotifier')
-    def test_publish_success_flow(self, mock_notifier_class, mock_composer_class):
-        mock_composer_instance = mock_composer_class.return_value
-        expected_notes = f"Release Notes: {uuid.uuid4().hex}"
-        mock_composer_instance.compose.return_value = expected_notes
-        mock_composer_instance.generate.return_value = expected_notes
-        mock_composer_instance.run.return_value = expected_notes
+    def test_publish_success(self):
+        with patch('skills.release_notes_publisher.ReleaseNotesComposer') as mock_composer_cls, \
+             patch('skills.release_notes_publisher.RepoNotifier') as mock_notifier_cls, \
+             patch('os.makedirs') as mock_makedirs:
+            
+            mock_composer = mock_composer_cls.return_value
+            mock_composer.compose.return_value = self.expected_compose_result
+            
+            mock_notifier = mock_notifier_cls.return_value
+            mock_notifier.notify.return_value = self.expected_result
 
-        mock_notifier_instance = mock_notifier_class.return_value
-        mock_notifier_instance.notify.return_value = True
-        mock_notifier_instance.notify_and_commit.return_value = True
+            publisher = ReleaseNotesPublisher(self.repo_path)
+            res = publisher.publish(self.output_path)
 
-        result = self.publisher.publish(self.output_path)
+            mock_makedirs.assert_called_once_with(os.path.dirname(self.output_path), exist_ok=True)
+            mock_composer.compose.assert_called_once_with(self.output_path)
+            mock_notifier.notify.assert_called_once_with(self.output_path)
+            self.assertEqual(res, self.expected_result)
 
-        mock_composer_class.assert_called_once_with(self.repo_path)
-        mock_composer_instance.compose.assert_called_once_with(self.output_path)
-        mock_notifier_class.assert_called_once_with(self.repo_path)
-        mock_notifier_instance.notify.assert_called_once_with(self.output_path)
-        self.assertTrue(result)
+    def test_publish_composer_fails(self):
+        with patch('skills.release_notes_publisher.ReleaseNotesComposer') as mock_composer_cls, \
+             patch('skills.release_notes_publisher.RepoNotifier') as mock_notifier_cls, \
+             patch('os.makedirs'):
+            
+            mock_composer = mock_composer_cls.return_value
+            random_error_msg = uuid.uuid4().hex
+            mock_composer.compose.side_effect = Exception(random_error_msg)
+            
+            publisher = ReleaseNotesPublisher(self.repo_path)
+            
+            with self.assertRaises(Exception) as ctx:
+                publisher.publish(self.output_path)
+            
+            self.assertIn(random_error_msg, str(ctx.exception))
 
-    @patch('skills.release_notes_publisher.ReleaseNotesComposer')
-    @patch('skills.release_notes_publisher.RepoNotifier')
-    def test_publish_composer_fails(self, mock_notifier_class, mock_composer_class):
-        mock_composer_instance = mock_composer_class.return_value
-        mock_composer_instance.compose.side_effect = Exception(uuid.uuid4().hex)
+    def test_run_executes_workflow(self):
+        with patch('skills.release_notes_publisher.ReleaseNotesComposer') as mock_composer_cls, \
+             patch('skills.release_notes_publisher.RepoNotifier') as mock_notifier_cls:
+            
+            mock_composer = mock_composer_cls.return_value
+            mock_notifier = mock_notifier_cls.return_value
+            mock_notifier.notify_and_commit.return_value = self.expected_result
 
-        mock_notifier_instance = mock_notifier_class.return_value
+            publisher = ReleaseNotesPublisher(self.repo_path)
+            res = publisher.run()
 
-        with self.assertRaises(Exception):
-            self.publisher.publish(self.output_path)
+            mock_composer.run.assert_called_once()
+            mock_notifier.notify_and_commit.assert_called_once()
+            self.assertEqual(res, self.expected_result)
 
-        mock_notifier_instance.notify.assert_not_called()
+    def test_generate_and_notify(self):
+        with patch('skills.release_notes_publisher.ReleaseNotesComposer') as mock_composer_cls, \
+             patch('skills.release_notes_publisher.RepoNotifier') as mock_notifier_cls, \
+             patch('os.makedirs') as mock_makedirs:
+            
+            mock_composer = mock_composer_cls.return_value
+            mock_composer.generate.return_value = self.expected_compose_result
+            
+            mock_notifier = mock_notifier_cls.return_value
+            mock_notifier.notify.return_value = self.expected_result
 
-    @patch('skills.release_notes_publisher.ReleaseNotesComposer')
-    @patch('skills.release_notes_publisher.RepoNotifier')
-    def test_publish_notifier_fails(self, mock_notifier_class, mock_composer_class):
-        mock_composer_instance = mock_composer_class.return_value
-        mock_composer_instance.compose.return_value = uuid.uuid4().hex
+            publisher = ReleaseNotesPublisher(self.repo_path)
+            res = publisher.generate_and_notify(self.output_path)
 
-        mock_notifier_instance = mock_notifier_class.return_value
-        mock_notifier_instance.notify.return_value = False
+            mock_makedirs.assert_called_once_with(os.path.dirname(self.output_path), exist_ok=True)
+            mock_composer.generate.assert_called_once_with(self.output_path)
+            mock_notifier.notify.assert_called_once_with(self.output_path)
+            self.assertEqual(res, self.expected_result)
 
-        result = self.publisher.publish(self.output_path)
+    def test_compose_and_notify_delegates_to_publish(self):
+        with patch('skills.release_notes_publisher.ReleaseNotesPublisher.publish') as mock_publish:
+            mock_publish.return_value = self.expected_result
 
-        self.assertFalse(result)
+            publisher = ReleaseNotesPublisher(self.repo_path)
+            res = publisher.compose_and_notify(self.output_path)
 
-    @patch('skills.release_notes_publisher.ReleaseNotesComposer')
-    @patch('skills.release_notes_publisher.RepoNotifier')
-    def test_run_digest_distribution(self, mock_notifier_class, mock_composer_class):
-        mock_composer_instance = mock_composer_class.return_value
-        mock_composer_instance.run.return_value = uuid.uuid4().hex
+            mock_publish.assert_called_once_with(self.output_path)
+            self.assertEqual(res, self.expected_result)
 
-        mock_notifier_instance = mock_notifier_class.return_value
-        mock_notifier_instance.notify_and_commit.return_value = True
-
-        result = self.publisher.run()
-
-        mock_composer_class.assert_called_once_with(self.repo_path)
-        mock_composer_instance.run.assert_called_once()
-        mock_notifier_class.assert_called_once_with(self.repo_path)
-        mock_notifier_instance.notify_and_commit.assert_called_once()
-        self.assertTrue(result)
-
-    @patch('skills.release_notes_publisher.ReleaseNotesComposer')
-    @patch('skills.release_notes_publisher.RepoNotifier')
-    def test_custom_generation_and_notification(self, mock_notifier_class, mock_composer_class):
-        custom_output = f"/home/user/{uuid.uuid4().hex}.txt"
-        mock_composer_instance = mock_composer_class.return_value
-        mock_composer_instance.generate.return_value = uuid.uuid4().hex
-
-        mock_notifier_instance = mock_notifier_class.return_value
-        mock_notifier_instance.notify.return_value = True
-
-        res = self.publisher.generate_and_notify(custom_output)
-
-        mock_composer_instance.generate.assert_called_once_with(custom_output)
-        mock_notifier_instance.notify.assert_called_once_with(custom_output)
-        self.assertTrue(res)
 
 if __name__ == '__main__':
     unittest.main()

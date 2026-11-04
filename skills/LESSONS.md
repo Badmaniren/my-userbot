@@ -188,3 +188,7 @@
 ## repo_health_optimizer (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=2, errors=1)
 - Статус: успешно прошёл тесты и влит в main
+
+## repo_security_gateway (start_new) — раундов: 2
+- Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
+- Статус: успешно прошёл тесты и влит в main

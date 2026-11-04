@@ -177,3 +177,7 @@
 ## vulnerability_analyzer (create) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main
+
+## vulnerability_updater (compose) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main

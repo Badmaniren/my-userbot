@@ -42,24 +42,19 @@ class RepoAutoCommitter:
         self.repo_path = repo_path
 
     def process_and_commit(self) -> bool:
-        try:
-            committer = GitCommitter(self.repo_path)
-            # Сначала добавляем все неотслеживаемые изменения, чтобы commit -am или аналогичное сработало
-            subprocess.run(
-                ["git", "-C", self.repo_path, "add", "."],
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            return committer.commit("Auto-commit updates")
-        except Exception:
-            return False
+        # Сначала добавляем все неотслеживаемые изменения через subprocess.run, 
+        # а затем вызываем committer.commit, чтобы юнит-тесты с патчем GitCommitter.commit работали корректно.
+        subprocess.run(
+            ["git", "-C", self.repo_path, "add", "."],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        committer = GitCommitter(self.repo_path)
+        return committer.commit("Auto-commit updates")
 
     def run(self) -> bool:
-        try:
-            return self.process_and_commit()
-        except Exception:
-            return False
+        return self.process_and_commit()
 
 
 class RepoMonitor:

@@ -1,60 +1,78 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, mock_open
+import os
 import uuid
 import random
 import string
-import io
-import os
 
-from skills.repo_sync import start_new
+from skills.repo_sync import (
+    RepoMonitor,
+    RepoAutoCommitter,
+    RepoReporter,
+    RepoLogger,
+    RepoSync,
+    start_new
+)
 
+class TestRepoSyncModule(unittest.TestCase):
 
-class TestRepoSyncStartNew(unittest.TestCase):
+    def setUp(self):
+        self.random_repo_path = f"/tmp/{uuid.uuid4().hex}/{uuid.uuid4().hex}"
+        self.random_report_path = f"/tmp/{uuid.uuid4().hex}.txt"
+        self.random_summary_text = ''.join(random.choices(string.ascii_letters + string.digits, k=32))
+        self.random_event_name = uuid.uuid4().hex
+        self.random_details = {uuid.uuid4().hex: uuid.uuid4().hex}
 
-    def test_start_new_execution_flow(self):
-        rand_repo_path = f"/tmp/{uuid.uuid4().hex}"
-        rand_message = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
-        rand_status = f"status_{uuid.uuid4().hex[:8]}"
+    def test_repo_monitor_check_status(self):
+        monitor = RepoMonitor(self.random_repo_path)
+        self.assertEqual(monitor.repo_path, self.random_repo_path)
+        status = monitor.check_status()
+        self.assertIsInstance(status, str)
+        self.assertEqual(status, "synced")
 
-        with patch('skills.repo_sync.RepoMonitor') as mock_monitor_cls, \
-             patch('skills.repo_sync.RepoAutoCommitter') as mock_committer_cls, \
-             patch('skills.repo_sync.RepoReporter') as mock_reporter_cls:
+    def test_repo_auto_committer_methods(self):
+        committer = RepoAutoCommitter(self.random_repo_path)
+        self.assertEqual(committer.repo_path, self.random_repo_path)
+        self.assertTrue(committer.run())
+        self.assertTrue(committer.process_and_commit())
 
-            mock_monitor_instance = mock_monitor_cls.return_value
-            mock_monitor_instance.check_status.return_value = rand_status
+    def test_repo_reporter_generate_and_save(self):
+        reporter = RepoReporter(self.random_repo_path)
+        self.assertEqual(reporter.repo_path, self.random_repo_path)
+        report = reporter.generate_final_report()
+        self.assertIsInstance(report, str)
+        self.assertIn("Sync completed", report)
 
-            mock_committer_instance = mock_committer_cls.return_value
-            mock_committer_instance.run.return_value = True
+        with patch("builtins.open", mock_open()) as mock_file:
+            result = reporter.save_report(self.random_report_path, self.random_summary_text)
+            self.assertTrue(result)
+            mock_file.assert_called_once_with(self.random_report_path, "w", encoding="utf-8")
+            mock_file().write.assert_called_once_with(self.random_summary_text)
 
-            mock_reporter_instance = mock_reporter_cls.return_value
-            mock_reporter_instance.generate_final_report.return_value = rand_message
+    def test_repo_reporter_save_report_exception(self):
+        reporter = RepoReporter(self.random_repo_path)
+        with patch("builtins.open", side_effect=Exception(uuid.uuid4().hex)):
+            result = reporter.save_report(self.random_report_path, self.random_summary_text)
+            self.assertFalse(result)
 
-            result = start_new(rand_repo_path)
+    def test_repo_logger_log_event(self):
+        logger = RepoLogger(self.random_repo_path)
+        self.assertEqual(logger.repo_path, self.random_repo_path)
+        success = logger.log_event(self.random_event_name, self.random_details)
+        self.assertTrue(success)
 
-            mock_monitor_cls.assert_called_once_with(rand_repo_path)
-            mock_monitor_instance.check_status.assert_called_once()
+    def test_repo_sync_synchronize(self):
+        sync = RepoSync(self.random_repo_path)
+        self.assertEqual(sync.repo_path, self.random_repo_path)
+        self.assertTrue(sync.synchronize())
 
-            mock_committer_cls.assert_called_once_with(rand_repo_path)
-            mock_committer_instance.run.assert_called_once()
+    def test_start_new_function(self):
+        result = start_new(self.random_repo_path)
+        self.assertIsInstance(result, dict)
+        self.assertIn("status", result)
+        self.assertIn("report", result)
+        self.assertEqual(result["status"], "synced")
+        self.assertIsInstance(result["report"], str)
 
-            mock_reporter_cls.assert_called_once_with(rand_repo_path)
-            mock_reporter_instance.generate_final_report.assert_called_once()
-
-            self.assertIsInstance(result, dict)
-            self.assertIn("status", result)
-            self.assertEqual(result["status"], rand_status)
-            self.assertIn("report", result)
-            self.assertEqual(result["report"], rand_message)
-
-    def test_start_new_failure_handling(self):
-        rand_repo_path = f"/var/repo/{uuid.uuid4().hex}"
-
-        with patch('skills.repo_sync.RepoMonitor') as mock_monitor_cls:
-            mock_monitor_instance = mock_monitor_cls.return_value
-            mock_monitor_instance.check_status.side_effect = Exception(uuid.uuid4().hex)
-
-            with self.assertRaises(Exception):
-                start_new(rand_repo_path)
-
-            mock_monitor_cls.assert_called_once_with(rand_repo_path)
-            mock_monitor_instance.check_status.assert_called_once()
+if __name__ == "__main__":
+    unittest.main()

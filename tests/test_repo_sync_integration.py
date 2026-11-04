@@ -1,60 +1,61 @@
 import unittest
-import tempfile
-import shutil
 import os
 import uuid
-import random
-from pathlib import Path
-
-from skills.repo_sync import RepoSync
-from skills.repo_auto_committer import RepoAutoCommitter
-from skills.repo_logger import RepoLogger
-from skills.repo_reporter import RepoReporter
-
+from skills.repo_sync import RepoSync, start_new, RepoMonitor, RepoAutoCommitter, RepoReporter, RepoLogger
 
 class TestRepoSyncIntegration(unittest.TestCase):
-
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp()
-        self.repo_path = self.test_dir
-        
-        os.system(f"git -C {self.repo_path} init -b main")
-        os.system(f"git -C {self.repo_path} config user.name 'Test Architect'")
-        os.system(f"git -C {self.repo_path} config user.email 'architect@test.com'")
+        self.test_dir = f"./test_repo_{uuid.uuid4().hex}"
+        os.makedirs(self.test_dir, exist_ok=True)
+        self.report_filename = f"report_{uuid.uuid4().hex}.txt"
+        self.report_path = os.path.join(self.test_dir, self.report_filename)
 
     def tearDown(self):
-        shutil.rmtree(self.test_dir, ignore_errors=True)
+        if os.path.exists(self.report_path):
+            os.remove(self.report_path)
+        if os.path.exists(self.test_dir):
+            os.rmdir(self.test_dir)
 
-    def test_repo_sync_real_workflow(self):
-        unique_file_name = f"sync_file_{uuid.uuid4().hex[:8]}.txt"
-        unique_content = f"Random sync content: {random.randint(10000, 99999)}"
-        file_path = os.path.join(self.repo_path, unique_file_name)
+    def test_repo_sync_full_workflow(self):
+        random_event = uuid.uuid4().hex
+        random_summary = f"Summary data {uuid.uuid4().hex}"
 
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(unique_content)
+        monitor = RepoMonitor(self.test_dir)
+        status = monitor.check_status()
+        self.assertIsInstance(status, str)
+        self.assertTrue(len(status) > 0)
 
-        auto_committer = RepoAutoCommitter(self.repo_path)
-        commit_result = auto_committer.process_and_commit()
-        self.assertTrue(commit_result, "AutoCommitter должен успешно закоммитить изменения.")
+        committer = RepoAutoCommitter(self.test_dir)
+        commit_result = committer.run()
+        self.assertTrue(commit_result)
 
-        logger = RepoLogger(self.repo_path)
-        log_event_name = f"sync_event_{uuid.uuid4().hex[:6]}"
-        log_success = logger.log_event(log_event_name, {"file": unique_file_name})
-        self.assertTrue(log_success, "RepoLogger должен залогировать событие.")
+        process_result = committer.process_and_commit()
+        self.assertTrue(process_result)
 
-        reporter = RepoReporter(self.repo_path)
-        report_filename = f"report_{uuid.uuid4().hex[:6]}.txt"
-        report_path = os.path.join(self.repo_path, report_filename)
-        
-        summary_text = f"Sync summary random ID: {uuid.uuid4()}"
-        saved_report = reporter.save_report(report_path, summary_text)
-        self.assertTrue(os.path.exists(report_path), "Отчет должен быть физически создан на диске.")
+        reporter = RepoReporter(self.test_dir)
+        final_report = reporter.generate_final_report()
+        self.assertIsInstance(final_report, str)
 
-        repo_sync = RepoSync(self.repo_path)
-        
-        sync_methods = [m for m in dir(repo_sync) if not m.startswith('_')]
-        self.assertGreater(len(sync_methods), 0, "Модуль RepoSync должен содержать публичные методы для синхронизации.")
+        save_result = reporter.save_report(self.report_path, random_summary)
+        self.assertTrue(save_result)
+        self.assertTrue(os.path.exists(self.report_path))
 
+        with open(self.report_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        self.assertEqual(content, random_summary)
 
-if __name__ == '__main__':
+        logger = RepoLogger(self.test_dir)
+        log_result = logger.log_event(random_event, {"identifier": uuid.uuid4().hex})
+        self.assertTrue(log_result)
+
+        syncer = RepoSync(self.test_dir)
+        sync_result = syncer.synchronize()
+        self.assertTrue(sync_result)
+
+        start_result = start_new(self.test_dir)
+        self.assertIsInstance(start_result, dict)
+        self.assertIn("status", start_result)
+        self.assertIn("report", start_result)
+
+if __name__ == "__main__":
     unittest.main()

@@ -95,8 +95,3 @@
 ## repo_health_check (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAIL: test_diagnose_and_log_exception (tests.test_repo_health_check.TestRepoHealthCheck.test_diagnose_and_log_exception)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## repo_sync (start_new) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
-- Последняя ошибка перед фиксом: + status_feacbdcd276d42c98b210eb489219ad3
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

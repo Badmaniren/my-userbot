@@ -5,7 +5,7 @@ from skills.vulnerability_analyzer import VulnerabilityAnalyzer
 class RepoHealthOptimizer:
     """Модуль оптимизации репозитория на основе комбинирования аудита структуры,
 
-    восстановления здоровья и анализа уязвимостей.
+    восстановления здоровья и анализа уязвимостей для непрерывного улучшения кодовой базы.
     """
 
     def __init__(self, repo_path: str):
@@ -23,7 +23,7 @@ class RepoHealthOptimizer:
 
     def process_optimization_stream(self, stream) -> dict:
         stream_restoration = self.restorer.comprehensive_health_restoration(stream)
-        stream_vulnerabilities = self.vulnerability_analyzer.parse_stream_data()
+        stream_vulnerabilities = self.vulnerability_analyzer.parse_stream_data(stream)
         return {
             "stream_restoration": stream_restoration,
             "stream_vulnerabilities": stream_vulnerabilities,

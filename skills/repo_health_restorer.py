@@ -1,3 +1,4 @@
+from io import BytesIO
 from skills.repo_health_guardian import RepoHealthGuardian
 from skills.repo_recovery import RepoRecovery
 
@@ -22,6 +23,8 @@ class RepoHealthRestorer:
         }
 
     def comprehensive_health_restoration(self, stream) -> dict:
+        if isinstance(stream, str):
+            stream = BytesIO(stream.encode("utf-8"))
         structure_analysis = self.guardian.analyze_repo_structure()
         restored = self.recovery.safe_restore(stream)
         return {

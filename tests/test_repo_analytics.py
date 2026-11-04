@@ -1,140 +1,129 @@
 import unittest
 from unittest.mock import patch, MagicMock
+import subprocess
+import os
 import uuid
 import random
 import string
-import io
-import os
+from skills.repo_analytics import GitCommitter, RepoAutoCommitter, RepoMonitor, RepoSummarizer
 
-from skills.repo_analytics import (
-    GitCommitter,
-    RepoAutoCommitter,
-    RepoMonitor,
-    RepoSummarizer
-)
+class TestRepoAnalytics(unittest.TestCase):
 
+    def setUp(self):
+        self.repo_path = f"/tmp/{uuid.uuid4().hex}"
+        self.message = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
+        self.file_path = os.path.join(self.repo_path, f"{uuid.uuid4().hex}.txt")
 
-class TestRepoAnalyticsInquisitor(unittest.TestCase):
+    def test_git_committer_commit_success(self):
+        committer = GitCommitter(self.repo_path)
+        mock_result = MagicMock()
+        mock_result.returncode = 0
 
-    def _generate_random_path(self):
-        return f"/tmp/{uuid.uuid4().hex}/{uuid.uuid4().hex}"
+        with patch("subprocess.run", return_value=mock_result) as mock_run:
+            res = committer.commit(self.message)
+            self.assertTrue(res)
+            mock_run.assert_called_once_with(
+                ["git", "-C", self.repo_path, "commit", "-am", self.message],
+                capture_output=True,
+                text=True,
+                check=True
+            )
 
-    def _generate_random_message(self):
-        return ''.join(random.choices(string.ascii_letters + string.whitespace, k=random.randint(10, 50)))
+    def test_git_committer_commit_failure(self):
+        committer = GitCommitter(self.repo_path)
+        with patch("subprocess.run", side_effect=subprocess.SubprocessError("git fail")) as mock_run:
+            res = committer.commit(self.message)
+            self.assertFalse(res)
+            mock_run.assert_called_once()
 
-    def test_git_committer_commit(self):
-        repo_path = self._generate_random_path()
-        msg = self._generate_random_message()
+    def test_git_committer_commit_changes_success(self):
+        committer = GitCommitter(self.repo_path)
+        mock_result = MagicMock()
+        mock_result.returncode = 0
 
-        committer = GitCommitter(repo_path)
-        self.assertEqual(committer.repo_path, repo_path)
-
-        with patch('subprocess.run') as mock_run:
-            mock_run.return_value.returncode = 0
-            result = committer.commit(msg)
-            self.assertTrue(result)
-            mock_run.assert_called()
-
-        with patch('subprocess.run') as mock_run:
-            mock_run.side_effect = Exception(uuid.uuid4().hex)
-            result = committer.commit(msg)
-            self.assertFalse(result)
-
-    def test_git_committer_commit_changes(self):
-        repo_path = self._generate_random_path()
-        file_path = f"{repo_path}/{uuid.uuid4().hex}.py"
-        msg = self._generate_random_message()
-
-        committer = GitCommitter(repo_path)
-
-        with patch('subprocess.run') as mock_run:
-            mock_run.return_value.returncode = 0
-            result = committer.commit_changes(file_path, msg)
-            self.assertTrue(result)
+        with patch("os.path.relpath", return_value="relative_dummy.txt") as mock_relpath, \
+             patch("subprocess.run", return_value=mock_result) as mock_run:
+            res = committer.commit_changes(self.file_path, self.message)
+            self.assertTrue(res)
             self.assertEqual(mock_run.call_count, 2)
+            mock_relpath.assert_called_once_with(self.file_path, self.repo_path)
 
-        with patch('subprocess.run') as mock_run:
-            mock_run.side_effect = Exception(uuid.uuid4().hex)
-            result = committer.commit_changes(file_path, msg)
-            self.assertFalse(result)
-
-    def test_repo_auto_committer_run(self):
-        repo_path = self._generate_random_path()
-        auto_committer = RepoAutoCommitter(repo_path)
-
-        with patch.object(RepoAutoCommitter, 'process_and_commit') as mock_process:
-            mock_process.return_value = True
-            result = auto_committer.run()
-            self.assertTrue(result)
-            mock_process.assert_called_once()
-
-        with patch.object(RepoAutoCommitter, 'process_and_commit') as mock_process:
-            mock_process.return_value = False
-            result = auto_committer.run()
-            self.assertFalse(result)
+    def test_git_committer_commit_changes_failure(self):
+        committer = GitCommitter(self.repo_path)
+        with patch("os.path.relpath", return_value="relative_dummy.txt"), \
+             patch("subprocess.run", side_effect=subprocess.SubprocessError("git add/commit fail")) as mock_run:
+            res = committer.commit_changes(self.file_path, self.message)
+            self.assertFalse(res)
+            mock_run.assert_called_once()
 
     def test_repo_auto_committer_process_and_commit(self):
-        repo_path = self._generate_random_path()
-        auto_committer = RepoAutoCommitter(repo_path)
+        auto_committer = RepoAutoCommitter(self.repo_path)
+        with patch.object(GitCommitter, "commit", return_value=True) as mock_commit:
+            res = auto_committer.process_and_commit()
+            self.assertTrue(res)
+            mock_commit.assert_called_once_with("Auto-commit updates")
 
-        with patch('skills.repo_analytics.GitCommitter') as MockGitCommitter:
-            instance = MockGitCommitter.return_value
-            instance.commit.return_value = True
+    def test_repo_auto_committer_process_and_commit_exception(self):
+        auto_committer = RepoAutoCommitter(self.repo_path)
+        with patch.object(GitCommitter, "commit", side_effect=Exception("Critical error")) as mock_commit:
+            res = auto_committer.process_and_commit()
+            self.assertFalse(res)
+            mock_commit.assert_called_once()
 
-            result = auto_committer.process_and_commit()
-            self.assertTrue(result)
-            MockGitCommitter.assert_called_once_with(repo_path)
-            instance.commit.assert_called_once()
+    def test_repo_auto_committer_run(self):
+        auto_committer = RepoAutoCommitter(self.repo_path)
+        with patch.object(RepoAutoCommitter, "process_and_commit", return_value=True) as mock_proc:
+            res = auto_committer.run()
+            self.assertTrue(res)
+            mock_proc.assert_called_once()
 
-        with patch('skills.repo_analytics.GitCommitter') as MockGitCommitter:
-            instance = MockGitCommitter.return_value
-            instance.commit.return_value = False
+    def test_repo_monitor_check_status_success(self):
+        monitor = RepoMonitor(self.repo_path)
+        expected_output = f"On branch {uuid.uuid4().hex}\nnothing to commit"
+        mock_result = MagicMock()
+        mock_result.stdout = expected_output
 
-            result = auto_committer.process_and_commit()
-            self.assertFalse(result)
+        with patch("subprocess.run", return_value=mock_result) as mock_run:
+            res = monitor.check_status()
+            self.assertEqual(res, expected_output)
+            mock_run.assert_called_once_with(
+                ["git", "-C", self.repo_path, "status"],
+                capture_output=True,
+                text=True,
+                check=True
+            )
 
-    def test_repo_monitor_check_status(self):
-        repo_path = self._generate_random_path()
-        expected_output = uuid.uuid4().hex
+    def test_repo_monitor_check_status_exception(self):
+        monitor = RepoMonitor(self.repo_path)
+        err_msg = f"Err-{uuid.uuid4().hex}"
+        with patch("subprocess.run", side_effect=Exception(err_msg)) as mock_run:
+            res = monitor.check_status()
+            self.assertIn(err_msg, res)
+            mock_run.assert_called_once()
 
-        monitor = RepoMonitor(repo_path)
-        self.assertEqual(monitor.repo_path, repo_path)
+    def test_repo_summarizer_generate_summary_success(self):
+        summarizer = RepoSummarizer(self.repo_path)
+        expected_log = f"{uuid.uuid4().hex[:7]} commit message\n{uuid.uuid4().hex[:7]} another commit"
+        mock_result = MagicMock()
+        mock_result.stdout = expected_log
 
-        with patch('subprocess.run') as mock_run:
-            mock_instance = MagicMock()
-            mock_instance.returncode = 0
-            mock_instance.stdout = expected_output
-            mock_run.return_value = mock_instance
+        with patch("subprocess.run", return_value=mock_result) as mock_run:
+            res = summarizer.generate_summary()
+            self.assertEqual(res, expected_log)
+            mock_run.assert_called_once_with(
+                ["git", "-C", self.repo_path, "log", "-n", "5", "--oneline"],
+                capture_output=True,
+                text=True,
+                check=True
+            )
 
-            status = monitor.check_status()
-            self.assertEqual(status, expected_output)
+    def test_repo_summarizer_generate_summary_exception(self):
+        summarizer = RepoSummarizer(self.repo_path)
+        err_msg = f"Fail-{uuid.uuid4().hex}"
+        with patch("subprocess.run", side_effect=Exception(err_msg)) as mock_run:
+            res = summarizer.generate_summary()
+            self.assertIn(err_msg, res)
+            mock_run.assert_called_once()
 
-        with patch('subprocess.run') as mock_run:
-            mock_run.side_effect = Exception(uuid.uuid4().hex)
-            status = monitor.check_status()
-            self.assertIsInstance(status, str)
-
-    def test_repo_summarizer_generate_summary(self):
-        repo_path = self._generate_random_path()
-        random_summary_fragment = uuid.uuid4().hex
-
-        summarizer = RepoSummarizer(repo_path)
-        self.assertEqual(summarizer.repo_path, repo_path)
-
-        with patch('subprocess.run') as mock_run:
-            mock_instance = MagicMock()
-            mock_instance.returncode = 0
-            mock_instance.stdout = random_summary_fragment
-            mock_run.return_value = mock_instance
-
-            summary = summarizer.generate_summary()
-            self.assertIn(random_summary_fragment, summary)
-
-        with patch('subprocess.run') as mock_run:
-            mock_run.side_effect = Exception(uuid.uuid4().hex)
-            summary = summarizer.generate_summary()
-            self.assertIsInstance(summary, str)
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

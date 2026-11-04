@@ -1,80 +1,57 @@
 import unittest
 import tempfile
-import shutil
 import os
+import subprocess
 import uuid
 import random
-from skills.repo_analytics import (
-    GitCommitter,
-    RepoAutoCommitter,
-    RepoMonitor,
-    RepoSummarizer
-)
+
+from skills.repo_analytics import RepoAutoCommitter, RepoMonitor, RepoSummarizer, GitCommitter
 
 class TestRepoAnalyticsIntegration(unittest.TestCase):
-
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp()
+        self.test_dir = tempfile.TemporaryDirectory()
+        self.repo_path = self.test_dir.name
         
-        # Инициализация простого git-репозитория через системные команды для подготовки базы
-        os.system(f"git init {self.test_dir}")
-        os.system(f"git -C {self.test_dir} config user.name 'Test Bot'")
-        os.system(f"git -C {self.test_dir} config user.email 'bot@test.com'")
+        subprocess.run(["git", "-C", self.repo_path, "init"], capture_output=True, check=True)
+        subprocess.run(["git", "-C", self.repo_path, "config", "user.name", "Architect Bot"], capture_output=True, check=True)
+        subprocess.run(["git", "-C", self.repo_path, "config", "user.email", "architect@example.com"], capture_output=True, check=True)
         
-        # Создаем начальный файл и коммит, чтобы HEAD существовал
-        self.initial_file = os.path.join(self.test_dir, "README.md")
-        with open(self.initial_file, "w", encoding="utf-8") as f:
-            f.write(f"Initial content: {uuid.uuid4()}")
+        self.random_file_name = f"file_{uuid.uuid4().hex[:8]}.txt"
+        self.file_path = os.path.join(self.repo_path, self.random_file_name)
         
-        os.system(f"git -C {self.test_dir} add README.md")
-        os.system(f"git -C {self.test_dir} commit -m 'Initial commit'")
+        self.random_content = f"Random metric value: {random.randint(1000, 9999)}"
+        with open(self.file_path, "w", encoding="utf-8") as f:
+            f.write(self.random_content)
 
     def tearDown(self):
-        shutil.rmtree(self.test_dir)
+        self.test_dir.cleanup()
 
-    def test_full_analytics_and_git_workflow(self):
-        # Генерируем уникальные данные для теста
-        unique_filename = f"file_{uuid.uuid4().hex[:8]}.txt"
-        file_path = os.path.join(self.test_dir, unique_filename)
-        random_content = f"Random data payload: {uuid.uuid4()} - {random.randint(1000, 9999)}"
-
-        # 1. Создаем файл с рандомными данными
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(random_content)
-
-        # 2. Проверяем мониторинг репозитория (RepoMonitor) до коммита
-        monitor = RepoMonitor(self.test_dir)
-        status_before = monitor.check_status()
-        self.assertIsInstance(status_before, str)
-        self.assertTrue(len(status_before) > 0)
-
-        # 3. Используем GitCommitter для добавления и коммита изменений
-        committer = GitCommitter(self.test_dir)
-        commit_message = f"Add {unique_filename} with id {uuid.uuid4()}"
+    def test_analytics_pipeline_integration(self):
+        committer = GitCommitter(self.repo_path)
+        unique_commit_msg = f"Commit message {uuid.uuid4().hex}"
         
-        commit_result = committer.commit_changes(file_path, commit_message)
-        self.assertTrue(commit_result, "GitCommitter должен успешно закомитить изменения файла")
+        commit_success = committer.commit_changes(self.file_path, unique_commit_msg)
+        self.assertTrue(commit_success, "GitCommitter должен успешно зафиксировать изменения файла.")
 
-        # 4. Создаем еще один файл через авто-коммитер или проверяем RepoAutoCommitter
-        auto_file = os.path.join(self.test_dir, f"auto_{uuid.uuid4().hex[:8]}.py")
-        with open(auto_file, "w", encoding="utf-8") as f:
-            f.write(f"# Auto generated content {uuid.uuid4()}")
-
-        auto_committer = RepoAutoCommitter(self.test_dir)
-        auto_run_result = auto_committer.process_and_commit()
-        self.assertIsInstance(auto_run_result, bool)
-
-        # 5. Генерируем общую сводку репозитория (RepoSummarizer)
-        summarizer = RepoSummarizer(self.test_dir)
-        summary = summarizer.generate_summary()
+        auto_committer = RepoAutoCommitter(self.repo_path)
         
-        self.assertIsInstance(summary, str)
-        # Проверяем, что в сводке отображаются наши реальные коммиты или файлы
-        self.assertTrue(len(summary) > 0)
+        extra_file_name = f"extra_{uuid.uuid4().hex[:8]}.txt"
+        extra_file_path = os.path.join(self.repo_path, extra_file_name)
+        with open(extra_file_path, "w", encoding="utf-8") as f:
+            f.write(str(uuid.uuid4()))
 
-        # Дополнительная проверка через повторный мониторинг статуса
-        status_after = monitor.check_status()
-        self.assertIsInstance(status_after, str)
+        auto_commit_run = auto_committer.run()
+        self.assertTrue(auto_commit_run, "RepoAutoCommitter должен успешно отработать через run().")
+
+        monitor = RepoMonitor(self.repo_path)
+        status_output = monitor.check_status()
+        self.assertIsInstance(status_output, str, "RepoMonitor должен возвращать статус в виде строки.")
+
+        summarizer = RepoSummarizer(self.repo_path)
+        summary_output = summarizer.generate_summary()
+        
+        self.assertIsInstance(summary_output, str, "RepoSummarizer должен генерировать сводку в виде строки.")
+        self.assertIn(unique_commit_msg, summary_output, "Сводка репозитория должна содержать уникальное сообщение коммита.")
 
 if __name__ == "__main__":
     unittest.main()

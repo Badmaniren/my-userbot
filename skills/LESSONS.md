@@ -262,3 +262,8 @@
 ## release_notes_scheduler (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## release_notes_validator (create) — раундов: 4
+- Античит поймал: ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'release_notes_composer'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.release_notes_composer import ...'
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

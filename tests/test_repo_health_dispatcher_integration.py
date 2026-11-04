@@ -1,54 +1,62 @@
 import unittest
-import tempfile
-import shutil
 import os
+import tempfile
 import uuid
 import random
 from skills.repo_health_dispatcher import RepoHealthDispatcher
 
+
 class TestRepoHealthDispatcherIntegration(unittest.TestCase):
+
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp()
-        os.system(f"git -C {self.test_dir} init -b main")
-        os.system(f"git -C {self.test_dir} config user.name 'Test Architect'")
-        os.system(f"git -C {self.test_dir} config user.email 'architect@test.com'")
-        
-        self.random_id = str(uuid.uuid4())
-        self.file_name = f"test_file_{self.random_id}.txt"
-        self.file_path = os.path.join(self.test_dir, self.file_name)
-        
-        random_content = f"Initial metric data: {random.randint(1000, 9999)}"
-        with open(self.file_path, "w") as f:
-            f.write(random_content)
-            
-        os.system(f"git -C {self.test_dir} add {self.file_name}")
-        os.system(f"git -C {self.test_dir} commit -m 'Initial commit {self.random_id}'")
+        self.test_dir = tempfile.TemporaryDirectory()
+        self.repo_path = self.test_dir.name
+        self.dispatcher = RepoHealthDispatcher(self.repo_path)
 
     def tearDown(self):
-        shutil.rmtree(self.test_dir, ignoreunicode=True) if hasattr(shutil, 'rmtree') else shutil.rmtree(self.test_dir)
+        self.test_dir.cleanup()
 
-    def test_dispatcher_composition_and_execution(self):
-        dispatcher = RepoHealthDispatcher(self.test_dir)
+    def test_dispatch_health_and_notify_integration(self):
+        unique_filename = f"report_{uuid.uuid4().hex}.json"
+        file_path = os.path.join(self.repo_path, unique_filename)
+
+        result = self.dispatcher.dispatch_health_and_notify(file_path)
+
+        self.assertIsInstance(result, bool)
+        self.assertTrue(os.path.exists(file_path), "Файл отчета должен быть создан дашбордом и использован нотификатором.")
+
+    def test_process_stream_and_dispatch_integration(self):
+        unique_filename = f"stream_report_{uuid.uuid4().hex}.json"
+        file_path = os.path.join(self.repo_path, unique_filename)
         
-        self.assertTrue(
-            hasattr(dispatcher, "repo_health_dashboard") or hasattr(dispatcher, "dashboard") or callable(getattr(dispatcher, "dispatch", None)) or callable(getattr(dispatcher, "run", None)),
-            "RepoHealthDispatcher must integrate underlying modules"
-        )
+        stream_data = f"event_id_{uuid.uuid4().hex}: metric_value_{random.randint(1000, 9999)}"
+
+        result = self.dispatcher.process_stream_and_dispatch(stream_data, file_path)
+
+        self.assertIsInstance(result, bool)
+        self.assertTrue(os.path.exists(file_path), "Стрим должен обработаться дашбордом и экспортироваться для рассылки.")
+
+    def test_check_and_notify_critical_integration(self):
+        title = f"Critical_Widget_{uuid.uuid4().hex[:8]}"
+        value = random.randint(100, 999)
+        unique_filename = f"critical_{uuid.uuid4().hex}.txt"
+        file_path = os.path.join(self.repo_path, unique_filename)
+
+        result = self.dispatcher.check_and_notify_critical(title, value, file_path)
+
+        self.assertIsInstance(result, bool)
+        self.assertTrue(os.path.exists(file_path), "Виджет должен быть отрендерен и записан в файл перед нотификацией.")
         
-        dispatch_method = getattr(dispatcher, "dispatch", None) or getattr(dispatcher, "run", None) or getattr(dispatcher, "process", None)
-        
-        if dispatch_method:
-            result = dispatch_method()
-            self.assertIsNotNone(result)
-        
-        dashboard_files = [f for f in os.listdir(self.test_dir) if "dashboard" in f or "report" in f]
-        
-        new_random_content = f"Updated metrics: {random.randint(10000, 99999)}"
-        with open(self.file_path, "w") as f:
-            f.write(new_random_content)
-            
-        dispatcher_methods = [method for method in dir(dispatcher) if callable(getattr(dispatcher, method)) and not method.startswith("_")]
-        self.assertGreater(len(dispatcher_methods), 0)
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+            self.assertIn(str(value), content)
+
+    def test_dispatch_default_integration(self):
+        result = self.dispatcher.dispatch()
+        self.assertIsInstance(result, bool)
+        expected_default_report = os.path.join(self.repo_path, "report.json")
+        self.assertTrue(os.path.exists(expected_default_report), "Дефолтный метод dispatch должен создавать report.json в корне репозитория.")
+
 
 if __name__ == "__main__":
     unittest.main()

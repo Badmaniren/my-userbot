@@ -37,5 +37,5 @@ class RepoHealthDispatcher:
         notifier = RepoNotifier(self.repo_path)
         return notifier.notify_and_commit()
 
-    def dispatch(self):
+    def dispatch(self) -> bool:
         return self.dispatch_health_and_notify(f"{self.repo_path}/report.json")

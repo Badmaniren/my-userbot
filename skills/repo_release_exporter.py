@@ -43,7 +43,6 @@ class RepoReleaseExporter:
 
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for root, dirs, files in os.walk(self.repo_path):
-                # Пропускаем служебные директории вроде .git
                 if '.git' in root:
                     continue
                 for file in files:

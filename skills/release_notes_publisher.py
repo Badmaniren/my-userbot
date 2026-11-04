@@ -1,3 +1,4 @@
+import os
 from skills.release_notes_composer import ReleaseNotesComposer
 from skills.repo_notifier import RepoNotifier
 
@@ -14,6 +15,9 @@ class ReleaseNotesPublisher:
         self.notifier = RepoNotifier(self.repo_path)
 
     def publish(self, output_path: str) -> bool:
+        dir_name = os.path.dirname(output_path)
+        if dir_name:
+            os.makedirs(dir_name, exist_ok=True)
         self.composer.compose(output_path)
         return self.notifier.notify(output_path)
 
@@ -22,6 +26,9 @@ class ReleaseNotesPublisher:
         return self.notifier.notify_and_commit()
 
     def generate_and_notify(self, output_path: str) -> bool:
+        dir_name = os.path.dirname(output_path)
+        if dir_name:
+            os.makedirs(dir_name, exist_ok=True)
         self.composer.generate(output_path)
         return self.notifier.notify(output_path)
 

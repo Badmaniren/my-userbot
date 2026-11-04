@@ -1,6 +1,7 @@
 import os
 import subprocess
 import shutil
+import sys
 import tempfile
 from pathlib import Path
 
@@ -118,13 +119,23 @@ class RepoRecovery:
         return True
 
 
-class start_new:
-    GitCommitter = GitCommitter
-    RepoAutoCommitter = RepoAutoCommitter
-    RepoMonitor = RepoMonitor
-    RepoSummarizer = RepoSummarizer
-    RepoNotifier = RepoNotifier
-    RepoReporter = RepoReporter
-    RepoBackup = RepoBackup
-    RepoLogger = RepoLogger
-    RepoRecovery = RepoRecovery
+class _StartNewMeta(type):
+    def __getattr__(cls, name: str):
+        mod = sys.modules.get(__name__)
+        if mod and hasattr(mod, name):
+            return getattr(mod, name)
+        raise AttributeError(f"type object '{cls.__name__}' has no attribute '{name}'")
+
+
+class start_new(metaclass=_StartNewMeta):
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def __call__(self, *args, **kwargs):
+        return self
+
+    def __getattr__(self, name: str):
+        mod = sys.modules.get(__name__)
+        if mod and hasattr(mod, name):
+            return getattr(mod, name)
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")

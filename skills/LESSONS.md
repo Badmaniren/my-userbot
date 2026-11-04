@@ -91,3 +91,7 @@
 
 ## repo_recovery (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## repo_health_check (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAIL: test_diagnose_and_log_exception (tests.test_repo_health_check.TestRepoHealthCheck.test_diagnose_and_log_exception)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

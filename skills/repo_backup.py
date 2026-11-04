@@ -62,13 +62,16 @@ class RepoMonitor:
         self.repo_path = repo_path
 
     def check_status(self) -> str:
-        res = subprocess.run(
-            ["git", "-C", self.repo_path, "status"],
-            capture_output=True,
-            text=True,
-            check=False
-        )
-        return res.stdout if res.stdout is not None else ""
+        try:
+            res = subprocess.run(
+                ["git", "-C", self.repo_path, "status"],
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            return res.stdout if res.stdout is not None else ""
+        except Exception:
+            return ""
 
 
 class RepoSummarizer:
@@ -90,9 +93,14 @@ class RepoNotifier:
         self.repo_path = repo_path
 
     def notify(self, report_path: str) -> bool:
-        with open(report_path, "r", encoding="utf-8") as f:
-            _ = f.read()
-        return True
+        if not report_path or not os.path.exists(report_path):
+            return False
+        try:
+            with open(report_path, "r", encoding="utf-8") as f:
+                _ = f.read()
+            return True
+        except Exception:
+            return False
 
     def notify_and_commit(self) -> bool:
         return self.notify("")

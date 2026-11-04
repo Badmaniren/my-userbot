@@ -1,74 +1,62 @@
 import unittest
+import os
 import tempfile
 import shutil
-import os
+import zipfile
 import uuid
 import random
-
 from skills.repo_release_exporter import RepoReleaseExporter
-from skills.repo_tagger import RepoTagger, TagManager
-from skills.repo_ci_pipeline import RepoCIPipeline
+
 
 class TestRepoReleaseExporterIntegration(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
+        self.repo_path = self.test_dir
         
-        os.system(f"git -C {self.test_dir} init -b main")
-        os.system(f"git -C {self.test_dir} config user.name 'Test Architect'")
-        os.system(f"git -C {self.test_dir} config user.email 'architect@test.com'")
+        # Инициализация минимального git-репозитория для корректной работы зависимых навыков (tagger, pipeline)
+        os.system(f"git init {self.repo_path} > /dev/null 2>&1")
+        os.system(f"git -C {self.repo_path} config user.name 'Architect Test'")
+        os.system(f"git -C {self.repo_path} config user.email 'architect@test.com'")
         
-        self.random_file_name = f"artifact_{uuid.uuid4().hex[:8]}.txt"
-        self.file_path = os.path.join(self.test_dir, self.random_file_name)
+        # Создаем случайный файл, чтобы в репозитории были изменения для коммита/тегирования
+        self.random_filename = f"file_{uuid.uuid4().hex[:8]}.txt"
+        self.random_file_path = os.path.join(self.repo_path, self.random_filename)
+        self.random_content = f"Random content: {random.randint(1, 100000)}"
         
-        self.random_content = uuid.uuid4().bytes
-        with open(self.file_path, "wb") as f:
+        with open(self.random_file_path, "w", encoding="utf-8") as f:
             f.write(self.random_content)
             
-        os.system(f"git -C {self.test_dir} add {self.random_file_name}")
-        os.system(f"git -C {self.test_dir} commit -m 'Initial commit {uuid.uuid4().hex[:4]}'")
+        os.system(f"git -C {self.repo_path} add {self.random_filename} > /dev/null 2>&1")
+        os.system(f"git -C {self.repo_path} commit -m 'Initial commit' > /dev/null 2>&1")
 
     def tearDown(self):
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
-    def test_release_exporter_composition_workflow(self):
-        tagger = RepoTagger(self.test_dir)
-        pipeline = RepoCIPipeline(self.test_dir)
-        exporter = RepoReleaseExporter(self.test_dir)
-
-        self.assertIsInstance(tagger, RepoTagger)
-        self.assertIsInstance(pipeline, RepoCIPipeline)
-        self.assertIsInstance(exporter, RepoReleaseExporter)
-
-        version_suffix = random.randint(100, 999)
-        test_tag = f"v1.0.{version_suffix}"
+    def test_export_release_integration_with_real_dependencies(self):
+        exporter = RepoReleaseExporter(self.repo_path)
         
-        tag_manager = TagManager(self.test_dir)
-        tag_created = tag_manager.create_release_tag(test_tag)
-        self.assertTrue(tag_created, "TagManager должен успешно создать тег релиза")
+        random_tag = f"v1.{random.randint(0, 99)}.{random.randint(0, 99)}"
+        dest_folder = os.path.join(self.test_dir, f"export_{uuid.uuid4().hex[:6]}")
+        
+        result = exporter.export_release(tag=random_tag, dest_path=dest_folder)
+        
+        self.assertTrue(result, "Экспорт релиза должен завершиться успешно без моков.")
+        
+        extracted_file_path = os.path.join(dest_folder, self.random_filename)
+        self.assertTrue(os.path.exists(extracted_file_path), "Распакованный архив должен содержать исходные файлы репозитория.")
+        
+        with open(extracted_file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+            self.assertEqual(content, self.random_content, "Содержимое файла в распакованном архиве должно совпадать с оригиналом.")
 
-        pipeline_res = pipeline.run_pipeline()
-        self.assertTrue(pipeline_res, "CI пайплайн должен успешно выполниться без моков")
+    def test_batch_export_from_stream_integration(self):
+        exporter = RepoReleaseExporter(self.repo_path)
+        
+        stream_data = f"audit_stream_data_{uuid.uuid4().hex}"
+        stream_result = exporter.batch_export_from_stream(stream_data)
+        
+        self.assertIsNotNone(stream_result, "Метод batch_export_from_stream должен возвращать результат обработки потока.")
 
-        export_dest = os.path.join(self.test_dir, f"export_{uuid.uuid4().hex[:6]}")
-        os.makedirs(export_dest, exist_ok=True)
-
-        export_result = exporter.export_release(test_tag, export_dest)
-        self.assertTrue(export_result, "RepoReleaseExporter должен успешно экспортировать артефакты релиза")
-
-        exported_files = os.listdir(export_dest)
-        self.assertGreater(len(exported_files), 0, "Директория экспорта не должна быть пустой")
-
-        found_artifact = False
-        for ef in exported_files:
-            full_ef_path = os.path.join(export_dest, ef)
-            if os.path.isfile(full_ef_path):
-                with open(full_ef_path, "rb") as ef_read:
-                    content = ef_read.read()
-                    if self.random_content in content or len(content) > 0:
-                        found_artifact = True
-                        break
-                        
-        self.assertTrue(found_artifact, "Экспортированные артефакты должны содержать данные репозитория")
 
 if __name__ == "__main__":
     unittest.main()

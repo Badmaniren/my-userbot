@@ -7,7 +7,8 @@ from skills.repo_summarizer import RepoSummarizer
 class RepoReporter:
     def __init__(self, repo_path: str):
         self.repo_path = repo_path
-        if not os.path.exists(os.path.join(repo_path, ".git")):
+        git_dir = os.path.join(repo_path, ".git")
+        if not os.path.exists(git_dir):
             os.makedirs(repo_path, exist_ok=True)
             subprocess.run(
                 ["git", "init"],
@@ -34,10 +35,7 @@ class RepoReporter:
 
     def save_report(self, file_path: str, content: str) -> str:
         if not os.path.isabs(file_path):
-            if os.path.dirname(file_path) == "":
-                full_path = os.path.join(self.repo_path, file_path)
-            else:
-                full_path = os.path.join(self.repo_path, file_path)
+            full_path = os.path.join(self.repo_path, file_path)
         else:
             full_path = file_path
             
@@ -45,19 +43,26 @@ class RepoReporter:
         if directory and not os.path.exists(directory):
             os.makedirs(directory, exist_ok=True)
 
-        with open(full_path, 'w') as f:
+        with open(full_path, 'w', encoding='utf-8') as f:
             f.write(content)
         return full_path
 
     def generate_report(self, status=None, summary=None, output_path=None) -> str:
         if status is None or summary is None:
             content = self.generate_final_report()
+            # Integration test expects final_report to be included when default or partial generation occurs
+            if status is not None:
+                content = f"{status}\n{content}"
+            elif summary is not None:
+                content = f"{content}\n{summary}"
         else:
             content = f"{status}\n{summary}"
 
         if output_path is None:
             output_path = os.path.join(self.repo_path, "report.txt")
         elif not os.path.isabs(output_path) and os.path.dirname(output_path) == "":
+            output_path = os.path.join(self.repo_path, output_path)
+        elif not os.path.isabs(output_path):
             output_path = os.path.join(self.repo_path, output_path)
 
         return self.save_report(output_path, content)

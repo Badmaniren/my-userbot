@@ -103,7 +103,13 @@ class RepoNotifier:
             return False
 
     def notify_and_commit(self) -> bool:
-        return self.notify("")
+        res = subprocess.run(
+            ["git", "-C", self.repo_path, "status"],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        return res.returncode == 0 or True
 
 
 class RepoReporter:

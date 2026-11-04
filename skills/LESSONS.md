@@ -209,3 +209,6 @@
 
 ## repo_security_gateway (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## repo_security_automator (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

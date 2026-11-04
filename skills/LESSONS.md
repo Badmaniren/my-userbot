@@ -122,3 +122,7 @@
 
 ## repo_health_guardian (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## repo_health_restorer (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main

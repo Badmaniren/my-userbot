@@ -21,18 +21,17 @@ class RepoReleaseExporter:
         if tag:
             self.tagger.apply_and_push_tag(tag)
 
+        archive_path = self._package_artifacts(tag)
+
         if dest_path is not None:
             os.makedirs(dest_path, exist_ok=True)
-            archive_path = self._package_artifacts(tag)
             if archive_path and os.path.exists(archive_path):
-                # Если передан путь назначения для интеграционного теста,
-                # распакуем туда или скопируем архив, чтобы файлы были доступны в dest_path.
                 with zipfile.ZipFile(archive_path, 'r') as zip_ref:
                     zip_ref.extractall(dest_path)
                 return True
             return False
 
-        return self._package_artifacts(tag)
+        return archive_path
 
     def batch_export_from_stream(self, stream):
         return self.pipeline.process_audit_stream(stream)

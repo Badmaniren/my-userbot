@@ -160,3 +160,7 @@
 
 ## repo_ci_pipeline (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## repo_release_exporter (compose) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: успешно прошёл тесты и влит в main

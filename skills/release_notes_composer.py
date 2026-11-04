@@ -17,9 +17,14 @@ class ReleaseNotesComposer:
 
         content = f"# Release Notes\n\n## Changelog\n{changelog_text}\n\n## Audit Metrics\n- Score: {metrics.get('score', 'N/A')}\n- Report: {audit_report_path}\n"
 
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        with open(output_path, "w", encoding="utf-8") as f:
-            f.write(content)
+        output_dir = os.path.dirname(output_path)
+        if output_dir:
+            try:
+                os.makedirs(output_dir, exist_ok=True)
+                with open(output_path, "w", encoding="utf-8") as f:
+                    f.write(content)
+            except (PermissionError, OSError):
+                pass
 
         return content
 

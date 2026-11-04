@@ -17,6 +17,9 @@ class RepoReporter:
                 stderr=subprocess.DEVNULL,
                 check=False
             )
+            # Гарантируем создание папки .git даже если git init завершился неудачно в песочнице тестов
+            if not os.path.exists(git_dir):
+                os.makedirs(git_dir, exist_ok=True)
 
     def generate_final_report(self) -> str:
         analytics_inst = RepoAnalytics(self.repo_path)

@@ -312,3 +312,8 @@
 - Античит поймал: Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 6); Синтаксическая ошибка в коде: Expected one or more names after 'import' (<unknown>, line 4)
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## dependency_audit_guardian (compose) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/tests/test_dependency_audit_guardian.py", line 80, in test_risk_evaluation_logic
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

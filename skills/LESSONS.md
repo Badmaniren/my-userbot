@@ -3,13 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ommitter (compose) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено создавать классы или функции-заглушки внутри `except`! Импортируй честно.
-- Последняя ошибка перед фиксом: FAILED (failures=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## repo_auto_committer (compose) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
+о прошёл тесты и влит в main
 
 ## repo_analytics (create) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
@@ -327,4 +321,9 @@ ommitter (compose) — раундов: 4
 ## dependency_audit_exporter (compose) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 53)
 - Последняя ошибка перед фиксом: ImportError: Failed to import test module: tests.test_dependency_audit_exporter_integration
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## dependency_audit_gateway (compose) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 29)
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

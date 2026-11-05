@@ -3,17 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-nc (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## repo_health_dashboard (create) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## repo_notifier (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## repo_health_automator (compose) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
+ перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## repo_health_dispatcher (compose) — раундов: 4
@@ -280,4 +270,9 @@ nc (refactor) — раундов: 1
 ## dependency_audit_shield (compose) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 10)
 - Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## dependency_audit_optimizer (refactor) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid character '—' (U+2014) (<unknown>, line 64); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

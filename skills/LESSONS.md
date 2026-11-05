@@ -299,3 +299,7 @@
 ## dependency_audit_exporter (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## dependency_audit_optimizer (compose) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: успешно прошёл тесты и влит в main

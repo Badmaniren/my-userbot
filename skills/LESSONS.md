@@ -3,18 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-reate) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## repo_logger (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## repo_logger (create) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## repo_recovery (compose) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
+ain
 
 ## repo_health_check (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAIL: test_diagnose_and_log_exception (tests.test_repo_health_check.TestRepoHealthCheck.test_diagnose_and_log_exception)
@@ -309,4 +298,9 @@ reate) — раундов: 1
 
 ## dependency_audit_validator (create) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## dependency_audit_integrator (compose) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

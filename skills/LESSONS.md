@@ -317,3 +317,7 @@
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/tests/test_dependency_audit_guardian.py", line 80, in test_risk_evaluation_logic
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## dependency_audit_restorer (compose) — раундов: 2
+- Античит поймал: Синтаксическая ошибка в коде: unterminated triple-quoted string literal (detected at line 6) (<unknown>, line 6)
+- Статус: успешно прошёл тесты и влит в main

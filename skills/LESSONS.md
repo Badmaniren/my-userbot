@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-рез raise.
-- Статус: успешно прошёл тесты и влит в main
-
-## repo_reporter (refactor) — раундов: 4
+: 4
 - Последняя ошибка перед фиксом: Traceback (most recent call last):
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -300,3 +297,6 @@
 ## dependency_scanner (refactor) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## dependency_audit_sync (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

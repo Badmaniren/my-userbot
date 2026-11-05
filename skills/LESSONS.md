@@ -3,20 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## repo_monitor (create) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## repo_summarizer (create) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## repo_auto_committer (compose) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## repo_auto_committer (compose) — раундов: 4
+ommitter (compose) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено создавать классы или функции-заглушки внутри `except`! Импортируй честно.
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
@@ -335,4 +322,9 @@
 ## dependency_audit_optimizer (refactor) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: unterminated string literal (detected at line 37) (<unknown>, line 37)
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## dependency_audit_exporter (compose) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 53)
+- Последняя ошибка перед фиксом: ImportError: Failed to import test module: tests.test_dependency_audit_exporter_integration
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

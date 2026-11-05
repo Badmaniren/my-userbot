@@ -3,14 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ain
-
-## repo_health_check (compose) — раундов: 4
-- Последняя ошибка перед фиксом: FAIL: test_diagnose_and_log_exception (tests.test_repo_health_check.TestRepoHealthCheck.test_diagnose_and_log_exception)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## repo_sync (start_new) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
+e`! Обработай ошибку осмысленно или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: + status_feacbdcd276d42c98b210eb489219ad3
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -303,4 +296,8 @@ ain
 ## dependency_audit_integrator (compose) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## dependency_audit_aggregator (refactor) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

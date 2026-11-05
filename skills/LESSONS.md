@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ractor_tool_1793718660 (create) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
-- Последняя ошибка перед фиксом: FAILED (errors=1)
+)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## repo_notifier (compose) — раундов: 4
@@ -313,4 +311,9 @@ ractor_tool_1793718660 (create) — раундов: 4
 ## dependency_audit_dispatcher (compose) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid character '—' (U+2014) (<unknown>, line 71); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## dependency_audit_notifier (compose) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 41)
+- Последняя ошибка перед фиксом: FAILED (failures=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

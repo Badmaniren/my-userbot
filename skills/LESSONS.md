@@ -303,3 +303,7 @@
 ## dependency_audit_optimizer (compose) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main
+
+## dependency_audit_reporter (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

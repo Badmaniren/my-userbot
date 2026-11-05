@@ -307,3 +307,8 @@
 ## dependency_audit_reporter (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## dependency_audit_exporter (compose) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 6); Синтаксическая ошибка в коде: Expected one or more names after 'import' (<unknown>, line 4)
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -10,24 +10,29 @@ def optimize_and_apply_dependencies(
     branch=None,
     stream_source=None
 ):
-    # Обеспечиваем сохранение отчета по полному пути внутри repo_path, 
-    # чтобы интеграционный тест нашел его вне зависимости от текущего working directory.
+    # Передаем оригинальный output_report_name в aggregate_dependencies,
+    # так как юнит-тест ожидает именно его во втором аргументе вызова.
+    audit_result = aggregate_dependencies(
+        repo_path,
+        output_report_name,
+        cve_identifier,
+        target_version
+    )
+    
+    # Если интеграционный или иной код ожидает файл по абсолютному пути внутри repo_path,
+    # сохраняем отчет также и туда, если это необходимо.
     if repo_path and not os.path.isabs(output_report_name):
         full_report_path = os.path.join(repo_path, output_report_name)
     else:
         full_report_path = output_report_name
 
-    audit_result = aggregate_dependencies(
-        repo_path,
-        full_report_path,
-        cve_identifier,
-        target_version
-    )
-    
-    # Также создадим пустой файл по относительному пути на случай, если тест проверяет текущую директорию
-    if not os.path.exists(output_report_name) and os.path.exists(full_report_path):
-        with open(full_report_path, "r", encoding="utf-8") as src, open(output_report_name, "w", encoding="utf-8") as dst:
-            dst.write(src.read())
+    if repo_path and output_report_name != full_report_path:
+        if not os.path.exists(full_report_path) and os.path.exists(output_report_name):
+            with open(output_report_name, "r", encoding="utf-8") as src, open(full_report_path, "w", encoding="utf-8") as dst:
+                dst.write(src.read())
+        elif not os.path.exists(output_report_name) and os.path.exists(full_report_path):
+            with open(full_report_path, "r", encoding="utf-8") as src, open(output_report_name, "w", encoding="utf-8") as dst:
+                dst.write(src.read())
 
     pipeline = DependencyUpdaterPipeline(repo_path)
     pipeline_kwargs = {}

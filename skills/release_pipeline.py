@@ -10,5 +10,5 @@ class ReleasePipeline:
 
     def run(self, output_path: str) -> bool:
         self.composer.compose(output_path=output_path)
-        result = self.publisher.publish(output_path=output_path)
-        return bool(result)
+        publish_result = self.publisher.publish(output_path=output_path)
+        return bool(publish_result)

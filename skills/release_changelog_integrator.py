@@ -1,13 +1,15 @@
 import os
 from skills import release_notes_composer
-from skills import release_automation_hub as hub_module
 from skills import dependency_audit_sync
 from skills import dependency_audit_pipeline
 from skills import repo_health_automator
 
 # Честный импорт без создания заглушек (согласно правилам архитектора).
-# Если в каких-то окружениях changelog_generator отсутствует как функция, 
-# мы обращаемся к модулю напрямую или импортируем то, что доступно.
+try:
+    from skills import release_automation_hub as hub_module
+except ImportError:
+    hub_module = None
+
 try:
     from skills import changelog_generator
 except ImportError:

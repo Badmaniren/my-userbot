@@ -5,55 +5,53 @@ import random
 import string
 from skills.release_pipeline import ReleasePipeline
 
+
 class TestReleasePipeline(unittest.TestCase):
-    def setUp(self):
-        self.random_repo_path = f"/repo/{uuid.uuid4().hex}/{''.join(random.choices(string.ascii_lowercase, k=6))}"
-        self.random_output_path = f"/output/{uuid.uuid4().hex}/{''.join(random.choices(string.ascii_lowercase, k=6))}.md"
 
-    @patch('skills.release_pipeline.ReleaseNotesPublisher')
-    @patch('skills.release_pipeline.ReleaseNotesComposer')
-    def test_release_pipeline_run_success(self, mock_composer_cls, mock_publisher_cls):
-        mock_composer_instance = mock_composer_cls.return_value
-        mock_publisher_instance = mock_publisher_cls.return_value
+    def test_release_pipeline_initialization_and_run(self):
+        rand_repo = f"/tmp/{uuid.uuid4().hex}/{''.join(random.choices(string.ascii_lowercase, k=6))}"
+        rand_output = f"/var/releases/{uuid.uuid4().hex}.md"
+        expected_publish_result = random.choice([True, False, "success", ""])
 
-        expected_publish_result = random.choice([True, 1, "success_token_" + uuid.uuid4().hex])
-        mock_publisher_instance.publish.return_value = expected_publish_result
+        with patch("skills.release_pipeline.ReleaseNotesComposer") as MockComposer, \
+             patch("skills.release_pipeline.ReleaseNotesPublisher") as MockPublisher:
 
-        pipeline = ReleasePipeline(repo_path=self.random_repo_path)
-        
-        self.assertEqual(pipeline.repo_path, self.random_repo_path)
-        self.assertEqual(pipeline.composer, mock_composer_instance)
-        self.assertEqual(pipeline.publisher, mock_publisher_instance)
+            mock_composer_instance = MockComposer.return_value
+            mock_publisher_instance = MockPublisher.return_value
+            mock_publisher_instance.publish.return_value = expected_publish_result
 
-        result = pipeline.run(output_path=self.random_output_path)
+            pipeline = ReleasePipeline(repo_path=rand_repo)
 
-        mock_composer_instance.compose.assert_called_once_with(output_path=self.random_output_path)
-        mock_publisher_instance.publish.assert_called_once_with(output_path=self.random_output_path)
-        self.assertTrue(result)
+            MockComposer.assert_called_once_with(repo_path=rand_repo)
+            MockPublisher.assert_called_once_with(repo_path=rand_repo)
+            self.assertEqual(pipeline.repo_path, rand_repo)
 
-    @patch('skills.release_pipeline.ReleaseNotesPublisher')
-    @patch('skills.release_pipeline.ReleaseNotesComposer')
-    def test_release_pipeline_run_failure(self, mock_composer_cls, mock_publisher_cls):
-        mock_composer_instance = mock_composer_cls.return_value
-        mock_publisher_instance = mock_publisher_cls.return_value
+            run_result = pipeline.run(output_path=rand_output)
 
-        expected_publish_result = random.choice([False, 0, None, ""])
-        mock_publisher_instance.publish.return_value = expected_publish_result
+            mock_composer_instance.compose.assert_called_once_with(output_path=rand_output)
+            mock_publisher_instance.publish.assert_called_once_with(output_path=rand_output)
+            self.assertEqual(run_result, bool(expected_publish_result))
 
-        pipeline = ReleasePipeline(repo_path=self.random_repo_path)
-        result = pipeline.run(output_path=self.random_output_path)
+    def test_release_pipeline_run_handles_truthy_falsy_publishing(self):
+        rand_repo = f"repo_{uuid.uuid4().hex}"
+        rand_output = f"output_{uuid.uuid4().hex}"
 
-        mock_composer_instance.compose.assert_called_once_with(output_path=self.random_output_path)
-        mock_publisher_instance.publish.assert_called_once_with(output_path=self.random_output_path)
-        self.assertFalse(result)
+        for truthy_val in [True, 1, "non_empty", ["item"]]:
+            with patch("skills.release_pipeline.ReleaseNotesComposer"), \
+                 patch("skills.release_pipeline.ReleaseNotesPublisher") as MockPublisher:
 
-    @patch('skills.release_pipeline.ReleaseNotesPublisher')
-    @patch('skills.release_pipeline.ReleaseNotesComposer')
-    def test_release_pipeline_initialization_passes_repo_path(self, mock_composer_cls, mock_publisher_cls):
-        ReleasePipeline(repo_path=self.random_repo_path)
+                MockPublisher.return_value.publish.return_value = truthy_val
+                pipeline = ReleasePipeline(repo_path=rand_repo)
+                self.assertTrue(pipeline.run(output_path=rand_output))
 
-        mock_composer_cls.assert_called_once_with(repo_path=self.random_repo_path)
-        mock_publisher_cls.assert_called_once_with(repo_path=self.random_repo_path)
+        for falsy_val in [False, 0, "", None]:
+            with patch("skills.release_pipeline.ReleaseNotesComposer"), \
+                 patch("skills.release_pipeline.ReleaseNotesPublisher") as MockPublisher:
 
-if __name__ == '__main__':
+                MockPublisher.return_value.publish.return_value = falsy_val
+                pipeline = ReleasePipeline(repo_path=rand_repo)
+                self.assertFalse(pipeline.run(output_path=rand_output))
+
+
+if __name__ == "__main__":
     unittest.main()

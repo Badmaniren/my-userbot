@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- в main
-
-## repo_health_optimizer (compose) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=2, errors=1)
-- Статус: успешно прошёл тесты и влит в main
+ы и влит в main
 
 ## repo_security_gateway (start_new) — раундов: 2
 - Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
@@ -262,3 +258,7 @@
 ## dependency_audit_aggregator (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.18/x64/lib/python3.11/unittest/mock.py", line 1446, in __enter__
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## dependency_audit_guardian (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main

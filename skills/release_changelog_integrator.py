@@ -15,6 +15,12 @@ try:
 except ImportError:
     changelog_generator = None
 
+# Добавлено для совместимости с моками в тестах (проверка атрибута модуля)
+try:
+    from skills import release_automation_hub
+except ImportError:
+    release_automation_hub = None
+
 
 class ReleaseChangelogIntegrator:
     def integrate(self, version: str) -> str:

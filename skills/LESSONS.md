@@ -3,16 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-раундов: 3
-- Последняя ошибка перед фиксом: FAILED (failures=1)
-- Статус: успешно прошёл тесты и влит в main
-
-## dependency_scanner (create) — раундов: 2
-- Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
-- Статус: успешно прошёл тесты и влит в main
-
-## vulnerability_checker (create) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
+ЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -267,4 +258,8 @@
 ## dependency_audit_aggregator (refactor) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 30)
 - Последняя ошибка перед фиксом: from skills.dependency_audit_optimizer import optimize_and_apply_dependencies
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## dependency_audit_aggregator (refactor) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: expected an indented block after 'if' statement on line 31 (<unknown>, line 31); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

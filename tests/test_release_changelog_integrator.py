@@ -1,89 +1,113 @@
+import os
+import io
 import unittest
-from unittest.mock import MagicMock, patch
 import uuid
 import random
-import string
-import io
-from skills.release_changelog_integrator import ReleaseChangelogIntegrator
+from unittest.mock import patch, MagicMock
+from skills.release_changelog_integrator import (
+    ReleaseChangelogIntegrator,
+    release_changelog_integrator
+)
+
 
 class TestReleaseChangelogIntegrator(unittest.TestCase):
 
-    def setUp(self):
-        self.integrator = ReleaseChangelogIntegrator()
+    def test_integrate_success(self):
+        rand_version = f"v{random.randint(1, 9)}.{random.randint(0, 9)}.{random.randint(0, 9)}"
+        rand_content = uuid.uuid4().hex
+        rand_hub_id = uuid.uuid4().hex
 
-    def test_integration_flow_integrity(self):
-        # Генерируем хаотичные данные для проверки
-        random_version = f"{random.randint(1, 9)}.{random.randint(0, 9)}.{random.randint(0, 9)}"
-        random_changelog_content = ''.join(random.choices(string.ascii_letters + string.digits, k=128))
-        random_hub_id = uuid.uuid4().hex
-        
-        # Инициализируем реальные зависимости (честный импорт)
-        # Используем with patch внутри метода для контроля потоков данных
+        integrator = ReleaseChangelogIntegrator()
+
         with patch('skills.release_changelog_integrator.release_notes_composer') as mock_composer, \
-             patch('skills.release_changelog_integrator.release_automation_hub') as mock_hub:
+             patch('skills.release_changelog_integrator.hub_module') as mock_hub:
             
-            mock_composer.compose.return_value = random_changelog_content
-            mock_hub.push_release.return_value = random_hub_id
-            
-            result = self.integrator.integrate(random_version)
-            
-            # Проверка логики: интегратор должен вернуть ID, полученный от хаба
-            self.assertEqual(result, random_hub_id)
-            mock_composer.compose.assert_called_once_with(random_version)
-            mock_hub.push_release.assert_called_once_with(random_changelog_content)
+            mock_composer.compose.return_value = rand_content
+            mock_hub.push_release.return_value = rand_hub_id
 
-    def test_changelog_parsing_with_random_payload(self):
-        # Генерируем случайный поток байтов для эмуляции чтения файла
-        random_data = uuid.uuid4().bytes + b'\n' + uuid.uuid4().hex.encode()
-        mock_file_stream = io.BytesIO(random_data)
-        
-        with patch('builtins.open', return_value=mock_file_stream):
-            # Проверяем, что парсер корректно извлекает данные из случайного потока
-            parsed_data = self.integrator.parse_changelog_file(f"/{uuid.uuid4().hex}.md")
-            
-            self.assertIn(random_data.decode(errors='ignore'), parsed_data)
+            result_id = integrator.integrate(rand_version)
 
-    def test_sync_failure_handling(self):
-        # Проверка устойчивости к сбоям при случайных URL
-        random_url = f"https://{uuid.uuid4().hex}.com/api/v1/sync"
-        
+            mock_composer.compose.assert_called_once_with(rand_version)
+            mock_hub.push_release.assert_called_once_with(rand_content)
+            self.assertEqual(result_id, rand_hub_id)
+
+    def test_parse_changelog_file(self):
+        rand_filename = f"{uuid.uuid4().hex}.md"
+        rand_text = f"Changelog entry {uuid.uuid4().hex}"
+        file_bytes = rand_text.encode('utf-8')
+
+        integrator = ReleaseChangelogIntegrator()
+
+        with patch('builtins.open', unittest.mock.mock_open(read_data=file_bytes)) as mock_file:
+            parsed_data = integrator.parse_changelog_file(rand_filename)
+            mock_file.assert_called_once_with(rand_filename, 'rb')
+            self.assertEqual(parsed_data, rand_text)
+
+    def test_sync_with_hub(self):
+        rand_url = f"https://{uuid.uuid4().hex}.com/hub/sync"
+        integrator = ReleaseChangelogIntegrator()
+
         with patch('skills.release_changelog_integrator.dependency_audit_sync') as mock_sync:
-            mock_sync.sync.side_effect = Exception("Connection lost")
-            
-            # Проверяем, что интегратор корректно пробрасывает или обрабатывает исключение
-            with self.assertRaises(Exception):
-                self.integrator.sync_with_hub(random_url)
-            
-            mock_sync.sync.assert_called_once_with(random_url)
+            integrator.sync_with_hub(rand_url)
+            mock_sync.sync.assert_called_once_with(rand_url)
 
-    def test_audit_pipeline_execution(self):
-        # Проверка передачи случайных параметров в пайплайн аудита
-        random_audit_id = uuid.uuid4().hex
-        random_threshold = random.random()
-        
+    def test_run_audit(self):
+        rand_audit_id = uuid.uuid4().hex
+        rand_threshold = round(random.uniform(0.1, 0.9), 2)
+        expected_result = random.choice([True, False])
+
+        integrator = ReleaseChangelogIntegrator()
+
         with patch('skills.release_changelog_integrator.dependency_audit_pipeline') as mock_pipeline:
-            mock_pipeline.run.return_value = True
-            
-            status = self.integrator.run_audit(random_audit_id, random_threshold)
-            
-            self.assertTrue(status)
-            mock_pipeline.run.assert_called_once_with(
-                audit_id=random_audit_id, 
-                threshold=random_threshold
-            )
+            mock_pipeline.run.return_value = expected_result
 
-    def test_repo_health_integration(self):
-        # Проверка взаимодействия с health-системой
-        random_repo_name = uuid.uuid4().hex
-        random_score = random.randint(0, 100)
-        
+            res = integrator.run_audit(rand_audit_id, rand_threshold)
+
+            mock_pipeline.run.assert_called_once_with(audit_id=rand_audit_id, threshold=rand_threshold)
+            self.assertEqual(res, expected_result)
+
+    def test_get_repo_health(self):
+        rand_repo_name = f"repo-{uuid.uuid4().hex[:8]}"
+        expected_score = random.randint(1, 100)
+
+        integrator = ReleaseChangelogIntegrator()
+
         with patch('skills.release_changelog_integrator.repo_health_automator') as mock_health:
-            mock_health.get_score.return_value = random_score
-            
-            score = self.integrator.get_repo_health(random_repo_name)
-            
-            self.assertEqual(score, random_score)
-            mock_health.get_score.assert_called_once_with(random_repo_name)
+            mock_health.get_score.return_value = expected_score
 
-if __name__ == '__main__':
-    unittest.main()
+            score = integrator.get_repo_health(rand_repo_name)
+
+            mock_health.get_score.assert_called_once_with(rand_repo_name)
+            self.assertEqual(score, expected_score)
+
+    def test_functional_release_changelog_integrator(self):
+        rand_repo_path = f"/tmp/{uuid.uuid4().hex}"
+        rand_version = f"{random.randint(1, 5)}.{random.randint(0, 9)}.0"
+        rand_integration_id = uuid.uuid4().hex
+        rand_hub_status = uuid.uuid4().hex
+
+        payload = {
+            "repo_path": rand_repo_path,
+            "target_version": rand_version,
+            "integration_id": rand_integration_id,
+            "hub_status": rand_hub_status
+        }
+
+        mock_file_instance = MagicMock()
+        expected_path = os.path.join(rand_repo_path, "CHANGELOG.md")
+
+        with patch('builtins.open', mock_file_instance) as mock_open:
+            response = release_changelog_integrator(payload)
+
+            mock_open.assert_called_once_with(expected_path, "w", encoding="utf-8")
+            
+            handle = mock_open()
+            written_content = "".join(call.args[0] for call in handle.write.call_args_list)
+            
+            self.assertIn(rand_version, written_content)
+            self.assertIn(rand_integration_id, written_content)
+            self.assertIn(rand_hub_status, written_content)
+
+            self.assertEqual(response["status"], "synchronized")
+            self.assertEqual(response["integration_id"], rand_integration_id)
+            self.assertEqual(response["version"], rand_version)

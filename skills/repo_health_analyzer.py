@@ -1,7 +1,6 @@
 import os
 import requests
 from skills import vulnerability_analyzer
-from skills.vulnerability_analyzer import vulnerability_analyzer as vuln_scan_func
 from skills.repo_auditor import repo_auditor
 from skills.repo_reporter import repo_reporter
 from skills.dependency_scanner import dependency_scanner

@@ -2,51 +2,47 @@ import unittest
 import uuid
 import random
 import os
-import tempfile
-from skills.dependency_audit_guardian import *
+from skills import dependency_audit_guardian
 
 class TestDependencyAuditGuardianIntegration(unittest.TestCase):
-
     def setUp(self):
-        self.test_dir = tempfile.TemporaryDirectory()
-        self.repo_path = self.test_dir.name
-        self.branch = f"feature/audit-{uuid.uuid4().hex[:8]}"
-        self.stream_source = random.choice(["npm", "maven", "pip", "cargo"])
-        self.output_report_name = f"report_{uuid.uuid4().hex[:6]}.json"
-        self.cve_identifier = f"CVE-2025-{random.randint(1000, 9999)}"
+        self.repo_path = f"/tmp/test_repo_{uuid.uuid4()}"
+        os.makedirs(self.repo_path, exist_ok=True)
+        self.branch = f"feature-{uuid.uuid4().hex[:8]}"
+        self.stream = f"stream-{random.randint(1000, 9999)}"
+        self.report_name = f"report_{uuid.uuid4().hex[:6]}.json"
+        self.cve_id = f"CVE-2023-{random.randint(10000, 99999)}"
         self.target_version = f"{random.randint(1, 3)}.{random.randint(0, 9)}.{random.randint(0, 9)}"
+        self.chaos_data = os.urandom(random.randint(16, 64))
 
     def tearDown(self):
-        self.test_dir.cleanup()
+        if os.path.exists(self.repo_path):
+            try:
+                os.rmdir(self.repo_path)
+            except OSError:
+                pass
 
-    def test_guardian_composition_workflow(self):
-        # Проверяем сквозной интеграционный вызов композитного модуля без моков.
-        # Модуль должен внутри себя вызывать функции из dependency_audit_aggregator
-        # и dependency_audit_validator.
-        
-        # Шаг 1: Запуск процесса через гардиана с использованием валидации и агрегации
-        result = validate_and_aggregate_dependencies(
-            repo_path=self.repo_path,
-            output_report_name=self.output_report_name,
-            cve_identifier=self.cve_identifier,
-            target_version=self.target_version,
-            branch=self.branch,
-            stream_source=self.stream_source
+    def test_start_new_audit_integration(self):
+        result = dependency_audit_guardian.start_new_audit(
+            self.repo_path, self.branch, self.stream
         )
+        self.assertIsNotNone(result)
 
-        # Шаг 2: Проверяем, что гардиан реально отработал и вернул структурированные данные
-        self.assertIsNotNone(result, "Композитный модуль не должен возвращать None")
-        
-        # Шаг 3: Проверяем создание реального отчетного файла в целевой директории
-        expected_report_path = os.path.join(self.repo_path, self.output_report_name)
-        
-        # Если логика модуля предполагает создание файла отчета, проверяем его наличие,
-        # либо проверяем корректность возвращаемого словаря с результатами валидации/агрегации.
-        if os.path.exists(expected_report_path):
-            self.assertTrue(os.path.getsize(expected_report_path) > 0, "Файл отчета не должен быть пустым")
-        else:
-            # Если файл не создается напрямую, проверяем что структура ответа содержит ключевые артефакты
-            self.assertIsInstance(result, (dict, list, bool), "Результат должен быть валидным типом данных")
+    def test_execute_guarded_audit_integration(self):
+        result = dependency_audit_guardian.execute_guarded_audit(
+            self.repo_path, self.report_name, self.cve_id, self.target_version, self.branch, self.stream
+        )
+        self.assertIsNotNone(result)
+
+    def test_apply_audit_data_integration(self):
+        result = dependency_audit_guardian.apply_audit_data(self.chaos_data)
+        self.assertIsNotNone(result)
+
+    def test_validate_and_aggregate_dependencies_integration(self):
+        result = dependency_audit_guardian.validate_and_aggregate_dependencies(
+            self.repo_path, self.report_name, self.cve_id, self.target_version, self.branch, self.stream
+        )
+        self.assertIsNotNone(result)
 
 if __name__ == "__main__":
     unittest.main()

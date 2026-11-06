@@ -39,17 +39,12 @@ class RepoHealthPulseCollector:
             err_output = res.stderr.decode('utf-8') if isinstance(res.stderr, bytes) else res.stderr
             raise RepoHealthDegradationError(err_output)
 
-        try:
-            data = json.loads(stdout.strip())
-            return RepoHealthMetric(
-                name=data.get("metric", metric_name),
-                value=float(data.get("value", 0.0)),
-                details=data.get("details", {})
-            )
-        except Exception as e:
-            if res.returncode != 0:
-                raise RepoHealthDegradationError(str(e))
-            return RepoHealthMetric(name=metric_name, value=0.0, details={})
+        data = json.loads(stdout.strip())
+        return RepoHealthMetric(
+            name=data.get("metric", metric_name),
+            value=float(data.get("value", 0.0)),
+            details=data.get("details", {})
+        )
 
     def parse_health_stream(self, stream_name: str) -> Dict[str, Any]:
         result = {}

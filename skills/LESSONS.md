@@ -3,12 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
-- Статус: успешно прошёл тесты и влит в main
-
-## repo_vulnerability_shield (compose) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
-- Последняя ошибка перед фиксом: AssertionError: None is not true
+ка перед фиксом: AssertionError: None is not true
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## repo_security_automator (compose) — раундов: 4
@@ -262,4 +257,9 @@ continue`! Обработай ошибку осмысленно или проб�
 
 ## dependency_audit_shield (compose) — раундов: 4
 - Последняя ошибка перед фиксом: Ran 244 tests in 1.105s
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## dependency_audit_aggregator (refactor) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: unterminated string literal (detected at line 58) (<unknown>, line 58); Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 14)
+- Последняя ошибка перед фиксом: FAILED (errors=3)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

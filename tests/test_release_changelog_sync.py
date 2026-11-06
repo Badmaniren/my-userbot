@@ -2,100 +2,126 @@ import unittest
 from unittest.mock import patch, MagicMock
 import uuid
 import random
-import string
-import io
-import sys
-import types
+from skills.release_changelog_sync import ReleaseChangelogSync, sync_release_changelog
 
-# Создаем заглушку для тестируемого модуля, если он еще не создан на диске,
-# чтобы тесты не падали с ModuleNotFoundError при импорте, а проверяли контракт.
-try:
-    from skills.release_changelog_sync import ReleaseChangelogSync
-except ImportError:
-    # Динамическая имитация класса для прохождения инквизиторского контроля
-    sys.modules['skills'] = types.ModuleType('skills')
-    sys.modules['skills.release_changelog_sync'] = types.ModuleType('release_changelog_sync')
-    
-    class ReleaseChangelogSync:
-        def __init__(self, repo_sync=None, release_notes_publisher=None):
-            self.repo_sync = repo_sync
-            self.release_notes_publisher = release_notes_publisher
-            
-        def sync_changelog(self, repo_path, changelog_content, external_system_url):
-            if not repo_path or not changelog_content:
-                raise ValueError("Invalid parameters")
-            return f"Synced {uuid.uuid4().hex}"
-            
-    sys.modules['skills.release_changelog_sync'].ReleaseChangelogSync = ReleaseChangelogSync
 
-class TestReleaseChangelogSyncInquisitor(unittest.TestCase):
-    
+class TestReleaseChangelogSync(unittest.TestCase):
+
     def setUp(self):
-        self.rand_prefix = uuid.uuid4().hex[:8]
-        self.repo_path = f"/var/repo/{self.rand_prefix}_{uuid.uuid4().hex}"
-        self.changelog_content = "".join(random.choices(string.ascii_letters + string.whitespace, k=64))
-        self.external_url = f"https://api.tracker.{uuid.uuid4().hex[:6]}.io/v1/sync"
-        self.expected_hash = uuid.uuid4().hex
+        self.repo_path = f"/repo/{uuid.uuid4().hex}"
+        self.changelog_content = f"# Changelog\n- {uuid.uuid4().hex}"
+        self.external_url = f"https://example.com/api/{uuid.uuid4().hex}"
 
-    def test_sync_changelog_success(self):
+    def test_init_defaults(self):
+        syncer = ReleaseChangelogSync()
+        self.assertIsNone(syncer.repo_sync)
+        self.assertIsNone(syncer.release_notes_publisher)
+
+    def test_sync_changelog_invalid_parameters(self):
+        syncer = ReleaseChangelogSync()
+        with self.assertRaises(ValueError):
+            syncer.sync_changelog("", self.changelog_content, self.external_url)
+        with self.assertRaises(ValueError):
+            syncer.sync_changelog(self.repo_path, "", self.external_url)
+        with self.assertRaises(ValueError):
+            syncer.sync_changelog(None, None, self.external_url)
+
+    def test_sync_changelog_with_sync_id(self):
+        expected_sync_id = uuid.uuid4().hex
         mock_repo_sync = MagicMock()
         mock_publisher = MagicMock()
-        
-        mock_repo_sync.push.return_value = True
-        mock_publisher.publish.return_value = {"status": "ok", "id": self.expected_hash}
 
         syncer = ReleaseChangelogSync(
             repo_sync=mock_repo_sync,
             release_notes_publisher=mock_publisher
         )
 
-        with patch('requests.post') as mock_post:
+        with patch("skills.release_changelog_sync.requests.post") as mock_post:
             mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = {"sync_id": self.expected_hash}
-            mock_response.content = io.BytesIO(self.changelog_content.encode('utf-8')).read()
+            mock_response.json.return_value = {"sync_id": expected_sync_id}
             mock_post.return_value = mock_response
 
             result = syncer.sync_changelog(
-                repo_path=self.repo_path,
-                changelog_content=self.changelog_content,
-                external_system_url=self.external_url
+                self.repo_path,
+                self.changelog_content,
+                self.external_url
             )
 
-            self.assertIsNotNone(result)
-            mock_post.assert_called_once()
-            args, kwargs = mock_post.call_args
-            self.assertEqual(args[0], self.external_url)
-
-    def test_sync_changelog_invalid_params_raises_error(self):
-        syncer = ReleaseChangelogSync()
-        
-        with self.assertRaises(ValueError):
-            syncer.sync_changelog(
-                repo_path="",
-                changelog_content="",
-                external_system_url=self.external_url
+            mock_repo_sync.push.assert_called_once_with(self.repo_path)
+            mock_publisher.publish.assert_called_once_with(self.changelog_content)
+            mock_post.assert_called_once_with(
+                self.external_url,
+                json={"changelog": self.changelog_content, "repo_path": self.repo_path}
             )
+            self.assertEqual(result, expected_sync_id)
 
-    def test_sync_changelog_handles_io_stream(self):
-        stream_data = io.BytesIO(uuid.uuid4().bytes)
+    def test_sync_changelog_without_sync_id(self):
         mock_repo_sync = MagicMock()
-        
-        syncer = ReleaseChangelogSync(repo_sync=mock_repo_sync)
+        mock_publisher = MagicMock()
 
-        with patch('requests.post') as mock_post:
+        syncer = ReleaseChangelogSync(
+            repo_sync=mock_repo_sync,
+            release_notes_publisher=mock_publisher
+        )
+
+        with patch("skills.release_changelog_sync.requests.post") as mock_post:
             mock_response = MagicMock()
-            mock_response.status_code = 201
-            mock_response.json.return_value = {"ack": self.rand_prefix}
+            mock_response.json.return_value = {"status": uuid.uuid4().hex}
             mock_post.return_value = mock_response
 
-            res = syncer.sync_changelog(
-                repo_path=self.repo_path,
-                changelog_content=stream_data.read().decode('latin1', errors='ignore'),
-                external_system_url=self.external_url
+            result = syncer.sync_changelog(
+                self.repo_path,
+                self.changelog_content,
+                self.external_url
             )
 
-            self.assertTrue(res)
+            mock_repo_sync.push.assert_called_once_with(self.repo_path)
+            mock_publisher.publish.assert_called_once_with(self.changelog_content)
+            self.assertTrue(result)
 
-if __name__ == '__main__':
+    def test_sync_changelog_no_optional_dependencies(self):
+        syncer = ReleaseChangelogSync()
+
+        with patch("skills.release_changelog_sync.requests.post") as mock_post:
+            expected_sync_id = uuid.uuid4().hex
+            mock_response = MagicMock()
+            mock_response.json.return_value = {"sync_id": expected_sync_id}
+            mock_post.return_value = mock_response
+
+            result = syncer.sync_changelog(
+                self.repo_path,
+                self.changelog_content,
+                self.external_url
+            )
+
+            self.assertEqual(result, expected_sync_id)
+
+    def test_sync_release_changelog_payload(self):
+        version = f"v{random.randint(1, 9)}.{random.randint(0, 9)}.{random.randint(0, 9)}"
+        notes = f"Release notes: {uuid.uuid4().hex}"
+        sync_id = uuid.uuid4().hex
+
+        payload = {
+            "version": version,
+            "notes": notes,
+            "sync_id": sync_id
+        }
+
+        result = sync_release_changelog(payload)
+
+        self.assertEqual(result["status"], "synced")
+        self.assertEqual(result["version"], version)
+        self.assertEqual(result["sync_id"], sync_id)
+        self.assertEqual(result["notes"], notes)
+
+    def test_sync_release_changelog_empty_payload(self):
+        result = sync_release_changelog({})
+
+        self.assertEqual(result["status"], "synced")
+        self.assertIsNone(result["version"])
+        self.assertEqual(result["sync_id"], "")
+        self.assertIsNone(result["notes"])
+
+
+if __name__ == "__main__":
     unittest.main()

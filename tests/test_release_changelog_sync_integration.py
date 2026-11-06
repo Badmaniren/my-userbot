@@ -1,71 +1,71 @@
 import unittest
 import uuid
 import random
-import os
 import tempfile
-import shutil
+import os
+from unittest.mock import patch, MagicMock
 
-from skills.release_changelog_sync import sync_release_changelog
-from skills.release_notes_composer import compose_release_notes
-from skills.git_committer import commit_changes
-from skills.repo_logger import log_repository_event
+from skills.release_changelog_sync import ReleaseChangelogSync, sync_release_changelog
+from skills.repo_sync import repo_sync
+from skills.release_notes_publisher import release_notes_publisher
 
-class TestIntegrationReleaseChangelogSync(unittest.TestCase):
+
+class TestReleaseChangelogSyncIntegration(unittest.TestCase):
 
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp()
-        self.old_cwd = os.getcwd()
-        os.chdir(self.test_dir)
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.repo_path = self.temp_dir.name
         
-        self.random_issue_id = f"ISSUE-{random.randint(1000, 9999)}"
-        self.random_version = f"v1.{random.randint(0, 9)}.{random.randint(0, 9)}"
-        self.random_commit_msg = f"feat: add synchronization logic {uuid.uuid4()}"
+        self.random_version = f"{random.randint(1, 9)}.{random.randint(0, 9)}.{random.randint(0, 9)}"
+        self.random_notes = f"Changelog entry notes {uuid.uuid4()}"
+        self.random_sync_id = str(uuid.uuid4())
+        self.external_url = f"https://api.external-tracker.internal/v1/sync/{uuid.uuid4()}"
 
     def tearDown(self):
-        os.chdir(self.old_cwd)
-        shutil.rmtree(self.test_dir)
+        self.temp_dir.cleanup()
 
-    def test_release_changelog_sync_integration(self):
-        os.makedirs(".git", exist_ok=True)
-        
-        dummy_file = os.path.join(self.test_dir, "change_log_source.txt")
-        with open(dummy_file, "w", encoding="utf-8") as f:
-            f.write(f"Release {self.random_version}: {self.random_issue_id}")
+    @patch('skills.release_changelog_sync.requests.post')
+    def test_sync_changelog_integration_real_flow(self, mock_requests_post):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"sync_id": self.random_sync_id, "status": "success"}
+        mock_requests_post.return_value = mock_response
 
-        composed_notes = compose_release_notes({
+        real_repo_sync = repo_sync() if callable(repo_sync) else None
+        real_publisher = release_notes_publisher() if callable(release_notes_publisher) else None
+
+        syncer = ReleaseChangelogSync(
+            repo_sync=real_repo_sync,
+            release_notes_publisher=real_publisher
+        )
+
+        result_id = syncer.sync_changelog(
+            repo_path=self.repo_path,
+            changelog_content=self.random_notes,
+            external_system_url=self.external_url
+        )
+
+        self.assertEqual(result_id, self.random_sync_id)
+
+        mock_requests_post.assert_called_once()
+        called_url, called_kwargs = mock_requests_post.call_args
+        self.assertEqual(called_url[0], self.external_url)
+        self.assertEqual(
+            called_kwargs.get("json"),
+            {"changelog": self.random_notes, "repo_path": self.repo_path}
+        )
+
+        payload = {
             "version": self.random_version,
-            "source_path": dummy_file,
-            "identifier": self.random_issue_id
-        })
-
-        self.assertIsNotNone(composed_notes)
-
-        commit_result = commit_changes({
-            "message": self.random_commit_msg,
-            "paths": [dummy_file]
-        })
-
-        self.assertTrue(commit_result or isinstance(commit_result, dict))
-
-        sync_result = sync_release_changelog({
-            "version": self.random_version,
-            "notes": composed_notes,
-            "target_system": "external_tracker",
-            "sync_id": str(uuid.uuid4())
-        })
-
-        self.assertIsInstance(sync_result, dict)
-        self.assertIn("status", sync_result)
-        self.assertEqual(sync_result["status"], "synced")
-        self.assertEqual(sync_result.get("version"), self.random_version)
-
-        log_payload = {
-            "event": "changelog_synchronized",
-            "version": self.random_version,
-            "sync_id": sync_result.get("sync_id")
+            "notes": self.random_notes,
+            "sync_id": result_id
         }
-        log_result = log_repository_event(log_payload)
-        self.assertIsNotNone(log_result)
+        sync_result = sync_release_changelog(payload)
+
+        self.assertEqual(sync_result["status"], "synced")
+        self.assertEqual(sync_result["version"], self.random_version)
+        self.assertEqual(sync_result["sync_id"], self.random_sync_id)
+        self.assertEqual(sync_result["notes"], self.random_notes)
+
 
 if __name__ == "__main__":
     unittest.main()

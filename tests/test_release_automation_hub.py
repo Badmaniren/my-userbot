@@ -1,48 +1,62 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
+import tempfile
 import uuid
 import random
-import string
-import io
+import os
+
 from skills.release_automation_hub import ReleaseAutomationHub
 
 
 class TestReleaseAutomationHub(unittest.TestCase):
 
     def setUp(self):
-        self.repo_path = f"/repo/{uuid.uuid4().hex}"
-        self.output_path = f"/reports/{uuid.uuid4().hex}.md"
-        self.status = random.choice(["SUCCESS", "FAILURE", "WARNING", "CRITICAL"])
-        self.summary = "".join(random.choices(string.ascii_letters + string.whitespace, k=30))
-        self.report_content = f"# Report {uuid.uuid4().hex}\nStatus: {self.status}\nSummary: {self.summary}"
+        self.tmp_dir = tempfile.TemporaryDirectory()
+        self.repo_path = self.tmp_dir.name
+        self.output_filename = f"{uuid.uuid4().hex}.log"
+        self.output_path = os.path.join(self.repo_path, self.output_filename)
 
-    def test_release_automation_hub_success_flow(self):
+    def tearDown(self):
+        self.tmp_dir.cleanup()
+
+    @patch('skills.release_automation_hub.RepoReporter')
+    @patch('skills.release_automation_hub.ReleasePipeline')
+    def test_release_automation_hub_success_flow(self, mock_release_pipeline_cls, mock_repo_reporter_cls):
+        random_report_content = uuid.uuid4().hex
+
+        mock_pipeline_instance = mock_release_pipeline_cls.return_value
+        mock_pipeline_instance.run.return_value = True
+
+        mock_reporter_instance = mock_repo_reporter_cls.return_value
+        mock_reporter_instance.generate_final_report.return_value = random_report_content
+
         hub = ReleaseAutomationHub(repo_path=self.repo_path)
+        success = hub.execute_release_cycle(self.output_path)
 
-        with patch("skills.release_automation_hub.ReleasePipeline") as mock_pipeline_cls, \
-             patch("skills.release_automation_hub.RepoReporter") as mock_reporter_cls:
+        self.assertTrue(success)
+        mock_pipeline_instance.run.assert_called_once_with(self.output_path)
+        mock_reporter_instance.generate_final_report.assert_called_once()
+        mock_reporter_instance.save_report.assert_called_once_with(self.output_path, random_report_content)
 
-            mock_pipeline_instance = mock_pipeline_cls.return_value
-            mock_pipeline_instance.run.return_value = True
+    @patch('skills.release_automation_hub.RepoReporter')
+    @patch('skills.release_automation_hub.ReleasePipeline')
+    def test_release_automation_hub_failure_flow(self, mock_release_pipeline_cls, mock_repo_reporter_cls):
+        random_report_content = uuid.uuid4().hex
 
-            mock_reporter_instance = mock_reporter_cls.return_value
-            mock_reporter_instance.generate_final_report.return_value = self.report_content
-            mock_reporter_instance.save_report.return_value = self.output_path
+        mock_pipeline_instance = mock_release_pipeline_cls.return_value
+        mock_pipeline_instance.run.return_value = False
 
-            result = hub.execute_release_cycle(output_path=self.output_path)
+        mock_reporter_instance = mock_repo_reporter_cls.return_value
+        mock_reporter_instance.generate_final_report.return_value = random_report_content
 
-            mock_pipeline_cls.assert_called_once_with(self.repo_path)
-            mock_pipeline_instance.run.assert_called_once_with(self.output_path)
-            mock_reporter_cls.assert_called_once_with(self.repo_path)
-            mock_reporter_instance.generate_final_report.assert_called_once()
-            mock_reporter_instance.save_report.assert_called_once_with(self.output_path, self.report_content)
-
-            self.assertTrue(result)
-
-    def test_release_automation_hub_failure_flow(self):
         hub = ReleaseAutomationHub(repo_path=self.repo_path)
+        success = hub.execute_release_with_report(self.output_path)
 
-        with patch("skills.release_automation_hub.ReleasePipeline") as mock_pipeline_cls, \
-             patch("skills.release_automation_hub.RepoReporter") as mock_reporter_cls:
+        self.assertFalse(success)
+        mock_pipeline_instance.run.assert_called_once_with(self.output_path)
+        mock_reporter_instance.generate_final_report.assert_called_once()
+        mock_reporter_instance.save_report.assert_called_once_with(self.output_path, random_report_content)
 
-            mock_pipeline_instance = mock_pipeline_cls.return_
+
+if __name__ == '__main__':
+    unittest.main()

@@ -3,8 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-шибка в коде: invalid syntax (<unknown>, line 1)
-- Последняя ошибка перед фиксом: FileNotFoundError: [Errno 2] No such file or directory: '/tmp/fe9414bf00f5469eaa265da5904b8a64/security_report.json'
+f00f5469eaa265da5904b8a64/security_report.json'
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## repo_security_gateway (refactor) — раундов: 1
@@ -260,3 +259,7 @@
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: from skills import dependency_audit_guardian
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## dependency_audit_pipeline (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: успешно прошёл тесты и влит в main

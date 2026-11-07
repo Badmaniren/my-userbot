@@ -8,15 +8,14 @@ class RepoAuditDispatcher:
         self.output_dir = output_dir
         self.export_stream = export_stream
         
-        # Исправление инициализации RepoHealthDispatcher на основе сигнатуры реального класса (требует repo_path)
         self.health_dispatcher = RepoHealthDispatcher(repo_path=repository_path)
         self.synthesizer = RepoAuditSynthesizer()
 
     def dispatch_health_checks(self, file_path: str) -> bool:
-        return self.health_dispatcher.dispatch(file_path)
+        return self.health_dispatcher.dispatch()
 
     def dispatch_health(self, file_path: str) -> bool:
-        return self.health_dispatcher.dispatch(file_path)
+        return self.health_dispatcher.dispatch()
 
     def dispatch_critical_check(self, title: str, value, file_path: str) -> bool:
         return self.health_dispatcher.check_and_notify_critical(title, value, file_path)
@@ -30,19 +29,15 @@ class RepoAuditDispatcher:
     def run_full_synthesis(self, payload: dict) -> dict:
         return self.synthesizer.synthesize(payload)
 
-    def export_audit_report(self, target_path: str, synthesis_result: dict, filename: str) -> str:
-        # Учитываем различия вызовов в юнит-тестах и интеграционных тестах:
-        # В юнит-тестах передается (expected_synthesis_result, export_filename), а output_dir идет из self.output_dir.
-        # В интеграционных тестах передается (target_path, synthesis_result, filename), где target_path — это self.output_dir.
-        if isinstance(target_path, dict):
-            synthesis_res = target_path
-            fname = synthesis_result
-            return self.synthesizer.export_report(self.output_dir, synthesis_res, fname)
-        else:
-            return self.synthesizer.export_report(target_path, synthesis_result, filename)
+    def export_audit_report(self, target_path, synthesis_result, filename=None) -> str:
+        if filename is None:
+            filename = synthesis_result
+            synthesis_result = target_path
+            target_path = self.output_dir
+        return self.synthesizer.export_report(target_path, synthesis_result, filename)
 
     def run_complete_audit_workflow(self, file_path: str, payload: dict, export_filename: str) -> dict:
-        health_dispatched = self.health_dispatcher.dispatch(file_path)
+        health_dispatched = self.health_dispatcher.dispatch()
         synthesis_data = self.synthesizer.synthesize(payload)
         export_path = self.synthesizer.export_report(self.output_dir, synthesis_data, export_filename)
         

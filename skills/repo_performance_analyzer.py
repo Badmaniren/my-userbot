@@ -2,18 +2,27 @@ import os
 import uuid
 import json
 
+from skills.repo_monitor import repo_monitor
+from skills.repo_analytics import repo_analytics
+
 class RepoPerformanceAnalyzer:
     def analyze_metric_stream(self, log_id: str, threshold: float) -> dict:
         metric_name = None
         value = 0.0
         
         with open(log_id, 'r', encoding='utf-8') as f:
-            content = f.read().strip()
+            content = f.read()
+            if isinstance(content, bytes):
+                content = content.decode('utf-8', errors='ignore')
+            content = content.strip()
             if content and content.startswith("METRIC:"):
                 parts = content.split(':')
                 if len(parts) >= 4:
                     metric_name = parts[1]
-                    value = float(parts[2])
+                    try:
+                        value = float(parts[2])
+                    except ValueError:
+                        value = 0.0
 
         is_bottleneck = value > threshold if metric_name is not None else False
         return {
@@ -29,13 +38,18 @@ class RepoPerformanceAnalyzer:
         
         with open(log_id, 'r', encoding='utf-8') as f:
             for line in f:
+                if isinstance(line, bytes):
+                    line = line.decode('utf-8', errors='ignore')
                 if ':' in line:
                     parts = line.strip().split(':')
                     if len(parts) >= 2:
-                        val = float(parts[1])
-                        total_metrics += 1
-                        if val > max_val:
-                            max_val = val
+                        try:
+                            val = float(parts[1])
+                            total_metrics += 1
+                            if val > max_val:
+                                max_val = val
+                        except ValueError:
+                            pass
 
         return {
             'total_metrics_analyzed': total_metrics,

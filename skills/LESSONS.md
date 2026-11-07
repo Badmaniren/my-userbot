@@ -3,7 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## dependency_audit_integrator (compose) — раундов: 4
@@ -289,4 +289,7 @@
 
 ## repo_health_predictor_pipeline (create) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: успешно прошёл тесты и влит в main
+
+## repo_health_predictor_pipeline (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

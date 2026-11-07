@@ -1,13 +1,14 @@
 import os
 import json
 import requests
+from skills.repo_analytics import analyze_repository
 
 def start_new(epic_name, target_path, endpoint_url, threshold):
     """
     Инициализирует новый эпик оптимизации и метрик скорости репозитория.
     """
     if os.path.exists(target_path):
-        with open(target_path, "r", encoding="utf-8") as f:
+        with open(target_path, "r", encoding="utf-8", errors="ignore") as f:
             content = f.read()
             metric_key = None
             limit_val = None
@@ -41,6 +42,8 @@ def profile_repository(repo_path, session_id, threshold):
     """
     Профилирует репозиторий, анализирует его и сохраняет отчет в формате JSON.
     """
+    analyze_repository(repo_path)
+    
     report_data = {
         "profile_id": session_id,
         "session_id": session_id,

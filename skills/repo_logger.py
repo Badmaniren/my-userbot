@@ -50,3 +50,14 @@ class RepoLogger:
         """Логирует динамическую метрику."""
         message = f"Metric -> {metric_key}: {metric_value} (Repo: {self.repo_path})"
         self.logger.debug(message)
+
+
+def log_repo_event(repo_id: str, event: str) -> dict:
+    """Логгер событий репозитория для интеграционных тестов."""
+    logger = RepoLogger(repo_path=str(repo_id))
+    logger.log_event(event)
+    return {
+        "repo_id": repo_id,
+        "event": event,
+        "logged": True
+    }

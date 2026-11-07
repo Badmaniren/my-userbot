@@ -3,16 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ерез raise.
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## dependency_audit_aggregator (start_new) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено перекрывать системный модуль 'repo_logger' глобальной переменной!
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: успешно прошёл тесты и влит в main
-
-## dependency_vulnerability_pipeline (compose) — раундов: 3
+pendency_vulnerability_pipeline (compose) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main
 
@@ -262,5 +253,10 @@
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## vulnerability_publisher_hub (compose) — раундов: 4
+- Последняя ошибка перед фиксом: raise AssertionError(msg)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## vulnerability_publisher (compose) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: raise AssertionError(msg)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -3,12 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-—' (U+2014) (<unknown>, line 64); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## dependency_audit_aggregator (refactor) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 30)
+(<unknown>, line 1); Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 30)
 - Последняя ошибка перед фиксом: from skills.dependency_audit_optimizer import optimize_and_apply_dependencies
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -304,4 +299,9 @@
 
 ## repo_health_guardian (refactor) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_trend_tracker (create) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid character '—' (U+2014) (<unknown>, line 93); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

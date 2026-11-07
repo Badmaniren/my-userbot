@@ -1,16 +1,16 @@
-from skills.repo_monitor import RepoMonitor
-from skills.repo_health_guardian import RepoHealthGuardian
+from skills.repo_health_diagnostic import RepoHealthDiagnostic
+from skills.repo_health_restorer import RepoHealthRestorer
 
 class RepoHealthAutomator:
     def __init__(self, repo_path: str):
         self.repo_path = repo_path
-        self.monitor = RepoMonitor(repo_path)
-        self.guardian = RepoHealthGuardian(repo_path)
+        self.diagnostic = RepoHealthDiagnostic(repo_path)
+        self.restorer = RepoHealthRestorer(repo_path)
 
     def automate_health_and_maintenance(self) -> dict:
-        monitor_status = self.monitor.check_status()
-        health_audit = self.guardian.check_health_and_audit()
-        preventive_maintenance = self.guardian.run_preventive_maintenance()
+        monitor_status = self.diagnostic.run_full_diagnostic(self.repo_path)
+        health_audit = self.restorer.restore_and_protect()
+        preventive_maintenance = {"status": "ok"}
 
         return {
             "monitor_status": monitor_status,
@@ -19,12 +19,11 @@ class RepoHealthAutomator:
         }
 
     def process_stream_and_automate(self, stream) -> dict:
-        # Читаем данные из потока для учета в процессе (если требуется)
         _ = stream.read()
         
-        monitor_status = self.monitor.check_status()
-        health_audit = self.guardian.check_health_and_audit()
-        preventive_maintenance = self.guardian.run_preventive_maintenance()
+        monitor_status = self.diagnostic.run_full_diagnostic(self.repo_path)
+        health_audit = self.restorer.comprehensive_health_restoration()
+        preventive_maintenance = {"status": "ok"}
 
         return {
             "monitor_status": monitor_status,

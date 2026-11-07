@@ -3,14 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-
-
-## dependency_audit_guardian (compose) — раундов: 4
-- Последняя ошибка перед фиксом: ----------------------------------------------------------------------
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## dependency_audit_gateway (compose) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## dependency_audit_optimizer (refactor) — раундов: 4
@@ -268,3 +261,8 @@
 
 ## vulnerability_security_optimizer (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## repo_performance_profiler (start_new) — раундов: 4
+- Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

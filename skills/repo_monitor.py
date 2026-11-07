@@ -10,11 +10,13 @@ class GitCommitter:
 
     def commit(self, message: str) -> bool:
         """Создает коммит с переданным сообщением в указанном репозитории."""
+        cmd = ["git", "-C", self.repo_path, "commit", "-m", message]
         try:
-            cmd = ["git", "-C", self.repo_path, "commit", "-m", message]
             result = subprocess.run(cmd, capture_output=True, text=True)
             return result.returncode == 0
-        except Exception:
+        except Exception as e:
+            if isinstance(e, (FileNotFoundError, PermissionError)):
+                return False
             return False
 
     def commit_changes(self, file_path: str, message: str) -> bool:
@@ -28,7 +30,9 @@ class GitCommitter:
 
             # git commit
             return self.commit(message)
-        except Exception:
+        except Exception as e:
+            if isinstance(e, (FileNotFoundError, PermissionError)):
+                return False
             return False
 
 
@@ -40,11 +44,13 @@ class RepoMonitor:
 
     def check_status(self) -> str:
         """Проверяет статус репозитория через git status."""
+        cmd = ["git", "-C", self.repo_path, "status", "--porcelain"]
         try:
-            cmd = ["git", "-C", self.repo_path, "status", "--porcelain"]
             result = subprocess.run(cmd, capture_output=True, text=True)
             if result.returncode == 0:
                 return result.stdout
+        except Exception as e:
+            if isinstance(e, (FileNotFoundError, PermissionError)):
+                return ""
             return ""
-        except Exception:
-            return ""
+        return ""

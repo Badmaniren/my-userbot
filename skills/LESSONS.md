@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-known>, line 1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## dependency_scanner (refactor) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## dependency_audit_sync (compose) — раундов: 1
@@ -300,5 +296,10 @@ known>, line 1)
 
 ## repo_health_intelligence (create) — раундов: 4
 - Античит поймал: ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'repo_health_diagnostic'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.repo_health_diagnostic import ...'
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_benchmark (create) — раундов: 4
+- Античит поймал: АНТИЧИТ: Запрещено создавать классы или функции-заглушки внутри `except`! Импортируй честно.
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

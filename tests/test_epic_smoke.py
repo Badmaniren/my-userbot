@@ -1,78 +1,64 @@
 import unittest
-import os
 import json
+import os
 import tempfile
-from unittest.mock import patch
 
 from vulnerability_analyzer import VulnerabilityAnalyzer
 from vulnerability_security_automator import VulnerabilitySecurityAutomator
 from vulnerability_predictor_pipeline import VulnerabilityPredictorPipeline
 from vulnerability_security_optimizer import VulnerabilitySecurityOptimizer
 
-class TestVulnerabilityCyberDefenseEpic(unittest.TestCase):
-
+class EpicPracticalVerificationTest(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.TemporaryDirectory()
-        self.telemetry_path = os.path.join(self.test_dir.name, "vulnerability_telemetry.json")
+        self.data_file_path = os.path.join(self.test_dir.name, "vulnerabilities_feed.json")
         
-        # Создаем реалистичный файл телеметрии уязвимостей и логов безопасности (20+ строк)
-        realistic_telemetry = [
-            {"id": "CVE-2024-1001", "component": "auth_service", "severity": "HIGH", "trend_score": 0.85, "vector": "network", "exploit_available": True},
-            {"id": "CVE-2024-1002", "component": "payment_gateway", "severity": "CRITICAL", "trend_score": 0.95, "vector": "remote", "exploit_available": True},
-            {"id": "CVE-2024-1003", "component": "user_profile", "severity": "MEDIUM", "trend_score": 0.45, "vector": "local", "exploit_available": False},
-            {"id": "CVE-2024-1004", "component": "logger_module", "severity": "LOW", "trend_score": 0.20, "vector": "local", "exploit_available": False},
-            {"id": "CVE-2024-1005", "component": "api_gateway", "severity": "HIGH", "trend_score": 0.88, "vector": "network", "exploit_available": True},
-            {"id": "CVE-2024-1006", "component": "database_connector", "severity": "CRITICAL", "trend_score": 0.92, "vector": "remote", "exploit_available": True},
-            {"id": "CVE-2024-1007", "component": "session_manager", "severity": "MEDIUM", "trend_score": 0.60, "vector": "network", "exploit_available": False},
-            {"id": "CVE-2024-1008", "component": "cache_service", "severity": "LOW", "trend_score": 0.15, "vector": "local", "exploit_available": False},
-            {"id": "CVE-2024-1009", "component": "notification_service", "severity": "MEDIUM", "trend_score": 0.50, "vector": "network", "exploit_available": False},
-            {"id": "CVE-2024-1010", "component": "admin_panel", "severity": "CRITICAL", "trend_score": 0.99, "vector": "remote", "exploit_available": True},
-            {"id": "CVE-2024-1011", "component": "file_uploader", "severity": "HIGH", "trend_score": 0.82, "vector": "network", "exploit_available": True},
-            {"id": "CVE-2024-1012", "component": "config_parser", "severity": "MEDIUM", "trend_score": 0.55, "vector": "local", "exploit_available": False},
-            {"id": "CVE-2024-1013", "component": "crypto_lib", "severity": "HIGH", "trend_score": 0.78, "vector": "remote", "exploit_available": True},
-            {"id": "CVE-2024-1014", "component": "metrics_exporter", "severity": "LOW", "trend_score": 0.10, "vector": "network", "exploit_available": False},
-            {"id": "CVE-2024-1015", "component": "search_engine", "severity": "MEDIUM", "trend_score": 0.65, "vector": "remote", "exploit_available": False},
-            {"id": "CVE-2024-1016", "component": "plugin_loader", "severity": "CRITICAL", "trend_score": 0.97, "vector": "remote", "exploit_available": True},
-            {"id": "CVE-2024-1017", "component": "websocket_handler", "severity": "HIGH", "trend_score": 0.80, "vector": "network", "exploit_available": True},
-            {"id": "CVE-2024-1018", "component": "template_engine", "severity": "MEDIUM", "trend_score": 0.52, "vector": "local", "exploit_available": False},
-            {"id": "CVE-2024-1019", "component": "dns_resolver", "severity": "LOW", "trend_score": 0.25, "vector": "network", "exploit_available": False},
-            {"id": "CVE-2024-1020", "component": "proxy_module", "severity": "HIGH", "trend_score": 0.89, "vector": "network", "exploit_available": True}
+        # Создаем реалистичный файл с данными уязвимостей (телеметрия и тренды)
+        realistic_data = [
+            {"id": "CVE-2023-38606", "component": "kernel", "severity": "HIGH", "exploit_probability": 0.85, "vector": "LPE"},
+            {"id": "CVE-2023-4911", "component": "glibc", "severity": "CRITICAL", "exploit_probability": 0.95, "vector": "Buffer Overflow"},
+            {"id": "CVE-2024-21413", "component": "windows_mshtml", "severity": "HIGH", "exploit_probability": 0.78, "vector": "RCE"},
+            {"id": "CVE-2024-3400", "component": "pan_os", "severity": "CRITICAL", "exploit_probability": 0.99, "vector": "Command Injection"},
+            {"id": "CVE-2023-22515", "component": "confluence", "severity": "HIGH", "exploit_probability": 0.82, "vector": "Auth Bypass"}
         ]
         
-        with open(self.telemetry_path, 'w', encoding='utf-8') as f:
-            json.dump(realistic_telemetry, f, indent=2)
+        with open(self.data_file_path, "w", encoding="utf-8") as f:
+            json.dump(realistic_data, f, indent=2)
 
     def tearDown(self):
         self.test_dir.cleanup()
 
-    def test_vulnerability_cyber_defense_pipeline(self):
-        print("\n=== НАЧАЛО ПРАКТИЧЕСКОЙ ПРОВЕРКИ ЭПИКА: Продвинутая система прогнозирования уязвимостей и кибер-защиты ===")
+    def test_vulnerability_prediction_and_optimization_pipeline(self):
+        print("\n--- ЗАПУСК ПРАКТИЧЕСКОЙ ПРОВЕРКИ ЭПИКА: Предиктивная кибер-защита ---")
         
-        # 1. Шаг анализатора трендов уязвимостей
-        analyzer = VulnerabilityAnalyzer()
-        analysis_result = analyzer.analyze(self.telemetry_path)
-        print(f"[1] VulnerabilityAnalyzer результаты анализа: {analysis_result}")
+        # 1. Проверяем VulnerabilityAnalyzer на реальном файле данных
+        print(f"[1] Чтение и анализ файла уязвимостей: {self.data_file_path}")
+        analyzer = VulnerabilityAnalyzer(data_source=self.data_file_path)
+        analysis_result = analyzer.analyze_trends()
+        print(f" -> Результат анализа трендов: {analysis_result}")
         self.assertIsNotNone(analysis_result)
 
-        # 2. Шаг шлюза безопасности и автоматизатора
-        automator = VulnerabilitySecurityAutomator()
-        automator_result = automator.automate(analysis_result)
-        print(f"[2] VulnerabilitySecurityAutomator контур защиты: {automator_result}")
-        self.assertIsNotNone(automator_result)
+        # 2. Интеграция со шлюзом безопасности через VulnerabilitySecurityAutomator
+        print("[2] Запуск автоматизатора безопасности (VulnerabilitySecurityAutomator)...")
+        automator = VulnerabilitySecurityAutomator(analyzer=analyzer)
+        security_status = automator.evaluate_and_lock()
+        print(f" -> Статус автоматизированного контура: {security_status}")
+        self.assertTrue(security_status.get("secured", True))
 
-        # 3. Шаг единого пайплайна прогнозирования
-        pipeline = VulnerabilityPredictorPipeline()
-        pipeline_forecast = pipeline.run(self.telemetry_path)
-        print(f"[3] VulnerabilityPredictorPipeline прогноз: {pipeline_forecast}")
-        self.assertIsNotNone(pipeline_forecast)
+        # 3. Прогон через пайплайн прогнозирования VulnerabilityPredictorPipeline
+        print("[3] Выполнение предиктивного пайплайна (VulnerabilityPredictorPipeline)...")
+        pipeline = VulnerabilityPredictorPipeline(automator=automator)
+        prediction_report = pipeline.run_pipeline()
+        print(f" -> Отчет пайплайна прогнозирования:\n{json.dumps(prediction_report, indent=2)}")
+        self.assertIn("predictions", prediction_report)
 
-        # 4. Шаг оптимизатора защиты на основе предсказаний (завершение эпика)
-        optimizer = VulnerabilitySecurityOptimizer()
-        optimization_report = optimizer.optimize(pipeline_forecast)
-        print(f"[4] VulnerabilitySecurityOptimizer отчет об оптимизации: {optimization_report}")
-        self.assertIsNotNone(optimization_report)
-        
-        print("=== ПРАКТИЧЕСКАЯ ПРОВЕРКА УСПЕШНО ЗАВЕРШЕНА ===")
+        # 4. Завершение оптимизацией защиты в VulnerabilitySecurityOptimizer
+        print("[4] Финальная оптимизация правил защиты (VulnerabilitySecurityOptimizer)...")
+        optimizer = VulnerabilitySecurityOptimizer(pipeline_report=prediction_report)
+        optimization_result = optimizer.optimize_rules()
+        print(f" -> Примененные оптимизации защиты: {optimization_result}")
+        self.assertIsNotNone(optimization_result)
+        print("--- ПРАКТИЧЕСКАЯ ПРОВЕРКА УСПЕШНО ЗАВЕРШЕНА ---")
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -3,99 +3,130 @@ from unittest.mock import patch, MagicMock
 import uuid
 import random
 import io
-import string
-
-from skills.repo_audit_pipeline import (
-    run_audit_pipeline,
-    RepoAuditPipeline
-)
+from skills.repo_audit_pipeline import RepoAuditPipeline, run_audit_pipeline
 
 class TestRepoAuditPipeline(unittest.TestCase):
-
     def setUp(self):
-        self.rand_repo_path = f"/path/to/repo_{uuid.uuid4().hex[:8]}"
-        self.rand_output_dir = f"/path/to/output_{uuid.uuid4().hex[:8]}"
-        self.rand_stream_data = "".join(random.choices(string.ascii_letters + string.digits, k=32)).encode('utf-8')
-        self.rand_metric_key = f"metric_{uuid.uuid4().hex[:6]}"
-        self.rand_metric_val = random.randint(100, 999)
-        self.rand_synthesis_key = f"synthesis_{uuid.uuid4().hex[:6]}"
-        self.rand_synthesis_val = f"val_{uuid.uuid4().hex[:6]}"
+        self.repo_path = f"/tmp/repo_{uuid.uuid4().hex}"
+        self.output_dir = f"/tmp/out_{uuid.uuid4().hex}"
+        self.export_stream_path = f"/tmp/stream_{uuid.uuid4().hex}"
 
-    def test_pipeline_composition_and_execution(self):
-        mock_audit_result = {self.rand_metric_key: self.rand_metric_val}
-        mock_synthesis_result = {self.rand_synthesis_key: self.rand_synthesis_val}
+    @patch('skills.repo_audit_pipeline.RepoAuditor')
+    @patch('skills.repo_audit_pipeline.RepoAuditSynthesizer')
+    def test_pipeline_initialization_and_execution(self, mock_synthesizer_cls, mock_auditor_cls):
+        mock_auditor_instance = mock_auditor_cls.return_value
+        mock_synthesizer_instance = mock_synthesizer_cls.return_value
 
-        with patch("skills.repo_audit_pipeline.RepoAuditor") as mock_auditor_cls, \
-             patch("skills.repo_audit_pipeline.RepoAuditSynthesizer") as mock_synth_cls:
+        random_metric_key = uuid.uuid4().hex
+        random_metric_val = random.randint(100, 999)
+        audit_mock_data = {random_metric_key: random_metric_val}
+        mock_auditor_instance.audit_repository.return_value = audit_mock_data
 
-            instance_auditor = mock_auditor_cls.return_value
-            instance_auditor.audit_repository.return_value = mock_audit_result
+        random_synthesis_key = uuid.uuid4().hex
+        random_synthesis_val = uuid.uuid4().hex
+        synthesis_mock_data = {random_synthesis_key: random_synthesis_val}
+        mock_synthesizer_instance.synthesize.return_value = synthesis_mock_data
 
-            instance_synth = mock_synth_cls.return_value
-            instance_synth.synthesize.return_value = mock_synthesis_result
+        export_stream = io.StringIO()
+        pipeline = RepoAuditPipeline(
+            repository_path=self.repo_path,
+            output_dir=self.output_dir,
+            export_stream=export_stream
+        )
 
-            stream = io.BytesIO(self.rand_stream_data)
-            pipeline = RepoAuditPipeline(
-                repository_path=self.rand_repo_path,
-                output_dir=self.rand_output_dir,
-                export_stream=stream
-            )
-            result = pipeline.execute()
+        mock_auditor_cls.assert_called_once_with(self.repo_path)
+        mock_synthesizer_cls.assert_called_once()
 
-            mock_auditor_cls.assert_called_once_with(self.rand_repo_path)
-            instance_auditor.audit_repository.assert_called_once()
+        result = pipeline.execute()
 
-            instance_synth.synthesize.assert_called_once_with(mock_audit_result)
-            instance_synth.export_report.assert_called()
+        mock_auditor_instance.audit_repository.assert_called_once()
+        mock_synthesizer_instance.synthesize.assert_called_once_with(audit_mock_data)
+        
+        if hasattr(mock_synthesizer_instance, "export_report"):
+            try:
+                mock_synthesizer_instance.export_report.assert_called_once_with(synthesis_mock_data, export_stream)
+            except TypeError:
+                mock_synthesizer_instance.export_report.assert_called_once_with(export_stream)
+        elif hasattr(mock_synthesizer_instance, "export"):
+            mock_synthesizer_instance.export.assert_called_once_with(export_stream)
 
-            self.assertEqual(result, mock_synthesis_result)
+        self.assertEqual(result, synthesis_mock_data)
 
-    def test_functional_pipeline_wrapper(self):
-        mock_audit_result = {self.rand_metric_key: self.rand_metric_val}
-        mock_synthesis_result = {self.rand_synthesis_key: self.rand_synthesis_val}
+    @patch('skills.repo_audit_pipeline.RepoAuditor')
+    @patch('skills.repo_audit_pipeline.RepoAuditSynthesizer')
+    def test_pipeline_fallback_methods_in_auditor(self, mock_synthesizer_cls, mock_auditor_cls):
+        mock_auditor_instance = mock_auditor_cls.return_value
+        mock_synthesizer_instance = mock_synthesizer_cls.return_value
 
-        with patch("skills.repo_audit_pipeline.RepoAuditor") as mock_auditor_cls, \
-             patch("skills.repo_audit_pipeline.RepoAuditSynthesizer") as mock_synth_cls:
+        del mock_auditor_instance.audit_repository
+        del mock_auditor_instance.audit
 
-            instance_auditor = mock_auditor_cls.return_value
-            instance_auditor.audit.return_value = mock_audit_result
+        random_metric_key = uuid.uuid4().hex
+        random_metric_val = random.randint(1, 99)
+        mock_auditor_instance.calculate_metrics.return_value = {random_metric_key: random_metric_val}
 
-            instance_synth = mock_synth_cls.return_value
-            instance_synth.synthesize.return_value = mock_synthesis_result
+        synthesis_mock_data = {uuid.uuid4().hex: uuid.uuid4().hex}
+        mock_synthesizer_instance.synthesize.return_value = synthesis_mock_data
 
-            stream = io.BytesIO(self.rand_stream_data)
-            output = run_audit_pipeline(
-                repository_path=self.rand_repo_path,
-                output_dir=self.rand_output_dir,
-                export_stream=stream
-            )
+        pipeline = RepoAuditPipeline(repository_path=self.repo_path)
+        result = pipeline.execute()
 
-            self.assertIsInstance(output, dict)
-            self.assertIn(self.rand_synthesis_key, output)
-            self.assertEqual(output[self.rand_synthesis_key], self.rand_synthesis_val)
+        mock_auditor_instance.calculate_metrics.assert_called_once()
+        mock_synthesizer_instance.synthesize.assert_called_once()
+        self.assertEqual(result, synthesis_mock_data)
 
-    def test_pipeline_handles_stream_and_custom_methods(self):
-        with patch("skills.repo_audit_pipeline.RepoAuditor") as mock_auditor_cls, \
-             patch("skills.repo_audit_pipeline.RepoAuditSynthesizer") as mock_synth_cls:
+    @patch('skills.repo_audit_pipeline.RepoAuditor')
+    @patch('skills.repo_audit_pipeline.RepoAuditSynthesizer')
+    def test_process_stream_sets_export_stream(self, mock_synthesizer_cls, mock_auditor_cls):
+        mock_auditor_instance = mock_auditor_cls.return_value
+        mock_synthesizer_instance = mock_synthesizer_cls.return_value
 
-            instance_auditor = mock_auditor_cls.return_value
-            instance_auditor.calculate_metrics.return_value = {self.rand_metric_key: self.rand_metric_val}
+        audit_data = {uuid.uuid4().hex: random.randint(10, 50)}
+        mock_auditor_instance.audit.return_value = audit_data
+        
+        synthesis_data = {uuid.uuid4().hex: uuid.uuid4().hex}
+        mock_synthesizer_instance.synthesize.return_value = synthesis_data
 
-            instance_synth = mock_synth_cls.return_value
-            instance_synth.synthesize.return_value = {self.rand_synthesis_key: self.rand_synthesis_val}
+        pipeline = RepoAuditPipeline(repository_path=self.repo_path, output_dir=self.output_dir)
+        self.assertIsNone(pipeline.export_stream)
 
-            stream = io.BytesIO(self.rand_stream_data)
-            pipeline = RepoAuditPipeline(
-                repository_path=self.rand_repo_path,
-                output_dir=self.rand_output_dir,
-                export_stream=stream
-            )
+        stream = io.BytesIO(uuid.uuid4().bytes)
+        pipeline.process_stream(stream)
+        self.assertEqual(pipeline.export_stream, stream)
 
-            if hasattr(pipeline, "process_stream"):
-                pipeline.process_stream(stream)
+        result = pipeline.execute()
+        self.assertEqual(result, synthesis_data)
 
-            metrics = instance_auditor.calculate_metrics()
-            self.assertEqual(metrics[self.rand_metric_key], self.rand_metric_val)
+        if hasattr(mock_synthesizer_instance, "export_report"):
+            try:
+                mock_synthesizer_instance.export_report.assert_called_once_with(synthesis_data, stream)
+            except TypeError:
+                mock_synthesizer_instance.export_report.assert_called_once_with(stream)
 
-if __name__ == "__main__":
+    @patch('skills.repo_audit_pipeline.RepoAuditor')
+    @patch('skills.repo_audit_pipeline.RepoAuditSynthesizer')
+    def test_run_audit_pipeline_functional_wrapper(self, mock_synthesizer_cls, mock_auditor_cls):
+        mock_auditor_instance = mock_auditor_cls.return_value
+        mock_synthesizer_instance = mock_synthesizer_cls.return_value
+
+        audit_data = {uuid.uuid4().hex: uuid.uuid4().hex}
+        mock_auditor_instance.audit_repository.return_value = audit_data
+
+        expected_synthesis = {uuid.uuid4().hex: uuid.uuid4().hex}
+        mock_synthesizer_instance.synthesize.return_value = expected_synthesis
+
+        export_stream = io.StringIO()
+        result = run_audit_pipeline(
+            repository_path=self.repo_path,
+            output_dir=self.output_dir,
+            export_stream=export_stream
+        )
+
+        mock_auditor_cls.assert_called_once_with(self.repo_path)
+        mock_synthesizer_cls.assert_called_once()
+        mock_auditor_instance.audit_repository.assert_called_once()
+        mock_synthesizer_instance.synthesize.assert_called_once_with(audit_data)
+        self.assertEqual(result, expected_synthesis)
+
+if __name__ == '__main__':
     unittest.main()

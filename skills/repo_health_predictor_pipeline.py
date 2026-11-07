@@ -13,7 +13,7 @@ class RepoHealthPredictorPipeline:
     def analyze_health(self, raw_data):
         if not raw_data:
             raise ValueError("Empty raw data")
-        return {"status": "predicted", "score": random.random()}
+        return {"status": "predicted", "score": float(random.uniform(0.0, 1.0))}
 
     def run_pipeline(self, stream):
         content = stream.read()

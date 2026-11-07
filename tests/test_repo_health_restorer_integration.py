@@ -1,61 +1,75 @@
 import unittest
-import tempfile
-import shutil
 import os
+import shutil
 import uuid
-import random
+import tempfile
+from io import BytesIO
 from skills.repo_health_restorer import RepoHealthRestorer
 
 class TestRepoHealthRestorerIntegration(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
-        os.system(f"git -C {self.test_dir} init -b main")
-        os.system(f"git -C {self.test_dir} config user.name 'Architect Test'")
-        os.system(f"git -C {self.test_dir} config user.email 'architect@test.com'")
+        self.repo_path = os.path.join(self.test_dir, f"repo_{uuid.uuid4().hex}")
+        os.makedirs(self.repo_path)
         
-        self.restorer = RepoHealthRestorer(self.test_dir)
+        # Инициализация тестируемого модуля
+        self.restorer = RepoHealthRestorer(self.repo_path)
+        
+        # Создаем фиктивный файл для имитации состояния репозитория
+        self.dummy_file = os.path.join(self.repo_path, "test_data.txt")
+        with open(self.dummy_file, "w") as f:
+            f.write(f"data_{uuid.uuid4().hex}")
 
     def tearDown(self):
-        shutil.rmtree(self.test_dir, ignore_errors=True)
-
-    def test_restore_and_protect_integration(self):
-        unique_file = f"file_{uuid.uuid4().hex}.txt"
-        file_path = os.path.join(self.test_dir, unique_file)
-        random_content = f"content_{random.randint(1000, 9999)}"
-        
-        with open(file_path, "w") as f:
-            f.write(random_content)
-            
-        os.system(f"git -C {self.test_dir} add {unique_file}")
-        os.system(f"git -C {self.test_dir} commit -m 'Initial commit {uuid.uuid4().hex}'")
-
-        result = self.restorer.restore_and_protect()
-
-        self.assertIsInstance(result, dict)
-        self.assertIn("recovery_status", result)
-        self.assertIn("maintenance_report", result)
-        self.assertIsInstance(result["recovery_status"], bool)
-        self.assertIsInstance(result["maintenance_report"], dict)
+        shutil.rmtree(self.test_dir)
 
     def test_comprehensive_health_restoration_integration(self):
-        stream_data = f"stream_payload_{uuid.uuid4().hex}"
+        """
+        Интеграционный тест: проверяет взаимодействие RepoHealthRestorer с 
+        RepoHealthDiagnostic и RepoRecovery без использования моков.
+        """
+        # Генерируем случайный поток данных для восстановления
+        random_content = f"recovery_payload_{uuid.uuid4().hex}"
+        stream = BytesIO(random_content.encode("utf-8"))
         
-        result = self.restorer.comprehensive_health_restoration(stream_data)
-
-        self.assertIsInstance(result, dict)
+        # Выполняем комплексное восстановление
+        result = self.restorer.comprehensive_health_restoration(stream)
+        
+        # Проверяем структуру ответа
         self.assertIn("restored", result)
         self.assertIn("structure_analysis", result)
-        self.assertIsInstance(result["restored"], bool)
+        
+        # Проверяем, что восстановление вернуло булево значение (успех)
+        self.assertTrue(result["restored"])
+        
+        # Проверяем, что диагностика вернула данные (словарь)
         self.assertIsInstance(result["structure_analysis"], dict)
+        self.assertGreater(len(result["structure_analysis"]), 0)
 
     def test_execute_restoration_routine_integration(self):
-        dummy_file = os.path.join(self.test_dir, f"dummy_{uuid.uuid4().hex}.py")
-        with open(dummy_file, "w") as f:
-            f.write(f"print('{uuid.uuid4().hex}')\n")
-
+        """
+        Интеграционный тест: проверяет цепочку вызовов check_health_and_audit 
+        и recover_repository.
+        """
+        # Выполняем рутину восстановления
         status = self.restorer.execute_restoration_routine()
+        
+        # Проверяем, что процесс завершился успешно
+        self.assertTrue(status)
 
-        self.assertIsInstance(status, bool)
+    def test_restore_and_protect_integration(self):
+        """
+        Интеграционный тест: проверяет объединение функционала защиты и восстановления.
+        """
+        report = self.restorer.restore_and_protect()
+        
+        # Проверяем наличие ключей в отчете
+        self.assertIn("recovery_status", report)
+        self.assertIn("maintenance_report", report)
+        
+        # Проверяем типы данных
+        self.assertTrue(report["recovery_status"])
+        self.assertIsInstance(report["maintenance_report"], dict)
 
 if __name__ == "__main__":
     unittest.main()

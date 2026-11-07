@@ -36,8 +36,7 @@ except ImportError:
 def start_new(repository_path, output_dir=None, export_stream=False):
     """
     Функция комплексного синтеза аудита репозитория.
-    Собирает метрики из различных модулей, обрабатывает исключения при необходимости
-    и возвращает единый аналитический срез.
+    Собирает метрики из различных модулей и возвращает единый аналитический срез.
     """
     result = {
         "synthesis_id": str(uuid.uuid4()),
@@ -47,45 +46,38 @@ def start_new(repository_path, output_dir=None, export_stream=False):
     if output_dir:
         result["output_dir"] = output_dir
 
-    try:
-        # Сканирование репозитория через базовый аудитор
-        if repo_auditor and hasattr(repo_auditor, "scan"):
-            scan_res = repo_auditor.scan(repository_path)
-            if isinstance(scan_res, dict):
-                result.update(scan_res)
+    # Сканирование репозитория через базовый аудитор
+    if repo_auditor and hasattr(repo_auditor, "scan"):
+        scan_res = repo_auditor.scan(repository_path)
+        if isinstance(scan_res, dict):
+            result.update(scan_res)
 
-        # Профилирование производительности
-        if repo_performance_profiler_pipeline:
-            if hasattr(repo_performance_profiler_pipeline, "run_profiler"):
-                perf_res = repo_performance_profiler_pipeline.run_profiler(repository_path)
-                result["performance"] = perf_res
-            elif hasattr(repo_performance_profiler_pipeline, "RepoPerformanceProfilerPipeline"):
-                # На случай интеграционного использования класса
-                pass
+    # Профилирование производительности
+    if repo_performance_profiler_pipeline:
+        if hasattr(repo_performance_profiler_pipeline, "run_profiler"):
+            perf_res = repo_performance_profiler_pipeline.run_profiler(repository_path)
+            result["performance"] = perf_res
+        elif hasattr(repo_performance_profiler_pipeline, "RepoPerformanceProfilerPipeline"):
+            pass
 
-        # Анализ уязвимостей
-        if vulnerability_analyzer and hasattr(vulnerability_analyzer, "analyze"):
-            vuln_res = vulnerability_analyzer.analyze(repository_path)
-            result["vulnerability"] = vuln_res
+    # Анализ уязвимостей
+    if vulnerability_analyzer and hasattr(vulnerability_analyzer, "analyze"):
+        vuln_res = vulnerability_analyzer.analyze(repository_path)
+        result["vulnerability"] = vuln_res
 
-        # Диагностика здоровья репозитория
-        if repo_health_diagnostic and hasattr(repo_health_diagnostic, "diagnose"):
-            health_res = repo_health_diagnostic.diagnose(repository_path)
-            result["health"] = health_res
+    # Диагностика здоровья репозитория
+    if repo_health_diagnostic and hasattr(repo_health_diagnostic, "diagnose"):
+        health_res = repo_health_diagnostic.diagnose(repository_path)
+        result["health"] = health_res
 
-        # Оценка шлюза безопасности (для агрегированных метрик)
-        if repo_security_gateway and hasattr(repo_security_gateway, "evaluate"):
-            # Если у нас есть метрики из сканирования, передадим репозиторий или метрики
-            sec_eval = repo_security_gateway.evaluate(repository_path)
-            result["security_evaluation"] = sec_eval
+    # Оценка шлюза безопасности (для агрегированных метрик)
+    if repo_security_gateway and hasattr(repo_security_gateway, "evaluate"):
+        sec_eval = repo_security_gateway.evaluate(repository_path)
+        result["security_evaluation"] = sec_eval
 
-        # Работа со стримом отчета
-        if export_stream and repo_reporter and hasattr(repo_reporter, "export_stream"):
-            # Поведение для теста со стримом
-            repo_reporter.export_stream()
-
-    except Exception as e:
-        result["error"] = str(e)
+    # Работа со стримом отчета
+    if export_stream and repo_reporter and hasattr(repo_reporter, "export_stream"):
+        repo_reporter.export_stream()
 
     return result
 

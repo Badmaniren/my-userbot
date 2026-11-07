@@ -26,7 +26,14 @@ class RepoAuditCollector:
         }
         
         synthesis = self.synthesizer.synthesize(audit_data)
-        export_path = self.synthesizer.export_report(synthesis, self.output_dir)
+        
+        # Поддержка вызова export_report с разным числом аргументов (в зависимости от реализации синтезатора)
+        import inspect
+        sig = inspect.signature(self.synthesizer.export_report)
+        if len(sig.parameters) >= 2:
+            export_path = self.synthesizer.export_report(synthesis, self.output_dir if self.output_dir else "report.json")
+        else:
+            export_path = self.synthesizer.export_report(synthesis)
         
         return {
             "metrics": metrics,
@@ -47,5 +54,13 @@ class RepoAuditCollector:
     def export_aggregated_report(self, filename="report.json"):
         import os
         data = self.collect_and_aggregate()
-        export_path = os.path.join(self.output_dir if self.output_dir else ".", filename)
-        return self.synthesizer.export_report(data, export_path)
+        target_dir = self.output_dir if self.output_dir else "."
+        
+        import inspect
+        sig = inspect.signature(self.synthesizer.export_report)
+        if len(sig.parameters) >= 2:
+            export_path = self.synthesizer.export_report(data, os.path.join(target_dir, filename))
+        else:
+            export_path = self.synthesizer.export_report(data)
+            
+        return export_path

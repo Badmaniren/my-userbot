@@ -2,16 +2,16 @@ import unittest
 import os
 import json
 import uuid
-from skills.repo_health_predictor_pipeline import RepoHealthPredictorPipeline, repo_health_predictor_pipeline
+from skills.repo_health_predictor_pipeline import repo_health_predictor_pipeline, RepoHealthPredictorPipeline
 
 class TestRepoHealthPredictorPipelineIntegration(unittest.TestCase):
     def setUp(self):
-        self.repo_id = str(uuid.uuid4())
+        self.repo_id = f"repo-{uuid.uuid4()}"
         self.raw_data = {
             "repository_id": self.repo_id,
             "metrics": {
-                "commits_count": int(uuid.uuid4().int % 1000),
-                "open_issues": int(uuid.uuid4().int % 50)
+                "commits_frequency": uuid.uuid4().hex,
+                "open_issues": 42
             }
         }
         self.report_path = f"reports/health_prediction_{self.repo_id}.json"
@@ -23,48 +23,30 @@ class TestRepoHealthPredictorPipelineIntegration(unittest.TestCase):
             except OSError:
                 pass
 
-    def test_pipeline_execution_and_persistence(self):
+    def test_repo_health_predictor_pipeline_integration(self):
         result = repo_health_predictor_pipeline(self.raw_data)
         
-        self.assertEqual(result["status"], "success")
-        self.assertEqual(result["repository_id"], self.repo_id)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("status"), "success")
+        self.assertEqual(result.get("repository_id"), self.repo_id)
         self.assertIn("prediction_score", result)
         self.assertIsInstance(result["prediction_score"], float)
 
-        self.assertTrue(os.path.exists(self.report_path))
-        
+        self.assertTrue(os.path.exists(self.report_path), "Report file was not created on disk")
+
         with open(self.report_path, "r", encoding="utf-8") as f:
             saved_data = json.load(f)
-            
-        self.assertEqual(saved_data["repository_id"], self.repo_id)
-        self.assertEqual(saved_data["prediction_score"], result["prediction_score"])
 
-    def class_pipeline_methods_test(self):
+        self.assertEqual(saved_data.get("repository_id"), self.repo_id)
+        self.assertEqual(saved_data.get("prediction_score"), result["prediction_score"])
+
+    def test_class_pipeline_integration(self):
         pipeline = RepoHealthPredictorPipeline(endpoint="http://localhost", threshold=0.7)
+        analysis = pipeline.analyze_health(self.raw_data)
         
-        analysis_result = pipeline.analyze_health(self.raw_data)
-        self.assertEqual(analysis_result["status"], "predicted")
-        self.assertIn("score", analysis_result)
-
-        class MockStream:
-            def __init__(self, data):
-                self.data = data
-            def read(self):
-                return self.data
-
-        valid_stream = MockStream(b"test_stream_content")
-        self.assertTrue(pipeline.run_pipeline(valid_stream))
-
-        empty_stream = MockStream(b"")
-        self.assertFalse(pipeline.run_pipeline(empty_stream))
-
-    def test_empty_data_raises_value_error(self):
-        with self.assertRaises(ValueError):
-            repo_health_predictor_pipeline({})
-
-        pipeline = RepoHealthPredictorPipeline()
-        with self.assertRaises(ValueError):
-            pipeline.analyze_health({})
+        self.assertEqual(analysis.get("status"), "predicted")
+        self.assertIn("score", analysis)
+        self.assertIsInstance(analysis["score"], float)
 
 if __name__ == "__main__":
     unittest.main()

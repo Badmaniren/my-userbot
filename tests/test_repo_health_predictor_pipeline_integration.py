@@ -1,33 +1,59 @@
 import unittest
-import uuid
-import random
 import os
-from skills.repo_health_predictor_pipeline import repo_health_predictor_pipeline
+import json
+import uuid
+from skills.repo_health_predictor_pipeline import RepoHealthPredictorPipeline, repo_health_predictor_pipeline
 
 class TestRepoHealthPredictorPipelineIntegration(unittest.TestCase):
-    def test_pipeline_execution(self):
-        unique_repo_id = f"repo_{uuid.uuid4().hex[:8]}"
-        metric_threshold = round(random.uniform(0.5, 0.95), 2)
-        
-        input_payload = {
-            "repository_id": unique_repo_id,
-            "historical_window_days": random.randint(30, 365),
-            "confidence_threshold": metric_threshold,
-            "target_environment": "integration_test"
+    def setUp(self):
+        self.repo_id = f"repo-{uuid.uuid4()}"
+        self.raw_data = {
+            "repository_id": self.repo_id,
+            "metrics": {
+                "commits_per_week": uuid.uuid4().int % 100,
+                "open_issues": uuid.uuid4().int % 50
+            }
         }
+        self.pipeline_instance = RepoHealthPredictorPipeline(endpoint="http://localhost/api", threshold=0.7)
 
-        result = repo_health_predictor_pipeline(input_payload)
-
-        self.assertIsInstance(result, dict, "Конвейер должен возвращать словарь с результатами")
-        self.assertIn("status", result, "Результат должен содержать статус выполнения")
-        self.assertEqual(result.get("repository_id"), unique_repo_id, "Идентификатор репозитория должен совпадать с переданным")
-        self.assertIn("prediction_score", result, "В результате должен присутствовать прогнозируемый показатель здоровья")
-        self.assertIsInstance(result["prediction_score"], float, "Показатель прогноза должен быть числом с плавающей точкой")
-        
-        report_path = f"reports/health_prediction_{unique_repo_id}.json"
+    def tearDown(self):
+        report_path = f"reports/health_prediction_{self.repo_id}.json"
         if os.path.exists(report_path):
-            self.assertTrue(os.path.isfile(report_path), "Артефакт отчета должен быть файлом")
             os.remove(report_path)
+
+    def test_repo_health_predictor_functional_and_file_generation(self):
+        result = repo_health_predictor_pipeline(self.raw_data)
+        
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["repository_id"], self.repo_id)
+        self.assertIn("prediction_score", result)
+        self.assertIsInstance(result["prediction_score"], float)
+
+        report_path = f"reports/health_prediction_{self.repo_id}.json"
+        self.assertTrue(os.path.exists(report_path), "Integration error: report file was not created on disk.")
+
+        with open(report_path, "r", encoding="utf-8") as f:
+            file_data = json.load(f)
+
+        self.assertEqual(file_data["repository_id"], self.repo_id)
+        self.assertEqual(file_data["prediction_score"], result["prediction_score"])
+
+    def test_class_based_pipeline_methods(self):
+        analysis_res = self.pipeline_instance.analyze_health(self.raw_data)
+        self.assertEqual(analysis_res["status"], "predicted")
+        self.assertIn("score", analysis_res)
+
+        from io import StringIO
+        stream = StringIO("some historical metrics stream content")
+        stream_res = self.pipeline_instance.run_pipeline(stream)
+        self.assertTrue(stream_res)
+
+    def test_empty_data_raises_value_error(self):
+        with self.assertRaises(ValueError):
+            repo_health_predictor_pipeline({})
+
+        with self.assertRaises(ValueError):
+            self.pipeline_instance.analyze_health({})
 
 if __name__ == "__main__":
     unittest.main()

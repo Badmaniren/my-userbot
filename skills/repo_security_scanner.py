@@ -1,9 +1,17 @@
 import json
 import requests
 
-from skills.repo_auditor import repo_auditor
+try:
+    from skills.repo_auditor import repo_auditor
+except ImportError:
+    repo_auditor = None
+
 from skills.vulnerability_analyzer import vulnerability_analyzer
-from skills.repo_reporter import repo_reporter
+
+try:
+    from skills.repo_reporter import repo_reporter
+except ImportError:
+    repo_reporter = None
 
 
 def start_new(repo_url, api_token=None, output_path=None):

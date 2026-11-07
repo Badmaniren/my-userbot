@@ -3,8 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ncy_audit_guardian (compose) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+x (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: AssertionError: '' == '' : RepoMonitor не зафиксировал изменений после аудита
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -279,3 +278,6 @@ ncy_audit_guardian (compose) — раундов: 4
 ## repo_audit_pipeline (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_audit_aggregator_pipeline (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

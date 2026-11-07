@@ -4,7 +4,7 @@ from skills.repo_health_restorer import RepoHealthRestorer
 class RepoHealthAutomator:
     def __init__(self, repo_path: str):
         self.repo_path = repo_path
-        self.diagnostic = RepoHealthDiagnostic()
+        self.diagnostic = RepoHealthDiagnostic(repo_path)
         self.restorer = RepoHealthRestorer(repo_path)
 
     def automate_health_and_maintenance(self) -> dict:
@@ -19,10 +19,10 @@ class RepoHealthAutomator:
         }
 
     def process_stream_and_automate(self, stream) -> dict:
-        _ = stream.read()
+        stream_data = stream.read()
         
         monitor_status = self.diagnostic.run_full_diagnostic(self.repo_path)
-        health_audit = self.restorer.comprehensive_health_restoration()
+        health_audit = self.restorer.comprehensive_health_restoration(stream_data)
         preventive_maintenance = {"status": "ok"}
 
         return {

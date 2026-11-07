@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-еред фиксом: AssertionError: '' == '' : RepoMonitor не зафиксировал изменений после аудита
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## dependency_audit_validator (create) — раундов: 4
+ndency_audit_validator (create) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -286,3 +283,7 @@
 
 ## repo_reporter (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## repo_health_predictor (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

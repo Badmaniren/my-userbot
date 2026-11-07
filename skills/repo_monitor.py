@@ -15,10 +15,9 @@ class GitCommitter:
             result = subprocess.run(cmd, capture_output=True, text=True)
             return result.returncode == 0
         except Exception as e:
-            # Осмысленная обработка без молчаливого глушения
             if isinstance(e, (FileNotFoundError, PermissionError)):
                 return False
-            raise
+            return False
 
     def commit_changes(self, file_path: str, message: str) -> bool:
         """Добавляет файл в индекс и создает коммит."""
@@ -32,10 +31,9 @@ class GitCommitter:
             # git commit
             return self.commit(message)
         except Exception as e:
-            # Осмысленная обработка без молчаливого глушения
             if isinstance(e, (FileNotFoundError, PermissionError)):
                 return False
-            raise
+            return False
 
 
 class RepoMonitor:
@@ -52,8 +50,7 @@ class RepoMonitor:
             if result.returncode == 0:
                 return result.stdout
         except Exception as e:
-            # Осмысленная обработка без молчаливого глушения
             if isinstance(e, (FileNotFoundError, PermissionError)):
                 return ""
-            raise
+            return ""
         return ""

@@ -1,8 +1,8 @@
 import unittest
 import json
-import tempfile
 import os
-from unittest.mock import MagicMock
+import tempfile
+from unittest.mock import patch
 
 from vulnerability_analyzer import VulnerabilityAnalyzer
 from vulnerability_patcher import VulnerabilityPatchEngine
@@ -11,89 +11,95 @@ from vulnerability_security_gate import VulnerabilitySecurityGate
 from vulnerability_publisher_hub import VulnerabilityPublisherHub
 
 
-class TestVulnerabilityPatchingPipeline(unittest.TestCase):
+class TestVulnerabilityPatchingPipelineRealExecution(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.TemporaryDirectory()
-        self.report_path = os.path.join(self.test_dir.name, "vulnerability_report.json")
-        
-        # Создаем реалистичные входные данные: уязвимости в зависимостях
-        self.raw_vuln_data = {
-            "target": "repo-core-service",
-            "scanned_at": "2023-10-25T10:00:00Z",
+        self.vuln_db_path = os.path.join(self.test_dir.name, "vulnerabilities.json")
+        self.audit_log_path = os.path.join(self.test_dir.name, "audit_results.json")
+        self.report_path = os.path.join(self.test_dir.name, "security_report.json")
+
+        self.raw_vulnerability_data = {
+            "target_repo": "ung-core-service",
+            "scan_timestamp": "2023-10-25T10:00:00Z",
             "vulnerabilities": [
                 {
-                    "id": "CVE-2023-1111",
-                    "package": "requests",
-                    "current_version": "2.28.1",
-                    "fixed_version": "2.31.0",
-                    "severity": "HIGH",
-                    "description": "Remote Code Execution via crafted header"
+                    "id": "CVE-2023-38545",
+                    "package": "curl",
+                    "current_version": "7.88.0",
+                    "fixed_version": "7.88.1",
+                    "severity": "CRITICAL",
+                    "description": "Heap-based buffer overflow in SOCKS5 proxy handshake"
                 },
                 {
-                    "id": "CVE-2023-2222",
-                    "package": "urllib3",
-                    "current_version": "1.26.14",
-                    "fixed_version": "1.26.15",
-                    "severity": "MEDIUM",
-                    "description": "Proxy-Authorization header leak"
+                    "id": "CVE-2023-44487",
+                    "package": "hyper",
+                    "current_version": "0.14.26",
+                    "fixed_version": "0.14.28",
+                    "severity": "HIGH",
+                    "description": "HTTP/2 Rapid Reset Attack"
                 }
             ]
         }
-        
-        with open(self.report_path, "w", encoding="utf-8") as f:
-            json.dump(self.raw_vuln_data, f, indent=2)
+
+        with open(self.vuln_db_path, "w", encoding="utf-8") as f:
+            json.dump(self.raw_vulnerability_data, f, indent=2)
 
     def tearDown(self):
         self.test_dir.cleanup()
 
-    def test_end_to_end_patching_pipeline(self):
-        print("\n=== НАЧАЛО ПРАКТИЧЕСКОЙ ПРОВЕРКИ ЭПИКА ===")
-        print(f"1. Загрузка файла уязвимостей: {self.report_path}")
+    def test_complete_vulnerability_patching_pipeline(self):
+        print("\n=== НАЧАЛО ПРАКТИЧЕСКОЙ ПРОВЕРКИ ЭПИКА: КОНВЕЙЕР ПАТЧИНГА УЯЗВИМОСТЕЙ ===")
         
-        with open(self.report_path, "r", encoding="utf-8") as f:
-            loaded_data = json.load(f)
-            
-        print(f"Обнаружено уязвимостей в отчете: {len(loaded_data['vulnerabilities'])}")
-        for v in loaded_data['vulnerabilities']:
-            print(f" - [{v['severity']}] {v['package']} ({v['current_version']} -> {v['fixed_version']}): {v['id']}")
-
         # Шаг 1: Анализ уязвимостей
-        analyzer = VulnerabilityAnalyzer()
-        analysis_result = analyzer.analyze(loaded_data)
-        print(f"\n[Шаг 1: vulnerability_analyzer] Анализ завершен. Статус: {analysis_result.get('status', 'OK')}")
+        analyzer = VulnerabilityAnalyzer(vulnerability_source=self.vuln_db_path)
+        analyzed_report = analyzer.run_analysis()
+        
+        print(f"[1] Анализ завершен. Обнаружено уязвимостей: {len(analyzed_report['vulnerabilities'])}")
+        for vuln in analyzed_report['vulnerabilities']:
+            print(f"    - [{vuln['severity']}] {vuln['id']}: пакет {vuln['package']} ({vuln['current_version']} -> {vuln['fixed_version']})")
+        
+        self.assertGreater(len(analyzed_report['vulnerabilities']), 0, "Анализатор должен найти уязвимости")
 
-        # Шаг 2: Патчинг зависимостей
+        # Шаг 2: Автоматический патчинг зависимостей
         patcher = VulnerabilityPatchEngine()
-        patch_result = patcher.apply_patches(analysis_result)
-        print(f"[Шаг 2: vulnerability_patcher] Применено патчей: {len(patch_result.get('patched_packages', []))}")
-        for p in patch_result.get('patched_packages', ['requests', 'urllib3']):
-            print(f"   Успешно обновлен пакет: {p}")
+        patch_result = patcher.apply_patches(analyzed_report)
+        
+        print(f"[2] Патчинг зависимостей выполнен. Статус: {patch_result['status']}")
+        print(f"    - Успешно пропатчено пакетов: {len(patch_result['patched_packages'])}")
+        self.assertEqual(patch_result['status'], "SUCCESS", "Патчинг должен завершиться успешно")
 
-        # Шаг 3: Интеграционный аудит безопасности после патча
-        audit_bridge = VulnerabilityAuditBridge()
-        audit_result = audit_bridge.verify_environment(patch_result)
-        print(f"[Шаг 3: vulnerability_audit_bridge] Аудит среды после патча пройден: {audit_result.get('passed', True)}")
+        # Шаг 3: Интеграционная проверка безопасности после патчинга
+        audit_bridge = VulnerabilityAuditBridge(output_path=self.audit_log_path)
+        audit_result = audit_bridge.verify_patched_state(patch_result)
+        
+        print(f"[3] Интеграционный аудит пройден. Ошибок безопасности после патча: {audit_result['remaining_vulnerabilities_count']}")
+        print(f"    - Лог аудита сохранен в: {self.audit_log_path}")
+        self.assertEqual(audit_result['remaining_vulnerabilities_count'], 0, "После патчинга не должно остаться целевых уязвимостей")
 
         # Шаг 4: Финальный шлюз безопасности
-        security_gate = VulnerabilitySecurityGate()
+        security_gate = VulnerabilitySecurityGate(threshold="HIGH")
         gate_decision = security_gate.evaluate(audit_result)
-        print(f"[Шаг 4: vulnerability_security_gate] Решение шлюза безопасности: {gate_decision.get('action', 'APPROVE_MERGE')}")
-
-        # Шаг 5: Публикация отчетов и уведомлений
-        publisher_hub = VulnerabilityPublisherHub()
-        publication_receipt = publisher_hub.publish(gate_decision)
-        print(f"[Шаг 5: vulnerability_publisher_hub] Отчет опубликован. ID рассылки: {publication_receipt.get('receipt_id', 'PUB-998877')}")
         
-        print("=== КОНЕЦ ПРАКТИЧЕСКОЙ ПРОВЕРКИ ЭПИКА ===\n")
+        print(f"[4] Шлюз безопасности (Security Gate): {'ПРОЙДЕН' if gate_decision['passed'] else 'ЗАБЛОКИРОВАН'}")
+        print(f"    - Уровень риска: {gate_decision['risk_level']}")
+        self.assertTrue(gate_decision['passed'], "Шлюз безопасности должен пропустить репозиторий после устранения уязвимостей")
 
-        # Проверки целостности конвейера
-        self.assertTrue(len(loaded_data['vulnerabilities']) > 0)
-        self.assertEqual(loaded_data['target'], "repo-core-service")
-        self.assertIsNotNone(analysis_result)
-        self.assertIsNotNone(patch_result)
-        self.assertIsNotNone(audit_result)
-        self.assertIsNotNone(gate_decision)
-        self.assertIsNotNone(publication_receipt)
+        # Шаг 5: Публикация отчетов и оповещений
+        publisher = VulnerabilityPublisherHub(report_destination=self.report_path)
+        publish_result = publisher.publish(gate_decision, patch_result)
+        
+        print(f"[5] Конвейер публикации отчетов завершен.")
+        print(f"    - Отчет опубликован по пути: {publish_result['destination']}")
+        print(f"    - Уведомления отправлены в каналы интеграции: {publish_result['notifications_sent']}")
+
+        self.assertTrue(os.path.exists(self.report_path), "Файл финального отчета должен быть создан")
+        
+        with open(self.report_path, "r", encoding="utf-8") as rf:
+            saved_report = json.load(rf)
+            print(f"    - Проверка содержимого файла отчета: статус конвейера = {saved_report.get('pipeline_status')}")
+            self.assertEqual(saved_report.get('pipeline_status'), "COMPLETED")
+
+        print("=== КОНЕЦ ПРАКТИЧЕСКОЙ ПРОВЕРКИ: ВСЕ МОДУЛИ ОТРАБОТАЛИ НА РЕАЛЬНЫХ ДАННЫХ ===\n")
 
 
 if __name__ == "__main__":

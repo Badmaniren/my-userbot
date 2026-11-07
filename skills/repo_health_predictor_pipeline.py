@@ -1,7 +1,7 @@
 import os
 import random
 import json
-from typing import Any, Dict, IO
+from typing import Any, Dict
 
 
 class RepoHealthPredictorPipeline:

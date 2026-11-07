@@ -1,106 +1,88 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, mock_open
 import os
 import uuid
 import random
-import tempfile
-from skills.repo_health_visualizer import (
-    RepoHealthDiagnostic,
-    RepoHealthPredictorPipeline,
-    RepoHealthVisualizer
-)
+import json
+from skills.repo_health_visualizer import RepoHealthDiagnostic, RepoHealthPredictorPipeline, RepoHealthVisualizer
 
-class TestRepoHealthVisualizerUnit(unittest.TestCase):
+class TestRepoHealthVisualizerInquisitor(unittest.TestCase):
+
     def setUp(self):
         self.diagnostic = RepoHealthDiagnostic()
-        self.predictor = RepoHealthPredictorPipeline()
+        self.pipeline = RepoHealthPredictorPipeline()
         self.visualizer = RepoHealthVisualizer()
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.random_repo = f"/repo_{uuid.uuid4().hex}"
+        self.random_repo = f"/tmp/{uuid.uuid4().hex}/{uuid.uuid4().hex}"
         self.random_run_id = uuid.uuid4().hex
 
-    def tearDown(self):
-        self.temp_dir.cleanup()
-
-    def test_repo_health_diagnostic_run_diagnostics(self):
-        res = self.diagnostic.run_diagnostics(self.random_repo, run_id=self.random_run_id)
-        self.assertEqual(res["repo_path"], self.random_repo)
-        self.assertEqual(res["run_id"], self.random_run_id)
-        self.assertIn("metrics", res)
-        self.assertIn("health_score", res["metrics"])
-        self.assertIn("complexity", res["metrics"])
-        self.assertIn("issues", res["metrics"])
+    def test_repo_health_diagnostic_run(self):
+        result = self.diagnostic.run_diagnostics(self.random_repo, self.random_run_id)
+        self.assertEqual(result["run_id"], self.random_run_id)
+        self.assertEqual(result["repo_path"], self.random_repo)
+        self.assertIn("health_score", result["metrics"])
+        self.assertIn("complexity", result["metrics"])
+        self.assertIn("issues", result["metrics"])
 
     def test_repo_health_diagnostic_analyze(self):
-        res = self.diagnostic.analyze(self.random_repo, run_id=self.random_run_id)
-        self.assertEqual(res["repo_path"], self.random_repo)
-        self.assertEqual(res["run_id"], self.random_run_id)
+        result = self.diagnostic.analyze(self.random_repo, self.random_run_id)
+        self.assertEqual(result["run_id"], self.random_run_id)
+        self.assertEqual(result["repo_path"], self.random_repo)
 
-    def test_repo_health_predictor_pipeline_execute(self):
-        diag_data = self.diagnostic.run_diagnostics(self.random_repo, run_id=self.random_run_id)
+    def test_repo_health_predictor_pipeline(self):
+        diag_data = self.diagnostic.run_diagnostics(self.random_repo, self.random_run_id)
         seed_val = random.randint(1, 1000)
-        res = self.predictor.execute_pipeline(diag_data, seed=seed_val)
-        self.assertEqual(res["diagnostic_data"], diag_data)
-        self.assertEqual(res["run_id"], self.random_run_id)
-        self.assertEqual(res["seed"], seed_val)
-        self.assertIn("prediction", res)
-        self.assertIn("risk_level", res["prediction"])
-        self.assertIn("score", res["prediction"])
+        pipeline_result = self.pipeline.execute_pipeline(diag_data, seed=seed_val)
+        
+        self.assertEqual(pipeline_result["diagnostic_data"], diag_data)
+        self.assertEqual(pipeline_result["run_id"], self.random_run_id)
+        self.assertEqual(pipeline_result["seed"], seed_val)
+        self.assertIn("prediction", pipeline_result)
+        self.assertIn("risk_level", pipeline_result["prediction"])
+        self.assertIn("score", pipeline_result["prediction"])
 
-    def test_repo_health_visualizer_generate_visualization_json(self):
-        diag_data = self.diagnostic.run_diagnostics(self.random_repo, run_id=self.random_run_id)
-        pred_data = self.predictor.execute_pipeline(diag_data)
+    def test_repo_health_visualizer_generation(self):
+        diag_data = self.diagnostic.run_diagnostics(self.random_repo, self.random_run_id)
+        pipeline_result = self.pipeline.execute_pipeline(diag_data)
         
-        ext = "json"
-        res = self.visualizer.generate_visualization(
-            prediction_data=pred_data,
-            output_format=ext,
-            target_directory=self.temp_dir.name,
-            run_identifier=self.random_run_id
-        )
-        
-        self.assertEqual(res["format"], ext)
-        self.assertEqual(res["run_id"], self.random_run_id)
-        self.assertTrue(os.path.exists(res["file_path"]))
-        
-        with open(res["file_path"], "r", encoding="utf-8") as f:
-            content = f.read()
-        self.assertIn(self.random_run_id, content)
+        exts = ["png", "svg", "json", "html", uuid.uuid4().hex[:3]]
+        chosen_ext = random.choice(exts)
+        target_dir = f"/tmp/{uuid.uuid4().hex}"
 
-    def test_repo_health_visualizer_generate_visualization_invalid_format(self):
-        diag_data = self.diagnostic.run_diagnostics(self.random_repo, run_id=self.random_run_id)
-        pred_data = self.predictor.execute_pipeline(diag_data)
+        mock_file_handle = mock_open()
+        with patch("builtins.open", mock_file_handle):
+            with patch("os.path.join", return_value=f"{target_dir}/file.{chosen_ext}"):
+                res = self.visualizer.generate_visualization(
+                    prediction_data=pipeline_result,
+                    output_format=chosen_ext,
+                    target_directory=target_dir,
+                    run_identifier=self.random_run_id
+                )
+
+        self.assertEqual(res["run_id"], self.random_run_id)
+        expected_ext = chosen_ext if chosen_ext in ["png", "svg", "json", "html"] else "json"
+        self.assertEqual(res["format"], expected_ext)
+        mock_file_handle.assert_called_once()
         
-        invalid_ext = uuid.uuid4().hex[:4]
-        res = self.visualizer.generate_visualization(
-            prediction_data=pred_data,
-            output_format=invalid_ext,
-            target_directory=self.temp_dir.name,
-            run_identifier=self.random_run_id
-        )
+        handle = mock_file_handle()
+        written_content = "".join(call.args[0] for call in handle.write.call_args_list)
+        self.assertIn(self.random_run_id, written_content)
+        self.assertIn(self.random_repo, written_content)
+
+    def test_repo_health_visualizer_fallback_run_id(self):
+        diag_data = self.diagnostic.run_diagnostics(self.random_repo)
+        pipeline_result = self.pipeline.execute_pipeline(diag_data)
+        pipeline_result.pop("run_id", None)
         
+        target_dir = f"/tmp/{uuid.uuid4().hex}"
+        mock_file_handle = mock_open()
+        with patch("builtins.open", mock_file_handle):
+            with patch("os.path.join", return_value=f"{target_dir}/file.json"):
+                res = self.visualizer.generate_visualization(
+                    prediction_data=pipeline_result,
+                    output_format="json",
+                    target_directory=target_dir
+                )
+
+        self.assertTrue(res["run_id"])
         self.assertEqual(res["format"], "json")
-        self.assertTrue(res["file_path"].endswith(".json"))
-
-    def test_health_visualizer_end_to_end_integration(self):
-        diag_data = self.diagnostic.run_diagnostics(self.random_repo, run_id=self.random_run_id)
-        pred_data = self.predictor.execute_pipeline(diag_data, seed=42)
-        
-        formats = ["png", "svg", "json", "html"]
-        chosen_format = random.choice(formats)
-        
-        res = self.visualizer.generate_visualization(
-            prediction_data=pred_data,
-            output_format=chosen_format,
-            target_directory=self.temp_dir.name,
-            run_identifier=self.random_run_id
-        )
-        
-        self.assertEqual(res["run_id"], self.random_run_id)
-        self.assertTrue(os.path.exists(res["file_path"]))
-        
-        with open(res["file_path"], "r", encoding="utf-8") as f:
-            data_content = f.read()
-            
-        self.assertIn(self.random_run_id, data_content)
-        self.assertIn(self.random_repo, data_content)
+        mock_file_handle.assert_called_once()

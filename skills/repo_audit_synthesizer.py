@@ -46,7 +46,7 @@ def start_new(repository_path, output_dir=None, export_stream=False):
     if output_dir:
         result["output_dir"] = output_dir
 
-    # Сканирование репозитория через базовый аудитор
+    # Сканирование репозитория через базовый аудитор (исключения не перехватываем, если тест ожидает их падение)
     if repo_auditor and hasattr(repo_auditor, "scan"):
         scan_res = repo_auditor.scan(repository_path)
         if isinstance(scan_res, dict):

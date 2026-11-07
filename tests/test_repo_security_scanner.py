@@ -1,79 +1,117 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, mock_open
+import json
 import uuid
 import random
-import string
-import io
 import requests
+import io
+
 from skills.repo_security_scanner import start_new
 
-class TestRepoSecurityScanner(unittest.TestCase):
 
-    def test_start_new_success_flow(self):
-        rand_repo = f"https://github.com/secure/{uuid.uuid4().hex}"
-        rand_token = f"tok_{uuid.uuid4().hex}"
-        rand_output = f"/tmp/{uuid.uuid4().hex}.json"
-        rand_severity = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
-        rand_vuln_id = f"CVE-{random.randint(1000, 9999)}-{random.randint(10000, 99999)}"
+class TestRepoSecurityScannerStartNew(unittest.TestCase):
 
-        mock_response_data = {
-            "status": "success",
-            "repository": rand_repo,
-            "vulnerabilities": [
-                {
-                    "id": rand_vuln_id,
-                    "severity": rand_severity,
-                    "description": ''.join(random.choices(string.ascii_letters + string.space, k=30))
-                }
-            ],
-            "score": random.randint(0, 100)
-        }
+    def test_start_new_success_without_token(self):
+        rand_url = f"https://api.github.com/v{random.randint(1,9)}/{uuid.uuid4().hex}"
+        rand_key = uuid.uuid4().hex
+        rand_val = uuid.uuid4().hex
+        mock_response_data = {rand_key: rand_val}
 
-        with patch('requests.post') as mock_post:
-            mock_resp = MagicMock()
+        with patch("requests.post") as mock_post:
+            mock_resp = mock_post.return_value
             mock_resp.status_code = 200
             mock_resp.json.return_value = mock_response_data
-            mock_resp.iter_content.return_value = [json.dumps(mock_response_data).encode('utf-8')]
-            mock_post.return_value = mock_resp
 
-            result = start_new(repo_url=rand_repo, api_token=rand_token, output_path=rand_output)
+            result = start_new(repo_url=rand_url)
 
-            self.assertIsInstance(result, dict)
-            self.assertEqual(result.get("repository"), rand_repo)
-            self.assertIn("vulnerabilities", result)
-            
-            vulns = result["vulnerabilities"]
-            self.assertTrue(len(vulns) > 0)
-            self.assertEqual(vulns[0]["id"], rand_vuln_id)
-            self.assertEqual(vulns[0]["severity"], rand_severity)
-            mock_post.assert_called_once()
+            mock_post.assert_called_once_with(
+                "https://api.github.com/v1/security/scan",
+                json={"repository": rand_url},
+                headers={},
+                timeout=30
+            )
+            self.assertEqual(result, mock_response_data)
 
-    def test_start_new_network_failure(self):
-        rand_repo = f"git://internal.host/{uuid.uuid4().hex}.git"
+    def test_start_new_success_with_token_and_output(self):
+        rand_url = f"https://api.github.com/repo/{uuid.uuid4().hex}"
         rand_token = uuid.uuid4().hex
+        rand_path = f"/tmp/{uuid.uuid4().hex}.json"
+        rand_key = uuid.uuid4().hex
+        rand_val = uuid.uuid4().hex
+        mock_response_data = {rand_key: rand_val}
 
-        with patch('requests.post', side_effect=requests.exceptions.ConnectionError("Connection lost")):
-            with self.assertRaises(Exception) as context:
-                start_new(repo_url=rand_repo, api_token=rand_token)
-            
-            self.assertTrue(len(str(context.exception)) > 0)
+        with patch("requests.post") as mock_post, patch("builtins.open", new_callable=mock_open()) as mock_file:
+            mock_resp = mock_post.return_value
+            mock_resp.status_code = 201
+            mock_resp.json.return_value = mock_response_data
 
-    def test_start_new_malformed_response_handling(self):
-        rand_repo = f"repo_{uuid.uuid4().hex}"
-        rand_garbage = bytes(''.join(random.choices(string.printable, k=50)), 'utf-8')
+            result = start_new(repo_url=rand_url, api_token=rand_token, output_path=rand_path)
 
-        with patch('requests.post') as mock_post:
-            mock_resp = MagicMock()
-            mock_resp.status_code = 500
-            mock_resp.raw = io.BytesIO(rand_garbage)
-            mock_resp.json.side_effect = ValueError("Invalid JSON")
-            mock_post.return_value = mock_resp
+            mock_post.assert_called_once_with(
+                "https://api.github.com/v1/security/scan",
+                json={"repository": rand_url},
+                headers={"Authorization": f"Bearer {rand_token}"},
+                timeout=30
+            )
+            mock_file.assert_called_once_with(rand_path, "w", encoding="utf-8")
+            handle = mock_file()
+            handle.write.assert_called()
+            self.assertEqual(result, mock_response_data)
 
-            result = start_new(repo_url=rand_repo)
+    def test_start_new_invalid_json(self):
+        rand_url = f"https://api.github.com/repo/{uuid.uuid4().hex}"
+        rand_status = random.choice([200, 201, 400, 500])
 
-            self.assertIsInstance(result, dict)
-            self.assertIn("error", result)
-            self.assertEqual(result.get("status_code"), 500)
+        with patch("requests.post") as mock_post:
+            mock_resp = mock_post.return_value
+            mock_resp.status_code = rand_status
+            mock_resp.json.side_effect = json.JSONDecodeError("Expecting value", "", 0)
 
-if __name__ == '__main__':
+            result = start_new(repo_url=rand_url)
+
+            self.assertEqual(result, {
+                "error": "Invalid JSON response",
+                "status_code": rand_status
+            })
+
+    def test_start_new_request_failed(self):
+        rand_url = f"https://api.github.com/repo/{uuid.uuid4().hex}"
+        rand_status = random.randint(400, 599)
+        rand_key = uuid.uuid4().hex
+        rand_val = uuid.uuid4().hex
+        err_data = {rand_key: rand_val}
+
+        with patch("requests.post") as mock_post:
+            mock_resp = mock_post.return_value
+            mock_resp.status_code = rand_status
+            mock_resp.json.return_value = err_data
+
+            result = start_new(repo_url=rand_url)
+
+            self.assertEqual(result, {
+                "error": "Request failed",
+                "status_code": rand_status,
+                "data": err_data
+            })
+
+    def test_start_new_connection_error(self):
+        rand_url = f"https://api.github.com/repo/{uuid.uuid4().hex}"
+        rand_msg = uuid.uuid4().hex
+
+        with patch("requests.post", side_effect=requests.exceptions.ConnectionError(rand_msg)):
+            with self.assertRaises(Exception) as ctx:
+                start_new(repo_url=rand_url)
+            self.assertIn(f"Connection error: {rand_msg}", str(ctx.exception))
+
+    def test_start_new_request_exception(self):
+        rand_url = f"https://api.github.com/repo/{uuid.uuid4().hex}"
+        rand_msg = uuid.uuid4().hex
+
+        with patch("requests.post", side_effect=requests.exceptions.RequestException(rand_msg)):
+            with self.assertRaises(Exception) as ctx:
+                start_new(repo_url=rand_url)
+            self.assertIn(f"Network error: {rand_msg}", str(ctx.exception))
+
+
+if __name__ == "__main__":
     unittest.main()

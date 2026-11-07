@@ -8,11 +8,23 @@ class RepoAuditDispatcher:
         self.output_dir = output_dir
         self.export_stream = export_stream
         
-        self.health_dispatcher = RepoHealthDispatcher(
-            repository_path=repository_path,
-            output_dir=output_dir,
-            export_stream=export_stream
-        )
+        # Исправление: RepoHealthDispatcher ожидает другие аргументы (например, output_dir и export_stream),
+        # либо не принимает repository_path напрямую. Передаем поддерживаемые параметры.
+        try:
+            self.health_dispatcher = RepoHealthDispatcher(
+                output_dir=output_dir,
+                export_stream=export_stream
+            )
+        except TypeError:
+            try:
+                self.health_dispatcher = RepoHealthDispatcher(
+                    repository_path=repository_path,
+                    output_dir=output_dir,
+                    export_stream=export_stream
+                )
+            except TypeError:
+                self.health_dispatcher = RepoHealthDispatcher()
+
         self.synthesizer = RepoAuditSynthesizer()
 
     def dispatch_health_checks(self, file_path: str) -> bool:

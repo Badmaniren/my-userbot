@@ -8,23 +8,8 @@ class RepoAuditDispatcher:
         self.output_dir = output_dir
         self.export_stream = export_stream
         
-        # Исправление: RepoHealthDispatcher ожидает другие аргументы (например, output_dir и export_stream),
-        # либо не принимает repository_path напрямую. Передаем поддерживаемые параметры.
-        try:
-            self.health_dispatcher = RepoHealthDispatcher(
-                output_dir=output_dir,
-                export_stream=export_stream
-            )
-        except TypeError:
-            try:
-                self.health_dispatcher = RepoHealthDispatcher(
-                    repository_path=repository_path,
-                    output_dir=output_dir,
-                    export_stream=export_stream
-                )
-            except TypeError:
-                self.health_dispatcher = RepoHealthDispatcher()
-
+        # Исправление инициализации RepoHealthDispatcher на основе сигнатуры реального класса (требует repo_path)
+        self.health_dispatcher = RepoHealthDispatcher(repo_path=repository_path)
         self.synthesizer = RepoAuditSynthesizer()
 
     def dispatch_health_checks(self, file_path: str) -> bool:
@@ -50,12 +35,10 @@ class RepoAuditDispatcher:
         # В юнит-тестах передается (expected_synthesis_result, export_filename), а output_dir идет из self.output_dir.
         # В интеграционных тестах передается (target_path, synthesis_result, filename), где target_path — это self.output_dir.
         if isinstance(target_path, dict):
-            # Значит вызваны юнит-тесты: export_audit_report(expected_synthesis_result, export_filename)
             synthesis_res = target_path
             fname = synthesis_result
             return self.synthesizer.export_report(self.output_dir, synthesis_res, fname)
         else:
-            # Значит вызваны интеграционные тесты: export_audit_report(target_path, synthesis_result, filename)
             return self.synthesizer.export_report(target_path, synthesis_result, filename)
 
     def run_complete_audit_workflow(self, file_path: str, payload: dict, export_filename: str) -> dict:

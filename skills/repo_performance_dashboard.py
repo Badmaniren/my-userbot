@@ -1,4 +1,5 @@
 import os
+import io
 from skills.repo_reporter import RepoReporter
 from skills.repo_performance_optimizer import RepoPerformanceOptimizer
 
@@ -64,6 +65,9 @@ class RepoPerformanceDashboard:
 
     def process_performance_stream(self, stream_data: dict):
         """Передает данные потока производительности в оптимизатор и запускает рутину."""
+        if isinstance(stream_data, dict) and "metric" in stream_data and "value" in stream_data:
+            # Превращаем в формат, совместимый со стримом логов (если требуется), либо передаем как есть
+            pass
         self.optimizer.process_performance_stream(stream_data)
         self.optimizer.run_performance_routine()
 
@@ -79,10 +83,23 @@ class RepoPerformanceDashboard:
 
     def handle_dashboard_stream(self, stream_data: dict) -> dict:
         """Обрабатывает поток данных для интеграционного теста панели мониторинга."""
+        # Адаптируем словарь, если вложенные компоненты ожидают файл-подобный объект (например, .read())
+        adapted_stream = stream_data
+        if isinstance(stream_data, dict):
+            # Создаем обертку на случай, если логгер ожидает поток с методом read()
+            class DictStream(io.StringIO):
+                def __init__(self, data_dict):
+                    import json
+                    super().__init__(json.dumps(data_dict))
+            adapted_stream = DictStream(stream_data)
+
         if hasattr(self.optimizer, "handle_stream"):
-            return self.optimizer.handle_stream(stream_data)
+            return self.optimizer.handle_stream(adapted_stream)
         elif hasattr(self.optimizer, "process_performance_stream"):
-            self.optimizer.process_performance_stream(stream_data)
+            try:
+                self.optimizer.process_performance_stream(adapted_stream)
+            except AttributeError:
+                self.optimizer.process_performance_stream(stream_data)
             return {"status": "PROCESSED", "data": stream_data}
         return {"status": "SUCCESS", "data": stream_data}
 

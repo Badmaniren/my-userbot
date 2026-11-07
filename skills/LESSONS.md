@@ -3,8 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-osed (<unknown>, line 53)
-- Последняя ошибка перед фиксом: ImportError: Failed to import test module: tests.test_dependency_audit_exporter_integration
+.test_dependency_audit_exporter_integration
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## dependency_audit_gateway (compose) — раундов: 4
@@ -267,3 +266,6 @@ osed (<unknown>, line 53)
 - Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.; АНТИЧИТ: Запрещено создавать классы или функции-заглушки внутри `except`! Импортируй честно.
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_performance_profiler_pipeline (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

@@ -5,6 +5,10 @@ import time
 import pathlib
 from typing import Dict, Any, Optional
 
+from skills.repo_health_diagnostic import RepoHealthDiagnostic
+from skills.repo_health_predictor_pipeline import RepoHealthPredictorPipeline
+
+
 def start_new(
     health_data: Dict[str, Any],
     predictions: Dict[str, Any],
@@ -31,7 +35,6 @@ def start_new(
             json.dump(data, f, ensure_ascii=False, indent=2)
 
     elif export_format == "csv":
-        # Используем newline='' для корректной записи CSV
         with open(output_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow(["Category", "Key", "Value"])

@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-D (failures=1)
-- Статус: успешно прошёл тесты и влит в main
-
-## dependency_audit_exporter (compose) — раундов: 4
+ндов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=3)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -266,4 +263,7 @@ D (failures=1)
 
 ## vulnerability_security_automator (compose) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## vulnerability_predictor_pipeline (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

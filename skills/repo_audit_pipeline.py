@@ -34,8 +34,7 @@ class RepoAuditPipeline:
         return synthesis_result
 
     def process_stream(self, stream):
-        if self.export_stream is None:
-            self.export_stream = stream
+        self.export_stream = stream
 
 def run_audit_pipeline(repository_path, output_dir=None, export_stream=None):
     pipeline = RepoAuditPipeline(

@@ -4,7 +4,7 @@ from skills.repo_health_restorer import RepoHealthRestorer
 class RepoHealthAutomator:
     def __init__(self, repo_path: str):
         self.repo_path = repo_path
-        self.diagnostic = RepoHealthDiagnostic(repo_path)
+        self.diagnostic = RepoHealthDiagnostic()
         self.restorer = RepoHealthRestorer(repo_path)
 
     def automate_health_and_maintenance(self) -> dict:

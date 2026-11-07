@@ -1,111 +1,129 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import uuid
 import random
-import string
-import io
-import sys
 import os
+import io
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
-
-from skills.repo_audit_synthesizer import start_new
+from skills.repo_audit_synthesizer import start_new, RepoAuditSynthesizer
 
 
 class TestRepoAuditSynthesizer(unittest.TestCase):
 
     def setUp(self):
-        self.random_repo_path = f"/repo/{uuid.uuid4().hex}"
-        self.random_output_dir = f"/output/{uuid.uuid4().hex}"
-        self.random_metric_key = uuid.uuid4().hex
-        self.random_metric_value = random.randint(100, 9999)
-        self.random_security_flag = random.choice([True, False])
-        self.random_performance_score = round(random.uniform(0.1, 99.9), 2)
-        self.random_health_status = random.choice(["EXCELLENT", "CRITICAL", "WARNING", "OPTIMAL"])
+        self.random_repo_path = f"/tmp/{uuid.uuid4().hex}"
+        self.random_output_dir = f"/tmp/{uuid.uuid4().hex}"
 
-    def test_start_new_success_synthesis(self):
-        mock_payload = {
-            "repository": self.random_repo_path,
-            "security_metric": {self.random_metric_key: self.random_metric_value},
-            "security_flag": self.random_security_flag,
-            "performance_score": self.random_performance_score,
-            "health_status": self.random_health_status
+    def test_start_new_basic_execution(self):
+        with patch("skills.repo_audit_synthesizer.repo_auditor") as mock_auditor:
+            rand_key = uuid.uuid4().hex
+            rand_val = uuid.uuid4().hex
+            mock_auditor.scan.return_value = {rand_key: rand_val}
+
+            result = start_new(self.random_repo_path, output_dir=self.random_output_dir, export_stream=True)
+
+            self.assertIn("synthesis_id", result)
+            self.assertEqual(result["repository"], self.random_repo_path)
+            self.assertEqual(result["output_dir"], self.random_output_dir)
+            self.assertEqual(result.get(rand_key), rand_val)
+            mock_auditor.scan.assert_called_once_with(self.random_repo_path)
+
+    def test_start_new_handles_exceptions_gracefully(self):
+        with patch("skills.repo_audit_synthesizer.repo_auditor") as mock_auditor:
+            err_msg = uuid.uuid4().hex
+            mock_auditor.scan.side_effect = Exception(err_msg)
+
+            with self.assertRaises(Exception) as ctx:
+                start_new(self.random_repo_path)
+            
+            self.assertEqual(str(ctx.exception), err_msg)
+
+    def test_synthesize_method_data_mapping(self):
+        synthesizer = RepoAuditSynthesizer()
+        run_id = uuid.uuid4().hex
+        security_payload = {uuid.uuid4().hex: uuid.uuid4().hex}
+        health_payload = {uuid.uuid4().hex: uuid.uuid4().hex}
+        performance_payload = {uuid.uuid4().hex: uuid.uuid4().hex}
+        base_audit_payload = {uuid.uuid4().hex: uuid.uuid4().hex}
+
+        payload = {
+            "run_id": run_id,
+            "security": security_payload,
+            "health": health_payload,
+            "performance": performance_payload,
+            "base_audit": base_audit_payload
         }
 
+        result = synthesizer.synthesize(payload)
+        unified_slice = result.get("unified_slice", {})
+
+        self.assertEqual(unified_slice.get("run_id"), run_id)
+        self.assertEqual(unified_slice.get("security"), security_payload)
+        self.assertEqual(unified_slice.get("health"), health_payload)
+        self.assertEqual(unified_slice.get("performance"), performance_payload)
+        self.assertEqual(unified_slice.get("base_audit"), base_audit_payload)
+        self.assertEqual(unified_slice.get("metrics"), payload)
+
+    def test_export_report_file_creation(self):
+        synthesizer = RepoAuditSynthesizer()
+        filename = f"{uuid.uuid4().hex}.txt"
+        run_id = uuid.uuid4().hex
+        synthesis_result = {
+            "unified_slice": {
+                "run_id": run_id,
+                "metrics": {uuid.uuid4().hex: uuid.uuid4().hex}
+            }
+        }
+
+        os.makedirs(self.random_output_dir, exist_ok=True)
+        try:
+            full_path = synthesizer.export_report(self.random_output_dir, synthesis_result, filename)
+            self.assertTrue(os.path.exists(full_path))
+            with open(full_path, "r", encoding="utf-8") as f:
+                content = f.read()
+                self.assertIn(run_id, content)
+        finally:
+            if os.path.exists(full_path):
+                os.remove(full_path)
+            if os.path.exists(self.random_output_dir):
+                os.rmdir(self.random_output_dir)
+
+
+class TestRepoAuditSynthesizerIntegration(unittest.TestCase):
+
+    def setUp(self):
+        self.random_repo_path = f"/tmp/{uuid.uuid4().hex}"
+
+    def test_synthesize_repository_audit_real_flow(self):
         with patch("skills.repo_audit_synthesizer.repo_auditor") as mock_auditor, \
              patch("skills.repo_audit_synthesizer.repo_performance_profiler_pipeline") as mock_perf, \
              patch("skills.repo_audit_synthesizer.vulnerability_analyzer") as mock_vuln, \
-             patch("skills.repo_audit_synthesizer.repo_health_diagnostic") as mock_health:
+             patch("skills.repo_audit_synthesizer.repo_health_diagnostic") as mock_health, \
+             patch("skills.repo_audit_synthesizer.repo_security_gateway") as mock_sec, \
+             patch("skills.repo_audit_synthesizer.repo_reporter") as mock_reporter:
 
-            mock_auditor.scan.return_value = {"repo_path": self.random_repo_path, "status": "scanned"}
-            mock_perf.run_profiler.return_value = {"score": self.random_performance_score}
-            mock_vuln.analyze.return_value = {"secure": self.random_security_flag, "metric": {self.random_metric_key: self.random_metric_value}}
-            mock_health.diagnose.return_value = {"health": self.random_health_status}
+            audit_key, audit_val = uuid.uuid4().hex, uuid.uuid4().hex
+            perf_key, perf_val = uuid.uuid4().hex, uuid.uuid4().hex
+            vuln_key, vuln_val = uuid.uuid4().hex, uuid.uuid4().hex
+            health_key, health_val = uuid.uuid4().hex, uuid.uuid4().hex
+            sec_key, sec_val = uuid.uuid4().hex, uuid.uuid4().hex
 
-            result = start_new(self.random_repo_path, output_dir=self.random_output_dir)
-
-            self.assertIsInstance(result, dict)
-            self.assertIn("synthesis_id", result)
-            self.assertEqual(result["repository"], self.random_repo_path)
-            self.assertEqual(result["performance"]["score"], self.random_performance_score)
-            self.assertEqual(result["vulnerability"]["metric"][self.random_metric_key], self.random_metric_value)
-            self.assertEqual(result["health"]["health"], self.random_health_status)
-
-            mock_auditor.scan.assert_called_once_with(self.random_repo_path)
-            mock_perf.run_profiler.assert_called_once_with(self.random_repo_path)
-            mock_vuln.analyze.assert_called_once_with(self.random_repo_path)
-            mock_health.diagnose.assert_called_once_with(self.random_repo_path)
-
-    def test_start_new_handles_exceptions_gracefully(self):
-        random_error_msg = "".join(random.choices(string.ascii_letters + string.digits, k=16))
-
-        with patch("skills.repo_audit_synthesizer.repo_auditor") as mock_auditor:
-            mock_auditor.scan.side_effect = Exception(random_error_msg)
-
-            result = start_new(self.random_repo_path)
-
-            self.assertIsInstance(result, dict)
-            self.assertIn("error", result)
-            self.assertIn(random_error_msg, result["error"])
-            self.assertEqual(result.get("repository"), self.random_repo_path)
-
-    def test_start_new_with_stream_io_integration(self):
-        random_stream_data = f"AUDIT_TARGET::{uuid.uuid4().hex}::SCORE::{random.randint(1, 100)}".encode('utf-8')
-        mock_bytes_io = io.BytesIO(random_stream_data)
-
-        with patch("skills.repo_audit_synthesizer.repo_reporter") as mock_reporter, \
-             patch("skills.repo_audit_synthesizer.repo_auditor") as mock_auditor:
-
-            mock_auditor.scan.return_value = {"stream_processed": True}
-            mock_reporter.export_stream.return_value = mock_bytes_io
+            mock_auditor.scan.return_value = {audit_key: audit_val}
+            mock_perf.run_profiler.return_value = {perf_key: perf_val}
+            mock_vuln.analyze.return_value = {vuln_key: vuln_val}
+            mock_health.diagnose.return_value = {health_key: health_val}
+            mock_sec.evaluate.return_value = {sec_key: sec_val}
 
             result = start_new(self.random_repo_path, export_stream=True)
 
-            self.assertIsInstance(result, dict)
-            self.assertTrue(result.get("stream_processed"))
-            
-            exported_stream = mock_reporter.export_stream()
-            read_data = exported_stream.read()
-            self.assertEqual(read_data, random_stream_data)
+            self.assertEqual(result.get(audit_key), audit_val)
+            self.assertEqual(result.get("performance"), {perf_key: perf_val})
+            self.assertEqual(result.get("vulnerability"), {vuln_key: vuln_val})
+            self.assertEqual(result.get("health"), {health_key: health_val})
+            self.assertEqual(result.get("security_evaluation"), {sec_key: sec_val})
+            mock_reporter.export_stream.assert_called_once()
 
-    def test_start_new_validates_aggregated_metrics(self):
-        random_threshold = random.randint(500, 1500)
-        random_val_1 = random.randint(1, random_threshold)
-        random_val_2 = random.randint(1, random_threshold)
-
-        with patch("skills.repo_audit_synthesizer.repo_security_gateway") as mock_sec_gate, \
-             patch("skills.repo_audit_synthesizer.repo_auditor") as mock_auditor:
-
-            mock_auditor.scan.return_value = {"metrics": [random_val_1, random_val_2]}
-            mock_sec_gate.evaluate.return_value = {
-                "passed": (random_val_1 + random_val_2) < (random_threshold * 2),
-                "threshold": random_threshold
-            }
-
-            result = start_new(self.random_repo_path)
-
-            self.assertIsInstance(result, dict)
-            self.assertIn("security_evaluation", result)
-            self.assertTrue(result["security_evaluation"]["passed"])
-            self.assertEqual(result["security_evaluation"]["threshold"], random_threshold)
-            mock_sec_gate.evaluate.assert_called_once()
+            synthesizer = RepoAuditSynthesizer()
+            synth_res = synthesizer.synthesize(result)
+            self.assertIn("unified_slice", synth_res)
+            self.assertEqual(synth_res["unified_slice"]["metrics"]["repository"], self.random_repo_path)

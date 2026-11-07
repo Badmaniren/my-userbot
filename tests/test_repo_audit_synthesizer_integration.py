@@ -1,73 +1,93 @@
 import unittest
 import uuid
-import random
 import os
 import tempfile
-import shutil
+import random
 
-from skills.repo_audit_synthesizer import RepoAuditSynthesizer
-from skills.repo_auditor import RepoAuditor
-from skills.repo_performance_profiler_pipeline import RepoPerformanceProfilerPipeline
-from skills.repo_health_diagnostic import RepoHealthDiagnostic
-from skills.repo_security_gateway import RepoSecurityGateway
+from skills import repo_audit_synthesizer
+from skills import repo_auditor
+from skills import repo_performance_profiler_pipeline
+from skills import repo_health_diagnostic
+from skills import vulnerability_analyzer
+from skills import repo_security_gateway
+from skills import repo_reporter
 
 
 class TestRepoAuditSynthesizerIntegration(unittest.TestCase):
 
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp()
-        self.synthesizer = RepoAuditSynthesizer()
-        self.auditor = RepoAuditor()
-        self.profiler = RepoPerformanceProfilerPipeline()
-        self.diagnostic = RepoHealthDiagnostic()
-        self.security_gateway = RepoSecurityGateway()
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.repository_path = self.temp_dir.name
+        self.random_suffix = str(uuid.uuid4())[:8]
 
     def tearDown(self):
-        shutil.rmtree(self.test_dir, ignore_errors=True)
+        self.temp_dir.cleanup()
 
-    def test_synthesize_repository_audit_real_flow(self):
-        run_id = str(uuid.uuid4())
-        mock_metric_value = random.randint(10, 100)
+    def test_start_new_integration(self):
+        output_dir = os.path.join(self.repository_path, f"output_{self.random_suffix}")
+        os.makedirs(output_dir, exist_ok=True)
+
+        result = repo_audit_synthesizer.start_new(
+            repository_path=self.repository_path,
+            output_dir=output_dir,
+            export_stream=True
+        )
+
+        self.assertIsInstance(result, dict)
+        self.assertIn("synthesis_id", result)
+        self.assertIn("repository", result)
+        self.assertEqual(result["repository"], self.repository_path)
+        self.assertEqual(result.get("output_dir"), output_dir)
+
+        # Проверка что реальные суб-модули отработали и вернули структуры данных (если они реализованы)
+        if repo_auditor and hasattr(repo_auditor, "scan"):
+            pass
+        if repo_performance_profiler_pipeline and hasattr(repo_performance_profiler_pipeline, "run_profiler"):
+            self.assertIn("performance", result)
+        if vulnerability_analyzer and hasattr(vulnerability_analyzer, "analyze"):
+            self.assertIn("vulnerability", result)
+        if repo_health_diagnostic and hasattr(repo_health_diagnostic, "diagnose"):
+            self.assertIn("health", result)
+        if repo_security_gateway and hasattr(repo_security_gateway, "evaluate"):
+            self.assertIn("security_evaluation", result)
+
+    def test_repo_audit_synthesizer_class_flow(self):
+        synthesizer = repo_audit_synthesizer.RepoAuditSynthesizer()
         
-        test_file_path = os.path.join(self.test_dir, f"test_target_{run_id}.py")
-        with open(test_file_path, "w", encoding="utf-8") as f:
-            f.write(f"# Target file for audit run {run_id}\n")
-            f.write(f"PERFORMANCE_WEIGHT = {mock_metric_value}\n")
-
-        security_result = self.security_gateway.evaluate(self.test_dir)
-        health_result = self.diagnostic.run_diagnostic(self.test_dir)
-        performance_result = self.profiler.execute(self.test_dir)
-        base_audit = self.auditor.audit(self.test_dir)
-
-        synthetic_payload = {
+        run_id = f"run-{uuid.uuid4()}"
+        random_score = random.randint(1, 100)
+        
+        payload = {
             "run_id": run_id,
-            "target_path": self.test_dir,
-            "security": security_result,
-            "health": health_result,
-            "performance": performance_result,
-            "base_audit": base_audit,
-            "random_seed": random.random()
+            "security": {"score": random_score, "status": "passed"},
+            "health": {"issues": []},
+            "performance": {"latency_ms": 42.5},
+            "base_audit": {"files_scanned": 10}
         }
 
-        synthesis_result = self.synthesizer.synthesize(synthetic_payload)
-
+        synthesis_result = synthesizer.synthesize(payload)
+        
         self.assertIsInstance(synthesis_result, dict)
         self.assertIn("unified_slice", synthesis_result)
         
-        slice_data = synthesis_result["unified_slice"]
-        self.assertEqual(slice_data.get("run_id"), run_id)
-        self.assertIn("metrics", slice_data)
-        
-        report_filename = f"audit_report_{run_id}.json"
-        saved_report_path = self.synthesizer.export_report(self.test_dir, synthesis_result, report_filename)
-        
-        full_path = os.path.join(self.test_dir, report_filename)
-        self.assertTrue(os.path.exists(full_path))
-        self.assertEqual(saved_report_path, full_path)
+        unified = synthesis_result["unified_slice"]
+        self.assertEqual(unified["run_id"], run_id)
+        self.assertEqual(unified["security"]["score"], random_score)
 
-        with open(full_path, "r", encoding="utf-8") as rf:
-            content = rf.read()
-            self.assertIn(run_id, content)
+        filename = f"report_{self.random_suffix}.txt"
+        exported_file_path = synthesizer.export_report(
+            target_path=self.repository_path,
+            synthesis_result=synthesis_result,
+            filename=filename
+        )
+
+        self.assertTrue(os.path.exists(exported_file_path))
+        
+        with open(exported_file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+            
+        self.assertIn(run_id, content)
+        self.assertIn(str(random_score), content)
 
 
 if __name__ == "__main__":

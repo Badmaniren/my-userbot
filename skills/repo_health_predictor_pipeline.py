@@ -1,7 +1,6 @@
 import os
 import random
 import json
-import requests
 from typing import Any, Dict, IO
 
 
@@ -10,12 +9,12 @@ class RepoHealthPredictorPipeline:
         self.endpoint = endpoint
         self.threshold = threshold
 
-    def analyze_health(self, raw_data):
+    def analyze_health(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
         if not raw_data:
             raise ValueError("Empty raw data")
         return {"status": "predicted", "score": float(random.uniform(0.0, 1.0))}
 
-    def run_pipeline(self, stream):
+    def run_pipeline(self, stream: Any) -> bool:
         content = stream.read()
         if not content:
             return False

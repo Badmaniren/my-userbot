@@ -42,7 +42,10 @@ class RepoHealthVisualizer:
         file_name = f"visualization_{run_id}.{ext}"
         file_path = os.path.join(target_directory, file_name)
         
-        content = f"RUN_ID: {run_id}\nDATA: {json.dumps(prediction_data)}"
+        diagnostic_data = prediction_data.get("diagnostic_data", {})
+        repo_path = diagnostic_data.get("repo_path", "")
+        
+        content = f"RUN_ID: {run_id}\nREPO_PATH: {repo_path}\nDATA: {json.dumps(prediction_data)}"
         
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(content)

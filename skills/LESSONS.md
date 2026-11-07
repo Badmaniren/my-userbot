@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-s never closed (<unknown>, line 15)
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## dependency_audit_guardian (compose) — раундов: 4
+ncy_audit_guardian (compose) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: AssertionError: '' == '' : RepoMonitor не зафиксировал изменений после аудита
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
@@ -278,4 +274,8 @@ s never closed (<unknown>, line 15)
 
 ## repo_audit_collector (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_audit_pipeline (compose) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -31,7 +31,9 @@ class RepoAuditCollector:
         target_dir = self.output_dir if self.output_dir else "."
         os.makedirs(target_dir, exist_ok=True)
         export_path = os.path.join(target_dir, "report.json")
-        self.synthesizer.export_report(synthesis, export_path)
+        res_path = self.synthesizer.export_report(synthesis, export_path)
+        if res_path is not None:
+            export_path = res_path
         
         return {
             "metrics": metrics,
@@ -50,12 +52,24 @@ class RepoAuditCollector:
         return self.auditor.process_log_stream(stream)
 
     def export_aggregated_report(self, filename="report.json"):
-        data = self.collect_and_aggregate()
+        metrics = self.auditor.calculate_metrics()
+        issues = self.auditor.detect_issues()
+        structure = self.auditor.analyze_structure()
+        
+        audit_data = {
+            "metrics": metrics,
+            "issues": issues,
+            "structure": structure
+        }
+        
+        synthesis = self.synthesizer.synthesize(audit_data)
+        
         target_dir = self.output_dir if self.output_dir else "."
         os.makedirs(target_dir, exist_ok=True)
         export_path = os.path.join(target_dir, filename)
         
-        synthesis = data.get("synthesis", data)
-        self.synthesizer.export_report(synthesis, export_path)
+        res_path = self.synthesizer.export_report(synthesis, export_path)
+        if res_path is not None:
+            export_path = res_path
             
         return export_path

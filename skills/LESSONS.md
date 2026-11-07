@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-.test_dependency_audit_exporter_integration
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## dependency_audit_gateway (compose) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 29)
+ит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 29)
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -268,4 +264,8 @@
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## repo_performance_profiler_pipeline (compose) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## repo_performance_optimizer (compose) — раундов: 2
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main

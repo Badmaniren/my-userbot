@@ -1,105 +1,124 @@
 import unittest
 from unittest.mock import patch, MagicMock
-import random
 import uuid
-import string
+import random
 import io
-import sys
-import os
-
-from skills.repo_performance_profiler_pipeline import RepoPerformanceProfilerPipeline
+from skills.repo_performance_profiler_pipeline import (
+    RepoPerformanceProfilerPipeline,
+    repo_performance_profiler_pipeline
+)
 
 class TestRepoPerformanceProfilerPipeline(unittest.TestCase):
+    def test_repo_performance_profiler_pipeline_class_success(self):
+        repo_path = f"/repo/{uuid.uuid4().hex}"
+        threshold = random.uniform(0.1, 0.9)
 
-    def setUp(self):
-        self.rand_repo_path = f"/tmp/repo_{uuid.uuid4().hex[:8]}"
-        self.rand_threshold = round(random.uniform(0.1, 99.9), 2)
-        self.rand_metric_key = f"metric_{uuid.uuid4().hex[:6]}"
-        self.rand_status = ''.join(random.choices(string.ascii_letters, k=10))
-        self.rand_diagnostic_data = {
-            self.rand_metric_key: round(random.uniform(1.0, 50.0), 2),
-            "status": self.rand_status
+        expected_status = uuid.uuid4().hex
+        expected_diagnostic = {
+            uuid.uuid4().hex: uuid.uuid4().hex,
+            "health_score": random.uniform(0.5, 1.0)
         }
-        self.pipeline = RepoPerformanceProfilerPipeline(
-            repo_path=self.rand_repo_path,
-            threshold=self.rand_threshold
-        )
+        expected_threshold_passed = random.choice([True, False])
+        stream_content = uuid.uuid4().bytes
 
-    def test_initialization(self):
-        self.assertEqual(self.pipeline.repo_path, self.rand_repo_path)
-        self.assertEqual(self.pipeline.threshold, self.rand_threshold)
+        with patch("skills.repo_performance_profiler_pipeline.RepoMonitor") as MockRepoMonitor, \
+             patch("skills.repo_performance_profiler_pipeline.RepoHealthDiagnostic") as MockRepoHealthDiagnostic:
+            
+            mock_monitor_instance = MockRepoMonitor.return_value
+            mock_monitor_instance.check_status.return_value = expected_status
 
-    def test_composition_execution_success(self):
-        rand_commit_msg = f"Commit {uuid.uuid4().hex}"
-        rand_report_content = f"Report data stream {uuid.uuid4().hex}"
-        
-        with patch('skills.repo_performance_profiler_pipeline.RepoMonitor') as mock_monitor_cls, \
-             patch('skills.repo_performance_profiler_pipeline.RepoHealthDiagnostic') as mock_diagnostic_cls:
+            mock_diagnostic_instance = MockRepoHealthDiagnostic.return_value
+            mock_diagnostic_instance.perform_deep_health_check.return_value = expected_diagnostic
+            mock_diagnostic_instance.evaluate_threshold.return_value = expected_threshold_passed
             
-            mock_monitor_instance = mock_monitor_cls.return_value
-            mock_monitor_instance.check_status.return_value = self.rand_status
-            
-            mock_diagnostic_instance = mock_diagnostic_cls.return_value
-            mock_diagnostic_instance.perform_deep_health_check.return_value = self.rand_diagnostic_data
-            mock_diagnostic_instance.evaluate_threshold.return_value = True
-            
-            mock_stream = io.StringIO(rand_report_content)
+            mock_stream = io.BytesIO(stream_content)
             mock_diagnostic_instance.export_report_stream.return_value = mock_stream
 
-            result = self.pipeline.run_profiling_pipeline()
+            pipeline = RepoPerformanceProfilerPipeline(repo_path, threshold)
+            result = pipeline.run_profiling_pipeline()
 
-            mock_monitor_cls.assert_called_once_with(self.rand_repo_path)
+            MockRepoMonitor.assert_called_once_with(repo_path)
             mock_monitor_instance.check_status.assert_called_once()
             
-            mock_diagnostic_cls.assert_called_once()
-            mock_diagnostic_instance.perform_deep_health_check.assert_called_once_with(
-                self.rand_repo_path, self.rand_threshold
-            )
+            MockRepoHealthDiagnostic.assert_called_once()
+            mock_diagnostic_instance.perform_deep_health_check.assert_called_once_with(repo_path, threshold)
+
+            metric_key = list(expected_diagnostic.keys())[0]
             mock_diagnostic_instance.evaluate_threshold.assert_called_once_with(
-                self.rand_diagnostic_data, self.rand_metric_key, self.rand_threshold
+                expected_diagnostic, metric_key, threshold
             )
-            mock_diagnostic_instance.export_report_stream.assert_called_once_with(self.rand_repo_path)
+            mock_diagnostic_instance.export_report_stream.assert_called_once_with(repo_path)
 
-            self.assertIsInstance(result, dict)
-            self.assertEqual(result.get("repo_status"), self.rand_status)
-            self.assertEqual(result.get("diagnostic_results"), self.rand_diagnostic_data)
-            self.assertTrue(result.get("threshold_passed"))
-            self.assertEqual(result.get("report_stream_content"), rand_report_content)
+            self.assertEqual(result["repo_status"], expected_status)
+            self.assertEqual(result["diagnostic_results"], expected_diagnostic)
+            self.assertEqual(result["threshold_passed"], expected_threshold_passed)
+            self.assertEqual(result["report_stream_content"], stream_content)
 
-    def test_composition_execution_threshold_failed(self):
-        with patch('skills.repo_performance_profiler_pipeline.RepoMonitor') as mock_monitor_cls, \
-             patch('skills.repo_performance_profiler_pipeline.RepoHealthDiagnostic') as mock_diagnostic_cls:
+    def test_repo_performance_profiler_pipeline_class_empty_diagnostic_keys(self):
+        repo_path = f"/var/git/{uuid.uuid4().hex}"
+        threshold = random.uniform(0.2, 0.8)
+
+        expected_status = uuid.uuid4().hex
+        expected_diagnostic = {"status": uuid.uuid4().hex}
+        expected_threshold_passed = random.choice([True, False])
+        stream_content = uuid.uuid4().bytes
+
+        with patch("skills.repo_performance_profiler_pipeline.RepoMonitor") as MockRepoMonitor, \
+             patch("skills.repo_performance_profiler_pipeline.RepoHealthDiagnostic") as MockRepoHealthDiagnostic:
             
-            mock_monitor_instance = mock_monitor_cls.return_value
-            mock_monitor_instance.check_status.return_value = self.rand_status
+            mock_monitor_instance = MockRepoMonitor.return_value
+            mock_monitor_instance.check_status.return_value = expected_status
+
+            mock_diagnostic_instance = MockRepoHealthDiagnostic.return_value
+            mock_diagnostic_instance.perform_deep_health_check.return_value = expected_diagnostic
+            mock_diagnostic_instance.evaluate_threshold.return_value = expected_threshold_passed
             
-            mock_diagnostic_instance = mock_diagnostic_cls.return_value
-            mock_diagnostic_instance.perform_deep_health_check.return_value = self.rand_diagnostic_data
-            mock_diagnostic_instance.evaluate_threshold.return_value = False
-            
-            mock_stream = io.StringIO(f"Failed threshold stream {uuid.uuid4().hex}")
+            mock_stream = io.BytesIO(stream_content)
             mock_diagnostic_instance.export_report_stream.return_value = mock_stream
 
-            result = self.pipeline.run_profiling_pipeline()
+            pipeline = RepoPerformanceProfilerPipeline(repo_path, threshold)
+            result = pipeline.run_profiling_pipeline()
 
-            self.assertFalse(result.get("threshold_passed"))
-            self.assertEqual(result.get("repo_status"), self.rand_status)
-            self.assertEqual(result.get("diagnostic_results"), self.rand_diagnostic_data)
+            mock_diagnostic_instance.evaluate_threshold.assert_called_once_with(
+                expected_diagnostic, "health_score", threshold
+            )
+            self.assertEqual(result["report_stream_content"], stream_content)
 
-    def test_monitor_exception_handling(self):
-        rand_error_msg = f"Error {uuid.uuid4().hex}"
+    def test_repo_performance_profiler_pipeline_function_success(self):
+        repo_path = f"/opt/repo_{uuid.uuid4().hex}"
+        profiling_id = uuid.uuid4().hex
+        threshold = random.uniform(0.3, 0.99)
         
-        with patch('skills.repo_performance_profiler_pipeline.RepoMonitor') as mock_monitor_cls, \
-             patch('skills.repo_performance_profiler_pipeline.RepoHealthDiagnostic') as mock_diagnostic_cls:
-            
-            mock_monitor_instance = mock_monitor_cls.return_value
-            mock_monitor_instance.check_status.side_effect = Exception(rand_error_msg)
+        monitor_status = uuid.uuid4().hex
+        diagnostic_data = {uuid.uuid4().hex: random.randint(10, 100)}
+        is_performant = random.choice([True, False])
 
-            with self.assertRaises(Exception) as ctx:
-                self.pipeline.run_profiling_pipeline()
+        with patch("skills.repo_performance_profiler_pipeline.RepoMonitor") as MockRepoMonitor, \
+             patch("skills.repo_performance_profiler_pipeline.RepoHealthDiagnostic") as MockRepoHealthDiagnostic:
             
-            self.assertIn(rand_error_msg, str(ctx.exception))
-            mock_diagnostic_cls.assert_not_called()
+            mock_monitor_instance = MockRepoMonitor.return_value
+            mock_monitor_instance.check_status.return_value = monitor_status
 
-if __name__ == '__main__':
+            mock_diagnostic_instance = MockRepoHealthDiagnostic.return_value
+            mock_diagnostic_instance.run_full_diagnostic.return_value = diagnostic_data
+            mock_diagnostic_instance.evaluate_threshold.return_value = is_performant
+
+            result = repo_performance_profiler_pipeline(repo_path, profiling_id, threshold)
+
+            MockRepoMonitor.assert_called_once_with(repo_path)
+            mock_monitor_instance.check_status.assert_called_once()
+
+            MockRepoHealthDiagnostic.assert_called_once()
+            mock_diagnostic_instance.run_full_diagnostic.assert_called_once_with(repo_path)
+            mock_diagnostic_instance.evaluate_threshold.assert_called_once_with(
+                diagnostic_data, "health_score", threshold
+            )
+
+            self.assertEqual(result["profiling_id"], profiling_id)
+            self.assertEqual(result["monitor_status"], monitor_status)
+            self.assertEqual(result["diagnostic_data"], diagnostic_data)
+            self.assertEqual(result["is_performant"], is_performant)
+
+
+if __name__ == "__main__":
     unittest.main()

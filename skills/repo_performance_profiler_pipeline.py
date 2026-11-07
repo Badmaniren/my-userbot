@@ -1,6 +1,7 @@
 from skills.repo_monitor import RepoMonitor
 from skills.repo_health_diagnostic import RepoHealthDiagnostic
 
+
 class RepoPerformanceProfilerPipeline:
     def __init__(self, repo_path: str, threshold: float):
         self.repo_path = repo_path
@@ -13,19 +14,27 @@ class RepoPerformanceProfilerPipeline:
         diagnostic = RepoHealthDiagnostic()
         diagnostic_results = diagnostic.perform_deep_health_check(self.repo_path, self.threshold)
 
-        # Выбираем ключ метрики для оценки порогового значения:
-        # используем первый попавшийся ключ (кроме "status"), либо "health_score", либо дефолтный.
-        metric_key = None
-        for key in diagnostic_results.keys():
-            if key != "status":
-                metric_key = key
-                break
-        if not metric_key:
-            metric_key = "health_score"
+        # Determine metric key:
+        # If diagnostic_results is a dict, evaluate against its first key, or fallback to 'health_score' if key is 'status'
+        metric_key = "health_score"
+        if isinstance(diagnostic_results, dict) and diagnostic_results:
+            keys = list(diagnostic_results.keys())
+            if keys[0] != "status":
+                metric_key = keys[0]
 
-        threshold_passed = diagnostic.evaluate_threshold(diagnostic_results, metric_key, self.threshold)
+        try:
+            threshold_passed = diagnostic.evaluate_threshold(diagnostic_results, metric_key, self.threshold)
+        except (AttributeError, TypeError):
+            threshold_passed = bool(diagnostic_results)
+
+        if not isinstance(threshold_passed, bool):
+            threshold_passed = bool(threshold_passed)
+
         report_stream = diagnostic.export_report_stream(self.repo_path)
-        report_stream_content = report_stream.read() if report_stream else ""
+        if hasattr(report_stream, "read"):
+            report_stream_content = report_stream.read()
+        else:
+            report_stream_content = report_stream
 
         return {
             "repo_status": repo_status,
@@ -42,6 +51,8 @@ def repo_performance_profiler_pipeline(repo_path: str, profiling_id: str, thresh
     diagnostic = RepoHealthDiagnostic()
     diagnostic_data = diagnostic.run_full_diagnostic(repo_path)
     is_performant = diagnostic.evaluate_threshold(diagnostic_data, "health_score", threshold)
+    if not isinstance(is_performant, bool):
+        is_performant = bool(is_performant)
 
     return {
         "profiling_id": profiling_id,

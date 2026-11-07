@@ -5,79 +5,100 @@ import os
 import json
 import uuid
 import random
-import requests
-from skills.repo_health_predictor_pipeline import RepoHealthPredictorPipeline, repo_health_predictor_pipeline
+from skills.repo_health_predictor_pipeline import (
+    RepoHealthPredictorPipeline,
+    repo_health_predictor_pipeline
+)
 
 
 class TestRepoHealthPredictorPipeline(unittest.TestCase):
 
-    def setUp(self):
-        self.rand_endpoint = f"https://{uuid.uuid4().hex}.com/api/v{random.randint(1,9)}"
-        self.rand_threshold = round(random.uniform(0.1, 0.9), 2)
-        self.pipeline = RepoHealthPredictorPipeline(endpoint=self.rand_endpoint, threshold=self.rand_threshold)
+    def test_pipeline_class_initialization_defaults(self):
+        rand_endpoint = f"https://{uuid.uuid4().hex}.internal/api"
+        rand_threshold = round(random.uniform(0.1, 0.9), 2)
+        
+        pipeline = RepoHealthPredictorPipeline(endpoint=rand_endpoint, threshold=rand_threshold)
+        self.assertEqual(pipeline.endpoint, rand_endpoint)
+        self.assertEqual(pipeline.threshold, rand_threshold)
 
-    def test_init_properties(self):
-        self.assertEqual(self.pipeline.endpoint, self.rand_endpoint)
-        self.assertEqual(self.pipeline.threshold, self.rand_threshold)
+        default_pipeline = RepoHealthPredictorPipeline()
+        self.assertIsNone(default_pipeline.endpoint)
+        self.assertEqual(default_pipeline.threshold, 0.5)
 
-    def test_analyze_health_valid(self):
+    def test_analyze_health_success(self):
+        pipeline = RepoHealthPredictorPipeline()
         rand_key = uuid.uuid4().hex
         rand_val = uuid.uuid4().hex
         raw_data = {rand_key: rand_val}
-        
-        result = self.pipeline.analyze_health(raw_data)
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result.get("status"), "predicted")
-        self.assertIn("score", result)
-        self.assertIsInstance(result["score"], float)
 
-    def test_analyze_health_empty(self):
+        with patch('random.random', return_value=0.77):
+            res = pipeline.analyze_health(raw_data)
+
+        self.assertEqual(res.get("status"), "predicted")
+        self.assertEqual(res.get("score"), 0.77)
+
+    def test_analyze_health_empty_raises_value_error(self):
+        pipeline = RepoHealthPredictorPipeline()
         with self.assertRaises(ValueError):
-            self.pipeline.analyze_health({})
+            pipeline.analyze_health({})
+
+        with self.assertRaises(ValueError):
+            pipeline.analyze_health(None)
 
     def test_run_pipeline_with_content(self):
+        pipeline = RepoHealthPredictorPipeline()
         rand_payload = uuid.uuid4().bytes
         stream = io.BytesIO(rand_payload)
-        res = self.pipeline.run_pipeline(stream)
-        self.assertTrue(res)
 
-    def test_run_pipeline_empty(self):
+        is_success = pipeline.run_pipeline(stream)
+        self.assertTrue(is_success)
+
+    def test_run_pipeline_empty_stream(self):
+        pipeline = RepoHealthPredictorPipeline()
         stream = io.BytesIO(b"")
-        res = self.pipeline.run_pipeline(stream)
-        self.assertFalse(res)
 
-    def test_functional_pipeline_success(self):
+        is_success = pipeline.run_pipeline(stream)
+        self.assertFalse(is_success)
+
+    def test_functional_repo_health_predictor_pipeline_success(self):
         rand_repo_id = uuid.uuid4().hex
-        raw_data = {"repository_id": rand_repo_id, "metrics": random.randint(100, 500)}
+        rand_meta_key = uuid.uuid4().hex
+        rand_meta_val = uuid.uuid4().hex
+        
+        raw_data = {
+            "repository_id": rand_repo_id,
+            rand_meta_key: rand_meta_val
+        }
 
-        with patch("os.makedirs") as mock_mkdirs, \
-             patch("builtins.open", mock_open()) as mock_file:
+        mock_file = mock_open()
+        
+        with patch("os.makedirs") as mock_makedirs, \
+             patch("builtins.open", mock_file), \
+             patch("random.uniform", return_value=0.88):
             
             result = repo_health_predictor_pipeline(raw_data)
-            
-            self.assertEqual(result["status"], "success")
-            self.assertEqual(result["repository_id"], rand_repo_id)
-            self.assertIn("prediction_score", result)
-            self.assertIsInstance(result["prediction_score"], float)
-            
-            mock_mkdirs.assert_called_once_with("reports", exist_ok=True)
-            mock_file.assert_called_once_with(f"reports/health_prediction_{rand_repo_id}.json", "w", encoding="utf-8")
 
-    def test_functional_pipeline_empty(self):
+        mock_makedirs.assert_called_once_with("reports", exist_ok=True)
+        
+        expected_path = f"reports/health_prediction_{rand_repo_id}.json"
+        mock_file.assert_called_once_with(expected_path, "w", encoding="utf-8")
+
+        self.assertEqual(result.get("status"), "success")
+        self.assertEqual(result.get("repository_id"), rand_repo_id)
+        self.assertEqual(result.get("prediction_score"), 0.88)
+
+        handle = mock_file()
+        written_data = "".join(call.args[0] for call in handle.write.mock_calls)
+        parsed_dump = json.loads(written_data)
+        self.assertEqual(parsed_dump["repository_id"], rand_repo_id)
+        self.assertEqual(parsed_dump["prediction_score"], 0.88)
+
+    def test_functional_repo_health_predictor_pipeline_empty_raises(self):
         with self.assertRaises(ValueError):
             repo_health_predictor_pipeline({})
 
-    def test_pipeline_external_call_mocking(self):
-        rand_metric_id = uuid.uuid4().hex
-        with patch("requests.post") as mock_post:
-            mock_post.return_value.status_code = 200
-            mock_post.return_value.json.return_value = {"status": "ok", "id": rand_metric_id}
-
-            response = requests.post(self.pipeline.endpoint, json={"id": rand_metric_id})
-            
-            mock_post.assert_called_once_with(self.pipeline.endpoint, json={"id": rand_metric_id})
-            self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.json()["id"], rand_metric_id)
+        with self.assertRaises(ValueError):
+            repo_health_predictor_pipeline(None)
 
 
 if __name__ == "__main__":

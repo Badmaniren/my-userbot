@@ -1,8 +1,9 @@
 from skills.repo_auditor import RepoAuditor
 from skills.repo_audit_synthesizer import RepoAuditSynthesizer
+import os
 
 def start_new(repo_path, output_dir, stream):
-    pass
+    return RepoAuditSynthesizer().export_report(stream, os.path.join(output_dir if output_dir else ".", "report.json"))
 
 class RepoAuditCollector:
     def __init__(self, repository_path, output_dir=None):
@@ -27,13 +28,10 @@ class RepoAuditCollector:
         
         synthesis = self.synthesizer.synthesize(audit_data)
         
-        # Поддержка вызова export_report с разным числом аргументов (в зависимости от реализации синтезатора)
-        import inspect
-        sig = inspect.signature(self.synthesizer.export_report)
-        if len(sig.parameters) >= 2:
-            export_path = self.synthesizer.export_report(synthesis, self.output_dir if self.output_dir else "report.json")
-        else:
-            export_path = self.synthesizer.export_report(synthesis)
+        target_dir = self.output_dir if self.output_dir else "."
+        os.makedirs(target_dir, exist_ok=True)
+        export_path = os.path.join(target_dir, "report.json")
+        self.synthesizer.export_report(synthesis, export_path)
         
         return {
             "metrics": metrics,
@@ -52,15 +50,12 @@ class RepoAuditCollector:
         return self.auditor.process_log_stream(stream)
 
     def export_aggregated_report(self, filename="report.json"):
-        import os
         data = self.collect_and_aggregate()
         target_dir = self.output_dir if self.output_dir else "."
+        os.makedirs(target_dir, exist_ok=True)
+        export_path = os.path.join(target_dir, filename)
         
-        import inspect
-        sig = inspect.signature(self.synthesizer.export_report)
-        if len(sig.parameters) >= 2:
-            export_path = self.synthesizer.export_report(data, os.path.join(target_dir, filename))
-        else:
-            export_path = self.synthesizer.export_report(data)
+        synthesis = data.get("synthesis", data)
+        self.synthesizer.export_report(synthesis, export_path)
             
         return export_path

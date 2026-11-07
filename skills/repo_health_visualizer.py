@@ -2,9 +2,6 @@ import os
 import json
 import uuid
 import random
-import tempfile
-import unittest
-from unittest.mock import patch, MagicMock
 
 class RepoHealthDiagnostic:
     def run_diagnostics(self, repo_path: str, run_id: str = None) -> dict:
@@ -17,6 +14,9 @@ class RepoHealthDiagnostic:
                 "issues": random.randint(0, 10)
             }
         }
+        
+    def analyze(self, repo_path: str, run_id: str = None) -> dict:
+        return self.run_diagnostics(repo_path, run_id)
 
 class RepoHealthPredictorPipeline:
     def execute_pipeline(self, diagnostic_data: dict, seed: int = None) -> dict:

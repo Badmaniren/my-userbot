@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## dependency_audit_validator (compose) — раундов: 1
+в: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## dependency_audit_shield (compose) — раундов: 4
@@ -311,6 +309,9 @@
 
 ## repo_health_visualizer (create) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: успешно прошёл тесты и влит в main
+
+## repo_health_visualizer (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## repo_health_visualizer (refactor) — раундов: 1

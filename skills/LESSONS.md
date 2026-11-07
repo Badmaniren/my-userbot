@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-цию
-
-## dependency_audit_aggregator (refactor) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: expected an indented block after 'if' statement on line 31 (<unknown>, line 31); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+ statement on line 31 (<unknown>, line 31); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## dependency_audit_validator (compose) — раундов: 1
@@ -307,4 +304,8 @@
 ## vulnerability_patch_verifier (compose) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 6)
 - Последняя ошибка перед фиксом: ^^^^^^^^^^^^^^^^^^^^^
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_analyzer (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

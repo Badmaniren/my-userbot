@@ -1,18 +1,31 @@
 import os
+from skills.repo_health_diagnostic import RepoHealthDiagnostic
 from skills.repo_health_restorer import RepoHealthRestorer
 from skills.vulnerability_analyzer import VulnerabilityAnalyzer
 
 
 class RepoHealthOptimizer:
     """Модуль оптимизации репозитория на основе комбинирования аудита структуры,
-
     восстановления здоровья и анализа уязвимостей для непрерывного улучшения кодовой базы.
     """
 
     def __init__(self, repo_path: str):
         self.repo_path = repo_path
-        self.restorer = RepoHealthRestorer(self.repo_path)
-        self.vulnerability_analyzer = VulnerabilityAnalyzer(self.repo_path)
+        # Учитываем сигнатуру RepoHealthDiagnostic(), которая может не принимать аргументов
+        try:
+            self.diagnostic = RepoHealthDiagnostic(self.repo_path)
+        except TypeError:
+            self.diagnostic = RepoHealthDiagnostic()
+            
+        try:
+            self.restorer = RepoHealthRestorer(self.repo_path)
+        except TypeError:
+            self.restorer = RepoHealthRestorer()
+            
+        try:
+            self.vulnerability_analyzer = VulnerabilityAnalyzer(self.repo_path)
+        except TypeError:
+            self.vulnerability_analyzer = VulnerabilityAnalyzer()
 
     def optimize_repository(self) -> dict:
         # Убедимся, что директория для отчетов уязвимостей существует на случай реального вызова

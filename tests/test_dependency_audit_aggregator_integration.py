@@ -1,47 +1,51 @@
 import unittest
 import os
-import tempfile
+import json
 import uuid
 import random
-import json
-
+import tempfile
+import shutil
 from skills import dependency_audit_aggregator
-import vulnerability_analyzer
-import dependency_updater_pipeline
-import repo_reporter
-
+from skills import vulnerability_analyzer
+from skills import dependency_updater_pipeline
+from skills import repo_reporter
 
 class TestDependencyAuditAggregatorIntegration(unittest.TestCase):
 
     def setUp(self):
-        self.test_dir = tempfile.TemporaryDirectory()
-        self.repo_path = self.test_dir.name
+        self.test_dir = tempfile.mkdtemp()
         self.random_pkg = f"pkg-{uuid.uuid4().hex[:8]}"
-        self.random_version = f"{random.randint(1, 9)}.{random.randint(0, 9)}.{random.randint(0, 9)}"
-        self.cve_id = f"CVE-{random.randint(2000, 2024)}-{random.randint(1000, 9999)}"
+        self.random_version = f"{random.randint(1,9)}.{random.randint(0,9)}.{random.randint(0,9)}"
+        self.cve_id = f"CVE-2023-{random.randint(10000,99999)}"
         
-        self.req_path = os.path.join(self.repo_path, "requirements.txt")
+        self.req_path = os.path.join(self.test_dir, "requirements.txt")
         with open(self.req_path, "w", encoding="utf-8") as f:
             f.write(f"{self.random_pkg}=={self.random_version}\n")
 
     def tearDown(self):
-        self.test_dir.cleanup()
+        shutil.rmtree(self.test_dir, ignore_errors=True)
 
-    def test_aggregate_dependencies_integration(self):
-        report_filename = f"report_{uuid.uuid4().hex[:6]}.json"
+    def test_start_new_integration_clean(self):
+        empty_dir = tempfile.mkdtemp()
+        try:
+            result = dependency_audit_aggregator.start_new(repo_path=empty_dir)
+            self.assertIn("secure", result)
+            self.assertTrue(result["secure"])
+        finally:
+            shutil.rmtree(empty_dir, ignore_errors=True)
+
+    def test_aggregate_dependencies_real_io(self):
+        report_name = f"report_{uuid.uuid4().hex[:6]}.json"
         
         result = dependency_audit_aggregator.aggregate_dependencies(
-            repo_path=self.repo_path,
-            output_report_name=report_filename,
+            repo_path=self.test_dir,
+            output_report_name=report_name,
             cve_identifier=self.cve_id,
-            target_version=self.random_version
+            target_version="2.0.0"
         )
 
-        self.assertIn("report_path", result)
-        self.assertIn("status", result)
         self.assertEqual(result["status"], "SUCCESS")
-        
-        expected_path = os.path.join(self.repo_path, report_filename)
+        expected_path = os.path.join(self.test_dir, report_name)
         self.assertEqual(result["report_path"], expected_path)
         
         self.assertTrue(os.path.exists(expected_path))
@@ -49,21 +53,10 @@ class TestDependencyAuditAggregatorIntegration(unittest.TestCase):
         with open(expected_path, "r", encoding="utf-8") as f:
             data = json.load(f)
             
-        self.assertEqual(data.get("package"), self.random_pkg)
-        self.assertEqual(data.get("cve"), self.cve_id)
-        self.assertEqual(data.get("target_version"), self.random_version)
-        self.assertEqual(data.get("status"), "AGGREGATED")
-
-    def test_start_new_clean_integration(self):
-        branch_name = f"branch-{uuid.uuid4().hex[:6]}"
-        
-        result = dependency_audit_aggregator.start_new(
-            repo_path=self.repo_path,
-            branch=branch_name
-        )
-        
-        self.assertIsInstance(result, dict)
-
+        self.assertEqual(data["package"], self.random_pkg)
+        self.assertEqual(data["cve"], self.cve_id)
+        self.assertEqual(data["target_version"], "2.0.0")
+        self.assertEqual(data["status"], "AGGREGATED")
 
 if __name__ == "__main__":
     unittest.main()

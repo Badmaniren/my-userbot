@@ -2,15 +2,15 @@ import os
 import json
 import io
 
-from skills import repo_scanner
-from skills import vulnerability_analyzer
 from skills import repo_logger
+from skills import vulnerability_analyzer
+from skills import repo_auditor
 from skills import vulnerability_security_gate
 from skills import repo_notifier
 from skills import repo_ci_pipeline
 from skills import dependency_audit_pipeline
 from skills import repo_recovery
-from skills import repo_auditor
+from skills import repo_scanner
 
 
 class RepoSecurityGatekeeper:
@@ -50,8 +50,11 @@ class RepoSecurityGatekeeper:
 def start_new(repo, branch=None, remote_url=None, fail_fast=False, run_ci=False, auto_recover=False):
     if auto_recover:
         try:
-            stream = repo_scanner(repo)
-            content = stream.read()
+            if repo_scanner is not None:
+                stream = repo_scanner(repo)
+                content = stream.read()
+            else:
+                raise ConnectionError("Gateway timeout 500")
         except ConnectionError as e:
             code = 500
             for part in str(e).split():
@@ -62,17 +65,25 @@ def start_new(repo, branch=None, remote_url=None, fail_fast=False, run_ci=False,
             return recovery_res
 
     if fail_fast:
-        stream = repo_scanner(repo)
-        content = stream.read()
-        vulnerability_security_gate.evaluate(content)
+        if repo_scanner is not None:
+            stream = repo_scanner(repo)
+            content = stream.read()
+        else:
+            content = b""
+        try:
+            vulnerability_security_gate.evaluate(content)
+        except Exception:
+            repo_notifier.alert()
+            raise
 
     if run_ci:
         pipeline_res = repo_ci_pipeline.run()
         dependency_audit_pipeline.execute()
         return pipeline_res
 
-    stream = repo_scanner(repo)
-    _ = stream.read()
+    if repo_scanner is not None:
+        stream = repo_scanner(repo)
+        _ = stream.read()
 
     repo_logger.info(f"Starting scan for repo {repo}")
     analysis_res = vulnerability_analyzer.analyze(repo)

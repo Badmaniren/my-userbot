@@ -4,70 +4,57 @@ import shutil
 import os
 import uuid
 import random
-
+import io
 from skills.repo_health_automator import RepoHealthAutomator
-from skills.repo_monitor import RepoMonitor
-from skills.repo_health_guardian import RepoHealthGuardian
 
 class TestRepoHealthAutomatorIntegration(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
         self.repo_path = self.test_dir
+        self.random_id = str(uuid.uuid4())
+        self.random_metric_value = random.randint(100, 999)
         
-        # Инициализация базового git репозитория для работы мониторинга и стража
-        os.system(f"git -C {self.repo_path} init -b main")
-        os.system(f"git -C {self.repo_path} config user.name 'Test Architect'")
-        os.system(f"git -C {self.repo_path} config user.email 'architect@test.com'")
-        
-        # Создаем случайный файл с использованием uuid и random, чтобы избежать хардкода
-        self.unique_id = str(uuid.uuid4())
-        self.random_metric = random.randint(100, 999)
-        
-        self.test_file_name = f"health_file_{self.unique_id}.py"
-        self.test_file_path = os.path.join(self.repo_path, self.test_file_name)
-        
-        with open(self.test_file_path, "w", encoding="utf-8") as f:
-            f.write(f"# Metric value: {self.random_metric}\n")
-            f.write("print('Repository health check running')\n")
-            
-        os.system(f"git -C {self.repo_path} add {self.test_file_name}")
-        os.system(f"git -C {self.repo_path} commit -m 'Initial commit for {self.unique_id}'")
+        marker_file = os.path.join(self.repo_path, f"health_marker_{self.random_id}.txt")
+        with open(marker_file, "w", encoding="utf-8") as f:
+            f.write(f"Diagnostic metric baseline: {self.random_metric_value}\n")
+
+        self.automator = RepoHealthAutomator(self.repo_path)
 
     def tearDown(self):
-        shutil.rmtree(self.test_dir)
+        if os.path.exists(self.test_dir):
+            shutil.rmtree(self.test_dir)
 
-    def test_repo_health_automator_composition_and_execution(self):
-        # Проверяем, что модуль корректно инициализируется и композиция работает
-        automator = RepoHealthAutomator(self.repo_path)
+    def test_automate_health_and_maintenance_integration(self):
+        result = self.automator.automate_health_and_maintenance()
         
-        # Проверяем наличие задействованных навыков внутри композиции
-        self.assertIsInstance(automator.monitor, RepoMonitor)
-        self.assertIsInstance(automator.guardian, RepoHealthGuardian)
+        self.assertIsInstance(result, dict, "Результат должен быть словарем")
+        self.assertIn("monitor_status", result)
+        self.assertIn("health_audit", result)
+        self.assertIn("preventive_maintenance", result)
         
-        # Выполняем реальный мониторинг через встроенный навык
-        status = automator.monitor.check_status()
-        self.assertIsInstance(status, str)
+        self.assertIsNotNone(result["monitor_status"])
+        self.assertIsNotNone(result["health_audit"])
+        self.assertIsNotNone(result["preventive_maintenance"])
+
+    def test_process_stream_and_automate_integration(self):
+        stream_content = f"Stream input payload ID: {self.random_id} with weight {self.random_metric_value}"
+        stream = io.StringIO(stream_content)
         
-        # Выполняем комплексную проверку здоровья и обслуживание через стража и автоматизатор
-        health_result = automator.guardian.check_health_and_audit()
-        self.assertIsInstance(health_result, dict)
+        result = self.automator.process_stream_and_automate(stream)
         
-        maintenance_result = automator.guardian.run_preventive_maintenance()
-        self.assertIsInstance(maintenance_result, dict)
+        self.assertIsInstance(result, dict, "Результат обработки потока должен быть словарем")
+        self.assertIn("monitor_status", result)
+        self.assertIn("health_audit", result)
+        self.assertIn("preventive_maintenance", result)
+
+    def test_run_and_aliases_integration(self):
+        run_result = self.automator.run()
+        check_result = self.automator.automate_health_check()
         
-        # Проверяем ключевой метод автоматизатора с генерацией уникальных данных
-        # Добавим еще одно случайное изменение для проверки реакции автоматизатора
-        new_random_file = os.path.join(self.repo_path, f"mod_{uuid.uuid4()}.txt")
-        with open(new_random_file, "w", encoding="utf-8") as f:
-            f.write(str(self.random_metric))
-            
-        # Запуск процесса автоматизации проверки здоровья репозитория
-        if hasattr(automator, 'run'):
-            exec_result = automator.run()
-            self.assertIsNotNone(exec_result)
-        elif hasattr(automator, 'automate_health_check'):
-            exec_result = automator.automate_health_check()
-            self.assertIsNotNone(exec_result)
+        self.assertIsInstance(run_result, dict)
+        self.assertIsInstance(check_result, dict)
+        
+        self.assertEqual(run_result.keys(), check_result.keys())
 
 if __name__ == "__main__":
     unittest.main()

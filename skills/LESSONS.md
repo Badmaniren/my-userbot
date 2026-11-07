@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-я ошибка перед фиксом: FAILED (failures=3)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## dependency_audit_dispatcher (compose) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: invalid character '—' (U+2014) (<unknown>, line 71); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+ичит поймал: Синтаксическая ошибка в коде: invalid character '—' (U+2014) (<unknown>, line 71); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -271,4 +267,8 @@
 
 ## repo_reporter (refactor) — раундов: 3
 - Последняя ошибка перед фиксом: shutil.rmtree(self.repo_path, ignore5errors=True)
+- Статус: успешно прошёл тесты и влит в main
+
+## repo_performance_dashboard (compose) — раундов: 2
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main

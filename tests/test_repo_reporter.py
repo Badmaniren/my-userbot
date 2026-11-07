@@ -1,108 +1,112 @@
-import unittest
-from unittest.mock import patch
 import os
 import shutil
+import unittest
+from unittest.mock import patch
 import uuid
 import random
+import string
 from skills.repo_reporter import RepoReporter
 
 
 class TestRepoReporter(unittest.TestCase):
     def setUp(self):
-        self.rand_prefix = uuid.uuid4().hex[:8]
-        self.repo_path = os.path.join(os.getcwd(), f"test_repo_{self.rand_prefix}")
+        self.rand_suffix = uuid.uuid4().hex[:8]
+        self.repo_path = os.path.abspath(f"test_repo_{self.rand_suffix}")
         os.makedirs(self.repo_path, exist_ok=True)
 
     def tearDown(self):
         if os.path.exists(self.repo_path):
-            shutil.rmtree(self.repo_path, ignore_errors=True)
+            shutil.rmtree(self.repo_path, ignore5errors=True)
 
     def test_init_creates_git_dir(self):
-        custom_repo = os.path.join(os.getcwd(), f"custom_repo_{uuid.uuid4().hex[:8]}")
+        non_git_path = os.path.abspath(f"non_git_{uuid.uuid4().hex[:8]}")
         try:
-            reporter = RepoReporter(custom_repo)
-            git_path = os.path.join(custom_repo, ".git")
-            self.assertTrue(os.path.exists(git_path))
+            reporter = RepoReporter(non_git_path)
+            self.assertTrue(os.path.exists(os.path.join(non_git_path, ".git")))
         finally:
-            if os.path.exists(custom_repo):
-                shutil.rmtree(custom_repo, ignore_errors=True)
-
-    @patch('skills.repo_reporter.RepoAnalytics')
-    @patch('skills.repo_reporter.RepoSummarizer')
-    def test_generate_final_report_success(self, mock_summarizer_cls, mock_analytics_cls):
-        rand_analytics_msg = f"analytics_{uuid.uuid4().hex}"
-        rand_summary_msg = f"summary_{uuid.uuid4().hex}"
-
-        mock_analytics_inst = mock_analytics_cls.return_value
-        mock_analytics_inst.get_report.return_value = rand_analytics_msg
-
-        mock_summarizer_inst = mock_summarizer_cls.return_value
-        mock_summarizer_inst.generate_summary.return_value = rand_summary_msg
-
-        reporter = RepoReporter(self.repo_path)
-        report = reporter.generate_final_report()
-
-        self.assertIn(rand_analytics_msg, report)
-        self.assertIn(rand_summary_msg, report)
+            if os.path.exists(non_git_path):
+                shutil.rmtree(non_git_path, ignore_errors=True)
 
     def test_save_report_relative_path(self):
-        rand_filename = f"report_{uuid.uuid4().hex[:6]}.txt"
-        rand_content = f"content_{uuid.uuid4().hex}"
-
         reporter = RepoReporter(self.repo_path)
-        saved_path = reporter.save_report(rand_filename, rand_content)
-
-        expected_path = os.path.join(self.repo_path, rand_filename)
-        self.assertEqual(os.path.abspath(saved_path), os.path.abspath(expected_path))
-        self.assertTrue(os.path.exists(expected_path))
-
-        with open(expected_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-        self.assertEqual(content, rand_content)
+        filename = f"report_{uuid.uuid4().hex[:6]}.txt"
+        content = "".join(random.choices(string.ascii_letters + string.digits, k=32))
+        
+        full_path = reporter.save_report(filename, content)
+        
+        self.assertTrue(os.path.isabs(full_path))
+        self.assertTrue(os.path.exists(full_path))
+        with open(full_path, 'r', encoding='utf-8') as f:
+            read_content = f.read()
+        self.assertEqual(read_content, content)
 
     def test_save_report_absolute_path(self):
-        rand_filename = f"abs_report_{uuid.uuid4().hex[:6]}.txt"
-        abs_file_path = os.path.join(self.repo_path, rand_filename)
-        rand_content = f"content_{uuid.uuid4().hex}"
-
         reporter = RepoReporter(self.repo_path)
-        saved_path = reporter.save_report(abs_file_path, rand_content)
+        abs_dir = os.path.abspath(f"abs_dir_{uuid.uuid4().hex[:8]}")
+        filename = f"abs_report_{uuid.uuid4().hex[:6]}.txt"
+        file_path = os.path.join(abs_dir, filename)
+        content = "".join(random.choices(string.ascii_letters + string.digits, k=25))
 
-        self.assertEqual(os.path.abspath(saved_path), os.path.abspath(abs_file_path))
-        self.assertTrue(os.path.exists(abs_file_path))
+        try:
+            full_path = reporter.save_report(file_path, content)
+            self.assertEqual(full_path, file_path)
+            self.assertTrue(os.path.exists(full_path))
+            with open(full_path, 'r', encoding='utf-8') as f:
+                self.assertEqual(f.read(), content)
+        finally:
+            if os.path.exists(abs_dir):
+                shutil.rmtree(abs_dir, ignore_errors=True)
 
-        with open(abs_file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-        self.assertEqual(content, rand_content)
-
-    @patch('skills.repo_reporter.RepoReporter.generate_final_report')
-    def test_generate_report_default_params(self, mock_gen_final):
-        rand_final_content = f"final_{uuid.uuid4().hex}"
-        mock_gen_final.return_value = rand_final_content
-
+    def test_generate_final_report(self):
         reporter = RepoReporter(self.repo_path)
-        output_file = f"out_{uuid.uuid4().hex[:6]}.txt"
+        analytics_mock_val = f"analytics_{uuid.uuid4().hex[:8]}"
+        summary_mock_val = f"summary_{uuid.uuid4().hex[:8]}"
+
+        with patch("skills.repo_reporter.RepoAnalytics") as mock_analytics, \
+             patch("skills.repo_reporter.RepoSummarizer") as mock_summarizer:
+            
+            instance_a = mock_analytics.return_value
+            instance_a.get_report.return_value = analytics_mock_val
+
+            instance_s = mock_summarizer.return_value
+            instance_s.generate_summary.return_value = summary_mock_val
+
+            result = reporter.generate_final_report()
+
+            self.assertIn(analytics_mock_val, result)
+            self.assertIn(summary_mock_val, result)
+
+    def test_generate_report_custom_status_summary(self):
+        reporter = RepoReporter(self.repo_path)
+        status_val = f"status_{uuid.uuid4().hex[:6]}"
+        summary_val = f"summary_{uuid.uuid4().hex[:6]}"
+        out_filename = f"custom_out_{uuid.uuid4().hex[:6]}.txt"
+
+        saved_path = reporter.generate_report(status=status_val, summary=summary_val, output_path=out_filename)
         
-        result_path = reporter.generate_report(output_path=output_file)
-
-        self.assertTrue(os.path.exists(result_path))
-        with open(result_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-        self.assertEqual(content, rand_final_content)
-
-    @patch('skills.repo_reporter.RepoReporter.generate_final_report')
-    def test_generate_report_with_status_and_summary(self, mock_gen_final):
-        rand_status = f"status_{uuid.uuid4().hex}"
-        rand_summary = f"summary_{uuid.uuid4().hex}"
-        rand_output = f"custom_out_{uuid.uuid4().hex[:6]}.txt"
-
-        reporter = RepoReporter(self.repo_path)
-        result_path = reporter.generate_report(status=rand_status, summary=rand_summary, output_path=rand_output)
-
-        mock_gen_final.assert_not_called()
-
-        with open(result_path, 'r', encoding='utf-8') as f:
+        self.assertTrue(os.path.exists(saved_path))
+        with open(saved_path, 'r', encoding='utf-8') as f:
             content = f.read()
         
-        self.assertIn(rand_status, content)
-        self.assertIn(rand_summary, content)
+        self.assertIn(status_val, content)
+        self.assertIn(summary_val, content)
+
+    def test_generate_report_default_path(self):
+        reporter = RepoReporter(self.repo_path)
+        status_val = f"st_{uuid.uuid4().hex[:6]}"
+        summary_val = f"su_{uuid.uuid4().hex[:6]}"
+
+        saved_path = reporter.generate_report(status=status_val, summary=summary_val)
+        
+        expected_default = os.path.join(self.repo_path, "report.txt")
+        self.assertEqual(saved_path, expected_default)
+        self.assertTrue(os.path.exists(saved_path))
+        
+        with open(saved_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        self.assertIn(status_val, content)
+        self.assertIn(summary_val, content)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -38,29 +38,24 @@ class RepoHealthMetricValidator:
 
     def validate_stream(self, stream: Union[IO[bytes], IO[str]]) -> List[Dict[str, Any]]:
         """Читает поток данных (стрим), парсит JSON и валидирует каждую метрику."""
-        try:
-            if hasattr(stream, "read"):
-                content = stream.read()
-            else:
-                content = stream
+        if hasattr(stream, "read"):
+            content = stream.read()
+        else:
+            content = stream
 
-            if isinstance(content, bytes):
-                content = content.decode('utf-8')
+        if isinstance(content, bytes):
+            content = content.decode('utf-8')
 
-            data = json.loads(content)
-            if not isinstance(data, list):
-                data = [data]
+        data = json.loads(content)
+        if not isinstance(data, list):
+            data = [data]
 
-            validated_metrics = []
-            for item in data:
-                self.validate(item)
-                validated_metrics.append(item)
+        validated_metrics = []
+        for item in data:
+            self.validate(item)
+            validated_metrics.append(item)
 
-            return validated_metrics
-        except Exception as e:
-            if isinstance(e, MetricValidationError):
-                raise
-            raise MetricValidationError(f"Failed to parse or validate stream: {e}")
+        return validated_metrics
 
     def dispatch_and_validate_remote(self, payload: Dict[str, Any], endpoint_url: str) -> Dict[str, Any]:
         """Отправляет метрики на внешний шлюз и возвращает ответ."""

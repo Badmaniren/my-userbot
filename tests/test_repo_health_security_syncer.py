@@ -1,220 +1,190 @@
-import os
+import unittest
+from unittest.mock import patch, MagicMock
 import uuid
-import json
 import random
 import string
 import hashlib
 import io
-import unittest
-from unittest.mock import patch, MagicMock
+import os
+import json
 from skills.repo_health_security_syncer import RepoHealthSecuritySyncer
 
 class TestRepoHealthSecuritySyncer(unittest.TestCase):
-    def test_synchronize_with_payload_success(self):
-        rand_repo_id = uuid.uuid4().hex
-        rand_sync_id = uuid.uuid4().hex
-        rand_score = random.randint(1, 100)
-        rand_vuln_count = random.randint(0, 10)
-        rand_sec_score = random.randint(1, 100)
-        
-        payload = {
-            "sync_id": rand_sync_id,
-            "health_score": rand_score,
-            "vulnerabilities": rand_vuln_count,
-            "security_score": rand_sec_score
+
+    def setUp(self):
+        self.repo_id = uuid.uuid4().hex
+        self.health_url = f"https://{uuid.uuid4().hex}.internal/health"
+        self.security_url = f"https://{uuid.uuid4().hex}.internal/security"
+        self.target_directory = f"/tmp/{uuid.uuid4().hex}"
+        self.syncer = RepoHealthSecuritySyncer(
+            repo_id=self.repo_id,
+            health_url=self.health_url,
+            security_url=self.security_url,
+            target_directory=self.target_directory
+        )
+
+    def test_synchronize_with_payload_success_token_match(self):
+        sync_id = uuid.uuid4().hex
+        token = uuid.uuid4().hex
+        health_score = random.randint(1, 100)
+        vulnerabilities = [uuid.uuid4().hex for _ in range(random.randint(1, 3))]
+        security_score = random.randint(1, 100)
+
+        metric_payload = {
+            "sync_id": sync_id,
+            "token": token,
+            "health_score": health_score,
+            "vulnerabilities": vulnerabilities,
+            "security_score": security_score
         }
 
-        syncer = RepoHealthSecuritySyncer(repo_id=rand_repo_id)
-        result = syncer.synchronize(metric_payload=payload)
+        with patch.dict(os.environ, {"REPO_SYNC_TOKEN": token}):
+            result = self.syncer.synchronize(metric_payload=metric_payload)
 
-        self.assertTrue(result["success"])
-        self.assertEqual(result["synced_id"], rand_sync_id)
-        self.assertEqual(result["health_data"]["health_score"], rand_score)
-        self.assertEqual(result["security_data"]["vulnerabilities"], rand_vuln_count)
-        self.assertEqual(result["security_data"]["security_score"], rand_sec_score)
+        self.assertTrue(result.get("success"))
+        self.assertEqual(result.get("synced_id"), sync_id)
+        self.assertEqual(result.get("health_data", {}).get("health_score"), health_score)
+        self.assertEqual(result.get("security_data", {}).get("security_score"), security_score)
+        self.assertEqual(result.get("security_data", {}).get("vulnerabilities"), vulnerabilities)
 
-    def test_synchronize_with_payload_token_mismatch(self):
-        rand_repo_id = uuid.uuid4().hex
-        rand_token = uuid.uuid4().hex
-        rand_env_token = uuid.uuid4().hex
-        
-        payload = {
-            "token": rand_token,
-            "health_score": random.randint(1, 50),
-            "vulnerabilities": random.randint(1, 5)
+    def test_synchronize_with_payload_failure_token_mismatch(self):
+        sync_id = uuid.uuid4().hex
+        token = uuid.uuid4().hex
+        env_token = uuid.uuid4().hex
+        health_score = random.randint(1, 100)
+
+        metric_payload = {
+            "sync_id": sync_id,
+            "token": token,
+            "health_score": health_score
         }
 
-        with patch.dict(os.environ, {"REPO_SYNC_TOKEN": rand_env_token}):
-            syncer = RepoHealthSecuritySyncer(repo_id=rand_repo_id)
-            result = syncer.synchronize(metric_payload=payload)
+        with patch.dict(os.environ, {"REPO_SYNC_TOKEN": env_token}):
+            result = self.syncer.synchronize(metric_payload=metric_payload)
 
-        self.assertFalse(result["success"])
+        self.assertFalse(result.get("success"))
+        self.assertEqual(result.get("synced_id"), sync_id)
 
-    def test_synchronize_with_payload_and_target_directory(self):
-        rand_repo_id = uuid.uuid4().hex
-        rand_dir = os.path.join(uuid.uuid4().hex, uuid.uuid4().hex)
-        rand_sync_id = uuid.uuid4().hex
-        rand_score = random.randint(50, 100)
-        
-        payload = {
-            "sync_id": rand_sync_id,
-            "health_score": rand_score,
-            "vulnerabilities": random.randint(0, 3)
+    def test_synchronize_with_payload_file_creation(self):
+        sync_id = uuid.uuid4().hex
+        health_score = random.randint(1, 100)
+        vulnerabilities = [uuid.uuid4().hex]
+
+        metric_payload = {
+            "sync_id": sync_id,
+            "health_score": health_score,
+            "vulnerabilities": vulnerabilities
         }
 
-        with patch("os.makedirs") as mock_makedirs, patch("builtins.open") as mock_open:
-            syncer = RepoHealthSecuritySyncer(repo_id=rand_repo_id, target_directory=rand_dir)
-            result = syncer.synchronize(metric_payload=payload)
+        expected_file_name = f"audit_{sync_id}.json"
+        expected_file_path = os.path.join(self.target_directory, expected_file_name)
 
-            self.assertTrue(result["success"])
-            mock_makedirs.assert_called_once_with(rand_dir, exist_ok=True)
-            mock_open.assert_called_once()
+        with patch("os.makedirs") as mock_makedirs, \
+             patch("builtins.open", unittest.mock.mock_open()) as mock_file:
+            
+            result = self.syncer.synchronize(metric_payload=metric_payload)
 
-    def test_synchronize_via_http_success(self):
-        rand_repo_id = uuid.uuid4().hex
-        rand_health_url = f"https://{uuid.uuid4().hex}.com/health"
-        rand_sec_url = f"https://{uuid.uuid4().hex}.com/security"
-        
-        health_payload = {uuid.uuid4().hex: random.randint(1, 100)}
-        sec_payload = {uuid.uuid4().hex: uuid.uuid4().hex}
+            mock_makedirs.assert_called_once_with(self.target_directory, exist_ok=True)
+            mock_file.assert_called_once_with(expected_file_path, "w", encoding="utf-8")
+            self.assertTrue(result.get("success"))
+
+    def test_synchronize_network_success(self):
+        health_payload = {"health_score": random.randint(1, 100), "id": uuid.uuid4().hex}
+        security_payload = {"security_score": random.randint(1, 100), "issues": []}
 
         mock_health_resp = MagicMock()
         mock_health_resp.status_code = 200
         mock_health_resp.json.return_value = health_payload
 
-        mock_sec_resp = MagicMock()
-        mock_sec_resp.status_code = 200
-        mock_sec_resp.json.return_value = sec_payload
+        mock_security_resp = MagicMock()
+        mock_security_resp.status_code = 200
+        mock_security_resp.json.return_value = security_payload
 
         with patch("requests.get") as mock_get:
-            mock_get.side_effect = [mock_health_resp, mock_sec_resp]
-            
-            syncer = RepoHealthSecuritySyncer(
-                repo_id=rand_repo_id,
-                health_url=rand_health_url,
-                security_url=rand_sec_url
-            )
-            result = syncer.synchronize()
+            mock_get.side_effect = [mock_health_resp, mock_security_resp]
+            result = self.syncer.synchronize()
 
-            self.assertTrue(result["success"])
-            self.assertEqual(result["health_data"], health_payload)
-            self.assertEqual(result["security_data"], sec_payload)
+        self.assertTrue(result.get("success"))
+        self.assertEqual(result.get("health_data"), health_payload)
+        self.assertEqual(result.get("security_data"), security_payload)
 
-    def test_synchronize_via_http_health_fail(self):
-        rand_repo_id = uuid.uuid4().hex
-        rand_health_url = f"https://{uuid.uuid4().hex}.com/health"
-        rand_sec_url = f"https://{uuid.uuid4().hex}.com/security"
-        rand_status = random.choice([400, 401, 403, 404, 500])
-        rand_err_text = uuid.uuid4().hex
+    def test_synchronize_health_fail(self):
+        status_code = random.choice([400, 401, 403, 404, 500, 502])
+        error_text = uuid.uuid4().hex
 
         mock_health_resp = MagicMock()
-        mock_health_resp.status_code = rand_status
-        mock_health_resp.text = rand_err_text
+        mock_health_resp.status_code = status_code
+        mock_health_resp.text = error_text
 
         with patch("requests.get") as mock_get:
             mock_get.return_value = mock_health_resp
-            
-            syncer = RepoHealthSecuritySyncer(
-                repo_id=rand_repo_id,
-                health_url=rand_health_url,
-                security_url=rand_sec_url
-            )
-            result = syncer.synchronize()
+            result = self.syncer.synchronize()
 
-            self.assertFalse(result["success"])
-            self.assertEqual(result["status_code"], rand_status)
-            self.assertIn(rand_err_text, result["error"])
+        self.assertFalse(result.get("success"))
+        self.assertEqual(result.get("status_code"), status_code)
+        self.assertIn(error_text, result.get("error"))
 
-    def test_synchronize_via_http_security_fail(self):
-        rand_repo_id = uuid.uuid4().hex
-        rand_health_url = f"https://{uuid.uuid4().hex}.com/health"
-        rand_sec_url = f"https://{uuid.uuid4().hex}.com/security"
-        rand_status = random.choice([500, 502, 503])
-        rand_err_text = uuid.uuid4().hex
+    def test_synchronize_security_fail(self):
+        health_payload = {"health_score": random.randint(1, 100)}
+        status_code = random.choice([400, 401, 403, 404, 500, 502])
+        error_text = uuid.uuid4().hex
 
         mock_health_resp = MagicMock()
         mock_health_resp.status_code = 200
-        mock_health_resp.json.return_value = {}
+        mock_health_resp.json.return_value = health_payload
 
-        mock_sec_resp = MagicMock()
-        mock_sec_resp.status_code = rand_status
-        mock_sec_resp.text = rand_err_text
+        mock_security_resp = MagicMock()
+        mock_security_resp.status_code = status_code
+        mock_security_resp.text = error_text
 
         with patch("requests.get") as mock_get:
-            mock_get.side_effect = [mock_health_resp, mock_sec_resp]
-            
-            syncer = RepoHealthSecuritySyncer(
-                repo_id=rand_repo_id,
-                health_url=rand_health_url,
-                security_url=rand_sec_url
-            )
-            result = syncer.synchronize()
+            mock_get.side_effect = [mock_health_resp, mock_security_resp]
+            result = self.syncer.synchronize()
 
-            self.assertFalse(result["success"])
-            self.assertEqual(result["status_code"], rand_status)
-            self.assertIn(rand_err_text, result["error"])
+        self.assertFalse(result.get("success"))
+        self.assertEqual(result.get("status_code"), status_code)
+        self.assertIn(error_text, result.get("error"))
 
     def test_synchronize_exception_handling(self):
-        rand_repo_id = uuid.uuid4().hex
-        rand_health_url = f"https://{uuid.uuid4().hex}.com/health"
-        rand_exception_msg = uuid.uuid4().hex
+        exception_message = uuid.uuid4().hex
 
         with patch("requests.get") as mock_get:
-            mock_get.side_effect = Exception(rand_exception_msg)
-            
-            syncer = RepoHealthSecuritySyncer(
-                repo_id=rand_repo_id,
-                health_url=rand_health_url
-            )
-            result = syncer.synchronize()
+            mock_get.side_effect = Exception(exception_message)
+            result = self.syncer.synchronize()
 
-            self.assertFalse(result["success"])
-            self.assertEqual(result["status_code"], 500)
-            self.assertIn(rand_exception_msg, result["error"])
+        self.assertFalse(result.get("success"))
+        self.assertEqual(result.get("status_code"), 500)
+        self.assertEqual(result.get("error"), exception_message)
 
     def test_export_audit_stream_with_raw(self):
-        rand_repo_id = uuid.uuid4().hex
-        rand_health_url = f"https://{uuid.uuid4().hex}.com/stream"
-        rand_data = uuid.uuid4().hex.encode('utf-8')
-        
+        random_bytes = uuid.uuid4().bytes + uuid.uuid4().bytes
+        expected_hash = hashlib.sha256(random_bytes).hexdigest()
+
         mock_resp = MagicMock()
-        mock_raw = io.BytesIO(rand_data)
+        mock_raw = io.BytesIO(random_bytes)
         mock_resp.raw = mock_raw
 
         with patch("requests.get") as mock_get:
             mock_get.return_value = mock_resp
-            
-            syncer = RepoHealthSecuritySyncer(
-                repo_id=rand_repo_id,
-                health_url=rand_health_url
-            )
-            result = syncer.export_audit_stream()
+            res = self.syncer.export_audit_stream()
 
-            expected_hash = hashlib.sha256(rand_data).hexdigest()
-            self.assertEqual(result["stream_hash"], expected_hash)
-            self.assertEqual(result["bytes_read"], len(rand_data))
+        self.assertEqual(res.get("stream_hash"), expected_hash)
+        self.assertEqual(res.get("bytes_read"), len(random_bytes))
 
-    def test_export_audit_stream_with_content_fallback(self):
-        rand_repo_id = uuid.uuid4().hex
-        rand_health_url = f"https://{uuid.uuid4().hex}.com/content"
-        rand_data = uuid.uuid4().hex.encode('utf-8')
-        
+    def test_export_audit_stream_with_content(self):
+        random_bytes = uuid.uuid4().bytes + uuid.uuid4().bytes
+        expected_hash = hashlib.sha256(random_bytes).hexdigest()
+
         mock_resp = MagicMock()
         mock_resp.raw = None
-        mock_resp.content = rand_data
+        mock_resp.content = random_bytes
 
         with patch("requests.get") as mock_get:
             mock_get.return_value = mock_resp
-            
-            syncer = RepoHealthSecuritySyncer(
-                repo_id=rand_repo_id,
-                health_url=rand_health_url
-            )
-            result = syncer.export_audit_stream()
+            res = self.syncer.export_audit_stream()
 
-            expected_hash = hashlib.sha256(rand_data).hexdigest()
-            self.assertEqual(result["stream_hash"], expected_hash)
-            self.assertEqual(result["bytes_read"], len(rand_data))
+        self.assertEqual(res.get("stream_hash"), expected_hash)
+        self.assertEqual(res.get("bytes_read"), len(random_bytes))
 
 if __name__ == "__main__":
     unittest.main()

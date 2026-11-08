@@ -3,7 +3,7 @@ from unittest.mock import patch, MagicMock
 import uuid
 import random
 import string
-from skills.repo_health_anomaly_inspector import RepoHealthAnomalyInspector
+from skills.repo_health_anomaly_inspector import RepoHealthAnomalyInspector, AnomalyInspector
 
 class TestRepoHealthAnomalyInspector(unittest.TestCase):
 
@@ -54,6 +54,25 @@ class TestRepoHealthAnomalyInspector(unittest.TestCase):
         self.assertFalse(result["is_anomaly"])
         self.assertEqual(result["anomalies"], [])
         self.assertEqual(result["deviation_score"], 0.0)
+
+    def test_anomaly_inspector_stream_inspection(self):
+        self.assertTrue(issubclass(AnomalyInspector, RepoHealthAnomalyInspector))
+        inspector = AnomalyInspector(threshold_cpu=80.0, threshold_error=5.0)
+
+        stream = [
+            {"metric_id": "normal-1", "cpu_load": 25.0, "error_rate": 0.1, "timestamp": "2026-11-08T00:00:00"},
+            {"metric_id": "anomaly-cpu", "cpu_load": 95.0, "error_rate": 1.0, "timestamp": "2026-11-08T01:00:00"},
+            {"metric_id": "anomaly-err", "cpu_load": 20.0, "error_rate": 12.0, "timestamp": "2026-11-08T02:00:00"},
+            {"metric_id": "normal-2", "cpu_load": 40.0, "error_rate": 2.0, "timestamp": "2026-11-08T03:00:00"}
+        ]
+
+        anomalies = inspector.inspect(stream)
+        self.assertEqual(len(anomalies), 2)
+        anomaly_ids = [a["metric_id"] for a in anomalies]
+        self.assertIn("anomaly-cpu", anomaly_ids)
+        self.assertIn("anomaly-err", anomaly_ids)
+        self.assertNotIn("normal-1", anomaly_ids)
+        self.assertNotIn("normal-2", anomaly_ids)
 
     def test_inspect_with_explicit_pulse_payload_and_threshold(self):
         mock_pulse_engine = MagicMock()

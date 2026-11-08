@@ -5,13 +5,15 @@ import random
 import io
 import requests
 
+import json
 from skills.repo_health_pulse_engine import (
     PulseException,
     PulseMetric,
     RepoMonitor,
     RepoLogger,
     RepoAnalytics,
-    RepoHealthPulseEngine
+    RepoHealthPulseEngine,
+    PulseEngine
 )
 
 class TestRepoHealthPulseEngine(unittest.TestCase):
@@ -121,6 +123,19 @@ class TestRepoHealthPulseEngine(unittest.TestCase):
         self.assertEqual(result.get("run_id"), run_id)
         self.assertEqual(result.get("metric"), metric_obj)
         self.assertEqual(result.get("repo_path"), self.random_path)
+
+    def test_pulse_engine_inheritance_and_process_stream(self):
+        self.assertTrue(issubclass(PulseEngine, RepoHealthPulseEngine))
+        record1 = {"metric_id": uuid.uuid4().hex, "cpu_load": 25.5, "error_rate": 0.5}
+        record2 = {"metric_id": uuid.uuid4().hex, "cpu_load": 95.0, "error_rate": 10.0}
+        stream_content = f"{json.dumps(record1)}\n{json.dumps(record2)}\n"
+
+        pulse_engine = PulseEngine()
+        stream_io = io.StringIO(stream_content)
+        parsed = pulse_engine.process_stream(stream_io)
+        self.assertEqual(len(parsed), 2)
+        self.assertEqual(parsed[0]["metric_id"], record1["metric_id"])
+        self.assertEqual(parsed[1]["cpu_load"], 95.0)
 
 if __name__ == "__main__":
     unittest.main()

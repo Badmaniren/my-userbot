@@ -1,3 +1,5 @@
+import os
+import json
 import requests
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, List
@@ -29,6 +31,9 @@ class RepoAnalytics:
         return {"report": "generated", "path": repo_path}
 
 class RepoHealthPulseEngine:
+    def __init__(self, source_path: str = ""):
+        self.source_path = source_path
+
     def _fetch_raw_metric(self, repo_id: str, name: str) -> float:
         return 0.0
 
@@ -62,3 +67,45 @@ class RepoHealthPulseEngine:
             "metric": metric,
             "repo_path": repo_path
         }
+
+    def process_stream(self, source: Optional[Any] = None) -> List[Dict[str, Any]]:
+        target = source if source is not None else self.source_path
+        results = []
+        if not target:
+            return results
+
+        if hasattr(target, "readlines"):
+            lines = target.readlines()
+        elif hasattr(target, "read"):
+            lines = target.read().splitlines()
+        elif isinstance(target, str):
+            if os.path.exists(target):
+                with open(target, "r", encoding="utf-8") as f:
+                    lines = f.readlines()
+            else:
+                lines = target.strip().splitlines()
+        elif isinstance(target, (list, tuple)):
+            for item in target:
+                if isinstance(item, str):
+                    try:
+                        results.append(json.loads(item))
+                    except Exception:
+                        pass
+                elif isinstance(item, dict):
+                    results.append(item)
+            return results
+        else:
+            return results
+
+        for line in lines:
+            line_str = line.decode("utf-8") if isinstance(line, bytes) else str(line).strip()
+            if line_str:
+                try:
+                    results.append(json.loads(line_str))
+                except Exception:
+                    pass
+        return results
+
+
+class PulseEngine(RepoHealthPulseEngine):
+    pass

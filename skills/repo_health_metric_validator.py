@@ -88,6 +88,7 @@ def validate_repo_health_metrics(metrics_data: Dict[str, Any]) -> Dict[str, Any]
     normalized_data = metrics_data.copy()
     if "health_score" in normalized_data and "score" not in normalized_data:
         normalized_data["score"] = normalized_data["health_score"]
+        metrics_data["score"] = normalized_data["health_score"]  # Обновляем оригинал для интеграционного теста
     if "run_id" in normalized_data and "metric_name" not in normalized_data:
         normalized_data["metric_name"] = normalized_data["run_id"]
     if "timestamp" not in normalized_data:

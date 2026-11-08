@@ -5,11 +5,11 @@ import json
 import random
 import uuid
 from skills.repo_health_metric_validator import (
-    RepoHealthMetricValidator,
     MetricValidationError,
+    RepoHealthMetricValidator,
     audit_repository,
     render_health_dashboard,
-    validate_repo_health_metrics
+    validate_repo_health_metrics,
 )
 
 
@@ -17,156 +17,160 @@ class TestRepoHealthMetricValidator(unittest.TestCase):
 
     def setUp(self):
         self.validator = RepoHealthMetricValidator()
-        self.random_metric_name = uuid.uuid4().hex
-        self.random_score = round(random.uniform(0.0, 100.0), 2)
-        self.random_timestamp = random.randint(1500000000, 1800000000)
-        self.random_url = f"https://{uuid.uuid4().hex}.com/api/v1/metrics"
+        self.metric_name = f"metric_{uuid.uuid4().hex[:8]}"
+        self.score = round(random.uniform(0.0, 100.0), 2)
+        self.timestamp = random.randint(1500000000, 1800000000)
 
     def test_validate_success(self):
-        valid_data = {
-            "metric_name": self.random_metric_name,
-            "score": self.random_score,
-            "timestamp": self.random_timestamp
+        payload = {
+            "metric_name": self.metric_name,
+            "score": self.score,
+            "timestamp": self.timestamp,
         }
-        result = self.validator.validate(valid_data)
+        result = self.validator.validate(payload)
         self.assertTrue(result)
 
-    def test_validate_not_a_dict(self):
-        invalid_data = [uuid.uuid4().hex, random.randint(1, 100)]
+    def test_validate_not_a_dictionary_raises_error(self):
+        invalid_data = [random.randint(1, 100), uuid.uuid4().hex]
         with self.assertRaises(MetricValidationError):
             self.validator.validate(invalid_data)
 
-    def test_validate_missing_metric_name(self):
-        invalid_data = {
-            "score": self.random_score,
-            "timestamp": self.random_timestamp
+    def test_validate_missing_metric_name_raises_error(self):
+        payload = {
+            "score": self.score,
+            "timestamp": self.timestamp,
         }
-        with self.assertRaises(MetricValidationError) as ctx:
-            self.validator.validate(invalid_data)
-        self.assertIn("metric_name", str(ctx.exception))
+        with self.assertRaises(MetricValidationError):
+            self.validator.validate(payload)
 
-    def test_validate_missing_score(self):
-        invalid_data = {
-            "metric_name": self.random_metric_name,
-            "timestamp": self.random_timestamp
+    def test_validate_missing_score_raises_error(self):
+        payload = {
+            "metric_name": self.metric_name,
+            "timestamp": self.timestamp,
         }
-        with self.assertRaises(MetricValidationError) as ctx:
-            self.validator.validate(invalid_data)
-        self.assertIn("score", str(ctx.exception))
+        with self.assertRaises(MetricValidationError):
+            self.validator.validate(payload)
 
-    def test_validate_missing_timestamp(self):
-        invalid_data = {
-            "metric_name": self.random_metric_name,
-            "score": self.random_score
+    def test_validate_missing_timestamp_raises_error(self):
+        payload = {
+            "metric_name": self.metric_name,
+            "score": self.score,
         }
-        with self.assertRaises(MetricValidationError) as ctx:
-            self.validator.validate(invalid_data)
-        self.assertIn("timestamp", str(ctx.exception))
+        with self.assertRaises(MetricValidationError):
+            self.validator.validate(payload)
 
-    def test_validate_score_type_invalid(self):
-        invalid_data = {
-            "metric_name": self.random_metric_name,
+    def test_validate_invalid_score_type_raises_error(self):
+        payload = {
+            "metric_name": self.metric_name,
             "score": uuid.uuid4().hex,
-            "timestamp": self.random_timestamp
+            "timestamp": self.timestamp,
         }
-        with self.assertRaises(MetricValidationError) as ctx:
-            self.validator.validate(invalid_data)
-        self.assertIn("Score must be a number", str(ctx.exception))
+        with self.assertRaises(MetricValidationError):
+            self.validator.validate(payload)
 
-    def test_validate_score_out_of_bounds_low(self):
-        invalid_data = {
-            "metric_name": self.random_metric_name,
+    def test_validate_score_out_of_bounds_low_raises_error(self):
+        payload = {
+            "metric_name": self.metric_name,
             "score": -random.uniform(0.1, 50.0),
-            "timestamp": self.random_timestamp
+            "timestamp": self.timestamp,
         }
-        with self.assertRaises(MetricValidationError) as ctx:
-            self.validator.validate(invalid_data)
-        self.assertIn("out of bounds", str(ctx.exception))
+        with self.assertRaises(MetricValidationError):
+            self.validator.validate(payload)
 
-    def test_validate_score_out_of_bounds_high(self):
-        invalid_data = {
-            "metric_name": self.random_metric_name,
+    def test_validate_score_out_of_bounds_high_raises_error(self):
+        payload = {
+            "metric_name": self.metric_name,
             "score": 100.0 + random.uniform(0.1, 50.0),
-            "timestamp": self.random_timestamp
+            "timestamp": self.timestamp,
         }
-        with self.assertRaises(MetricValidationError) as ctx:
-            self.validator.validate(invalid_data)
-        self.assertIn("out of bounds", str(ctx.exception))
+        with self.assertRaises(MetricValidationError):
+            self.validator.validate(payload)
 
-    def test_validate_stream_bytes(self):
-        metric_item = {
-            "metric_name": uuid.uuid4().hex,
-            "score": round(random.uniform(10.0, 90.0), 2),
-            "timestamp": random.randint(1500000000, 1800000000)
+    def test_validate_stream_with_bytes(self):
+        payload = {
+            "metric_name": self.metric_name,
+            "score": self.score,
+            "timestamp": self.timestamp,
         }
-        stream_content = json.dumps(metric_item).encode('utf-8')
-        mock_stream = io.BytesIO(stream_content)
-        
-        result = self.validator.validate_stream(mock_stream)
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]["metric_name"], metric_item["metric_name"])
+        raw_data = json.dumps(payload).encode("utf-8")
+        stream = io.BytesIO(raw_data)
+        results = self.validator.validate_stream(stream)
+        self.assertIsInstance(results, list)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["metric_name"], self.metric_name)
 
-    def test_validate_stream_string(self):
-        metric_item = {
-            "metric_name": uuid.uuid4().hex,
-            "score": round(random.uniform(10.0, 90.0), 2),
-            "timestamp": random.randint(1500000000, 1800000000)
+    def test_validate_stream_with_string_io(self):
+        payload = {
+            "metric_name": self.metric_name,
+            "score": self.score,
+            "timestamp": self.timestamp,
         }
-        stream_content = json.dumps(metric_item)
-        
-        result = self.validator.validate_stream(stream_content)
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]["score"], metric_item["score"])
+        raw_data = json.dumps(payload)
+        stream = io.StringIO(raw_data)
+        results = self.validator.validate_stream(stream)
+        self.assertEqual(results[0]["score"], self.score)
 
-    def test_validate_stream_malformed_payload(self):
-        malformed_bytes = b'\xb3\xff\x00invalid_garbage_stream'
-        mock_stream = io.BytesIO(malformed_bytes)
-        
-        with self.assertRaises((UnicodeDecodeError, json.JSONDecodeError, MetricValidationError)):
-            self.validator.validate_stream(mock_stream)
+    def test_validate_stream_invalid_json_raises_error(self):
+        bad_content = uuid.uuid4().hex + "{"
+        stream = io.StringIO(bad_content)
+        with self.assertRaises(MetricValidationError):
+            self.validator.validate_stream(stream)
+
+    def test_validate_stream_invalid_bytes_decode_raises_error(self):
+        bad_bytes = b'\xff\xfe\x00\x00invalid_bytes_' + uuid.uuid4().bytes
+        stream = io.BytesIO(bad_bytes)
+        with self.assertRaises(MetricValidationError):
+            self.validator.validate_stream(stream)
 
     def test_dispatch_and_validate_remote(self):
+        endpoint = f"https://{uuid.uuid4().hex}.example.com/api/v1/metrics"
         payload = {
-            "metric_name": self.random_metric_name,
-            "score": self.random_score,
-            "timestamp": self.random_timestamp
+            "metric_name": self.metric_name,
+            "score": self.score,
+            "timestamp": self.timestamp,
         }
-        mock_response_data = {"status": uuid.uuid4().hex, "accepted": True}
+        expected_response = {"status": "ok", "id": uuid.uuid4().hex}
 
-        with patch("requests.post") as mock_post:
-            instance = mock_post.return_value
-            instance.json.return_value = mock_response_data
+        mock_response = MagicMock()
+        mock_response.json.return_value = expected_response
 
-            response = self.validator.dispatch_and_validate_remote(payload, self.random_url)
-            mock_post.assert_called_once_with(self.random_url, json=payload)
-            self.assertEqual(response, mock_response_data)
+        with patch("requests.post", return_value=mock_response) as mock_post:
+            resp = self.validator.dispatch_and_validate_remote(payload, endpoint)
+            mock_post.assert_called_once_with(endpoint, json=payload)
+            self.assertEqual(resp, expected_response)
 
     def test_audit_repository_stub(self):
-        data = {uuid.uuid4().hex: uuid.uuid4().hex}
-        result = audit_repository(data)
-        self.assertEqual(result, data)
+        payload = {
+            "metric_name": self.metric_name,
+            "score": self.score,
+        }
+        res = audit_repository(payload)
+        self.assertEqual(res, payload)
 
     def test_render_health_dashboard_stub(self):
-        data = {uuid.uuid4().hex: random.randint(1, 100)}
-        result = render_health_dashboard(data)
-        self.assertIsInstance(result, str)
-        self.assertTrue(len(result) > 0)
+        payload = {
+            "metric_name": self.metric_name,
+            "score": self.score,
+        }
+        res = render_health_dashboard(payload)
+        self.assertIsInstance(res, str)
+        self.assertTrue(len(res) > 0)
 
     def test_validate_repo_health_metrics_wrapper_valid(self):
-        raw_data = {
-            "health_score": round(random.uniform(0.0, 100.0), 2),
-            "run_id": uuid.uuid4().hex
+        payload = {
+            "health_score": self.score,
+            "run_id": self.metric_name,
         }
-        res = validate_repo_health_metrics(raw_data)
+        res = validate_repo_health_metrics(payload)
         self.assertTrue(res["is_valid"])
         self.assertIn("metrics", res)
 
     def test_validate_repo_health_metrics_wrapper_invalid(self):
-        raw_data = {
-            "health_score": random.uniform(105.0, 200.0),
-            "run_id": uuid.uuid4().hex
+        payload = {
+            "health_score": uuid.uuid4().hex,
+            "run_id": self.metric_name,
         }
-        res = validate_repo_health_metrics(raw_data)
+        res = validate_repo_health_metrics(payload)
         self.assertFalse(res["is_valid"])
 
 

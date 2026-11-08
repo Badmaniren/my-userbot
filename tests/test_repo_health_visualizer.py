@@ -1,119 +1,134 @@
 import os
-import unittest
+import json
 import uuid
 import random
-import json
-from unittest.mock import patch
-import tempfile
-
+import unittest
+from unittest.mock import patch, mock_open
 from skills.repo_health_visualizer import (
     RepoHealthDiagnostic,
     RepoHealthPredictorPipeline,
     RepoHealthVisualizer
 )
 
-class TestRepoHealthVisualizerInquisitorial(unittest.TestCase):
-    def setUp(self):
-        self.diagnostic = RepoHealthDiagnostic()
-        self.pipeline = RepoHealthPredictorPipeline()
-        self.visualizer = RepoHealthVisualizer()
-        self.temp_dir = tempfile.TemporaryDirectory()
-
-    def tearDown(self):
-        self.temp_dir.cleanup()
-
+class TestRepoHealthVisualizerModule(unittest.TestCase):
     def test_repo_health_diagnostic_run(self):
-        random_repo = f"/path/to/{uuid.uuid4().hex}"
-        random_run_id = uuid.uuid4().hex
-
-        result = self.diagnostic.run_diagnostics(random_repo, random_run_id)
-
-        self.assertEqual(result["run_id"], random_run_id)
-        self.assertEqual(result["repo_path"], random_repo)
+        diagnostic = RepoHealthDiagnostic()
+        rand_path = f"/var/repo/{uuid.uuid4().hex}"
+        rand_run_id = uuid.uuid4().hex
+        
+        result = diagnostic.run_diagnostics(rand_path, rand_run_id)
+        
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("run_id"), rand_run_id)
+        self.assertEqual(result.get("repo_path"), rand_path)
         self.assertIn("metrics", result)
-        self.assertIn("health_score", result["metrics"])
-        self.assertIn("complexity", result["metrics"])
-        self.assertIn("issues", result["metrics"])
+        self.assertIsInstance(result["metrics"].get("health_score"), float)
+        self.assertIsInstance(result["metrics"].get("complexity"), int)
+        self.assertIsInstance(result["metrics"].get("issues"), int)
 
-    def test_repo_health_diagnostic_analyze_backward_compatibility(self):
-        random_repo = f"/repo/{uuid.uuid4().hex}"
-        result = self.diagnostic.analyze(random_repo)
-        self.assertIn("run_id", result)
-        self.assertEqual(result["repo_path"], random_repo)
+    def test_repo_health_diagnostic_analyze_fallback_run_id(self):
+        diagnostic = RepoHealthDiagnostic()
+        rand_path = f"/tmp/{uuid.uuid4().hex}"
+        
+        result = diagnostic.analyze(rand_path)
+        
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("repo_path"), rand_path)
+        self.assertIsNotNone(result.get("run_id"))
 
     def test_repo_health_predictor_pipeline_execution(self):
-        random_repo = f"/var/repo/{uuid.uuid4().hex}"
-        random_run_id = uuid.uuid4().hex
-        diagnostic_data = self.diagnostic.run_diagnostics(random_repo, random_run_id)
+        pipeline = RepoHealthPredictorPipeline()
+        rand_run_id = uuid.uuid4().hex
+        rand_path = f"/home/user/repo_{uuid.uuid4().hex}"
+        rand_seed = random.randint(1, 99999)
         
-        random_seed = random.randint(1, 1000)
-        pipeline_result = self.pipeline.execute_pipeline(diagnostic_data, seed=random_seed)
-
-        self.assertEqual(pipeline_result["run_id"], random_run_id)
-        self.assertEqual(pipeline_result["seed"], random_seed)
-        self.assertIn("prediction", pipeline_result)
-        self.assertIn("risk_level", pipeline_result["prediction"])
-        self.assertIn(pipeline_result["prediction"]["risk_level"], ["LOW", "HIGH"])
-
-    def test_repo_health_visualizer_generation_formats(self):
-        random_repo = f"/srv/git/{uuid.uuid4().hex}"
-        random_run_id = uuid.uuid4().hex
-        diagnostic_data = self.diagnostic.run_diagnostics(random_repo, random_run_id)
-        prediction_data = self.pipeline.execute_pipeline(diagnostic_data)
-
-        supported_formats = ["png", "svg", "json", "html"]
-        chosen_format = random.choice(supported_formats)
-
-        result = self.visualizer.generate_visualization(
-            prediction_data=prediction_data,
-            output_format=chosen_format,
-            target_directory=self.temp_dir.name,
-            run_identifier=random_run_id
-        )
-
-        self.assertEqual(result["run_id"], random_run_id)
-        self.assertEqual(result["format"], chosen_format)
-        self.assertTrue(os.path.exists(result["file_path"]))
+        diagnostic_data = {
+            "run_id": rand_run_id,
+            "repo_path": rand_path,
+            "metrics": {
+                "health_score": random.random(),
+                "complexity": random.randint(10, 50),
+                "issues": random.randint(0, 5)
+            }
+        }
         
-        with open(result["file_path"], "r", encoding="utf-8") as f:
-            file_content = f.read()
-            self.assertIn(random_run_id, file_content)
-            self.assertIn(random_repo, file_content)
+        result = pipeline.execute_pipeline(diagnostic_data, seed=rand_seed)
+        
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("run_id"), rand_run_id)
+        self.assertEqual(result.get("seed"), rand_seed)
+        self.assertIn("prediction", result)
+        self.assertIn(result["prediction"].get("risk_level"), ["LOW", "HIGH"])
+        self.assertIsInstance(result["prediction"].get("score"), float)
 
-    def test_repo_health_visualizer_fallback_format(self):
-        random_repo = f"/opt/{uuid.uuid4().hex}"
-        diagnostic_data = self.diagnostic.run_diagnostics(random_repo)
-        prediction_data = self.pipeline.execute_pipeline(diagnostic_data)
-
-        invalid_format = uuid.uuid4().hex[:5]
-
-        result = self.visualizer.generate_visualization(
-            prediction_data=prediction_data,
-            output_format=invalid_format,
-            target_directory=self.temp_dir.name
-        )
-
-        self.assertEqual(result["format"], "json")
-        self.assertTrue(result["file_path"].endswith(".json"))
-        self.assertTrue(os.path.exists(result["file_path"]))
-
-    def test_repo_health_visualizer_mocked_file_writing(self):
-        random_repo = f"/home/user/{uuid.uuid4().hex}"
-        random_run_id = uuid.uuid4().hex
-        diagnostic_data = self.diagnostic.run_diagnostics(random_repo, random_run_id)
-        prediction_data = self.pipeline.execute_pipeline(diagnostic_data)
-
-        with patch("builtins.open", unittest.mock.mock_open()) as mock_file:
-            result = self.visualizer.generate_visualization(
+    def test_repo_health_visualizer_generation_valid_format(self):
+        visualizer = RepoHealthVisualizer()
+        rand_run_id = uuid.uuid4().hex
+        rand_path = f"/opt/repos/{uuid.uuid4().hex}"
+        rand_dir = f"/tmp/{uuid.uuid4().hex}"
+        rand_format = random.choice(["json", "png", "svg", "html"])
+        
+        prediction_data = {
+            "run_id": rand_run_id,
+            "diagnostic_data": {
+                "repo_path": rand_path,
+                "metrics": {"health_score": 0.85}
+            },
+            "prediction": {
+                "risk_level": "LOW",
+                "score": 0.123
+            }
+        }
+        
+        mock_file = mock_open()
+        with patch("os.makedirs"), patch("builtins.open", mock_file):
+            result = visualizer.generate_visualization(
                 prediction_data=prediction_data,
-                output_format="svg",
-                target_directory="/fake/dir",
-                run_identifier=random_run_id
+                output_format=rand_format,
+                target_directory=rand_dir,
+                run_identifier=rand_run_id
             )
+            
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("run_id"), rand_run_id)
+        self.assertEqual(result.get("format"), rand_format)
+        self.assertTrue(result.get("file_path").endswith(f".{rand_format}"))
+        mock_file.assert_called_once()
 
-            mock_file.assert_called_once()
-            self.assertEqual(result["format"], "svg")
-            self.assertEqual(result["run_id"], random_run_id)
+    def test_repo_health_visualizer_generation_invalid_format_fallback(self):
+        visualizer = RepoHealthVisualizer()
+        rand_run_id = uuid.uuid4().hex
+        rand_path = f"/var/tmp/{uuid.uuid4().hex}"
+        rand_dir = f"/tmp/{uuid.uuid4().hex}"
+        invalid_format = uuid.uuid4().hex[:5]
+        
+        prediction_data = {
+            "run_id": rand_run_id,
+            "diagnostic_data": {
+                "repo_path": rand_path
+            }
+        }
+        
+        mock_file = mock_open()
+        with patch("os.makedirs"), patch("builtins.open", mock_file):
+            result = visualizer.generate_visualization(
+                prediction_data=prediction_data,
+                output_format=invalid_format,
+                target_directory=rand_dir,
+                run_identifier=rand_run_id
+            )
+            
+        self.assertEqual(result.get("format"), "json")
+        self.assertTrue(result.get("file_path").endswith(".json"))
+
+    def test_repo_health_visualizer_io_error_handling(self):
+        visualizer = RepoHealthVisualizer()
+        rand_run_id = uuid.uuid4().hex
+        prediction_data = {"run_id": rand_run_id, "diagnostic_data": {"repo_path": "/some/path"}}
+        
+        with patch("os.makedirs"), patch("builtins.open", side_effect=IOError("Disk full")):
+            with self.assertRaises(IOError):
+                visualizer.generate_visualization(prediction_data)
 
 if __name__ == "__main__":
     unittest.main()

@@ -13,53 +13,62 @@ class TestRepoHealthVisualizerIntegration(unittest.TestCase):
         self.diagnostic = RepoHealthDiagnostic()
         self.predictor = RepoHealthPredictorPipeline()
         self.visualizer = RepoHealthVisualizer()
-        self.test_dir = "."
+        self.test_dir = f"./test_artifacts_{uuid.uuid4()}"
+        os.makedirs(self.test_dir, exist_ok=True)
 
     def tearDown(self):
-        for ext in ["json", "png", "svg", "html"]:
-            file_path = os.path.join(self.test_dir, f"visualization_{self.run_id}.{ext}")
-            if os.path.exists(file_path):
-                try:
+        if os.path.exists(self.test_dir):
+            for file in os.listdir(self.test_dir):
+                file_path = os.path.join(self.test_dir, file)
+                if os.path.isfile(file_path):
                     os.remove(file_path)
-                except OSError:
-                    pass
+            os.rmdir(self.test_dir)
 
-    def test_repo_health_visualizer_pipeline_integration(self):
-        self.run_id = str(uuid.uuid4())
-        random_repo_path = f"/tmp/repo_{uuid.uuid4().hex[:8]}"
-        seed_value = random.randint(1, 1000)
-        output_format = random.choice(["json", "png", "svg", "html"])
+    def test_full_pipeline_visualization_integration(self):
+        random_repo_path = f"/mock/repo/path_{uuid.uuid4()}"
+        random_run_id = str(uuid.uuid4())
+        random_seed = random.randint(1, 10000)
+        output_formats = ["json", "svg", "html", "png"]
+        selected_format = random.choice(output_formats)
 
-        diag_result = self.diagnostic.run_diagnostics(repo_path=random_repo_path, run_id=self.run_id)
-        
-        self.assertEqual(diag_result["run_id"], self.run_id)
-        self.assertEqual(diag_result["repo_path"], random_repo_path)
-        self.assertIn("metrics", diag_result)
-
-        pred_result = self.predictor.execute_pipeline(diagnostic_data=diag_result, seed=seed_value)
-
-        self.assertEqual(pred_result["run_id"], self.run_id)
-        self.assertEqual(pred_result["seed"], seed_value)
-        self.assertIn("prediction", pred_result)
-
-        vis_result = self.visualizer.generate_visualization(
-            prediction_data=pred_result,
-            output_format=output_format,
-            target_directory=self.test_dir,
-            run_identifier=self.run_id
+        diagnostic_result = self.diagnostic.run_diagnostics(
+            repo_path=random_repo_path,
+            run_id=random_run_id
         )
 
-        self.assertEqual(vis_result["run_id"], self.run_id)
-        self.assertEqual(vis_result["format"], output_format)
-        
-        expected_file_path = vis_result["file_path"]
-        self.assertTrue(os.path.exists(expected_file_path))
+        self.assertEqual(diagnostic_result.get("run_id"), random_run_id)
+        self.assertEqual(diagnostic_result.get("repo_path"), random_repo_path)
+        self.assertIn("metrics", diagnostic_result)
 
-        with open(expected_file_path, "r", encoding="utf-8") as f:
-            content = f.read()
+        prediction_result = self.predictor.execute_pipeline(
+            diagnostic_data=diagnostic_result,
+            seed=random_seed
+        )
 
-        self.assertIn(self.run_id, content)
-        self.assertIn(random_repo_path, content)
+        self.assertEqual(prediction_result.get("run_id"), random_run_id)
+        self.assertEqual(prediction_result.get("seed"), random_seed)
+        self.assertIn("prediction", prediction_result)
+
+        visualization_result = self.visualizer.generate_visualization(
+            prediction_data=prediction_result,
+            output_format=selected_format,
+            target_directory=self.test_dir,
+            run_identifier=random_run_id
+        )
+
+        returned_file_path = visualization_result.get("file_path")
+        returned_format = visualization_result.get("format")
+        returned_run_id = visualization_result.get("run_id")
+
+        self.assertEqual(returned_run_id, random_run_id)
+        self.assertEqual(returned_format, selected_format)
+        self.assertTrue(os.path.exists(returned_file_path))
+
+        with open(returned_file_path, "r", encoding="utf-8") as f:
+            file_content = f.read()
+
+        self.assertIn(random_run_id, file_content)
+        self.assertIn(random_repo_path, file_content)
 
 if __name__ == "__main__":
     unittest.main()

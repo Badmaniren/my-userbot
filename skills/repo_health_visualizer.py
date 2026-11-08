@@ -40,6 +40,7 @@ class RepoHealthVisualizer:
             ext = "json"
             
         file_name = f"visualization_{run_id}.{ext}"
+        os.makedirs(target_directory, exist_ok=True)
         file_path = os.path.join(target_directory, file_name)
         
         diagnostic_data = prediction_data.get("diagnostic_data", {})

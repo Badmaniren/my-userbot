@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ecurity_gate (compose) — раундов: 2
-- Последняя ошибка перед фиксом: FAILED (failures=1)
-- Статус: успешно прошёл тесты и влит в main
+шно прошёл тесты и влит в main
 
 ## repo_health_aggregator (start_new) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
@@ -355,6 +353,9 @@ ecurity_gate (compose) — раундов: 2
 ## repo_health_anomaly_inspector (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_anomaly_inspector (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
 
 ## repo_health_anomaly_inspector (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

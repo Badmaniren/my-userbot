@@ -23,12 +23,13 @@ class RepoHealthSecuritySyncer:
 
             health_score = metric_payload.get("health_score")
             vulnerabilities = metric_payload.get("vulnerabilities")
+            security_score = metric_payload.get("security_score")
 
             result = {
                 "success": success,
                 "synced_id": sync_id,
                 "health_data": {"health_score": health_score},
-                "security_data": {"vulnerabilities": vulnerabilities, "token": token, "security_score": metric_payload.get("security_score")}
+                "security_data": {"vulnerabilities": vulnerabilities, "token": token, "security_score": security_score}
             }
 
             if self.target_directory:

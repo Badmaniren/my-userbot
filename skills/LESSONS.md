@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-шибка в коде: unterminated string literal (detected at line 58) (<unknown>, line 58); Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 14)
-- Последняя ошибка перед фиксом: FAILED (errors=3)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+гой, передан на эскалацию
 
 ## dependency_audit_aggregator (refactor) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
@@ -315,4 +313,9 @@
 
 ## repo_health_metric_aggregator (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_clean_collector (create) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 5)
+- Последняя ошибка перед фиксом: ^^^^^^^^^^^^
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

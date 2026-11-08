@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-nerability_patcher (compose) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## vulnerability_publisher (compose) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=2)
+бка перед фиксом: FAILED (failures=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## vulnerability_publisher (compose) — раундов: 4
@@ -354,3 +350,7 @@ nerability_patcher (compose) — раундов: 1
 ## repo_health_pulse_engine (create) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main
+
+## repo_health_anomaly_analyzer (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=4)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

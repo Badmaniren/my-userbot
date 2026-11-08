@@ -11,20 +11,43 @@ class TestRepoHealthAnomalyInspectorIntegration(unittest.TestCase):
         pulse_engine = RepoHealthPulseEngine()
         inspector = RepoHealthAnomalyInspector(pulse_engine=pulse_engine)
         
-        random_threshold = float(random.randint(10, 50))
+        negative_val = -float(random.randint(1, 100))
+        normal_val = float(random.randint(50, 200))
         
-        result = inspector.inspect(repo_id=random_repo_id, threshold=random_threshold)
+        payload_metrics = {
+            "error_rate": negative_val,
+            "latency_ms": normal_val
+        }
+        
+        pulse_payload = {
+            "metrics": payload_metrics
+        }
+        
+        threshold = 10.0
+        
+        result = inspector.inspect(
+            repo_id=random_repo_id, 
+            pulse_payload=pulse_payload, 
+            threshold=threshold
+        )
         
         self.assertIsInstance(result, dict)
-        self.assertEqual(result.get('repo_id'), random_repo_id)
-        self.assertIn('status', result)
-        self.assertEqual(result['status'], 'inspected')
-        self.assertIn('anomalies', result)
-        self.assertIn('is_anomaly', result)
-        self.assertIn('deviation_score', result)
-        self.assertIsInstance(result['anomalies'], list)
-        self.assertIsInstance(result['is_anomaly'], bool)
-        self.assertIsInstance(result['deviation_score'], float)
+        self.assertEqual(result.get("repo_id"), random_repo_id)
+        self.assertEqual(result.get("status"), "inspected")
+        self.assertTrue(result.get("is_anomaly"))
+        
+        anomalies = result.get("anomalies", [])
+        self.assertTrue(len(anomalies) > 0)
+        
+        found_negative = False
+        for anomaly in anomalies:
+            if anomaly.get("metric") == "error_rate":
+                self.assertEqual(anomaly.get("value"), negative_val)
+                self.assertEqual(anomaly.get("deviation"), "negative")
+                found_negative = True
+                
+        self.assertTrue(found_negative)
+        self.assertGreater(result.get("deviation_score", 0.0), 0.0)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

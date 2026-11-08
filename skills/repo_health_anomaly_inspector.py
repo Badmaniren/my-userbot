@@ -5,43 +5,42 @@ from skills.repo_logger import RepoLogger
 class RepoHealthAnomalyInspector:
     def __init__(self, pulse_engine=None):
         self.pulse_engine = pulse_engine if pulse_engine is not None else RepoHealthPulseEngine()
+        try:
+            self.logger = RepoLogger(repo_path=".")
+        except TypeError:
+            self.logger = RepoLogger()
 
     def inspect(self, repo_id, pulse_payload=None, threshold=None):
-        metrics = {}
-        if pulse_payload and isinstance(pulse_payload, dict) and "metrics" in pulse_payload:
-            metrics = pulse_payload["metrics"]
-        elif self.pulse_engine:
-            try:
-                if hasattr(self.pulse_engine, "get_metrics"):
-                    metrics = self.pulse_engine.get_metrics(repo_id)
-                elif hasattr(self.pulse_engine, "get_pulse"):
-                    pulse_data = self.pulse_engine.get_pulse(repo_id)
-                    if isinstance(pulse_data, dict) and "metrics" in pulse_data:
-                        metrics = pulse_data["metrics"]
-                    elif isinstance(pulse_data, dict):
-                        metrics = pulse_data
-            except TypeError:
-                pass
+        if pulse_payload is None:
+            pulse_payload = self.pulse_engine.get_pulse(repo_id)
 
+        metrics = pulse_payload.get("metrics", {})
         anomalies = []
-        is_anomaly = False
-        max_deviation = 0.0
+        deviation_score = 0.0
 
-        for k, v in metrics.items():
-            if isinstance(v, (int, float)):
-                if v < 0:
-                    anomalies.append({'metric': k, 'value': v, 'deviation': 'negative'})
-                    is_anomaly = True
-                if threshold is not None and v < threshold:
-                    is_anomaly = True
-                    dev = float(abs(threshold - v))
-                    if dev > max_deviation:
-                        max_deviation = dev
+        for metric_name, value in metrics.items():
+            if isinstance(value, (int, float)):
+                if value < 0:
+                    anomalies.append({
+                        "metric": metric_name,
+                        "value": value,
+                        "deviation": "negative"
+                    })
+                    deviation_score += abs(value)
+                elif threshold is not None and value > threshold:
+                    anomalies.append({
+                        "metric": metric_name,
+                        "value": value,
+                        "deviation": "high"
+                    })
+                    deviation_score += value - threshold
+
+        is_anomaly = len(anomalies) > 0
 
         return {
-            'repo_id': repo_id,
-            'anomalies': anomalies,
-            'status': 'inspected',
-            'is_anomaly': is_anomaly,
-            'deviation_score': max_deviation if max_deviation > 0 else (float(len(anomalies)) if anomalies else 0.0)
+            "repo_id": repo_id,
+            "status": "inspected",
+            "is_anomaly": is_anomaly,
+            "anomalies": anomalies,
+            "deviation_score": deviation_score
         }

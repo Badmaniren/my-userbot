@@ -1,82 +1,73 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 import uuid
 import random
-import string
 import io
-import sys
-import types
-
-module_name = 'skills.repo_health_anomaly_inspector'
-if module_name not in sys.modules:
-    mod = types.ModuleType(module_name)
-    class RepoHealthAnomalyInspector:
-        def __init__(self, pulse_engine=None):
-            self.pulse_engine = pulse_engine
-        def inspect(self, repo_id):
-            metrics = self.pulse_engine.get_metrics(repo_id) if self.pulse_engine else {}
-            anomalies = []
-            for k, v in metrics.items():
-                if isinstance(v, (int, float)) and v < 0:
-                    anomalies.append({'metric': k, 'value': v, 'deviation': 'negative'})
-            return {'repo_id': repo_id, 'anomalies': anomalies, 'status': 'inspected'}
-    mod.RepoHealthAnomalyInspector = RepoHealthAnomalyInspector
-    sys.modules[module_name] = mod
 
 from skills.repo_health_anomaly_inspector import RepoHealthAnomalyInspector
 
+
 class TestRepoHealthAnomalyInspector(unittest.TestCase):
+
     def setUp(self):
         self.repo_id = str(uuid.uuid4())
-        self.pulse_mock = MagicMock()
-        self.inspector = RepoHealthAnomalyInspector(pulse_engine=self.pulse_mock)
+        self.inspector = RepoHealthAnomalyInspector()
 
-    def test_anomaly_inspector_valid_metrics(self):
-        metric_name = ''.join(random.choices(string.ascii_lowercase, k=10))
-        negative_val = -1 * random.randint(1, 1000)
-        positive_val = random.randint(1, 1000)
-        
-        self.pulse_mock.get_metrics.return_value = {
-            metric_name: negative_val,
-            'stable_metric': positive_val
+    def test_inspect_with_direct_payload_metrics(self):
+        metric_key = str(uuid.uuid4())
+        negative_val = -1 * random.randint(1, 100)
+        payload = {
+            "metrics": {
+                metric_key: negative_val
+            }
         }
         
-        result = self.inspector.inspect(self.repo_id)
+        result = self.inspector.inspect(self.repo_id, pulse_payload=payload)
         
-        self.assertEqual(result['repo_id'], self.repo_id)
-        self.assertEqual(result['status'], 'inspected')
-        self.assertTrue(len(result['anomalies']) > 0)
-        
-        found = False
-        for anomaly in result['anomalies']:
-            if anomaly['metric'] == metric_name:
-                found = True
-                self.assertEqual(anomaly['value'], negative_val)
-                self.assertEqual(anomaly['deviation'], 'negative')
-        self.assertTrue(found)
+        self.assertEqual(result["repo_id"], self.repo_id)
+        self.assertTrue(result["is_anomaly"])
+        self.assertEqual(len(result["anomalies"]), 1)
+        self.assertEqual(result["anomalies"][0]["metric"], metric_key)
+        self.assertEqual(result["anomalies"][0]["value"], negative_val)
+        self.assertEqual(result["anomalies"][0]["deviation"], "negative")
 
-    def test_anomaly_inspector_no_anomalies(self):
-        metric_name = ''.join(random.choices(string.ascii_lowercase, k=8))
-        positive_val = random.randint(10, 500)
+    def test_inspect_with_pulse_engine_fallback(self):
+        mock_engine = MagicMock()
+        metric_key = str(uuid.uuid4())
+        normal_val = random.randint(10, 100)
+        mock_engine.get_metrics.return_value = {metric_key: normal_val}
+
+        inspector = RepoHealthAnomalyInspector(pulse_engine=mock_engine)
+        result = inspector.inspect(self.repo_id)
+
+        mock_engine.get_metrics.assert_called_once_with(self.repo_id)
+        self.assertEqual(result["repo_id"], self.repo_id)
+        self.assertFalse(result["is_anomaly"])
+        self.assertEqual(result["status"], "inspected")
+
+    def test_inspect_with_threshold_deviation(self):
+        metric_key = str(uuid.uuid4())
+        metric_val = random.randint(1, 50)
+        threshold_val = metric_val + random.randint(10, 50)
         
-        self.pulse_mock.get_metrics.return_value = {
-            metric_name: positive_val
+        payload = {
+            "metrics": {
+                metric_key: metric_val
+            }
         }
         
-        result = self.inspector.inspect(self.repo_id)
+        result = self.inspector.inspect(self.repo_id, pulse_payload=payload, threshold=threshold_val)
         
-        self.assertEqual(result['repo_id'], self.repo_id)
-        self.assertEqual(len(result['anomalies']), 0)
+        self.assertTrue(result["is_anomaly"])
+        self.assertGreater(result["deviation_score"], 0.0)
 
-    def test_anomaly_inspector_with_stream_mock(self):
-        stream_data = io.BytesIO(uuid.uuid4().bytes)
-        
-        with patch('skills.repo_health_anomaly_inspector.uuid') as mock_uuid:
-            mock_uuid.uuid4.return_value = uuid.UUID(self.repo_id)
-            res = self.inspector.inspect(str(mock_uuid.uuid4()))
-            self.assertEqual(res['repo_id'], self.repo_id)
-        
-        self.assertIsNotNone(stream_data.read())
+    def test_inspect_pulse_engine_type_error_handling(self):
+        mock_engine = MagicMock()
+        mock_engine.get_metrics.side_effect = TypeError("Unexpected signature")
 
-if __name__ == '__main__':
-    unittest.main()
+        inspector = RepoHealthAnomalyInspector(pulse_engine=mock_engine)
+        result = inspector.inspect(self.repo_id)
+
+        self.assertEqual(result["repo_id"], self.repo_id)
+        self.assertFalse(result["is_anomaly"])
+        self.assertEqual(result["anomalies"], [])

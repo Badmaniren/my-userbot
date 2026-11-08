@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-м: FAILED (errors=1)
-- Статус: успешно прошёл тесты и влит в main
-
-## dependency_audit_shield (compose) — раундов: 4
-- Последняя ошибка перед фиксом: Ran 244 tests in 1.105s
+ tests in 1.105s
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## dependency_audit_aggregator (refactor) — раундов: 4
@@ -316,3 +312,7 @@
 
 ## repo_health_visualizer (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## repo_health_exporter (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

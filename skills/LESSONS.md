@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-лушки внутри `except`! Импортируй честно.
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## vulnerability_patcher (compose) — раундов: 1
+nerability_patcher (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## vulnerability_publisher (compose) — раундов: 4
@@ -354,3 +350,7 @@
 ## repo_health_anomaly_detector (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=3, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_pulse_engine (create) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main

@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ty_audit_bridge (compose) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## vulnerability_security_gate (compose) — раундов: 2
+ecurity_gate (compose) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main
 
@@ -358,3 +355,6 @@ ty_audit_bridge (compose) — раундов: 1
 ## repo_health_anomaly_inspector (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_anomaly_inspector (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

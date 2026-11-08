@@ -44,9 +44,16 @@ class RepoHealthMetricValidator:
             content = stream
 
         if isinstance(content, bytes):
-            content = content.decode('utf-8')
+            try:
+                content = content.decode('utf-8')
+            except UnicodeDecodeError as e:
+                raise MetricValidationError(f"Failed to decode stream bytes: {e}")
 
-        data = json.loads(content)
+        try:
+            data = json.loads(content)
+        except json.JSONDecodeError as e:
+            raise MetricValidationError(f"Failed to parse JSON: {e}")
+
         if not isinstance(data, list):
             data = [data]
 

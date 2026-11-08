@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-гой, передан на эскалацию
-
-## dependency_audit_aggregator (refactor) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
-- Последняя ошибка перед фиксом: from skills import dependency_audit_guardian
+ледняя ошибка перед фиксом: from skills import dependency_audit_guardian
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## dependency_audit_pipeline (compose) — раундов: 4
@@ -318,4 +314,9 @@
 ## repo_health_clean_collector (create) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 5)
 - Последняя ошибка перед фиксом: ^^^^^^^^^^^^
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_pulse (create) — раундов: 4
+- Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
+- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

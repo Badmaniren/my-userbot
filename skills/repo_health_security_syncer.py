@@ -21,11 +21,14 @@ class RepoHealthSecuritySyncer:
             if token and env_token and token != env_token:
                 success = False
 
+            health_score = metric_payload.get("health_score")
+            vulnerabilities = metric_payload.get("vulnerabilities")
+
             result = {
                 "success": success,
                 "synced_id": sync_id,
-                "health_data": {"health_score": metric_payload.get("health_score")},
-                "security_data": {"vulnerabilities": metric_payload.get("vulnerabilities"), "token": token}
+                "health_data": {"health_score": health_score},
+                "security_data": {"vulnerabilities": vulnerabilities, "token": token, "security_score": metric_payload.get("security_score")}
             }
 
             if self.target_directory:
@@ -35,8 +38,8 @@ class RepoHealthSecuritySyncer:
                 audit_content = {
                     "audit_id": str(uuid.uuid4()),
                     "correlation_id": sync_id,
-                    "health_metrics": {"health_score": metric_payload.get("health_score")},
-                    "security_metrics": {"vulnerabilities": metric_payload.get("vulnerabilities")}
+                    "health_metrics": {"health_score": health_score},
+                    "security_metrics": {"vulnerabilities": vulnerabilities}
                 }
                 
                 os.makedirs(self.target_directory, exist_ok=True)

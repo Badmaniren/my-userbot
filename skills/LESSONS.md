@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-шно прошёл тесты и влит в main
-
-## repo_health_aggregator (start_new) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
+еред фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## repo_health_diagnostic (create) — раундов: 4
@@ -353,6 +350,9 @@
 ## repo_health_anomaly_inspector (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_anomaly_inspector (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
 
 ## repo_health_anomaly_inspector (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

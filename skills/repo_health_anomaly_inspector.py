@@ -12,7 +12,12 @@ class RepoHealthAnomalyInspector:
 
     def inspect(self, repo_id, pulse_payload=None, threshold=None):
         if pulse_payload is None:
-            pulse_payload = self.pulse_engine.get_pulse(repo_id)
+            if hasattr(self.pulse_engine, "get_pulse"):
+                pulse_payload = self.pulse_engine.get_pulse(repo_id)
+            elif hasattr(self.pulse_engine, "pulse"):
+                pulse_payload = self.pulse_engine.pulse(repo_id)
+            else:
+                pulse_payload = {}
 
         metrics = pulse_payload.get("metrics", {})
         anomalies = []

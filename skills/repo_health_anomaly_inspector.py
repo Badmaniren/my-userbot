@@ -1,4 +1,3 @@
-import uuid
 from skills.repo_health_pulse_engine import RepoHealthPulseEngine
 from skills.repo_logger import RepoLogger
 
@@ -8,7 +7,10 @@ class RepoHealthAnomalyInspector:
         try:
             self.logger = RepoLogger(repo_path=".")
         except TypeError:
-            self.logger = RepoLogger()
+            try:
+                self.logger = RepoLogger()
+            except TypeError:
+                self.logger = None
 
     def inspect(self, repo_id, pulse_payload=None, threshold=None):
         if pulse_payload is None:

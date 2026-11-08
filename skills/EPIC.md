@@ -5,3 +5,4 @@
 - repo_health_anomaly_inspector: Создаем базовый синтезатор аномалий как фундамент для новой системы сквозного аудита и самовосстановления
 - repo_health_anomaly_inspector: Проводим рефакторинг и стабилизацию repo_health_anomaly_inspector, чтобы сделать детектор устойчивым к ошибкам перед созданием цепочки автоматического восстановления
 - repo_health_anomaly_inspector: Исправление ошибок и стабилизация repo_health_anomaly_inspector для завершения фундамента системы самовосстановления
+- repo_health_anomaly_inspector: Выполняем необходимую стабилизацию repo_health_anomaly_inspector перед созданием конвейера восстановления (remediation pipeline)

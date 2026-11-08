@@ -7,3 +7,6 @@
 - repo_health_anomaly_inspector: Создаем синтезатор аномалий на базе repo_health_pulse_engine и repo_health_anomaly_inspector для объединения сырых метрик и инспекций в единую диагностическую картину.
 - repo_health_anomaly_inspector: Создаем синтезатор аномалий на базе repo_health_pulse_engine и repo_health_anomaly_inspector для объединения сырых метрик и инспекций в единую диагностическую картину.
 - repo_health_anomaly_inspector: Создаем синтезатор аномалий на базе repo_health_pulse_engine и repo_health_anomaly_inspector для завершения контура диагностики
+- repo_health_anomaly_inspector: Создаем синтезатор аномалий на базе repo_health_pulse_engine и repo_health_anomaly_inspector для завершения контура диагностики  ✅ ЭПИК ЗАВЕРШЁН
+
+Нет активного эпика — можно предложить новый.

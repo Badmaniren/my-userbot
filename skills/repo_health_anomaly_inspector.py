@@ -8,7 +8,10 @@ class RepoHealthAnomalyInspector:
         try:
             self.logger = RepoLogger(repo_path=".")
         except TypeError:
-            self.logger = RepoLogger()
+            try:
+                self.logger = RepoLogger()
+            except TypeError:
+                self.logger = None
 
     def inspect(self, repo_id, pulse_payload=None, threshold=None):
         if pulse_payload is None:
@@ -18,6 +21,9 @@ class RepoHealthAnomalyInspector:
                 pulse_payload = self.pulse_engine.pulse(repo_id)
             else:
                 pulse_payload = {}
+
+        if pulse_payload is None:
+            pulse_payload = {}
 
         metrics = pulse_payload.get("metrics", {})
         anomalies = []

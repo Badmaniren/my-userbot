@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
-- Последняя ошибка перед фиксом: raise AssertionError(msg)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+ус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## vulnerability_publisher_hub (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
@@ -356,4 +354,8 @@ invalid syntax (<unknown>, line 1); Синтаксическая ошибка в
 - Статус: успешно прошёл тесты и влит в main
 
 ## repo_health_anomaly_inspector (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## repo_health_anomaly_inspector (refactor) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: успешно прошёл тесты и влит в main

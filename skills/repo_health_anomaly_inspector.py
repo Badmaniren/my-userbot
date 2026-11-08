@@ -19,6 +19,9 @@ class RepoHealthAnomalyInspector:
             else:
                 pulse_payload = {}
 
+        if pulse_payload is None:
+            pulse_payload = {}
+
         metrics = pulse_payload.get("metrics", {})
         anomalies = []
         deviation_score = 0.0

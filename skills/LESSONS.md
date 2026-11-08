@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- tests in 1.105s
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## dependency_audit_aggregator (refactor) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: unterminated string literal (detected at line 58) (<unknown>, line 58); Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 14)
+шибка в коде: unterminated string literal (detected at line 58) (<unknown>, line 58); Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 14)
 - Последняя ошибка перед фиксом: FAILED (errors=3)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -315,4 +311,8 @@
 
 ## repo_health_exporter (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_metric_aggregator (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

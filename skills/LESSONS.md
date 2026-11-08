@@ -3,7 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-осмысленно или пробрось наружу через raise.; Синтаксическая ошибка в коде: invalid character '—' (U+2014) (<unknown>, line 43)
+014) (<unknown>, line 43)
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -323,6 +323,9 @@
 
 ## repo_health_security_syncer (refactor) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: успешно прошёл тесты и влит в main
+
+## repo_health_security_syncer (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## repo_health_security_syncer (refactor) — раундов: 1

@@ -3,12 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## vulnerability_publisher_hub (compose) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## vulnerability_audit_bridge (compose) — раундов: 1
+ty_audit_bridge (compose) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## vulnerability_security_gate (compose) — раундов: 2
@@ -359,3 +354,7 @@
 ## repo_health_anomaly_inspector (refactor) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: успешно прошёл тесты и влит в main
+
+## repo_health_anomaly_inspector (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

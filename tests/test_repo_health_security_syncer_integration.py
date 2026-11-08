@@ -42,7 +42,7 @@ class TestRepoHealthSecuritySyncerIntegration(unittest.TestCase):
         expected_file_name = f"audit_{random_sync_id}.json"
         expected_file_path = os.path.join(self.test_dir.name, expected_file_name)
         
-        self.assertTrue(os.path.exists(expected_file_path))
+        self.assertTrue(os.path.exists(expected_file_path), "Интеграционный файл аудита не был создан на диске.")
 
         with open(expected_file_path, "r", encoding="utf-8") as f:
             audit_data = json.load(f)
@@ -50,28 +50,28 @@ class TestRepoHealthSecuritySyncerIntegration(unittest.TestCase):
         self.assertEqual(audit_data["correlation_id"], random_sync_id)
         self.assertEqual(audit_data["health_metrics"]["health_score"], random_health_score)
         self.assertEqual(audit_data["security_metrics"]["vulnerabilities"], random_vuln_count)
+        self.assertIn("audit_id", audit_data)
 
     def test_synchronize_token_validation_failure(self):
         random_sync_id = str(uuid.uuid4())
-        invalid_token = str(uuid.uuid4())
         valid_token = str(uuid.uuid4())
+        invalid_token = str(uuid.uuid4())
 
         os.environ["REPO_SYNC_TOKEN"] = valid_token
 
         payload = {
             "sync_id": random_sync_id,
             "token": invalid_token,
-            "health_score": 95.0,
-            "vulnerabilities": 0
+            "health_score": random.randint(1, 100)
         }
 
-        try:
-            result = self.syncer.synchronize(metric_payload=payload)
-            self.assertFalse(result["success"])
-            self.assertEqual(result["synced_id"], random_sync_id)
-        finally:
-            if "REPO_SYNC_TOKEN" in os.environ:
-                del os.environ["REPO_SYNC_TOKEN"]
+        result = self.syncer.synchronize(metric_payload=payload)
+        
+        self.assertFalse(result["success"])
+        self.assertEqual(result["synced_id"], random_sync_id)
+
+        if "REPO_SYNC_TOKEN" in os.environ:
+            del os.environ["REPO_SYNC_TOKEN"]
 
 if __name__ == "__main__":
     unittest.main()

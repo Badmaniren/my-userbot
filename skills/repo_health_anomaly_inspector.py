@@ -12,7 +12,14 @@ class RepoHealthAnomalyInspector:
             metrics = pulse_payload["metrics"]
         elif self.pulse_engine:
             try:
-                metrics = self.pulse_engine.get_metrics(repo_id)
+                if hasattr(self.pulse_engine, "get_metrics"):
+                    metrics = self.pulse_engine.get_metrics(repo_id)
+                elif hasattr(self.pulse_engine, "get_pulse"):
+                    pulse_data = self.pulse_engine.get_pulse(repo_id)
+                    if isinstance(pulse_data, dict) and "metrics" in pulse_data:
+                        metrics = pulse_data["metrics"]
+                    elif isinstance(pulse_data, dict):
+                        metrics = pulse_data
             except TypeError:
                 pass
 

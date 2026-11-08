@@ -5,7 +5,10 @@ from skills.repo_logger import RepoLogger
 class RepoHealthAnomalyInspector:
     def __init__(self, pulse_engine=None):
         self.pulse_engine = pulse_engine if pulse_engine is not None else RepoHealthPulseEngine()
-        self.logger = RepoLogger()
+        try:
+            self.logger = RepoLogger(repo_path=".")
+        except TypeError:
+            self.logger = RepoLogger()
 
     def inspect(self, repo_id, pulse_payload=None, threshold=None):
         if pulse_payload is None:
@@ -16,10 +19,8 @@ class RepoHealthAnomalyInspector:
         deviation_score = 0.0
 
         for metric_name, value in metrics.items():
-            is_negative = False
             if isinstance(value, (int, float)):
                 if value < 0:
-                    is_negative = True
                     anomalies.append({
                         "metric": metric_name,
                         "value": value,

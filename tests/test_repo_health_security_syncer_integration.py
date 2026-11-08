@@ -9,18 +9,13 @@ from skills.repo_health_security_syncer import RepoHealthSecuritySyncer
 class TestRepoHealthSecuritySyncerIntegration(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
-        self.sync_id = str(uuid.uuid4())
-        self.token = str(uuid.uuid4())
-        os.environ["REPO_SYNC_TOKEN"] = self.token
-        
-        self.health_score = random.randint(50, 100)
-        self.security_score = random.randint(50, 100)
-        self.vulnerabilities_count = random.randint(0, 5)
-        self.vulnerabilities = [f"CVE-2023-{random.randint(1000, 9999)}" for _ in range(self.vulnerabilities_count)]
+        self.repo_id = str(uuid.uuid4())
+        self.syncer = RepoHealthSecuritySyncer(
+            repo_id=self.repo_id,
+            target_directory=self.test_dir
+        )
 
     def tearDown(self):
-        if "REPO_SYNC_TOKEN" in os.environ:
-            del os.environ["REPO_SYNC_TOKEN"]
         for root, dirs, files in os.walk(self.test_dir, topdown=False):
             for name in files:
                 os.remove(os.path.join(root, name))
@@ -28,53 +23,63 @@ class TestRepoHealthSecuritySyncerIntegration(unittest.TestCase):
                 os.rmdir(os.path.join(root, name))
         os.rmdir(self.test_dir)
 
-    def test_synchronize_with_payload_and_file_persistence(self):
-        syncer = RepoHealthSecuritySyncer(target_directory=self.test_dir)
-        
+    def test_synchronize_payload_integration(self):
+        sync_id = str(uuid.uuid4())
+        health_score = round(random.uniform(50.0, 100.0), 2)
+        security_score = round(random.uniform(50.0, 100.0), 2)
+        vuln_count = random.randint(0, 5)
+        vulnerabilities = [f"CVE-{random.randint(1000, 9999)}" for _ in range(vuln_count)]
+
         payload = {
-            "sync_id": self.sync_id,
-            "token": self.token,
-            "health_score": self.health_score,
-            "security_score": self.security_score,
-            "vulnerabilities": self.vulnerabilities
+            "sync_id": sync_id,
+            "health_score": health_score,
+            "security_score": security_score,
+            "vulnerabilities": vulnerabilities
         }
 
-        result = syncer.synchronize(metric_payload=payload)
+        result = self.syncer.synchronize(metric_payload=payload)
 
-        self.assertTrue(result.get("success"))
-        self.assertEqual(result.get("synced_id"), self.sync_id)
-        self.assertEqual(result.get("health_data", {}).get("health_score"), self.health_score)
-        self.assertEqual(result.get("security_data", {}).get("security_score"), self.security_score)
-        self.assertEqual(result.get("security_data", {}).get("vulnerabilities"), self.vulnerabilities)
+        self.assertTrue(result["success"])
+        self.assertEqual(result["synced_id"], sync_id)
+        self.assertEqual(result["health_data"]["health_score"], health_score)
+        self.assertEqual(result["security_data"]["security_score"], security_score)
+        self.assertEqual(result["security_data"]["vulnerabilities"], vulnerabilities)
 
-        expected_file_name = f"audit_{self.sync_id}.json"
+        expected_file_name = f"audit_{sync_id}.json"
         expected_file_path = os.path.join(self.test_dir, expected_file_name)
-        
-        self.assertTrue(os.path.exists(expected_file_path), "Audit file was not created on disk.")
+        self.assertTrue(os.path.exists(expected_file_path))
 
         with open(expected_file_path, "r", encoding="utf-8") as f:
-            file_data = json.load(f)
+            audit_data = json.load(f)
 
-        self.assertEqual(file_data.get("correlation_id"), self.sync_id)
-        self.assertEqual(file_data.get("health_metrics", {}).get("health_score"), self.health_score)
-        self.assertEqual(file_data.get("security_metrics", {}).get("vulnerabilities"), self.vulnerabilities)
+        self.assertEqual(audit_data["correlation_id"], sync_id)
+        self.assertEqual(audit_data["health_metrics"]["health_score"], health_score)
+        self.assertEqual(audit_data["security_metrics"]["vulnerabilities"], vulnerabilities)
 
-    def test_synchronize_token_mismatch(self):
-        syncer = RepoHealthSecuritySyncer(target_directory=self.test_dir)
-        
-        wrong_token = str(uuid.uuid4())
-        payload = {
-            "sync_id": self.sync_id,
-            "token": wrong_token,
-            "health_score": self.health_score,
-            "security_score": self.security_score,
-            "vulnerabilities": self.vulnerabilities
-        }
+    def test_synchronize_token_validation(self):
+        sync_id = str(uuid.uuid4())
+        expected_token = str(uuid.uuid4())
+        os.environ["REPO_SYNC_TOKEN"] = expected_token
 
-        result = syncer.synchronize(metric_payload=payload)
+        try:
+            payload_invalid = {
+                "sync_id": sync_id,
+                "token": "wrong_token",
+                "health_score": 90.0
+            }
+            result_invalid = self.syncer.synchronize(metric_payload=payload_invalid)
+            self.assertFalse(result_invalid["success"])
 
-        self.assertFalse(result.get("success"))
-        self.assertEqual(result.get("synced_id"), self.sync_id)
+            payload_valid = {
+                "sync_id": sync_id,
+                "token": expected_token,
+                "health_score": 95.0
+            }
+            result_valid = self.syncer.synchronize(metric_payload=payload_valid)
+            self.assertTrue(result_valid["success"])
+        finally:
+            if "REPO_SYNC_TOKEN" in os.environ:
+                del os.environ["REPO_SYNC_TOKEN"]
 
 if __name__ == "__main__":
     unittest.main()

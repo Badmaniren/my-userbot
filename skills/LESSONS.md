@@ -3,15 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-мпортируй честно.
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
-## repo_performance_profiler_pipeline (compose) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## repo_performance_optimizer (compose) — раундов: 2
-- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main
 
 ## repo_performance_profiler_pipeline (refactor) — раундов: 4
@@ -361,4 +353,9 @@
 
 ## repo_health_anomaly_remediation_pipeline (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_anomaly_remediation_pipeline (refactor) — раундов: 4
+- Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
+- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

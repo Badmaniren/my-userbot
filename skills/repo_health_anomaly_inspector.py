@@ -7,7 +7,15 @@ class RepoHealthAnomalyInspector:
         self.pulse_engine = pulse_engine if pulse_engine is not None else RepoHealthPulseEngine()
         self.logger = RepoLogger(repo_path=".")
 
-    def inspect(self, repo_id, pulse_payload=None, threshold=None):
+    def inspect(self, repo_id=None, pulse_payload=None, threshold=None):
+        if repo_id is None:
+            # Обработка краевого случая, если репозиторий не передан явно,
+            # но пытаемся извлечь его из payload или сгенерировать по умолчанию
+            if isinstance(pulse_payload, dict):
+                repo_id = pulse_payload.get("repo_id", "default-repo")
+            else:
+                repo_id = "default-repo"
+
         if pulse_payload is None:
             if hasattr(self.pulse_engine, "get_pulse"):
                 pulse_payload = self.pulse_engine.get_pulse(repo_id)

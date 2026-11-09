@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-
-- Статус: успешно прошёл тесты и влит в main
-
-## repo_performance_profiler_pipeline (refactor) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: expected '(' (<unknown>, line 9); Синтаксическая ошибка в коде: expected an indented block after function definition on line 5 (<unknown>, line 5)
+ expected an indented block after function definition on line 5 (<unknown>, line 5)
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -358,4 +354,8 @@
 ## repo_health_anomaly_remediation_pipeline (refactor) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_anomaly_remediation_pipeline (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: ----------------------------------------------------------------------
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

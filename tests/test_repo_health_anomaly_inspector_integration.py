@@ -6,50 +6,54 @@ from skills.repo_health_pulse_engine import RepoHealthPulseEngine
 from skills.repo_logger import RepoLogger
 
 class TestRepoHealthAnomalyInspectorIntegration(unittest.TestCase):
-    def setUp(self):
-        self.repo_id = str(uuid.uuid4())
-        self.pulse_engine = RepoHealthPulseEngine()
-        self.inspector = RepoHealthAnomalyInspector(pulse_engine=self.pulse_engine)
-
     def test_anomaly_inspector_real_integration(self):
-        random_metric_name = f"metric_{uuid.uuid4().hex[:8]}"
-        negative_value = -float(random.randint(1, 100))
-        high_value = float(random.randint(150, 300))
-        threshold = 100.0
+        unique_repo_id = f"repo-{uuid.uuid4()}"
+        negative_metric_val = -float(random.randint(1, 50))
+        high_metric_val = float(random.randint(150, 300))
+        threshold_val = 100.0
 
-        custom_payload = {
+        pulse_engine = RepoHealthPulseEngine()
+        inspector = RepoHealthAnomalyInspector(pulse_engine=pulse_engine)
+
+        custom_pulse_payload = {
             "metrics": {
-                random_metric_name: negative_value,
-                "stable_metric": 42.0,
-                "spike_metric": high_value
+                "error_rate": negative_metric_val,
+                "latency_ms": high_metric_val,
+                "stable_metric": 50.0
             }
         }
 
-        result = self.inspector.inspect(
-            repo_id=self.repo_id,
-            pulse_payload=custom_payload,
-            threshold=threshold
+        result = inspector.inspect(
+            repo_id=unique_repo_id,
+            pulse_payload=custom_pulse_payload,
+            threshold=threshold_val
         )
 
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result.get("repo_id"), self.repo_id)
-        self.assertEqual(result.get("status"), "inspected")
-        self.assertTrue(result.get("is_anomaly"))
-        
-        anomalies = result.get("anomalies", [])
-        self.assertGreaterEqual(len(anomalies), 2)
+        self.assertEqual(result["repo_id"], unique_repo_id)
+        self.assertEqual(result["status"], "inspected")
+        self.assertTrue(result["is_anomaly"])
+        self.assertGreater(len(result["anomalies"]), 0)
+        self.assertGreater(result["deviation_score"], 0.0)
 
-        anomaly_metrics = [a["metric"] for a in anomalies]
-        self.assertIn(random_metric_name, anomaly_metrics)
-        self.assertIn("spike_metric", anomaly_metrics)
-        self.assertGreater(result.get("deviation_score", 0.0), 0.0)
+        found_negative = False
+        found_high = False
+        for anomaly in result["anomalies"]:
+            if anomaly["metric"] == "error_rate" and anomaly["value"] == negative_metric_val:
+                found_negative = True
+            if anomaly["metric"] == "latency_ms" and anomaly["value"] == high_metric_val:
+                found_high = True
 
-    def test_anomaly_inspector_implicit_pulse_integration(self):
-        result = self.inspector.inspect(repo_id=self.repo_id)
+        self.assertTrue(found_negative)
+        self.assertTrue(found_high)
+
+    def test_anomaly_inspector_automatic_pulse_fetch(self):
+        unique_repo_id = f"target-repo-{uuid.uuid4()}"
+        inspector = RepoHealthAnomalyInspector()
         
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result.get("repo_id"), self.repo_id)
-        self.assertEqual(result.get("status"), "inspected")
+        result = inspector.inspect(repo_id=unique_repo_id)
+
+        self.assertEqual(result["repo_id"], unique_repo_id)
+        self.assertEqual(result["status"], "inspected")
         self.assertIn("is_anomaly", result)
         self.assertIn("anomalies", result)
         self.assertIn("deviation_score", result)

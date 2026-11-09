@@ -1,16 +1,11 @@
 from skills.repo_health_pulse_engine import RepoHealthPulseEngine
 from skills.repo_logger import RepoLogger
 
+
 class RepoHealthAnomalyInspector:
     def __init__(self, pulse_engine=None):
         self.pulse_engine = pulse_engine if pulse_engine is not None else RepoHealthPulseEngine()
-        try:
-            self.logger = RepoLogger(repo_path=".")
-        except TypeError:
-            try:
-                self.logger = RepoLogger()
-            except TypeError:
-                self.logger = None
+        self.logger = RepoLogger(repo_path=".")
 
     def inspect(self, repo_id, pulse_payload=None, threshold=None):
         if pulse_payload is None:

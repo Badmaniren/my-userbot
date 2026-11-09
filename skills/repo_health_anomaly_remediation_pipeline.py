@@ -67,6 +67,9 @@ def run_remediation_pipeline(payload):
     run_id = payload.get("run_id")
     target_path = payload.get("target_path")
     
+    if target_path and not os.path.exists(target_path):
+        os.makedirs(target_path, exist_ok=True)
+
     remediation_marker = os.path.join(target_path, f".remediated_{run_id}")
     with open(remediation_marker, "w") as f:
         f.write("remediated")

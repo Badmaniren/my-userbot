@@ -1,14 +1,16 @@
 import unittest
-from unittest.mock import patch, MagicMock
-import io
-import random
+from unittest.mock import MagicMock, patch
 import uuid
-import string
+import random
+import os
+import io
 
 from skills.repo_health_anomaly_remediation_pipeline import (
-    RepoHealthAnomalyRemediationPipeline,
+    AnomalySeverity,
     RemediationExecutionError,
-    AnomalySeverity
+    RepoHealthAnomalyRemediationPipeline,
+    run_remediation_pipeline,
+    inspect_anomalies
 )
 
 
@@ -16,123 +18,126 @@ class TestRepoHealthAnomalyRemediationPipeline(unittest.TestCase):
 
     def setUp(self):
         self.pipeline_id = uuid.uuid4().hex
-        self.inspector_mock = MagicMock()
-        self.automator_mock = MagicMock()
-        self.restorer_mock = MagicMock()
-        self.logger_mock = MagicMock()
-
+        self.inspector = MagicMock()
+        self.automator = MagicMock()
+        self.restorer = MagicMock()
+        self.logger = MagicMock()
+        
         self.pipeline = RepoHealthAnomalyRemediationPipeline(
             pipeline_id=self.pipeline_id,
-            inspector=self.inspector_mock,
-            automator=self.automator_mock,
-            restorer=self.restorer_mock,
-            logger=self.logger_mock
+            inspector=self.inspector,
+            automator=self.automator,
+            restorer=self.restorer,
+            logger=self.logger
         )
+        self.repo_path = f"/tmp/{uuid.uuid4().hex}"
 
-    def test_run_remediation_pipeline_success(self):
-        repo_path = f"/repo/{uuid.uuid4().hex}"
+    def test_run_pipeline_healthy_repository(self):
+        self.inspector.inspect_repository.return_value = None
+        
+        result = self.pipeline.run_pipeline(self.repo_path)
+        
+        self.assertEqual(result.get("pipeline_id"), self.pipeline_id)
+        self.assertEqual(result.get("status"), "healthy")
+        self.assertFalse(result.get("remediated"))
+        self.inspector.inspect_repository.assert_called_once_with(self.repo_path)
+        self.automator.execute_remediation.assert_not_called()
+
+    def test_run_pipeline_anomaly_remediated_successfully(self):
         anomaly_id = uuid.uuid4().hex
-        anomaly_metric = f"metric_{uuid.uuid4().hex[:8]}"
-        severity_value = random.choice(list(AnomalySeverity)).name
-
-        inspector_payload = {
-            "anomaly_id": anomaly_id,
-            "metric": anomaly_metric,
-            "severity": severity_value,
-            "score": random.uniform(0.1, 0.9)
-        }
-
-        self.inspector_mock.inspect_repository.return_value = inspector_payload
+        token_val = uuid.uuid4().hex
+        anomaly = {"anomaly_id": anomaly_id, "severity": AnomalySeverity.HIGH.name}
         
-        remediation_result_token = uuid.uuid4().hex
-        self.automator_mock.execute_remediation.return_value = {
-            "status": "success",
-            "token": remediation_result_token
-        }
-
-        execution_report = self.pipeline.run_pipeline(repo_path)
-
-        self.assertEqual(execution_report["pipeline_id"], self.pipeline_id)
-        self.assertEqual(execution_report["repo_path"], repo_path)
-        self.assertEqual(execution_report["anomaly_id"], anomaly_id)
-        self.assertEqual(execution_report["status"], "remediated")
-        self.assertEqual(execution_report["token"], remediation_result_token)
+        self.inspector.inspect_repository.return_value = anomaly
+        self.automator.execute_remediation.return_value = {"token": token_val}
         
-        self.inspector_mock.inspect_repository.assert_called_once_with(repo_path)
-        self.automator_mock.execute_remediation.assert_called_once()
-
-    def test_run_remediation_pipeline_no_anomalies(self):
-        repo_path = f"/repo/{uuid.uuid4().hex}"
-        self.inspector_mock.inspect_repository.return_value = None
-
-        execution_report = self.pipeline.run_pipeline(repo_path)
-
-        self.assertEqual(execution_report["pipeline_id"], self.pipeline_id)
-        self.assertEqual(execution_report["status"], "healthy")
-        self.assertEqual(execution_report["remediated"], False)
+        result = self.pipeline.run_pipeline(self.repo_path)
         
-        self.restorer_mock.restore_state.assert_not_called()
+        self.assertEqual(result.get("pipeline_id"), self.pipeline_id)
+        self.assertEqual(result.get("repo_path"), self.repo_path)
+        self.assertEqual(result.get("anomaly_id"), anomaly_id)
+        self.assertEqual(result.get("status"), "remediated")
+        self.assertEqual(result.get("token"), token_val)
+        
+        self.inspector.inspect_repository.assert_called_once_with(self.repo_path)
+        self.automator.execute_remediation.assert_called_once_with(self.repo_path, anomaly)
+        self.restorer.restore_state.assert_not_called()
 
-    def test_run_remediation_pipeline_fallback_to_restorer(self):
-        repo_path = f"/repo/{uuid.uuid4().hex}"
+    def test_run_pipeline_remediation_failure_triggers_restorer(self):
         anomaly_id = uuid.uuid4().hex
+        anomaly = {"anomaly_id": anomaly_id, "severity": AnomalySeverity.CRITICAL.name}
+        error_message = uuid.uuid4().hex
         
-        self.inspector_mock.inspect_repository.return_value = {
-            "anomaly_id": anomaly_id,
-            "severity": AnomalySeverity.CRITICAL.name,
-            "score": 0.99
+        self.inspector.inspect_repository.return_value = anomaly
+        self.automator.execute_remediation.side_effect = Exception(error_message)
+        
+        with self.assertRaises(RemediationExecutionError) as ctx:
+            self.pipeline.run_pipeline(self.repo_path)
+            
+        self.assertIn(error_message, str(ctx.exception))
+        self.restorer.restore_state.assert_called_once_with(self.repo_path, anomaly_id)
+
+    def test_analyze_anomaly_stream_file_reading(self):
+        log_path = f"/tmp/{uuid.uuid4().hex}.log"
+        metric_name = uuid.uuid4().hex
+        threshold = random.uniform(10.0, 100.0)
+        random_content = uuid.uuid4().hex * random.randint(1, 5)
+        
+        mock_file_data = io.StringIO(random_content)
+        
+        with patch("builtins.open", return_value=mock_file_data) as mock_open:
+            result = self.pipeline.analyze_anomaly_stream(log_path, metric_name, threshold)
+            
+            mock_open.assert_called_once_with(log_path, "r")
+            self.assertTrue(result.get("stream_processed"))
+            self.assertEqual(result.get("metric"), metric_name)
+            self.assertIsInstance(result.get("anomaly_score"), float)
+
+    def test_batch_remediate_processes_multiple_paths(self):
+        paths = [f"/tmp/{uuid.uuid4().hex}" for _ in range(3)]
+        
+        self.inspector.inspect_repository.return_value = None
+        
+        reports = self.pipeline.batch_remediate(paths)
+        
+        self.assertEqual(len(reports), 3)
+        for report in reports:
+            self.assertEqual(report.get("status"), "healthy")
+            self.assertEqual(report.get("pipeline_id"), self.pipeline_id)
+        
+        self.assertEqual(self.inspector.inspect_repository.call_count, 3)
+
+    def test_run_remediation_pipeline_utility(self):
+        run_id = uuid.uuid4().hex
+        target_path = f"/tmp/{uuid.uuid4().hex}"
+        payload = {
+            "run_id": run_id,
+            "target_path": target_path
         }
-
-        self.automator_mock.execute_remediation.side_effect = Exception("Fatal remediation error")
         
-        restoration_token = uuid.uuid4().hex
-        self.restorer_mock.restore_state.return_value = {
-            "restored": True,
-            "backup_id": restoration_token
-        }
-
-        with self.assertRaises(RemediationExecutionError):
-            self.pipeline.run_pipeline(repo_path)
-
-        self.restorer_mock.restore_state.assert_called_once_with(repo_path, anomaly_id)
-
-    def test_process_anomaly_stream_with_io_buffer(self):
-        random_bytes = "".join(random.choices(string.ascii_letters + string.digits, k=128)).encode('utf-8')
-        mock_stream = io.BytesIO(random_bytes)
-
-        metric_name = f"metric_{uuid.uuid4().hex[:6]}"
-        threshold = random.uniform(50.0, 100.0)
-
-        with patch("skills.repo_health_anomaly_remediation_pipeline.open", create=True) as mock_open:
-            mock_open.return_value.__enter__.return_value = mock_stream
+        mock_file = MagicMock()
+        with patch("os.path.join", return_value=f"{target_path}/marker") as mock_join, \
+             patch("builtins.open", return_value=mock_file) as mock_open:
             
-            result = self.pipeline.analyze_anomaly_stream(f"/var/log/{uuid.uuid4().hex}.log", metric_name, threshold)
+            res = run_remediation_pipeline(payload)
             
-            self.assertIn("stream_processed", result)
-            self.assertEqual(result["metric"], metric_name)
-            self.assertIsInstance(result["anomaly_score"], float)
+            self.assertEqual(res.get("run_id"), run_id)
+            self.assertEqual(res.get("status"), "remediated")
+            mock_open.assert_called_once()
 
-    def test_batch_remediation_execution(self):
-        repo_count = random.randint(2, 5)
-        repo_paths = [f"/repo/{uuid.uuid4().hex}" for _ in range(repo_count)]
+    def test_inspect_anomalies_utility(self):
+        target_path = f"/tmp/{uuid.uuid4().hex}"
+        payload = {"target_path": target_path}
         
-        expected_results = []
-        for path in repo_paths:
-            expected_results.append({
-                "repo_path": path,
-                "status": "fixed",
-                "anomaly_id": uuid.uuid4().hex
-            })
+        with patch("os.path.exists", return_value=True), \
+             patch("os.listdir", return_value=[f".remediated_{uuid.uuid4().hex}"]):
+            
+            res = inspect_anomalies(payload)
+            self.assertFalse(res.get("anomaly_detected"))
 
-        with patch.object(self.pipeline, "run_pipeline") as mock_run:
-            mock_run.side_effect = expected_results
-            
-            batch_report = self.pipeline.batch_remediate(repo_paths)
-            
-            self.assertEqual(len(batch_report), repo_count)
-            for i, res in enumerate(batch_report):
-                self.assertEqual(res["repo_path"], repo_paths[i])
-                self.assertEqual(res["status"], "fixed")
+        with patch("os.path.exists", return_value=False):
+            res_no_path = inspect_anomalies(payload)
+            self.assertTrue(res_no_path.get("anomaly_detected"))
 
 
 if __name__ == "__main__":

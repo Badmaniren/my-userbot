@@ -20,25 +20,30 @@ class RepoHealthAnomalyInspector:
             pulse_payload = {}
 
         metrics = pulse_payload.get("metrics", {})
+        if not isinstance(metrics, dict):
+            metrics = {}
+
         anomalies = []
         deviation_score = 0.0
 
         for metric_name, value in metrics.items():
-            if isinstance(value, (int, float)):
-                if value < 0:
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                # Приводим к float для точной математики и предотвращения проблем типизации
+                f_val = float(value)
+                if f_val < 0:
                     anomalies.append({
                         "metric": metric_name,
-                        "value": value,
+                        "value": f_val,
                         "deviation": "negative"
                     })
-                    deviation_score += abs(value)
-                elif threshold is not None and value > threshold:
+                    deviation_score += abs(f_val)
+                elif threshold is not None and f_val > float(threshold):
                     anomalies.append({
                         "metric": metric_name,
-                        "value": value,
+                        "value": f_val,
                         "deviation": "high"
                     })
-                    deviation_score += value - threshold
+                    deviation_score += f_val - float(threshold)
 
         is_anomaly = len(anomalies) > 0
 

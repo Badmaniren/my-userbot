@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- expected an indented block after function definition on line 5 (<unknown>, line 5)
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+н на эскалацию
 
 ## repo_reporter (refactor) — раундов: 3
 - Последняя ошибка перед фиксом: shutil.rmtree(self.repo_path, ignore5errors=True)
@@ -358,4 +356,8 @@
 
 ## repo_health_anomaly_remediation_pipeline (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: ----------------------------------------------------------------------
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_anomaly_remediation_pipeline (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

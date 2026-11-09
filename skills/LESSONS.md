@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-н на эскалацию
-
-## repo_reporter (refactor) — раундов: 3
-- Последняя ошибка перед фиксом: shutil.rmtree(self.repo_path, ignore5errors=True)
-- Статус: успешно прошёл тесты и влит в main
+ main
 
 ## repo_performance_dashboard (compose) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (errors=1)
@@ -360,4 +356,8 @@
 
 ## repo_health_anomaly_remediation_pipeline (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_anomaly_remediation_pipeline (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

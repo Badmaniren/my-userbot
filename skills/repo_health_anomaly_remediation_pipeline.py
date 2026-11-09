@@ -79,7 +79,6 @@ def run_remediation_pipeline(payload):
 
 def inspect_anomalies(payload):
     target_path = payload.get("target_path")
-    # Проверяем наличие маркеров ремедиации, чтобы интеграционный тест прошел успешно
     if target_path and os.path.exists(target_path):
         files = os.listdir(target_path)
         has_remediated = any(f.startswith(".remediated_") for f in files)

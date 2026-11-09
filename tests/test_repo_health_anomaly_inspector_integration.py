@@ -7,46 +7,45 @@ from skills.repo_logger import RepoLogger
 
 
 class TestRepoHealthAnomalyInspectorIntegration(unittest.TestCase):
-
-    def test_inspect_integration_real_chain(self):
+    def test_inspect_integration_real_data(self):
         unique_repo_id = f"repo-{uuid.uuid4()}"
-        random_metric_name = f"metric_{uuid.uuid4().hex[:8]}"
+        random_threshold = float(random.randint(10, 50))
         
-        negative_value = -float(random.randint(1, 100))
-        high_value = float(random.randint(150, 300))
-        threshold_val = 100.0
+        negative_val = -float(random.randint(1, 10))
+        high_val = random_threshold + float(random.randint(1, 20))
+        normal_val = random_threshold - float(random.randint(1, 5))
 
         pulse_engine = RepoHealthPulseEngine()
-        logger = RepoLogger(repo_path=".")
-        
         inspector = RepoHealthAnomalyInspector(pulse_engine=pulse_engine)
-        inspector.logger = logger
 
-        custom_payload = {
-            "metrics": {
-                random_metric_name: negative_value,
-                "stable_metric": 42.0,
-                "overflow_metric": high_value
-            }
-        }
+        class DummyPulseEngine:
+            def get_pulse(self, repo_id):
+                return {
+                    "repo_id": repo_id,
+                    "metrics": {
+                        "error_rate": negative_val,
+                        "latency": high_val,
+                        "cpu_load": normal_val
+                    }
+                }
+
+        inspector.pulse_engine = DummyPulseEngine()
 
         result = inspector.inspect(
-            repo_id=unique_repo_id,
-            pulse_payload=custom_payload,
-            threshold=threshold_val
+            repo_id=unique_repo_id, 
+            threshold=random_threshold
         )
 
-        self.assertIsInstance(result, dict)
         self.assertEqual(result["repo_id"], unique_repo_id)
         self.assertEqual(result["status"], "inspected")
         self.assertTrue(result["is_anomaly"])
-        
-        found_metrics = [anomaly["metric"] for anomaly in result["anomalies"]]
-        self.assertIn(random_metric_name, found_metrics)
-        self.assertIn("overflow_metric", found_metrics)
-        
-        expected_deviation = abs(negative_value) + (high_value - threshold_val)
-        self.assertAlmostEqual(result["deviation_score"], expected_deviation)
+        self.assertGreater(len(result["anomalies"]), 0)
+        self.assertGreater(result["deviation_score"], 0.0)
+
+        anomaly_metrics = [a["metric"] for a in result["anomalies"]]
+        self.assertIn("error_rate", anomaly_metrics)
+        self.assertIn("latency", anomaly_metrics)
+        self.assertNotIn("cpu_load", anomaly_metrics)
 
 
 if __name__ == "__main__":

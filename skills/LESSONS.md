@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+лацию
 
 ## repo_audit_collector (compose) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
@@ -357,6 +355,9 @@
 
 ## repo_health_anomaly_remediation_pipeline (refactor) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## repo_health_anomaly_inspector (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## repo_health_anomaly_inspector (refactor) — раундов: 1

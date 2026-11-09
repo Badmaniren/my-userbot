@@ -7,7 +7,15 @@ class RepoHealthAnomalyInspector:
         self.pulse_engine = pulse_engine if pulse_engine is not None else RepoHealthPulseEngine()
         self.logger = RepoLogger(repo_path=".")
 
-    def inspect(self, repo_id, pulse_payload=None, threshold=None):
+    def inspect(self, repo_id=None, pulse_payload=None, threshold=None):
+        if repo_id is None:
+            # Обработка краевого случая, если репозиторий не передан явно,
+            # но пытаемся извлечь его из payload или сгенерировать по умолчанию
+            if isinstance(pulse_payload, dict):
+                repo_id = pulse_payload.get("repo_id", "default-repo")
+            else:
+                repo_id = "default-repo"
+
         if pulse_payload is None:
             if hasattr(self.pulse_engine, "get_pulse"):
                 pulse_payload = self.pulse_engine.get_pulse(repo_id)
@@ -20,25 +28,30 @@ class RepoHealthAnomalyInspector:
             pulse_payload = {}
 
         metrics = pulse_payload.get("metrics", {})
+        if not isinstance(metrics, dict):
+            metrics = {}
+
         anomalies = []
         deviation_score = 0.0
 
         for metric_name, value in metrics.items():
-            if isinstance(value, (int, float)):
-                if value < 0:
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                # Приводим к float для точной математики и предотвращения проблем типизации
+                f_val = float(value)
+                if f_val < 0:
                     anomalies.append({
                         "metric": metric_name,
-                        "value": value,
+                        "value": f_val,
                         "deviation": "negative"
                     })
-                    deviation_score += abs(value)
-                elif threshold is not None and value > threshold:
+                    deviation_score += abs(f_val)
+                elif threshold is not None and f_val > float(threshold):
                     anomalies.append({
                         "metric": metric_name,
-                        "value": value,
+                        "value": f_val,
                         "deviation": "high"
                     })
-                    deviation_score += value - threshold
+                    deviation_score += f_val - float(threshold)
 
         is_anomaly = len(anomalies) > 0
 

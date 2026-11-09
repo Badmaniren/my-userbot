@@ -7,45 +7,40 @@ from skills.repo_logger import RepoLogger
 
 
 class TestRepoHealthAnomalyInspectorIntegration(unittest.TestCase):
-    def test_inspect_integration_real_data(self):
-        unique_repo_id = f"repo-{uuid.uuid4()}"
-        random_threshold = float(random.randint(10, 50))
-        
-        negative_val = -float(random.randint(1, 10))
-        high_val = random_threshold + float(random.randint(1, 20))
-        normal_val = random_threshold - float(random.randint(1, 5))
+    def setUp(self):
+        self.pulse_engine = RepoHealthPulseEngine()
+        self.inspector = RepoHealthAnomalyInspector(pulse_engine=self.pulse_engine)
+        self.repo_id = f"repo-{uuid.uuid4()}"
 
-        pulse_engine = RepoHealthPulseEngine()
-        inspector = RepoHealthAnomalyInspector(pulse_engine=pulse_engine)
+    def test_inspect_integration_real_pulse(self):
+        random_negative_value = -float(random.randint(1, 100))
+        random_high_value = float(random.randint(150, 500))
+        threshold_value = 100.0
 
-        class DummyPulseEngine:
-            def get_pulse(self, repo_id):
-                return {
-                    "repo_id": repo_id,
-                    "metrics": {
-                        "error_rate": negative_val,
-                        "latency": high_val,
-                        "cpu_load": normal_val
-                    }
-                }
+        custom_payload = {
+            "metrics": {
+                "commit_velocity": random_negative_value,
+                "issue_backlog": random_high_value,
+                "stable_metric": 50.0
+            }
+        }
 
-        inspector.pulse_engine = DummyPulseEngine()
-
-        result = inspector.inspect(
-            repo_id=unique_repo_id, 
-            threshold=random_threshold
+        result = self.inspector.inspect(
+            repo_id=self.repo_id,
+            pulse_payload=custom_payload,
+            threshold=threshold_value
         )
 
-        self.assertEqual(result["repo_id"], unique_repo_id)
+        self.assertEqual(result["repo_id"], self.repo_id)
         self.assertEqual(result["status"], "inspected")
         self.assertTrue(result["is_anomaly"])
         self.assertGreater(len(result["anomalies"]), 0)
         self.assertGreater(result["deviation_score"], 0.0)
 
-        anomaly_metrics = [a["metric"] for a in result["anomalies"]]
-        self.assertIn("error_rate", anomaly_metrics)
-        self.assertIn("latency", anomaly_metrics)
-        self.assertNotIn("cpu_load", anomaly_metrics)
+        anomaly_metrics = [anomaly["metric"] for anomaly in result["anomalies"]]
+        self.assertIn("commit_velocity", anomaly_metrics)
+        self.assertIn("issue_backlog", anomaly_metrics)
+        self.assertNotIn("stable_metric", anomaly_metrics)
 
 
 if __name__ == "__main__":

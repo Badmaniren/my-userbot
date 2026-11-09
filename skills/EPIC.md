@@ -9,3 +9,4 @@
 - repo_health_anomaly_inspector: Финальная стабилизация repo_health_anomaly_inspector для последующего внедрения пайплайна автоматического восстановления
 - repo_health_anomaly_inspector: Продолжаем стабилизацию repo_health_anomaly_inspector, устраняя замечания античита для обеспечения чистоты кода перед запуском цепочки автоматического восстановления.
 - repo_health_anomaly_remediation_pipeline: Создаем конвейер автоматического восстановления (remediation pipeline), используя стабильный фундамент repo_health_anomaly_inspector.
+- repo_health_anomaly_remediation_pipeline: Проводим рефакторинг и исправление ошибок в repo_health_anomaly_remediation_pipeline, добиваясь успешного прохождения тестов и завершения эпика.

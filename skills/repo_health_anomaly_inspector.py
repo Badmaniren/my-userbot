@@ -15,20 +15,16 @@ class RepoHealthAnomalyInspector:
     def inspect(self, repo_id=None, pulse_payload=None, threshold=None):
         # Если payload не передан, пытаемся получить его из движка пульса
         if pulse_payload is None:
-            if repo_id is None:
-                repo_id = "default-repo"
+            fetch_repo_id = repo_id if repo_id is not None else "default-repo"
             
             if hasattr(self.pulse_engine, "get_pulse") and callable(getattr(self.pulse_engine, "get_pulse")):
-                pulse_payload = self.pulse_engine.get_pulse(repo_id)
+                pulse_payload = self.pulse_engine.get_pulse(fetch_repo_id)
             elif hasattr(self.pulse_engine, "pulse") and callable(getattr(self.pulse_engine, "pulse")):
-                pulse_payload = self.pulse_engine.pulse(repo_id)
+                pulse_payload = self.pulse_engine.pulse(fetch_repo_id)
             else:
                 pulse_payload = {}
 
-        if pulse_payload is None:
-            pulse_payload = {}
-
-        if not isinstance(pulse_payload, dict):
+        if pulse_payload is None or not isinstance(pulse_payload, dict):
             pulse_payload = {}
 
         # Определяем идентификатор репозитория

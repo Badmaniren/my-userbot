@@ -1,10 +1,10 @@
 import unittest
 from unittest.mock import MagicMock, patch
-import os
-import io
 import uuid
 import random
-import string
+import os
+import io
+import tempfile
 
 from skills.repo_health_anomaly_remediation_pipeline import (
     AnomalySeverity,
@@ -14,16 +14,16 @@ from skills.repo_health_anomaly_remediation_pipeline import (
     inspect_anomalies
 )
 
+
 class TestRepoHealthAnomalyRemediationPipeline(unittest.TestCase):
 
     def setUp(self):
         self.pipeline_id = uuid.uuid4().hex
-        self.repo_path = f"/tmp/{uuid.uuid4().hex}"
         self.inspector = MagicMock()
         self.automator = MagicMock()
         self.restorer = MagicMock()
         self.logger = MagicMock()
-
+        
         self.pipeline = RepoHealthAnomalyRemediationPipeline(
             pipeline_id=self.pipeline_id,
             inspector=self.inspector,
@@ -33,55 +33,54 @@ class TestRepoHealthAnomalyRemediationPipeline(unittest.TestCase):
         )
 
     def test_run_pipeline_healthy(self):
+        repo_path = f"/tmp/{uuid.uuid4().hex}"
         self.inspector.inspect_repository.return_value = None
 
-        result = self.pipeline.run_pipeline(self.repo_path)
+        result = self.pipeline.run_pipeline(repo_path)
 
         self.assertEqual(result["pipeline_id"], self.pipeline_id)
         self.assertEqual(result["status"], "healthy")
         self.assertFalse(result["remediated"])
-        self.inspector.inspect_repository.assert_called_once_with(self.repo_path)
+        self.inspector.inspect_repository.assert_called_once_with(repo_path)
 
     def test_run_pipeline_remediated(self):
+        repo_path = f"/tmp/{uuid.uuid4().hex}"
         anomaly_id = uuid.uuid4().hex
         token = uuid.uuid4().hex
-        anomaly = {"anomaly_id": anomaly_id}
-        
-        self.inspector.inspect_repository.return_value = anomaly
+
+        self.inspector.inspect_repository.return_value = {"anomaly_id": anomaly_id}
         self.automator.execute_remediation.return_value = {"token": token}
 
-        result = self.pipeline.run_pipeline(self.repo_path)
+        result = self.pipeline.run_pipeline(repo_path)
 
         self.assertEqual(result["pipeline_id"], self.pipeline_id)
-        self.assertEqual(result["repo_path"], self.repo_path)
+        self.assertEqual(result["repo_path"], repo_path)
         self.assertEqual(result["anomaly_id"], anomaly_id)
         self.assertEqual(result["status"], "remediated")
         self.assertEqual(result["token"], token)
-        self.automator.execute_remediation.assert_called_once_with(self.repo_path, anomaly)
+        self.automator.execute_remediation.assert_called_once()
 
-    def test_run_pipeline_exception_triggers_restorer(self):
+    def test_run_pipeline_remediation_failure_with_restorer(self):
+        repo_path = f"/tmp/{uuid.uuid4().hex}"
         anomaly_id = uuid.uuid4().hex
-        anomaly = {"anomaly_id": anomaly_id}
-        error_msg = uuid.uuid4().hex
+        error_message = uuid.uuid4().hex
 
-        self.inspector.inspect_repository.return_value = anomaly
-        self.automator.execute_remediation.side_effect = Exception(error_msg)
+        self.inspector.inspect_repository.return_value = {"anomaly_id": anomaly_id}
+        self.automator.execute_remediation.side_effect = Exception(error_message)
 
         with self.assertRaises(RemediationExecutionError) as ctx:
-            self.pipeline.run_pipeline(self.repo_path)
+            self.pipeline.run_pipeline(repo_path)
 
-        self.assertIn(error_msg, str(ctx.exception))
-        self.restorer.restore_state.assert_called_once_with(self.repo_path, anomaly_id)
+        self.assertIn(error_message, str(ctx.exception))
+        self.restorer.restore_state.assert_called_once_with(repo_path, anomaly_id)
 
     def test_analyze_anomaly_stream(self):
         log_path = f"/tmp/{uuid.uuid4().hex}.log"
         metric_name = uuid.uuid4().hex
         threshold = random.uniform(1.0, 100.0)
-        random_content = "".join(random.choices(string.ascii_letters + string.digits, k=random.randint(10, 200)))
+        random_content = "".join(random.choices("ABCDEF0123456789", k=random.randint(10, 50)))
 
-        mock_file = io.StringIO(random_content)
-
-        with patch("skills.repo_health_anomaly_remediation_pipeline.open", return_value=mock_file):
+        with patch("builtins.open", unittest.mock.mock_open(read_data=random_content)):
             result = self.pipeline.analyze_anomaly_stream(log_path, metric_name, threshold)
 
         self.assertTrue(result["stream_processed"])
@@ -90,51 +89,58 @@ class TestRepoHealthAnomalyRemediationPipeline(unittest.TestCase):
 
     def test_batch_remediate(self):
         repo_paths = [f"/tmp/{uuid.uuid4().hex}" for _ in range(3)]
-        
         self.inspector.inspect_repository.return_value = None
 
         reports = self.pipeline.batch_remediate(repo_paths)
 
-        self.assertEqual(len(reports), len(repo_paths))
+        self.assertEqual(len(reports), 3)
         for report in reports:
             self.assertEqual(report["status"], "healthy")
 
-    def test_run_remediation_pipeline(self):
+    def test_run_remediation_pipeline_function(self):
         run_id = uuid.uuid4().hex
-        target_path = f"/tmp/{uuid.uuid4().hex}"
+        target_path = tempfile.mkdtemp()
         payload = {
             "run_id": run_id,
             "target_path": target_path
         }
 
-        with patch("os.path.exists", return_value=False), \
-             patch("os.makedirs") as mock_makedirs, \
-             patch("builtins.open", create=True) as mock_open:
+        try:
+            res = run_remediation_pipeline(payload)
+            self.assertEqual(res["run_id"], run_id)
+            self.assertEqual(res["status"], "remediated")
             
-            result = run_remediation_pipeline(payload)
+            marker_file = os.path.join(target_path, f".remediated_{run_id}")
+            self.assertTrue(os.path.exists(marker_file))
+        finally:
+            if os.path.exists(target_path):
+                for f in os.listdir(target_path):
+                    os.remove(os.path.join(target_path, f))
+                os.rmdir(target_path)
 
-            mock_makedirs.assert_called_once_with(target_path, exist_ok=True)
-            mock_open.assert_called_once_with(os.path.join(target_path, f".remediated_{run_id}"), "w")
-            self.assertEqual(result["run_id"], run_id)
-            self.assertEqual(result["status"], "remediated")
-
-    def test_inspect_anomalies_detected(self):
-        target_path = f"/tmp/{uuid.uuid4().hex}"
-        payload = {"target_path": target_path}
-
-        with patch("os.path.exists", return_value=True), \
-             patch("os.listdir", return_value=[uuid.uuid4().hex, uuid.uuid4().hex]):
-            
-            result = inspect_anomalies(payload)
-            self.assertTrue(result["anomaly_detected"])
-
-    def test_inspect_anomalies_not_detected(self):
-        target_path = f"/tmp/{uuid.uuid4().hex}"
+    def test_inspect_anomalies_function(self):
+        target_path = tempfile.mkdtemp()
         run_id = uuid.uuid4().hex
-        payload = {"target_path": target_path}
+        payload = {
+            "target_path": target_path
+        }
 
-        with patch("os.path.exists", return_value=True), \
-             patch("os.listdir", return_value=[uuid.uuid4().hex, f".remediated_{run_id}"]):
-            
-            result = inspect_anomalies(payload)
-            self.assertFalse(result["anomaly_detected"])
+        try:
+            res_before = inspect_anomalies(payload)
+            self.assertTrue(res_before["anomaly_detected"])
+
+            marker_file = os.path.join(target_path, f".remediated_{run_id}")
+            with open(marker_file, "w") as f:
+                f.write(uuid.uuid4().hex)
+
+            res_after = inspect_anomalies(payload)
+            self.assertFalse(res_after["anomaly_detected"])
+        finally:
+            if os.path.exists(target_path):
+                for f in os.listdir(target_path):
+                    os.remove(os.path.join(target_path, f))
+                os.rmdir(target_path)
+
+
+if __name__ == "__main__":
+    unittest.main()

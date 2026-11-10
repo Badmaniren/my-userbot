@@ -1,5 +1,6 @@
 from datetime import datetime
 import uuid
+import json
 import requests
 
 def uuid4():
@@ -34,10 +35,9 @@ class RepoHealthIncidentTracker:
         content = file_stream.read()
         if not content:
             return False
-        import json
         try:
             data = json.loads(content.decode('utf-8'))
-        except Exception:
+        except (json.JSONDecodeError, UnicodeDecodeError, AttributeError):
             return False
         
         repo_id = data.get("repo_id")
@@ -79,8 +79,11 @@ class RepoHealthIncidentTracker:
         incident = self.get_incident(incident_id)
         if not incident:
             return False
-        response = requests.post(endpoint, json=incident)
-        return response.status_code == 200
+        try:
+            response = requests.post(endpoint, json=incident)
+            return response.status_code == 200
+        except requests.RequestException:
+            return False
 
 def track_incident(*args, **kwargs):
     tracker = RepoHealthIncidentTracker()

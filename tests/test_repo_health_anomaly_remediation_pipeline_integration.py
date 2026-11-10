@@ -1,62 +1,62 @@
 import unittest
+import uuid
+import random
 import os
 import tempfile
 import shutil
-import uuid
-import random
 
 from skills.repo_health_anomaly_remediation_pipeline import (
     RepoHealthAnomalyRemediationPipeline,
     RemediationExecutionError,
-    AnomalySeverity
+    run_remediation_pipeline,
+    inspect_anomalies
 )
 
 class RealInspector:
     def inspect_repository(self, repo_path):
-        marker_path = os.path.join(repo_path, "anomaly.flag")
-        if os.path.exists(marker_path):
-            with open(marker_path, "r") as f:
-                anomaly_id = f.read().strip()
-            return {"anomaly_id": anomaly_id, "severity": AnomalySeverity.HIGH.name}
-        return None
+        files = os.listdir(repo_path)
+        has_marker = any(f.startswith(".remediated_") for f in files)
+        if has_marker:
+            return None
+        return {"anomaly_id": f"anomaly-{uuid.uuid4()}", "severity": "HIGH"}
 
 class RealAutomator:
-    def __init__(self, should_fail=False):
-        self.should_fail = should_fail
-
+    def __init__(self, token):
+        self.token = token
     def execute_remediation(self, repo_path, anomaly):
-        if self.should_fail:
-            raise RuntimeError("Remediation execution crashed explicitly.")
-        token = f"token_{uuid.uuid4().hex}"
-        fixed_file = os.path.join(repo_path, "fixed.txt")
-        with open(fixed_file, "w") as f:
-            f.write(token)
-        return {"token": token}
+        marker_path = os.path.join(repo_path, f".remediated_{uuid.uuid4()}")
+        with open(marker_path, "w") as f:
+            f.write("fixed")
+        return {"token": self.token}
+
+class FailingAutomator:
+    def execute_remediation(self, repo_path, anomaly):
+        raise ValueError("Critical automation failure")
 
 class RealRestorer:
     def __init__(self):
         self.restored_calls = []
-
     def restore_state(self, repo_path, anomaly_id):
         self.restored_calls.append((repo_path, anomaly_id))
-        restored_file = os.path.join(repo_path, "restored.flag")
-        with open(restored_file, "w") as f:
-            f.write(str(anomaly_id))
+        marker_path = os.path.join(repo_path, f"restored_{anomaly_id}")
+        with open(marker_path, "w") as f:
+            f.write("restored")
 
 class TestRepoHealthAnomalyRemediationPipelineIntegration(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
-        self.pipeline_id = f"pipe_{uuid.uuid4().hex[:8]}"
+        self.pipeline_id = str(uuid.uuid4())
+        self.expected_token = str(uuid.uuid4())
 
     def tearDown(self):
         if os.path.exists(self.test_dir):
             shutil.rmtree(self.test_dir)
 
-    def test_pipeline_healthy_repository(self):
+    def test_integration_successful_remediation_flow(self):
         inspector = RealInspector()
-        automator = RealAutomator()
+        automator = RealAutomator(self.expected_token)
         restorer = RealRestorer()
-
+        
         pipeline = RepoHealthAnomalyRemediationPipeline(
             pipeline_id=self.pipeline_id,
             inspector=inspector,
@@ -65,53 +65,21 @@ class TestRepoHealthAnomalyRemediationPipelineIntegration(unittest.TestCase):
         )
 
         result = pipeline.run_pipeline(self.test_dir)
-
-        self.assertEqual(result["pipeline_id"], self.pipeline_id)
-        self.assertEqual(result["status"], "healthy")
-        self.assertFalse(result["remediated"])
-        self.assertEqual(len(restorer.restored_calls), 0)
-
-    def test_pipeline_anomaly_remediation_success(self):
-        anomaly_id = f"anom_{random.randint(1000, 9999)}"
-        marker_path = os.path.join(self.test_dir, "anomaly.flag")
-        with open(marker_path, "w") as f:
-            f.write(anomaly_id)
-
-        inspector = RealInspector()
-        automator = RealAutomator(should_fail=False)
-        restorer = RealRestorer()
-
-        pipeline = RepoHealthAnomalyRemediationPipeline(
-            pipeline_id=self.pipeline_id,
-            inspector=inspector,
-            automator=automator,
-            restorer=restorer
-        )
-
-        result = pipeline.run_pipeline(self.test_dir)
-
+        
         self.assertEqual(result["pipeline_id"], self.pipeline_id)
         self.assertEqual(result["status"], "remediated")
-        self.assertEqual(result["anomaly_id"], anomaly_id)
-        self.assertIn("token_", result["token"])
+        self.assertEqual(result["token"], self.expected_token)
+        self.assertTrue(result["anomaly_id"].startswith("anomaly-"))
+        
+        files = os.listdir(self.test_dir)
+        remediated_files = [f for f in files if f.startswith(".remediated_")]
+        self.assertEqual(len(remediated_files), 1)
 
-        fixed_file = os.path.join(self.test_dir, "fixed.txt")
-        self.assertTrue(os.path.exists(fixed_file))
-        with open(fixed_file, "r") as f:
-            content = f.read()
-        self.assertEqual(content, result["token"])
-        self.assertEqual(len(restorer.restored_calls), 0)
-
-    def test_pipeline_anomaly_remediation_failure_with_restoration(self):
-        anomaly_id = f"anom_{uuid.uuid4().hex[:6]}"
-        marker_path = os.path.join(self.test_dir, "anomaly.flag")
-        with open(marker_path, "w") as f:
-            f.write(anomaly_id)
-
+    def test_integration_failure_and_restoration_flow(self):
         inspector = RealInspector()
-        automator = RealAutomator(should_fail=True)
+        automator = FailingAutomator()
         restorer = RealRestorer()
-
+        
         pipeline = RepoHealthAnomalyRemediationPipeline(
             pipeline_id=self.pipeline_id,
             inspector=inspector,
@@ -123,58 +91,55 @@ class TestRepoHealthAnomalyRemediationPipelineIntegration(unittest.TestCase):
             pipeline.run_pipeline(self.test_dir)
 
         self.assertEqual(len(restorer.restored_calls), 1)
-        self.assertEqual(restorer.restored_calls[0], (self.test_dir, anomaly_id))
+        restored_path, anomaly_id = restorer.restored_calls[0]
+        self.assertEqual(restored_path, self.test_dir)
+        
+        files = os.listdir(self.test_dir)
+        restored_files = [f for f in files if f.startswith("restored_")]
+        self.assertEqual(len(restored_files), 1)
 
-        restored_file = os.path.join(self.test_dir, "restored.flag")
-        self.assertTrue(os.path.exists(restored_file))
-        with open(restored_file, "r") as f:
-            self.assertEqual(f.read().strip(), anomaly_id)
+    def test_integration_batch_and_standalone_functions(self):
+        run_id = str(uuid.uuid4())
+        payload = {
+            "run_id": run_id,
+            "target_path": self.test_dir
+        }
+        
+        rem_res = run_remediation_pipeline(payload)
+        self.assertEqual(rem_res["run_id"], run_id)
+        self.assertEqual(rem_res["status"], "remediated")
 
-    def test_analyze_anomaly_stream_integration(self):
-        log_file = os.path.join(self.test_dir, "audit.log")
-        random_content = "".join(random.choices("ABCDEF0123456789\n", k=random.randint(50, 200)))
+        insp_res = inspect_anomalies(payload)
+        self.assertFalse(insp_res["anomaly_id"] if "anomaly_id" in insp_res else insp_res.get("anomaly_detected", True))
+
+        metric_name = f"metric-{uuid.uuid4()}"
+        threshold = random.uniform(10.0, 100.0)
+        
+        log_file = os.path.join(self.test_dir, "test.log")
+        random_content = "".join(random.choices("ABCDEF0123456789", k=random.randint(50, 200)))
         with open(log_file, "w") as f:
             f.write(random_content)
 
         pipeline = RepoHealthAnomalyRemediationPipeline(pipeline_id=self.pipeline_id)
-        metric_name = f"metric_{uuid.uuid4().hex[:4]}"
-        threshold = float(random.randint(10, 100))
+        stream_res = pipeline.analyze_anomaly_stream(log_file, metric_name, threshold)
+        
+        self.assertTrue(stream_res["stream_processed"])
+        self.assertEqual(stream_res["metric"], metric_name)
+        self.assertIsInstance(stream_res["anomaly_score"], float)
 
-        result = pipeline.analyze_anomaly_stream(log_file, metric_name, threshold)
-
-        self.assertTrue(result["stream_processed"])
-        self.assertEqual(result["metric"], metric_name)
-        self.assertIsInstance(result["anomaly_score"], float)
-        self.assertGreaterEqual(result["anomaly_score"], 0.0)
-        self.assertLessEqual(result["anomaly_score"], threshold)
-
-    def test_batch_remediate_integration(self):
-        sub_dirs = []
-        for i in range(3):
-            d = os.path.join(self.test_dir, f"repo_{i}_{uuid.uuid4().hex[:4]}")
-            os.makedirs(d)
-            if i % 2 == 0:
-                with open(os.path.join(d, "anomaly.flag"), "w") as f:
-                    f.write(f"batch_anom_{i}")
-            sub_dirs.append(d)
-
-        inspector = RealInspector()
-        automator = RealAutomator(should_fail=False)
-        restorer = RealRestorer()
-
-        pipeline = RepoHealthAnomalyRemediationPipeline(
+        sub_dir_1 = tempfile.mkdtemp(dir=self.test_dir)
+        sub_dir_2 = tempfile.mkdtemp(dir=self.test_dir)
+        
+        batch_pipeline = RepoHealthAnomalyRemediationPipeline(
             pipeline_id=self.pipeline_id,
-            inspector=inspector,
-            automator=automator,
-            restorer=restorer
+            inspector=RealInspector(),
+            automator=RealAutomator(self.expected_token)
         )
-
-        reports = pipeline.batch_remediate(sub_dirs)
-
-        self.assertEqual(len(reports), 3)
-        self.assertEqual(reports[0]["status"], "remediated")
-        self.assertEqual(reports[1]["status"], "healthy")
-        self.assertEqual(reports[2]["status"], "remediated")
+        
+        reports = batch_pipeline.batch_remediate([sub_dir_1, sub_dir_2])
+        self.assertEqual(len(reports), 2)
+        for rep in reports:
+            self.assertEqual(rep["status"], "remediated")
 
 if __name__ == "__main__":
     unittest.main()

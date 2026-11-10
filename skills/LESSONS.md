@@ -3,17 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-тус: успешно прошёл тесты и влит в main
-
-## repo_health_predictor (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## repo_health_predictor_pipeline (create) — раундов: 3
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: успешно прошёл тесты и влит в main
-
-## repo_health_predictor_pipeline (refactor) — раундов: 1
+efactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## repo_health_predictor_pipeline (refactor) — раундов: 1
@@ -353,4 +343,9 @@
 ## repo_health_anomaly_remediation_pipeline (refactor) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: FAILED (errors=4)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_anomaly_remediation_pipeline (refactor) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: unterminated string literal (detected at line 92) (<unknown>, line 92); Синтаксическая ошибка в коде: '{' was never closed (<unknown>, line 71)
+- Последняя ошибка перед фиксом: Traceback (most recent call last):
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

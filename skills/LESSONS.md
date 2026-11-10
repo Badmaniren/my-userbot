@@ -3,12 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-о прошёл тесты и влит в main
-
-## repo_health_visualizer (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## repo_health_visualizer (refactor) — раундов: 1
+ (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## repo_health_export_hub (start_new) — раундов: 4
@@ -354,4 +349,8 @@
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## repo_health_dispatcher (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## repo_health_incident_tracker (create) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main

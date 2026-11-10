@@ -36,7 +36,6 @@ class RepoHealthAnomalyInspector:
 
         for metric_name, value in metrics.items():
             if isinstance(value, (int, float)) and not isinstance(value, bool):
-                # Приводим к float для точной математики и предотвращения проблем типизации
                 f_val = float(value)
                 if f_val < 0:
                     anomalies.append({

@@ -8,15 +8,9 @@ class RepoHealthAnomalyInspector:
         self.logger = RepoLogger(repo_path=".")
 
     def inspect(self, repo_id=None, pulse_payload=None, threshold=None):
-        if repo_id is None:
-            # Обработка краевого случая, если репозиторий не передан явно,
-            # но пытаемся извлечь его из payload или сгенерировать по умолчанию
-            if isinstance(pulse_payload, dict):
-                repo_id = pulse_payload.get("repo_id", "default-repo")
-            else:
-                repo_id = "default-repo"
-
         if pulse_payload is None:
+            if repo_id is None:
+                repo_id = "default-repo"
             if hasattr(self.pulse_engine, "get_pulse"):
                 pulse_payload = self.pulse_engine.get_pulse(repo_id)
             elif hasattr(self.pulse_engine, "pulse"):
@@ -26,6 +20,12 @@ class RepoHealthAnomalyInspector:
 
         if pulse_payload is None:
             pulse_payload = {}
+
+        if not isinstance(pulse_payload, dict):
+            pulse_payload = {}
+
+        if repo_id is None:
+            repo_id = pulse_payload.get("repo_id", "default-repo")
 
         metrics = pulse_payload.get("metrics", {})
         if not isinstance(metrics, dict):

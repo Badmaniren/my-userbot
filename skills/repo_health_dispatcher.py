@@ -11,7 +11,7 @@ class RepoHealthDispatcher:
 
     def dispatch_health_and_notify(self, file_path: str) -> bool:
         dashboard = RepoHealthDashboard(self.repo_path)
-        data = dashboard.generate_dashboard()
+        dashboard.generate_dashboard()
         exported = dashboard.export_dashboard(file_path)
         
         if not exported:

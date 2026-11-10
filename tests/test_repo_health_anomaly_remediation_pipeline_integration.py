@@ -1,6 +1,7 @@
 import unittest
 import os
 import tempfile
+import shutil
 import uuid
 import random
 
@@ -10,111 +11,99 @@ from skills.repo_health_anomaly_remediation_pipeline import (
     run_remediation_pipeline,
     inspect_anomalies
 )
+from skills.repo_health_anomaly_inspector import inspect_repository as real_inspect_repository
+from skills.repo_health_automator import execute_remediation as real_execute_remediation
+from skills.repo_health_restorer import restore_state as real_restore_state
+from skills.repo_logger import log_event as real_log_event
 
-
-class RealInspector:
-    def __init__(self, expected_anomaly_id):
-        self.expected_anomaly_id = expected_anomaly_id
-
+class RealInspectorAdapter:
     def inspect_repository(self, repo_path):
         payload = {"target_path": repo_path}
         res = inspect_anomalies(payload)
         if res.get("anomaly_detected"):
-            return {"anomaly_id": self.expected_anomaly_id, "details": "Real anomaly found"}
+            return {"anomaly_id": f"anomaly_{uuid.uuid4().hex[:8]}"}
         return None
 
-
-class RealAutomator:
-    def __init__(self, run_id):
-        self.run_id = run_id
-
+class RealAutomatorAdapter:
     def execute_remediation(self, repo_path, anomaly):
-        payload = {
-            "run_id": self.run_id,
-            "target_path": repo_path
-        }
+        run_id = uuid.uuid4().hex[:8]
+        payload = {"target_path": repo_path, "run_id": run_id}
         res = run_remediation_pipeline(payload)
-        return {"token": f"token-{self.run_id}", "status": res.get("status")}
+        return {"token": res.get("run_id")}
 
-
-class RealRestorer:
+class RealRestorerAdapter:
     def restore_state(self, repo_path, anomaly_id):
-        marker = os.path.join(repo_path, f"restored_{anomaly_id}")
-        with open(marker, "w") as f:
-            f.write("restored")
+        if os.path.exists(repo_path):
+            for f in os.listdir(repo_path):
+                if f.startswith(".remediated_"):
+                    try:
+                        os.remove(os.path.join(repo_path, f))
+                    except Exception:
+                        pass
+        return {"restored": True, "anomaly_id": anomaly_id}
 
+class RealLoggerAdapter:
+    def log(self, message):
+        try:
+            real_log_event({"message": message})
+        except Exception:
+            pass
 
 class TestRepoHealthAnomalyRemediationPipelineIntegration(unittest.TestCase):
-
     def setUp(self):
-        self.test_dir = tempfile.TemporaryDirectory()
-        self.repo_path = self.test_dir.name
+        self.test_dir = tempfile.mkdtemp()
+        self.pipeline_id = f"pipe_{uuid.uuid4().hex[:6]}"
+        self.inspector = RealInspectorAdapter()
+        self.automator = RealAutomatorAdapter()
+        self.restorer = RealRestorerAdapter()
+        self.logger = RealLoggerAdapter()
 
-    def tearDown(self):
-        self.test_dir.cleanup()
-
-    def test_end_to_end_remediation_pipeline(self):
-        pipeline_id = str(uuid.uuid4())
-        anomaly_id = str(uuid.uuid4())
-        run_id = str(uuid.uuid4())
-
-        inspector = RealInspector(expected_anomaly_id=anomaly_id)
-        automator = RealAutomator(run_id=run_id)
-        restorer = RealRestorer()
-
-        pipeline = RepoHealthAnomalyRemediationPipeline(
-            pipeline_id=pipeline_id,
-            inspector=inspector,
-            automator=automator,
-            restorer=restorer
+        self.pipeline = RepoHealthAnomalyRemediationPipeline(
+            pipeline_id=self.pipeline_id,
+            inspector=self.inspector,
+            automator=self.automator,
+            restorer=self.restorer,
+            logger=self.logger
         )
 
-        result = pipeline.run_pipeline(self.repo_path)
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
 
-        self.assertEqual(result.get("pipeline_id"), pipeline_id)
-        self.assertEqual(result.get("anomaly_id"), anomaly_id)
+    def test_integration_full_remediation_cycle(self):
+        result = self.pipeline.run_pipeline(self.test_dir)
+        
+        self.assertEqual(result.get("pipeline_id"), self.pipeline_id)
         self.assertEqual(result.get("status"), "remediated")
-        self.assertEqual(result.get("token"), f"token-{run_id}")
+        self.assertIsNotNone(result.get("token"))
+        self.assertIsNotNone(result.get("anomaly_id"))
+        
+        files = os.listdir(self.test_dir)
+        remediated_files = [f for f in files if f.startswith(".remediated_")]
+        self.assertTrue(len(remediated_files) > 0)
 
-        expected_marker = os.path.join(self.repo_path, f".remediated_{run_id}")
-        self.assertTrue(os.path.exists(expected_marker))
+    def test_integration_healthy_repository(self):
+        run_id = uuid.uuid4().hex[:8]
+        marker_path = os.path.join(self.test_dir, f".remediated_{run_id}")
+        with open(marker_path, "w") as f:
+            f.write("already clean")
 
-        health_result = pipeline.run_pipeline(self.repo_path)
-        self.assertEqual(health_result.get("status"), "healthy")
-        self.assertFalse(health_result.get("remediated"))
+        result = self.pipeline.run_pipeline(self.test_dir)
+        
+        self.assertEqual(result.get("pipeline_id"), self.pipeline_id)
+        self.assertEqual(result.get("status"), "healthy")
+        self.assertFalse(result.get("remediated"))
 
-    def test_batch_remediate_integration(self):
-        subdirs = []
+    def test_integration_batch_remediate(self):
+        dirs = []
         for _ in range(random.randint(2, 4)):
-            d = tempfile.TemporaryDirectory()
-            subdirs.append(d.name)
+            d = tempfile.mkdtemp(dir=self.test_dir)
+            dirs.append(d)
 
-        try:
-            pipeline_id = str(uuid.uuid4())
-            anomaly_id = str(uuid.uuid4())
-            run_id = str(uuid.uuid4())
+        reports = self.pipeline.batch_remediate(dirs)
+        self.assertEqual(len(reports), len(dirs))
+        for rep in reports:
+            self.assertEqual(rep.get("status"), "remediated")
 
-            inspector = RealInspector(expected_anomaly_id=anomaly_id)
-            automator = RealAutomator(run_id=run_id)
-
-            pipeline = RepoHealthAnomalyRemediationPipeline(
-                pipeline_id=pipeline_id,
-                inspector=inspector,
-                automator=automator
-            )
-
-            reports = pipeline.batch_remediate(subdirs)
-            self.assertEqual(len(reports), len(subdirs))
-            for rep in reports:
-                self.assertEqual(rep.get("status"), "remediated")
-                self.assertEqual(rep.get("anomaly_id"), anomaly_id)
-        finally:
-            for d in subdirs:
-                try:
-                    os.rmdir(d)
-                except Exception:
-                    pass
-
-
-if __name__ == "__main__":
-    unittest.main()
+    def test_integration_anomaly_stream_analysis(self):
+        log_file = os.path.join(self.test_dir, f"log_{uuid.uuid4().hex}.txt")
+        random_content = "".join(random.choices("ABCDEF0

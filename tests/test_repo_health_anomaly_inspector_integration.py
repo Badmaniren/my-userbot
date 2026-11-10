@@ -9,50 +9,49 @@ from skills.repo_logger import RepoLogger
 class TestRepoHealthAnomalyInspectorIntegration(unittest.TestCase):
 
     def setUp(self):
+        self.repo_id = f"repo-{uuid.uuid4()}"
         self.pulse_engine = RepoHealthPulseEngine()
         self.inspector = RepoHealthAnomalyInspector(pulse_engine=self.pulse_engine)
-        self.random_repo_id = f"repo-{uuid.uuid4()}"
 
-    def test_inspect_real_integration_flow(self):
-        negative_metric = -1 * float(random.randint(1, 100))
-        high_metric = float(random.randint(101, 1000))
-        threshold_val = 50.0
+    def test_inspect_integration_real_data_flow(self):
+        random_metric_name = f"metric_{uuid.uuid4().hex[:6]}"
+        negative_value = float(-random.randint(1, 100))
+        high_value = float(random.randint(150, 500))
+        threshold_val = 100.0
 
         custom_payload = {
-            "repo_id": self.random_repo_id,
+            "repo_id": self.repo_id,
             "metrics": {
-                "cpu_load": 15.5,
-                "error_rate": negative_metric,
-                "latency_ms": high_metric
+                random_metric_name: negative_value,
+                "stable_metric": 42.0,
+                "over_threshold_metric": high_value
             }
         }
 
         result = self.inspector.inspect(
-            repo_id=self.random_repo_id,
+            repo_id=self.repo_id,
             pulse_payload=custom_payload,
             threshold=threshold_val
         )
 
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result.get("repo_id"), self.random_repo_id)
-        self.assertEqual(result.get("status"), "inspected")
-        self.assertTrue(result.get("is_anomaly"))
-        
-        anomalies = result.get("anomalies", [])
-        self.assertGreaterEqual(len(anomalies), 2)
-        
-        metrics_with_anomalies = [a["metric"] for a in anomalies]
-        self.assertIn("error_rate", metrics_with_anomalies)
-        self.assertIn("latency_ms", metrics_with_anomalies)
-        
-        self.assertGreater(result.get("deviation_score", 0.0), 0.0)
+        self.assertEqual(result["repo_id"], self.repo_id)
+        self.assertEqual(result["status"], "inspected")
+        self.assertTrue(result["is_anomaly"])
+        self.assertGreater(len(result["anomalies"]), 0)
+        self.assertGreater(result["deviation_score"], 0.0)
 
-    def test_inspect_without_payload_relies_on_pulse_engine(self):
-        result = self.inspector.inspect(repo_id=self.random_repo_id)
+        anomaly_metrics = [a["metric"] for a in result["anomalies"]]
+        self.assertIn(random_metric_name, anomaly_metrics)
+        self.assertIn("over_threshold_metric", anomaly_metrics)
+        self.assertNotIn("stable_metric", anomaly_metrics)
 
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result.get("repo_id"), self.random_repo_id)
-        self.assertEqual(result.get("status"), "inspected")
+    def test_inspect_integration_fallback_pulse_engine(self):
+        fallback_repo_id = f"fallback-{uuid.uuid4()}"
+        
+        result = self.inspector.inspect(repo_id=fallback_repo_id, threshold=50.0)
+
+        self.assertEqual(result["repo_id"], fallback_repo_id)
+        self.assertEqual(result["status"], "inspected")
         self.assertIn("is_anomaly", result)
         self.assertIn("anomalies", result)
         self.assertIn("deviation_score", result)

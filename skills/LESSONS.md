@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-efactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## repo_health_predictor_pipeline (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
+ main
 
 ## repo_health_predictor_pipeline (refactor) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=1)
@@ -349,3 +345,7 @@ efactor) — раундов: 1
 - Античит поймал: Синтаксическая ошибка в коде: unterminated string literal (detected at line 92) (<unknown>, line 92); Синтаксическая ошибка в коде: '{' was never closed (<unknown>, line 71)
 - Последняя ошибка перед фиксом: Traceback (most recent call last):
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_anomaly_remediation_pipeline (refactor) — раундов: 3
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main

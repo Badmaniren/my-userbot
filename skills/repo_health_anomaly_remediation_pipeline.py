@@ -41,7 +41,7 @@ class RepoHealthAnomalyRemediationPipeline:
                 "status": "remediated",
                 "token": token
             }
-        except Exception as e:
+        except (Exception, BaseException) as e:
             if self.restorer:
                 self.restorer.restore_state(repo_path, anomaly_id)
             raise RemediationExecutionError(str(e))

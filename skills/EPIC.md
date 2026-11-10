@@ -5,3 +5,4 @@
 - repo_health_anomaly_inspector: Создаем первый модуль нового эпика для предсказания сбоев на основе исторических метрик репозитория
 - repo_health_anomaly_inspector: Развиваем предиктивную аналитику сбоев: добавляем прогнозирование на базе исторических метрик здоровья
 - repo_health_anomaly_remediation_pipeline: Улучшаем надежность конвейера авторемедиации аномалий, фиксируя стабильность работы механизма устранения сбоев на базе исторических метрик.
+- repo_health_anomaly_remediation_pipeline: Корректировка связей импорта между repo_health_anomaly_remediation_pipeline и repo_health_anomaly_inspector для завершения конвейера авторемедиации аномалий.

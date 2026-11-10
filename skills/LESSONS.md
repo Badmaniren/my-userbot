@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## repo_health_remediator (create) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено перекрывать системный модуль 'repo_logger' глобальной переменной!
+НТИЧИТ: Запрещено перекрывать системный модуль 'repo_logger' глобальной переменной!
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -353,3 +350,6 @@
 ## repo_health_anomaly_remediation_pipeline (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: ImportError: cannot import name 'inspect_anomalies' from 'skills.repo_health_anomaly_inspector' (/home/runner/work/my-userbot/my-userbot/skills/repo_health_anomaly_inspector.py)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_anomaly_remediation_pipeline (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

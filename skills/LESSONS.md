@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ne 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## repo_health_trend_tracker (create) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: invalid character '—' (U+2014) (<unknown>, line 93); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+(<unknown>, line 1)
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -355,4 +351,9 @@ ne 1); Синтаксическая ошибка в коде: invalid syntax (<u
 ## repo_health_incident_tracker (create) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: expected ':' (<unknown>, line 17)
 - Последняя ошибка перед фиксом: return repo_health_dispatcher.route(incident_type, payload)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_incident_tracker (create) — раундов: 4
+- Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.; АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
+- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -117,8 +117,10 @@ class TestRepoHealthIncidentTracker(unittest.TestCase):
         self.assertFalse(result)
 
     def test_get_incident_metrics(self):
+        severities = ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
         sev1 = self.severity
-        sev2 = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
+        other_severities = [s for s in severities if s != sev1]
+        sev2 = random.choice(other_severities)
 
         self.tracker.track_incident(self.repo_id, uuid.uuid4().hex, sev1, self.description)
         self.tracker.track_incident(self.repo_id, uuid.uuid4().hex, sev1, self.description)

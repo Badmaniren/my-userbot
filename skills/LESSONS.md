@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-н на эскалацию
-
-## repo_health_anomaly_remediation_pipeline (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
+ перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## repo_health_anomaly_remediation_pipeline (refactor) — раундов: 4
@@ -299,3 +296,6 @@
 ## repo_health_trend_calculator (create) — раундов: 4
 - Последняя ошибка перед фиксом: Не удалось скачать архив логов рана (HTTP 404).
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_metric_validator (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

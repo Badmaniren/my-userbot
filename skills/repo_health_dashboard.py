@@ -17,7 +17,7 @@ class RepoHealthDashboard:
         self.repo_path = repo_path
 
     def generate_dashboard(self) -> dict:
-        auditor = RepoAuditor() if RepoAuditor else None
+        auditor = RepoAuditor(self.repo_path) if RepoAuditor else None
         if auditor is not None:
             if hasattr(auditor, "calculate_metrics"):
                 return auditor.calculate_metrics()

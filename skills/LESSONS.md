@@ -8,9 +8,6 @@
 ## repo_health_security_syncer (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
-## repo_health_security_syncer (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
 ## repo_health_security_syncer (refactor) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: успешно прошёл тесты и влит в main
@@ -323,3 +320,6 @@
 - Античит поймал: ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'git_committer'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.git_committer import ...'
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_security_syncer (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

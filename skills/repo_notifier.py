@@ -15,8 +15,5 @@ class RepoNotifier:
         return commit_result
 
     def notify_and_commit(self) -> bool:
-        report_content = self.reporter.generate_final_report()
         default_report_path = f"{self.repo_path}/report.txt"
-        self.reporter.save_report(default_report_path, report_content)
-        commit_result = self.committer.process_and_commit()
-        return commit_result
+        return self.notify(default_report_path)

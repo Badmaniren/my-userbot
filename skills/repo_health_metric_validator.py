@@ -1,104 +1,106 @@
 import json
+import io
+import time
 import requests
-from typing import Dict, Any, List, Union, IO
+from typing import Dict, Any, List, Union
 
 
-class MetricValidationError(Exception):
+class MetricValidationError(ValueError):
     """Исключение, выбрасываемое при ошибке валидации метрик здоровья репозитория."""
     pass
 
 
 class RepoHealthMetricValidator:
-    """Класс для проверки валидности и корректности собранных метрик здоровья репозитория."""
+    """Класс для валидации метрик здоровья репозитория."""
 
-    def __init__(self):
-        pass
+    def validate(self, metric: Dict[str, Any]) -> bool:
+        if not isinstance(metric, dict):
+            raise MetricValidationError("Metric must be a dictionary")
 
-    def validate(self, metric_data: Dict[str, Any]) -> bool:
-        """Проверяет отдельный словарь с метрикой на наличие обязательных полей и корректность значений."""
-        if not isinstance(metric_data, dict):
-            raise MetricValidationError("Metric data must be a dictionary.")
+        metric_name = metric.get("metric_name")
+        score = metric.get("score")
+        timestamp = metric.get("timestamp")
 
-        # Проверяем обязательные поля
-        if "metric_name" not in metric_data:
-            raise MetricValidationError("Missing mandatory field: 'metric_name'")
-        if "score" not in metric_data:
-            raise MetricValidationError("Missing mandatory field: 'score'")
-        if "timestamp" not in metric_data:
-            raise MetricValidationError("Missing mandatory field: 'timestamp'")
+        if not isinstance(metric_name, str) or not metric_name:
+            raise MetricValidationError("Invalid or missing 'metric_name'")
 
-        score = metric_data["score"]
         if not isinstance(score, (int, float)) or isinstance(score, bool):
-            raise MetricValidationError("Score must be a number.")
+            raise MetricValidationError("Score must be a number")
 
-        if score < 0.0 or score > 100.0:
-            raise MetricValidationError(f"score is out of bounds [0.0, 100.0]. Value: {score}")
+        if not (0.0 <= score <= 100.0):
+            raise MetricValidationError("Score must be between 0.0 and 100.0")
+
+        if not isinstance(timestamp, int) or isinstance(timestamp, bool):
+            raise MetricValidationError("Timestamp must be an integer")
 
         return True
 
-    def validate_stream(self, stream: Union[IO[bytes], IO[str], str, bytes]) -> List[Dict[str, Any]]:
-        """Читает поток данных (стрим), парсит JSON и валидирует каждую метрику."""
-        if hasattr(stream, "read"):
-            content = stream.read()
-        else:
-            content = stream
-
-        if isinstance(content, bytes):
-            try:
-                content = content.decode('utf-8')
-            except UnicodeDecodeError as e:
-                raise MetricValidationError(f"Failed to decode stream bytes: {e}")
-
+    def validate_stream(self, stream: Union[io.BytesIO, io.StringIO]) -> List[Dict[str, Any]]:
         try:
+            if isinstance(stream, io.BytesIO):
+                raw_data = stream.read()
+                try:
+                    content = raw_data.decode('utf-8')
+                except UnicodeDecodeError as e:
+                    raise MetricValidationError(f"Failed to decode stream bytes: {e}")
+            elif isinstance(stream, io.StringIO):
+                content = stream.read()
+            else:
+                content = stream.read()
+                if isinstance(content, bytes):
+                    try:
+                        content = content.decode('utf-8')
+                    except UnicodeDecodeError as e:
+                        raise MetricValidationError(f"Failed to decode stream bytes: {e}")
+
             data = json.loads(content)
-        except (json.JSONDecodeError, TypeError) as e:
-            raise MetricValidationError(f"Failed to parse JSON: {e}")
+        except (json.JSONDecodeError, UnicodeDecodeError) as e:
+            raise MetricValidationError(f"Invalid JSON in stream: {e}")
 
-        if not isinstance(data, list):
+        if isinstance(data, dict):
             data = [data]
+        elif not isinstance(data, list):
+            raise MetricValidationError("Stream data must be a JSON object or a list of objects")
 
-        validated_metrics = []
+        validated_items = []
         for item in data:
             self.validate(item)
-            validated_metrics.append(item)
+            validated_items.append(item)
 
-        return validated_metrics
+        return validated_items
 
-    def dispatch_and_validate_remote(self, payload: Dict[str, Any], endpoint_url: str) -> Dict[str, Any]:
-        """Отправляет метрики на внешний шлюз и возвращает ответ."""
-        response = requests.post(endpoint_url, json=payload)
+    def dispatch_and_validate_remote(self, payload: Dict[str, Any], url: str) -> Dict[str, Any]:
+        self.validate(payload)
+        response = requests.post(url, json=payload)
         return response.json()
 
 
-def audit_repository(metrics_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Аудит репозитория, возвращает переданные метрики."""
-    return metrics_data
+def validate_repo_health_metrics(raw_data: Dict[str, Any]) -> Dict[str, Any]:
+    metrics = dict(raw_data)
 
+    if "health_score" in metrics and "score" not in metrics:
+        metrics["score"] = metrics.pop("health_score")
+    if "run_id" in metrics and "metric_name" not in metrics:
+        metrics["metric_name"] = metrics.pop("run_id")
+    if "timestamp" not in metrics:
+        metrics["timestamp"] = int(time.time())
 
-def render_health_dashboard(metrics_data: Dict[str, Any]) -> str:
-    """Рендеринг дэшборда, возвращает строку-путь или описание."""
-    return "dashboard_output.html"
-
-
-def validate_repo_health_metrics(metrics_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Интеграционная обертка для валидации метрик для дашборда и аудитора."""
     validator = RepoHealthMetricValidator()
-
-    normalized_data = dict(metrics_data)
-    if "health_score" in normalized_data and "score" not in normalized_data:
-        normalized_data["score"] = normalized_data["health_score"]
-    if "run_id" in normalized_data and "metric_name" not in normalized_data:
-        normalized_data["metric_name"] = normalized_data["run_id"]
-    if "timestamp" not in normalized_data:
-        normalized_data["timestamp"] = 1600000000
-
     try:
-        validator.validate(normalized_data)
+        validator.validate(metrics)
         is_valid = True
     except MetricValidationError:
         is_valid = False
 
     return {
         "is_valid": is_valid,
-        "metrics": normalized_data
+        "metrics": metrics
     }
+
+
+def audit_repository(metrics: Dict[str, Any]) -> Dict[str, Any]:
+    return metrics
+
+
+def render_health_dashboard(metrics: Dict[str, Any]) -> str:
+    return f"Dashboard for {metrics.get('metric_name', 'Unknown')} with score {metrics.get('score', 0.0)}"

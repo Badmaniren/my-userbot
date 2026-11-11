@@ -1,215 +1,326 @@
 import io
-import os
 import random
 import string
 import unittest
+import uuid
 from unittest.mock import MagicMock, patch
 
-import skills.repo_security_gate_validator as rsgv_module
+from skills.repo_health_metric_validator import MetricValidationError
 from skills.repo_security_gate_validator import (
     RepoSecurityGateValidator,
     validate_repo_security_gate,
 )
-from skills.repo_health_metric_validator import MetricValidationError
 
 
-def generate_random_string(prefix="", length=8):
-    token = "".join(random.choices(string.ascii_letters + string.digits, k=length))
-    return f"{prefix}_{token}" if prefix else token
+def _rnd_str(prefix="str_"):
+    return f"{prefix}{uuid.uuid4().hex}"
 
 
-def generate_random_metrics():
-    return {
-        generate_random_string("metric"): random.uniform(0.1, 99.9),
-        generate_random_string("status"): generate_random_string("state"),
-        generate_random_string("count"): random.randint(1, 1000),
-    }
+def _rnd_path():
+    parts = [uuid.uuid4().hex[:8] for _ in range(random.randint(2, 4))]
+    return "/" + "/".join(parts)
 
 
 class TestRepoSecurityGateValidator(unittest.TestCase):
+    def test_init_initializes_collaborators(self):
+        repo_path = _rnd_path()
+        with patch("skills.repo_security_gate_validator.RepoSecurityGateway") as mock_sec_cls, \
+             patch("skills.repo_security_gate_validator.RepoHealthMetricValidator") as mock_hlth_cls:
+            dummy_sec_instance = MagicMock()
+            dummy_hlth_instance = MagicMock()
+            mock_sec_cls.return_value = dummy_sec_instance
+            mock_hlth_cls.return_value = dummy_hlth_instance
 
-    def setUp(self):
-        self.random_repo_path = f"/repos/{generate_random_string('path')}/{generate_random_string('repo')}"
-        self.security_token = generate_random_string("sec_token")
-        self.health_token = generate_random_string("hlth_token")
+            validator = RepoSecurityGateValidator(repo_path=repo_path)
 
-    def test_validator_initialization(self):
-        validator = RepoSecurityGateValidator(repo_path=self.random_repo_path)
-        self.assertEqual(validator.repo_path, self.random_repo_path)
+            mock_sec_cls.assert_called_once_with(repo_path)
+            mock_hlth_cls.assert_called_once_with()
+            self.assertEqual(validator.repo_path, repo_path)
+            self.assertIs(validator.security_gateway, dummy_sec_instance)
+            self.assertIs(validator.health_validator, dummy_hlth_instance)
 
-    def test_gate_passes_when_security_and_health_are_valid(self):
-        metrics_data = generate_random_metrics()
-        expected_scan_id = generate_random_string("scan_id")
+    def test_validate_gate_both_pass_dict_health(self):
+        repo_path = _rnd_path()
+        run_id = _rnd_str("run_")
+        metric_key = _rnd_str("metric_")
+        metric_val = random.randint(10, 100)
+        metrics_data = {"run_id": run_id, metric_key: metric_val}
+
+        sec_token = _rnd_str("sec_ok_")
+        sec_response = {"passed": True, "token": sec_token, "status": "SUCCESS"}
+        hlth_score = random.random()
+        hlth_response = {"valid": True, "score": hlth_score}
 
         with patch("skills.repo_security_gate_validator.RepoSecurityGateway") as mock_sec_cls, \
-             patch("skills.repo_security_gate_validator.RepoHealthMetricValidator") as mock_health_cls:
+             patch("skills.repo_security_gate_validator.RepoHealthMetricValidator") as mock_hlth_cls:
+            sec_mock = MagicMock()
+            sec_mock.scan_and_evaluate.return_value = sec_response
+            mock_sec_cls.return_value = sec_mock
 
-            mock_sec_instance = mock_sec_cls.return_value
-            mock_sec_instance.scan_and_evaluate.return_value = {
-                "status": "PASS",
-                "passed": True,
-                "scan_id": expected_scan_id,
-                "vulnerabilities": [],
-                "security_token": self.security_token,
-            }
+            hlth_mock = MagicMock()
+            hlth_mock.validate.return_value = hlth_response
+            mock_hlth_cls.return_value = hlth_mock
 
-            mock_health_instance = mock_health_cls.return_value
-            mock_health_instance.validate.return_value = True
-
-            validator = RepoSecurityGateValidator(repo_path=self.random_repo_path)
+            validator = RepoSecurityGateValidator(repo_path=repo_path)
             result = validator.validate_gate(metrics_data)
 
-            mock_sec_cls.assert_called_with(self.random_repo_path)
-            mock_sec_instance.scan_and_evaluate.assert_called_once()
-            mock_health_instance.validate.assert_called_once_with(metrics_data)
+            self.assertTrue(result["passed"])
+            self.assertTrue(result["allowed"])
+            self.assertFalse(result["blocked"])
+            self.assertEqual(result["run_id"], run_id)
+            self.assertEqual(result["security_evaluation"]["token"], sec_token)
+            self.assertEqual(result["health_evaluation"]["score"], hlth_score)
+            self.assertEqual(result["errors"], [])
+            self.assertEqual(result["reasons"], [])
+            self.assertEqual(result["failures"], [])
+            self.assertIn(run_id, result["audit_record"])
 
-            self.assertTrue(result.get("passed"))
-            self.assertFalse(result.get("blocked"))
-            self.assertEqual(result.get("security_evaluation", {}).get("scan_id"), expected_scan_id)
-            self.assertEqual(result.get("security_evaluation", {}).get("security_token"), self.security_token)
-            self.assertTrue(result.get("health_evaluation", {}).get("valid"))
-
-    def test_gate_blocks_when_security_check_fails(self):
-        metrics_data = generate_random_metrics()
-        critical_cve = f"CVE-{random.randint(2020, 2026)}-{random.randint(1000, 9999)}"
-        sec_failure_reason = f"Critical vulnerability detected: {critical_cve}"
+    def test_validate_gate_both_pass_boolean_health(self):
+        repo_path = _rnd_path()
+        metrics_data = {_rnd_str("k_"): _rnd_str("v_")}
 
         with patch("skills.repo_security_gate_validator.RepoSecurityGateway") as mock_sec_cls, \
-             patch("skills.repo_security_gate_validator.RepoHealthMetricValidator") as mock_health_cls:
+             patch("skills.repo_security_gate_validator.RepoHealthMetricValidator") as mock_hlth_cls:
+            sec_mock = MagicMock()
+            sec_mock.scan_and_evaluate.return_value = {"passed": True}
+            mock_sec_cls.return_value = sec_mock
 
-            mock_sec_instance = mock_sec_cls.return_value
-            mock_sec_instance.scan_and_evaluate.return_value = {
-                "status": "FAIL",
-                "passed": False,
-                "vulnerabilities": [critical_cve],
-                "reason": sec_failure_reason,
-            }
+            hlth_mock = MagicMock()
+            hlth_mock.validate.return_value = True
+            mock_hlth_cls.return_value = hlth_mock
 
-            mock_health_instance = mock_health_cls.return_value
-            mock_health_instance.validate.return_value = True
-
-            validator = RepoSecurityGateValidator(repo_path=self.random_repo_path)
+            validator = RepoSecurityGateValidator(repo_path=repo_path)
             result = validator.validate_gate(metrics_data)
 
-            self.assertFalse(result.get("passed"))
-            self.assertTrue(result.get("blocked"))
-            self.assertIn(sec_failure_reason, str(result.get("errors", [])) + str(result.get("reasons", [])))
-            self.assertIn(critical_cve, result.get("security_evaluation", {}).get("vulnerabilities", []))
+            self.assertTrue(result["passed"])
+            self.assertTrue(result["allowed"])
+            self.assertFalse(result["blocked"])
+            self.assertEqual(result["health_evaluation"], {"valid": True})
 
-    def test_gate_blocks_when_health_metrics_validation_fails(self):
-        metrics_data = generate_random_metrics()
-        health_error_message = f"Metric drift detected: {generate_random_string('metric_anomaly')}"
-
-        with patch("skills.repo_security_gate_validator.RepoSecurityGateway") as mock_sec_cls, \
-             patch("skills.repo_security_gate_validator.RepoHealthMetricValidator") as mock_health_cls:
-
-            mock_sec_instance = mock_sec_cls.return_value
-            mock_sec_instance.scan_and_evaluate.return_value = {
-                "status": "PASS",
-                "passed": True,
-                "vulnerabilities": [],
-            }
-
-            mock_health_instance = mock_health_cls.return_value
-            mock_health_instance.validate.side_effect = MetricValidationError(health_error_message)
-
-            validator = RepoSecurityGateValidator(repo_path=self.random_repo_path)
-            result = validator.validate_gate(metrics_data)
-
-            self.assertFalse(result.get("passed"))
-            self.assertTrue(result.get("blocked"))
-            all_errors = str(result.get("errors", [])) + str(result.get("reasons", []))
-            self.assertIn(health_error_message, all_errors)
-
-    def test_gate_blocks_when_both_security_and_health_fail(self):
-        metrics_data = generate_random_metrics()
-        critical_cve = f"CVE-{random.randint(2020, 2026)}-{random.randint(1000, 9999)}"
-        health_error_message = f"Health check failed on key: {generate_random_string('err_metric')}"
+    def test_validate_gate_security_fails_with_reason(self):
+        repo_path = _rnd_path()
+        reason_msg = _rnd_str("sec_violation_")
+        sec_response = {"passed": False, "reason": reason_msg}
 
         with patch("skills.repo_security_gate_validator.RepoSecurityGateway") as mock_sec_cls, \
-             patch("skills.repo_security_gate_validator.RepoHealthMetricValidator") as mock_health_cls:
+             patch("skills.repo_security_gate_validator.RepoHealthMetricValidator") as mock_hlth_cls:
+            sec_mock = MagicMock()
+            sec_mock.scan_and_evaluate.return_value = sec_response
+            mock_sec_cls.return_value = sec_mock
 
-            mock_sec_instance = mock_sec_cls.return_value
-            mock_sec_instance.scan_and_evaluate.return_value = {
-                "status": "FAIL",
-                "passed": False,
-                "vulnerabilities": [critical_cve],
-            }
+            hlth_mock = MagicMock()
+            hlth_mock.validate.return_value = {"valid": True}
+            mock_hlth_cls.return_value = hlth_mock
 
-            mock_health_instance = mock_health_cls.return_value
-            mock_health_instance.validate.side_effect = MetricValidationError(health_error_message)
+            validator = RepoSecurityGateValidator(repo_path=repo_path)
+            result = validator.validate_gate({})
 
-            validator = RepoSecurityGateValidator(repo_path=self.random_repo_path)
-            result = validator.validate_gate(metrics_data)
+            self.assertFalse(result["passed"])
+            self.assertFalse(result["allowed"])
+            self.assertTrue(result["blocked"])
+            self.assertIn(reason_msg, result["errors"])
+            self.assertIn(reason_msg, result["reasons"])
 
-            self.assertFalse(result.get("passed"))
-            self.assertTrue(result.get("blocked"))
+    def test_validate_gate_security_returns_invalid_type(self):
+        repo_path = _rnd_path()
+        with patch("skills.repo_security_gate_validator.RepoSecurityGateway") as mock_sec_cls, \
+             patch("skills.repo_security_gate_validator.RepoHealthMetricValidator") as mock_hlth_cls:
+            sec_mock = MagicMock()
+            sec_mock.scan_and_evaluate.return_value = random.choice([None, "not_a_dict", 42])
+            mock_sec_cls.return_value = sec_mock
 
-            failures_recorded = str(result.get("errors", [])) + str(result.get("reasons", []))
-            self.assertIn(critical_cve, str(result.get("security_evaluation", {})))
-            self.assertIn(health_error_message, failures_recorded)
+            hlth_mock = MagicMock()
+            hlth_mock.validate.return_value = {"valid": True}
+            mock_hlth_cls.return_value = hlth_mock
 
-    def test_gate_validates_stream_payload(self):
-        stream_payload = os.urandom(random.randint(64, 128))
-        stream_io = io.BytesIO(stream_payload)
-        parsed_stream_item = {generate_random_string("k"): generate_random_string("v")}
+            validator = RepoSecurityGateValidator(repo_path=repo_path)
+            result = validator.validate_gate({})
+
+            self.assertFalse(result["passed"])
+            self.assertFalse(result["allowed"])
+            self.assertTrue(result["blocked"])
+            self.assertIn("Invalid security evaluation response", result["reasons"])
+            self.assertIn("Invalid security evaluation response", result["errors"])
+
+    def test_validate_gate_security_exception_caught(self):
+        repo_path = _rnd_path()
+        err_text = _rnd_str("sec_crash_")
 
         with patch("skills.repo_security_gate_validator.RepoSecurityGateway") as mock_sec_cls, \
-             patch("skills.repo_security_gate_validator.RepoHealthMetricValidator") as mock_health_cls:
+             patch("skills.repo_security_gate_validator.RepoHealthMetricValidator") as mock_hlth_cls:
+            sec_mock = MagicMock()
+            sec_mock.scan_and_evaluate.side_effect = RuntimeError(err_text)
+            mock_sec_cls.return_value = sec_mock
 
-            mock_sec_instance = mock_sec_cls.return_value
-            mock_sec_instance.scan_and_evaluate.return_value = {
-                "status": "PASS",
-                "passed": True,
-            }
+            hlth_mock = MagicMock()
+            hlth_mock.validate.return_value = {"valid": True}
+            mock_hlth_cls.return_value = hlth_mock
 
-            mock_health_instance = mock_health_cls.return_value
-            mock_health_instance.validate_stream.return_value = [parsed_stream_item]
-            mock_health_instance.validate.return_value = True
+            validator = RepoSecurityGateValidator(repo_path=repo_path)
+            result = validator.validate_gate({})
 
-            validator = RepoSecurityGateValidator(repo_path=self.random_repo_path)
+            self.assertFalse(result["passed"])
+            self.assertFalse(result["allowed"])
+            self.assertTrue(result["blocked"])
+            self.assertEqual(result["security_evaluation"]["status"], "FAIL")
+            self.assertIn(err_text, result["errors"])
+
+    def test_validate_gate_health_metric_validation_error(self):
+        repo_path = _rnd_path()
+        mve_msg = _rnd_str("metric_invalid_")
+
+        with patch("skills.repo_security_gate_validator.RepoSecurityGateway") as mock_sec_cls, \
+             patch("skills.repo_security_gate_validator.RepoHealthMetricValidator") as mock_hlth_cls:
+            sec_mock = MagicMock()
+            sec_mock.scan_and_evaluate.return_value = {"passed": True}
+            mock_sec_cls.return_value = sec_mock
+
+            hlth_mock = MagicMock()
+            hlth_mock.validate.side_effect = MetricValidationError(mve_msg)
+            mock_hlth_cls.return_value = hlth_mock
+
+            validator = RepoSecurityGateValidator(repo_path=repo_path)
+            result = validator.validate_gate({})
+
+            self.assertFalse(result["passed"])
+            self.assertFalse(result["allowed"])
+            self.assertTrue(result["blocked"])
+            self.assertIn(mve_msg, result["failures"])
+            self.assertIn(mve_msg, result["errors"])
+            self.assertFalse(result["health_evaluation"]["valid"])
+            self.assertEqual(result["health_evaluation"]["error"], mve_msg)
+
+    def test_validate_gate_health_generic_exception(self):
+        repo_path = _rnd_path()
+        generic_err = _rnd_str("unexpected_health_err_")
+
+        with patch("skills.repo_security_gate_validator.RepoSecurityGateway") as mock_sec_cls, \
+             patch("skills.repo_security_gate_validator.RepoHealthMetricValidator") as mock_hlth_cls:
+            sec_mock = MagicMock()
+            sec_mock.scan_and_evaluate.return_value = {"passed": True}
+            mock_sec_cls.return_value = sec_mock
+
+            hlth_mock = MagicMock()
+            hlth_mock.validate.side_effect = ValueError(generic_err)
+            mock_hlth_cls.return_value = hlth_mock
+
+            validator = RepoSecurityGateValidator(repo_path=repo_path)
+            result = validator.validate_gate({})
+
+            self.assertFalse(result["passed"])
+            self.assertFalse(result["allowed"])
+            self.assertTrue(result["blocked"])
+            self.assertIn(generic_err, result["failures"])
+
+    def test_validate_gate_without_run_id_omits_run_id_key(self):
+        repo_path = _rnd_path()
+        with patch("skills.repo_security_gate_validator.RepoSecurityGateway") as mock_sec_cls, \
+             patch("skills.repo_security_gate_validator.RepoHealthMetricValidator") as mock_hlth_cls:
+            sec_mock = MagicMock()
+            sec_mock.scan_and_evaluate.return_value = {"passed": True}
+            mock_sec_cls.return_value = sec_mock
+
+            hlth_mock = MagicMock()
+            hlth_mock.validate.return_value = {"valid": True}
+            mock_hlth_cls.return_value = hlth_mock
+
+            validator = RepoSecurityGateValidator(repo_path=repo_path)
+            result = validator.validate_gate({"some_key": _rnd_str()})
+
+            self.assertNotIn("run_id", result)
+
+    def test_validate_stream_gate_success(self):
+        repo_path = _rnd_path()
+        random_bytes = uuid.uuid4().bytes * random.randint(1, 5)
+        stream_io = io.BytesIO(random_bytes)
+        run_id = _rnd_str("stream_run_")
+        parsed_payload = {"run_id": run_id, _rnd_str("val_"): random.randint(1, 1000)}
+
+        with patch("skills.repo_security_gate_validator.RepoSecurityGateway") as mock_sec_cls, \
+             patch("skills.repo_security_gate_validator.RepoHealthMetricValidator") as mock_hlth_cls:
+            sec_mock = MagicMock()
+            sec_mock.scan_and_evaluate.return_value = {"passed": True}
+            mock_sec_cls.return_value = sec_mock
+
+            hlth_mock = MagicMock()
+            hlth_mock.validate_stream.return_value = [parsed_payload]
+            hlth_mock.validate.return_value = {"valid": True}
+            mock_hlth_cls.return_value = hlth_mock
+
+            validator = RepoSecurityGateValidator(repo_path=repo_path)
             result = validator.validate_stream_gate(stream_io)
 
-            mock_health_instance.validate_stream.assert_called_once_with(stream_io)
-            self.assertTrue(result.get("passed"))
-            self.assertFalse(result.get("blocked"))
+            hlth_mock.validate_stream.assert_called_once_with(stream_io)
+            hlth_mock.validate.assert_called_once_with(parsed_payload)
+            self.assertTrue(result["passed"])
+            self.assertTrue(result["allowed"])
+            self.assertEqual(result["run_id"], run_id)
 
-    def test_validate_repo_security_gate_convenience_function(self):
-        metrics_data = generate_random_metrics()
-        random_repo = f"/repos/{generate_random_string('org')}/{generate_random_string('repo')}"
-        unique_run_token = generate_random_string("run_token")
-
-        with patch.object(RepoSecurityGateValidator, "validate_gate") as mock_val_method:
-            mock_val_method.return_value = {
-                "passed": True,
-                "blocked": False,
-                "token": unique_run_token,
-            }
-
-            result = validate_repo_security_gate(repo_path=random_repo, metrics_data=metrics_data)
-
-            self.assertTrue(result.get("passed"))
-            self.assertFalse(result.get("blocked"))
-            self.assertEqual(result.get("token"), unique_run_token)
-            mock_val_method.assert_called_once_with(metrics_data)
-
-    def test_fail_closed_on_unexpected_gateway_exception(self):
-        metrics_data = generate_random_metrics()
-        unexpected_error_text = f"Fatal system fault: {generate_random_string('crash')}"
+    def test_validate_stream_gate_empty_list_from_stream(self):
+        repo_path = _rnd_path()
+        stream_io = io.BytesIO(b"")
 
         with patch("skills.repo_security_gate_validator.RepoSecurityGateway") as mock_sec_cls, \
-             patch("skills.repo_security_gate_validator.RepoHealthMetricValidator"):
+             patch("skills.repo_security_gate_validator.RepoHealthMetricValidator") as mock_hlth_cls:
+            sec_mock = MagicMock()
+            sec_mock.scan_and_evaluate.return_value = {"passed": True}
+            mock_sec_cls.return_value = sec_mock
 
-            mock_sec_instance = mock_sec_cls.return_value
-            mock_sec_instance.scan_and_evaluate.side_effect = RuntimeError(unexpected_error_text)
+            hlth_mock = MagicMock()
+            hlth_mock.validate_stream.return_value = []
+            hlth_mock.validate.return_value = {"valid": True}
+            mock_hlth_cls.return_value = hlth_mock
 
-            validator = RepoSecurityGateValidator(repo_path=self.random_repo_path)
-            result = validator.validate_gate(metrics_data)
+            validator = RepoSecurityGateValidator(repo_path=repo_path)
+            result = validator.validate_stream_gate(stream_io)
 
-            self.assertFalse(result.get("passed"))
-            self.assertTrue(result.get("blocked"))
-            errors_str = str(result.get("errors", [])) + str(result.get("reasons", []))
-            self.assertIn(unexpected_error_text, errors_str)
+            hlth_mock.validate.assert_called_once_with({})
+            self.assertTrue(result["passed"])
+
+    def test_validate_stream_gate_stream_exception_caught(self):
+        repo_path = _rnd_path()
+        random_text = _rnd_str("corrupt_")
+        stream_io = io.StringIO(random_text)
+        stream_err = _rnd_str("stream_parse_error_")
+
+        with patch("skills.repo_security_gate_validator.RepoSecurityGateway") as mock_sec_cls, \
+             patch("skills.repo_security_gate_validator.RepoHealthMetricValidator") as mock_hlth_cls:
+            hlth_mock = MagicMock()
+            hlth_mock.validate_stream.side_effect = RuntimeError(stream_err)
+            mock_hlth_cls.return_value = hlth_mock
+
+            validator = RepoSecurityGateValidator(repo_path=repo_path)
+            result = validator.validate_stream_gate(stream_io)
+
+            self.assertFalse(result["passed"])
+            self.assertFalse(result["allowed"])
+            self.assertTrue(result["blocked"])
+            self.assertIn(stream_err, result["errors"])
+            self.assertIn(stream_err, result["reasons"])
+            self.assertIn(stream_err, result["failures"])
+            self.assertEqual(result["health_evaluation"]["error"], stream_err)
+
+    def test_standalone_validate_repo_security_gate(self):
+        repo_path = _rnd_path()
+        run_id = _rnd_str("standalone_run_")
+        metrics_data = {"run_id": run_id}
+
+        with patch("skills.repo_security_gate_validator.RepoSecurityGateway") as mock_sec_cls, \
+             patch("skills.repo_security_gate_validator.RepoHealthMetricValidator") as mock_hlth_cls:
+            sec_mock = MagicMock()
+            sec_mock.scan_and_evaluate.return_value = {"passed": True}
+            mock_sec_cls.return_value = sec_mock
+
+            hlth_mock = MagicMock()
+            hlth_mock.validate.return_value = {"valid": True}
+            mock_hlth_cls.return_value = hlth_mock
+
+            result = validate_repo_security_gate(repo_path=repo_path, metrics_data=metrics_data)
+
+            mock_sec_cls.assert_called_once_with(repo_path)
+            self.assertTrue(result["passed"])
+            self.assertTrue(result["allowed"])
+            self.assertEqual(result["run_id"], run_id)
 
 
 if __name__ == "__main__":

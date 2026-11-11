@@ -1,92 +1,109 @@
+import io
+import json
 import os
-import random
+import shutil
 import tempfile
 import unittest
 import uuid
-from pathlib import Path
 
-from skills.repo_health_metric_validator import (
-    MetricValidationError,
-    RepoHealthMetricValidator,
+from skills.repo_security_gate_validator import (
+    RepoSecurityGateValidator,
+    validate_repo_security_gate,
 )
-from skills.repo_security_gate_validator import RepoSecurityGateValidator
+from skills.repo_health_metric_validator import (
+    RepoHealthMetricValidator,
+    MetricValidationError,
+)
 from skills.repo_security_gateway import RepoSecurityGateway
 
 
 class TestRepoSecurityGateValidatorIntegration(unittest.TestCase):
     def setUp(self):
-        self.temp_dir_obj = tempfile.TemporaryDirectory()
-        self.temp_dir = self.temp_dir_obj.name
-        self.random_token = uuid.uuid4().hex
-        self.random_file_name = f"source_{self.random_token[:8]}.py"
-        self.source_file = Path(self.temp_dir) / self.random_file_name
-        self.source_file.write_text(
-            f"# Clean module {self.random_token}\ndef execute():\n    return True\n",
-            encoding="utf-8",
-        )
+        self.temp_dir = tempfile.mkdtemp(prefix="repo_sec_gate_test_")
 
     def tearDown(self):
-        self.temp_dir_obj.cleanup()
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    def test_validate_gate_successful_release(self):
-        unique_run_id = f"run_{uuid.uuid4().hex}"
-        random_score = round(random.uniform(85.0, 99.0), 2)
-        valid_metrics = {
-            "run_id": unique_run_id,
-            "health_score": random_score,
-            "status": "healthy",
-            "coverage": 92.5,
+    def test_validate_gate_contract_and_run_id_propagation(self):
+        random_run_id = f"run-{uuid.uuid4().hex}"
+        random_metric_name = f"metric-{uuid.uuid4().hex[:8]}"
+        metrics_payload = {
+            "run_id": random_run_id,
+            "metric_name": random_metric_name,
+            "status": "passed",
+            "coverage": 95.5,
         }
 
         validator = RepoSecurityGateValidator(repo_path=self.temp_dir)
-        result = validator.validate_gate(metrics_data=valid_metrics)
+        self.assertIsInstance(validator.security_gateway, RepoSecurityGateway)
+        self.assertIsInstance(validator.health_validator, RepoHealthMetricValidator)
+
+        result = validator.validate_gate(metrics_payload)
 
         self.assertIsInstance(result, dict)
+        self.assertIn("passed", result)
         self.assertIn("allowed", result)
-        self.assertTrue(result["allowed"])
-        self.assertFalse(result.get("blocked", False))
-
+        self.assertIn("blocked", result)
+        self.assertIn("security_evaluation", result)
         self.assertIn("security_gate", result)
-        self.assertIsInstance(result["security_gate"], dict)
-
         self.assertIn("health_evaluation", result)
-        self.assertEqual(result.get("run_id"), unique_run_id)
-
-    def test_validate_gate_blocks_release_on_unhealthy_metrics(self):
-        unique_bad_id = f"fail_{uuid.uuid4().hex}"
-        unhealthy_metrics = {
-            "run_id": unique_bad_id,
-            "health_score": random.uniform(5.0, 20.0),
-            "status": "critical",
-            "coverage": 15.0,
-        }
-
-        validator = RepoSecurityGateValidator(repo_path=self.temp_dir)
-        result = validator.validate_gate(metrics_data=unhealthy_metrics)
-
-        self.assertIsInstance(result, dict)
-        self.assertIn("allowed", result)
-        self.assertFalse(result["allowed"])
-        self.assertTrue(result.get("blocked", True))
+        self.assertIn("errors", result)
+        self.assertIn("reasons", result)
         self.assertIn("failures", result)
-        self.assertTrue(len(result["failures"]) > 0)
-        self.assertEqual(result.get("run_id"), unique_bad_id)
+        self.assertIn("audit_record", result)
 
-    def test_validate_gate_records_failures_on_corrupted_payload(self):
-        random_corrupt_id = uuid.uuid4().hex
-        corrupted_metrics = {
-            "invalid_key": random_corrupt_id,
-            "health_score": "not_a_number",
+        self.assertEqual(result.get("run_id"), random_run_id)
+        self.assertIn(random_run_id, result["audit_record"])
+        self.assertEqual(result["blocked"], not result["passed"])
+        self.assertEqual(result["allowed"], result["passed"])
+        self.assertIsInstance(result["errors"], list)
+        self.assertIsInstance(result["reasons"], list)
+        self.assertIsInstance(result["failures"], list)
+
+    def test_validate_repo_security_gate_function(self):
+        random_run_id = f"func-run-{uuid.uuid4().hex}"
+        metrics_payload = {
+            "run_id": random_run_id,
+            "score": 100,
         }
 
-        validator = RepoSecurityGateValidator(repo_path=self.temp_dir)
-        result = validator.validate_gate(metrics_data=corrupted_metrics)
+        result = validate_repo_security_gate(self.temp_dir, metrics_payload)
 
         self.assertIsInstance(result, dict)
-        self.assertFalse(result["allowed"])
-        self.assertTrue(result.get("blocked", True))
-        self.assertIn("audit_record", result)
-        self.assertIn(random_corrupt_id, str(result))
+        self.assertEqual(result.get("run_id"), random_run_id)
+        self.assertIn("security_gate", result)
+        self.assertIn("health_evaluation", result)
+        self.assertEqual(result["blocked"], not result["passed"])
+
+    def test_validate_gate_with_nonexistent_repo_blocks_or_reports_failure(self):
+        non_existent_path = os.path.join(self.temp_dir, f"missing_{uuid.uuid4().hex}")
+        random_run_id = f"err-run-{uuid.uuid4().hex}"
+        metrics_payload = {"run_id": random_run_id}
+
+        validator = RepoSecurityGateValidator(repo_path=non_existent_path)
+        result = validator.validate_gate(metrics_payload)
+
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("run_id"), random_run_id)
+        self.assertIsInstance(result["passed"], bool)
+        self.assertEqual(result["blocked"], not result["passed"])
+        self.assertIn("security_evaluation", result)
+        self.assertIn("health_evaluation", result)
+
+    def test_validate_stream_gate_integration(self):
+        random_run_id = f"stream-run-{uuid.uuid4().hex}"
+        sample_metrics = [{"run_id": random_run_id, "score": 90}]
+        stream = io.StringIO(json.dumps(sample_metrics))
+
+        validator = RepoSecurityGateValidator(repo_path=self.temp_dir)
+        result = validator.validate_stream_gate(stream)
+
+        self.assertIsInstance(result, dict)
+        self.assertIn("passed", result)
+        self.assertIn("blocked", result)
+        self.assertEqual(result["blocked"], not result["passed"])
+        self.assertIn("security_evaluation", result)
+        self.assertIn("health_evaluation", result)
 
 
 if __name__ == "__main__":

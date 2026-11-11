@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-st_synchronize_fetch_security_failure)
-- Статус: успешно прошёл тесты и влит в main
-
-## repo_health_security_syncer (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
+: успешно прошёл тесты и влит в main
 
 ## repo_health_security_syncer (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
@@ -325,4 +321,8 @@ st_synchronize_fetch_security_failure)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## repo_health_security_syncer (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## repo_health_dashboard (refactor) — раундов: 2
+- Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main

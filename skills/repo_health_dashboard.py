@@ -34,7 +34,10 @@ class RepoHealthDashboard:
         
         status = ""
         if RepoMonitor:
-            monitor = RepoMonitor()
+            try:
+                monitor = RepoMonitor(self.repo_path)
+            except TypeError:
+                monitor = RepoMonitor()
             if hasattr(monitor, "check_status"):
                 status = monitor.check_status()
         

@@ -41,9 +41,14 @@ class RepoSecurityGateValidator:
             passed_security = False
 
         try:
-            self.health_validator.validate(metrics_data)
-            passed_health = True
-            health_eval = {"valid": True}
+            health_res = self.health_validator.validate(metrics_data)
+            # Интеграционный тест ожидает успешный проход health_validator (который в реальной реализации может возвращать dict или True)
+            if isinstance(health_res, dict):
+                passed_health = health_res.get("valid", True)
+                health_eval = health_res
+            else:
+                passed_health = bool(health_res)
+                health_eval = {"valid": passed_health}
         except MetricValidationError as mve:
             err_msg = str(mve)
             reasons.append(err_msg)
@@ -85,7 +90,6 @@ class RepoSecurityGateValidator:
     def validate_stream_gate(self, stream_io) -> dict:
         try:
             parsed_items = self.health_validator.validate_stream(stream_io)
-            # Для валидации потока используем первый элемент или пустой словарь для validate_gate
             metrics_payload = parsed_items[0] if parsed_items and isinstance(parsed_items, list) else {}
             res = self.validate_gate(metrics_payload)
             return res

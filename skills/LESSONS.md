@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ity_syncer (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## repo_health_security_syncer (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
+шибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## repo_health_security_syncer (refactor) — раундов: 1
@@ -325,4 +321,8 @@ ity_syncer (refactor) — раундов: 1
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## repo_notifier (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## repo_incident_remediator (create) — раундов: 2
+- Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: успешно прошёл тесты и влит в main

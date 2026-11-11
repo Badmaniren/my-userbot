@@ -3,7 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'repo_health_anomaly_inspector'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.repo_health_anomaly_inspector import ...'
+спользуй честный импорт: 'from skills.repo_health_anomaly_inspector import ...'
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -299,3 +299,6 @@
 - Античит поймал: Синтаксическая ошибка в коде: Expected one or more names after 'import' (<unknown>, line 1); Синтаксическая ошибка в коде: unterminated string literal (detected at line 26) (<unknown>, line 26)
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_metric_validator (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

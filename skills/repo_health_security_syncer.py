@@ -3,6 +3,7 @@ import uuid
 import hashlib
 import requests
 import json
+from skills.repo_security_gate_validator import RepoSecurityGateValidator
 
 class RepoHealthSecuritySyncer:
     def __init__(self, repo_id=None, health_url=None, security_url=None, target_directory=None):
@@ -50,6 +51,22 @@ class RepoHealthSecuritySyncer:
                 }
                 with open(expected_file, "w", encoding="utf-8") as f:
                     json.dump(audit_data, f)
+
+                try:
+                    validator = RepoSecurityGateValidator(repo_path=self.target_directory)
+                except TypeError:
+                    try:
+                        validator = RepoSecurityGateValidator(repo_path=os.path.dirname(self.target_directory))
+                    except TypeError:
+                        try:
+                            validator = RepoSecurityGateValidator()
+                        except TypeError:
+                            validator = RepoSecurityGateValidator(self.target_directory)
+
+                if hasattr(validator, "validate"):
+                    validator.validate(expected_file)
+                elif hasattr(validator, "validate_gate"):
+                    validator.validate_gate(expected_file)
 
             return {
                 "success": True,

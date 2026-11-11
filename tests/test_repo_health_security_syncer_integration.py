@@ -1,88 +1,111 @@
-import unittest
 import os
+import json
 import uuid
 import random
-import json
 import tempfile
+import unittest
+
 from skills.repo_health_security_syncer import RepoHealthSecuritySyncer
+from skills.repo_security_gate_validator import RepoSecurityGateValidator
+
 
 class TestRepoHealthSecuritySyncerIntegration(unittest.TestCase):
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp()
-        self.repo_id = str(uuid.uuid4())
-        self.syncer = RepoHealthSecuritySyncer(
-            repo_id=self.repo_id,
-            target_directory=self.test_dir
-        )
+        self.test_dir = tempfile.TemporaryDirectory()
+        self.target_directory = self.test_dir.name
 
     def tearDown(self):
-        for root, dirs, files in os.walk(self.test_dir, topdown=False):
-            for name in files:
-                os.remove(os.path.join(root, name))
-            for name in dirs:
-                os.rmdir(os.path.join(root, name))
-        os.rmdir(self.test_dir)
+        self.test_dir.cleanup()
 
-    def test_synchronize_with_generated_payload(self):
+    def test_synchronize_end_to_end_audit_creation_and_gate_validation(self):
         sync_id = uuid.uuid4().hex
-        health_score = round(random.uniform(50.0, 100.0), 2)
-        security_score = round(random.uniform(0.0, 100.0), 2)
-        vuln_count = random.randint(0, 5)
-        vulnerabilities = [f"CVE-{random.randint(2000, 2024)}-{random.randint(1000, 9999)}" for _ in range(vuln_count)]
+        health_score = random.randint(60, 100)
+        security_score = random.randint(70, 99)
+        vulnerabilities = [
+            f"CVE-{random.randint(2020, 2025)}-{random.randint(1000, 9999)}"
+            for _ in range(random.randint(1, 4))
+        ]
 
-        metric_payload = {
+        payload = {
             "sync_id": sync_id,
             "health_score": health_score,
             "security_score": security_score,
             "vulnerabilities": vulnerabilities
         }
 
-        result = self.syncer.synchronize(metric_payload=metric_payload)
+        syncer = RepoHealthSecuritySyncer(target_directory=self.target_directory)
+        result = syncer.synchronize(metric_payload=payload)
 
         self.assertTrue(result.get("success"))
         self.assertEqual(result.get("synced_id"), sync_id)
-        
-        expected_file = os.path.join(self.test_dir, f"audit_{sync_id}.json")
-        self.assertTrue(os.path.exists(expected_file))
+        self.assertEqual(result.get("health_data", {}).get("health_score"), health_score)
+        self.assertEqual(result.get("security_data", {}).get("security_score"), security_score)
+        self.assertEqual(result.get("security_data", {}).get("vulnerabilities"), vulnerabilities)
 
-        with open(expected_file, "r", encoding="utf-8") as f:
-            audit_data = json.load(f)
+        expected_audit_file = os.path.join(self.target_directory, f"audit_{sync_id}.json")
+        self.assertTrue(os.path.exists(expected_audit_file))
 
-        self.assertEqual(audit_data.get("correlation_id"), sync_id)
-        self.assertEqual(audit_data.get("health_metrics", {}).get("health_score"), health_score)
-        self.assertEqual(audit_data.get("security_metrics", {}).get("security_score"), security_score)
-        self.assertEqual(audit_data.get("security_metrics", {}).get("vulnerabilities"), vulnerabilities)
+        with open(expected_audit_file, "r", encoding="utf-8") as f:
+            written_audit = json.load(f)
 
-    def test_synchronize_with_token_validation(self):
+        self.assertEqual(written_audit.get("correlation_id"), sync_id)
+        self.assertEqual(
+            written_audit.get("health_metrics", {}).get("health_score"),
+            health_score
+        )
+        self.assertEqual(
+            written_audit.get("security_metrics", {}).get("security_score"),
+            security_score
+        )
+        self.assertEqual(
+            written_audit.get("security_metrics", {}).get("vulnerabilities"),
+            vulnerabilities
+        )
+
+    def test_synchronize_with_token_protection_and_subfolder_creation(self):
+        sub_folder = os.path.join(self.target_directory, f"sync_dir_{uuid.uuid4().hex[:8]}")
+        auth_token = f"token_{uuid.uuid4().hex}"
         sync_id = uuid.uuid4().hex
-        valid_token = uuid.uuid4().hex
-        os.environ["REPO_SYNC_TOKEN"] = valid_token
+        health_score = random.randint(40, 90)
+        security_score = random.randint(50, 95)
+        vulnerabilities = [f"VULN-{uuid.uuid4().hex[:6]}"]
 
+        os.environ["REPO_SYNC_TOKEN"] = auth_token
         try:
-            metric_payload_invalid = {
+            invalid_payload = {
                 "sync_id": sync_id,
-                "token": "wrong_token",
-                "health_score": 90.0,
-                "security_score": 85.0,
-                "vulnerabilities": []
+                "token": f"wrong_{auth_token}",
+                "health_score": health_score,
+                "security_score": security_score,
+                "vulnerabilities": vulnerabilities
             }
-            result_invalid = self.syncer.synchronize(metric_payload=metric_payload_invalid)
-            self.assertFalse(result_invalid.get("success"))
-            self.assertEqual(result_invalid.get("synced_id"), sync_id)
+            syncer = RepoHealthSecuritySyncer(target_directory=sub_folder)
+            rejected_res = syncer.synchronize(metric_payload=invalid_payload)
+            self.assertFalse(rejected_res.get("success"))
+            self.assertEqual(rejected_res.get("synced_id"), sync_id)
+            self.assertFalse(os.path.exists(sub_folder))
 
-            metric_payload_valid = {
+            valid_payload = {
                 "sync_id": sync_id,
-                "token": valid_token,
-                "health_score": 95.0,
-                "security_score": 90.0,
-                "vulnerabilities": []
+                "token": auth_token,
+                "health_score": health_score,
+                "security_score": security_score,
+                "vulnerabilities": vulnerabilities
             }
-            result_valid = self.syncer.synchronize(metric_payload=metric_payload_valid)
-            self.assertTrue(result_valid.get("success"))
-            self.assertEqual(result_valid.get("synced_id"), sync_id)
+            accepted_res = syncer.synchronize(metric_payload=valid_payload)
+            self.assertTrue(accepted_res.get("success"))
+            self.assertEqual(accepted_res.get("synced_id"), sync_id)
+            self.assertEqual(accepted_res.get("health_data", {}).get("token"), auth_token)
+
+            audit_file = os.path.join(sub_folder, f"audit_{sync_id}.json")
+            self.assertTrue(os.path.exists(audit_file))
+
+            with open(audit_file, "r", encoding="utf-8") as f:
+                persisted = json.load(f)
+            self.assertEqual(persisted["correlation_id"], sync_id)
         finally:
-            if "REPO_SYNC_TOKEN" in os.environ:
-                del os.environ["REPO_SYNC_TOKEN"]
+            os.environ.pop("REPO_SYNC_TOKEN", None)
+
 
 if __name__ == "__main__":
     unittest.main()

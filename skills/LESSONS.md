@@ -3,17 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-нгой, передан на эскалацию
-
-## repo_health_anomaly_inspector (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## repo_health_anomaly_inspector (refactor) — раундов: 2
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: успешно прошёл тесты и влит в main
-
-## repo_health_predictor_pipeline (refactor) — раундов: 4
-- Античит поймал: ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'repo_health_anomaly_inspector'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.repo_health_anomaly_inspector import ...'
+ЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'repo_health_anomaly_inspector'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.repo_health_anomaly_inspector import ...'
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -303,4 +293,9 @@
 ## repo_health_pulse_engine (refactor) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_trend_collector (create) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: Expected one or more names after 'import' (<unknown>, line 1); Синтаксическая ошибка в коде: unterminated string literal (detected at line 26) (<unknown>, line 26)
+- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

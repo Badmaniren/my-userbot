@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ед фиксом: FAILED (errors=1)
-- Статус: успешно прошёл тесты и влит в main
-
-## repo_health_security_syncer (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
+тесты и влит в main
 
 ## repo_health_security_syncer (refactor) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=2)
@@ -330,4 +326,8 @@
 
 ## repo_health_incident_remediation_bridge (create) — раундов: 4
 - Античит поймал: АНТИЧИТ: Запрещено перекрывать системный модуль 'repo_health_incident_tracker' глобальной переменной!; АНТИЧИТ: Запрещено перекрывать системный модуль 'repo_health_anomaly_remediation_pipeline' глобальной переменной!; АНТИЧИТ: Запрещено перекрывать системный модуль 'repo_health_incident_tracker' глобальной переменной!; АНТИЧИТ: Запрещено перекрывать системный модуль 'repo_health_anomaly_remediation_pipeline' глобальной переменной!
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_incident_tracker (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

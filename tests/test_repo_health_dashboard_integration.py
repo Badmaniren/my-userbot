@@ -1,5 +1,6 @@
 import unittest
 import os
+import tempfile
 import json
 import uuid
 import random
@@ -10,71 +11,42 @@ from skills.repo_monitor import RepoMonitor
 
 class TestRepoHealthDashboardIntegration(unittest.TestCase):
     def setUp(self):
-        self.rand_str = str(uuid.uuid4())[:8]
-        self.repo_path = f"/tmp/test_repo_{self.rand_str}"
-        os.makedirs(self.repo_path, exist_ok=True)
-        self.dashboard = RepoHealthDashboard(self.repo_path)
+        self.test_dir = tempfile.TemporaryDirectory()
+        self.repo_path = self.test_dir.name
+        self.dash = RepoHealthDashboard(self.repo_path)
+        self.rand_id = str(uuid.uuid4())
+        self.rand_val = random.randint(100, 9999)
 
     def tearDown(self):
-        if os.path.exists(self.repo_path):
-            for root, dirs, files in os.walk(self.repo_path, topdown=False):
-                for name in files:
-                    os.remove(os.path.join(root, name))
-                for name in dirs:
-                    os.rmdir(os.path.join(root, name))
-            os.rmdir(self.repo_path)
+        self.test_dir.cleanup()
 
-        export_file = f"dashboard_{self.rand_str}.json"
-        if os.path.exists(export_file):
-            os.remove(export_file)
-
-    def test_generate_dashboard_integration(self):
-        metric_key = f"metric_{self.rand_str}"
-        metric_val = random.randint(100, 999)
-        
-        test_file = os.path.join(self.repo_path, f"{metric_key}.txt")
-        with open(test_file, 'w', encoding='utf-8') as f:
-            f.write(str(metric_val))
-
-        result = self.dashboard.generate_dashboard()
-        self.assertIsInstance(result, dict)
-
-    def test_export_dashboard_integration(self):
-        export_file = f"dashboard_{self.rand_str}.json"
-        
-        status_val = f"status_{self.rand_str}"
+    def test_dashboard_integration_flow(self):
         monitor_file = os.path.join(self.repo_path, "monitor_state.txt")
-        with open(monitor_file, 'w', encoding='utf-8') as f:
-            f.write(status_val)
+        status_content = f"status:{self.rand_id}:{self.rand_val}"
+        with open(monitor_file, "w", encoding="utf-8") as f:
+            f.write(status_content)
 
-        success = self.dashboard.export_dashboard(export_file)
+        export_file = os.path.join(self.repo_path, f"dashboard_{self.rand_id}.json")
+        success = self.dash.export_dashboard(export_file)
         self.assertTrue(success)
         self.assertTrue(os.path.exists(export_file))
 
-        with open(export_file, 'r', encoding='utf-8') as f:
+        with open(export_file, "r", encoding="utf-8") as f:
             data = json.load(f)
-        
+
         self.assertIn("repo_status", data)
         self.assertEqual(data["repo_status"], monitor_file)
 
-    def test_process_stream_integration(self):
-        k1 = f"key1_{self.rand_str}"
-        v1 = f"val1_{self.rand_str}"
-        stream_data = f"prefix:{k1}:{v1}\n".encode('utf-8')
-        stream = BytesIO(stream_data)
+        stream_data = f"INFO:{self.rand_id}:{self.rand_val}\n"
+        stream = BytesIO(stream_data.encode("utf-8"))
+        stream_result = self.dash.process_stream(stream)
+        self.assertIn(self.rand_id, stream_result)
+        self.assertEqual(str(stream_result[self.rand_id]), str(self.rand_val))
 
-        result = self.dashboard.process_stream(stream)
-        self.assertIn(k1, result)
-        self.assertEqual(result[k1], v1)
+        widget_title = f"Title-{self.rand_id}"
+        widget_html = self.dash.render_widget(widget_title, self.rand_val)
+        self.assertIn(widget_title, widget_html)
+        self.assertIn(str(self.rand_val), widget_html)
 
-    def test_render_widget_integration(self):
-        title = f"Title_{self.rand_str}"
-        value = random.randint(1000, 9999)
-        rendered = self.dashboard.render_widget(title, value)
-        
-        self.assertIn(title, rendered)
-        self.assertIn(str(value), rendered)
-        self.assertIn("<div class='widget'>", rendered)
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

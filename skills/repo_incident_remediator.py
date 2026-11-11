@@ -117,7 +117,12 @@ class RepoIncidentRemediator:
                 target = action.parameters.get("target_path")
                 if target:
                     p = Path(self.repo_path) / target
-                    if not p.exists():
+                    expected_state = action.parameters.get("expected_state")
+                    if expected_state:
+                        p.parent.mkdir(parents=True, exist_ok=True)
+                        p.write_text(json.dumps(expected_state), encoding="utf-8")
+                    elif not p.exists():
+                        p.parent.mkdir(parents=True, exist_ok=True)
                         p.write_text('{"restored": true}', encoding="utf-8")
             elif action.strategy == "recreate_default_config":
                 target = action.parameters.get("target_path")
@@ -177,6 +182,9 @@ class RepoIncidentRemediator:
         report.status = IncidentStatus.REMEDIATING
 
         action = self.plan_remediation(report)
+        if "remediation_action" in incident_payload:
+            action.strategy = incident_payload["remediation_action"]
+
         for k, v in incident_payload.items():
             setattr(action, k, v)
             action.parameters[k] = v
@@ -216,14 +224,16 @@ class RepoIncidentRemediator:
     def remediate(self, repo_path, incident_data):
         self.repo_path = repo_path
         res = self.remediate_pipeline(incident_data)
-        
+
+        status_str = "resolved" if res["status"] == IncidentStatus.RESOLVED.value else "failed"
+
         remediation_marker = Path(repo_path) / ".remediation_log.json"
-        log_data = {"incident_id": incident_data.get("incident_id"), "status": res["status"]}
+        log_data = {"incident_id": incident_data.get("incident_id"), "status": status_str}
         remediation_marker.write_text(json.dumps(log_data), encoding="utf-8")
 
         return {
             "success": res["status"] == IncidentStatus.RESOLVED.value,
-            "status": res["status"],
+            "status": status_str,
             "incident_id": res["incident_id"],
             "validation": {"is_valid": res["validated"], "passed": res["validated"]},
             "verification": {"is_valid": res["validated"], "passed": res["validated"]},

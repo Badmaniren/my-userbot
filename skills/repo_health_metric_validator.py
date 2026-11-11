@@ -28,7 +28,7 @@ class RepoHealthMetricValidator:
             raise MetricValidationError("Missing mandatory field: 'timestamp'")
 
         score = metric_data["score"]
-        if not isinstance(score, (int, float)):
+        if not isinstance(score, (int, float)) or isinstance(score, bool):
             raise MetricValidationError("Score must be a number.")
 
         if score < 0.0 or score > 100.0:
@@ -36,7 +36,7 @@ class RepoHealthMetricValidator:
 
         return True
 
-    def validate_stream(self, stream: Union[IO[bytes], IO[str]]) -> List[Dict[str, Any]]:
+    def validate_stream(self, stream: Union[IO[bytes], IO[str], str, bytes]) -> List[Dict[str, Any]]:
         """Читает поток данных (стрим), парсит JSON и валидирует каждую метрику."""
         if hasattr(stream, "read"):
             content = stream.read()
@@ -51,7 +51,7 @@ class RepoHealthMetricValidator:
 
         try:
             data = json.loads(content)
-        except json.JSONDecodeError as e:
+        except (json.JSONDecodeError, TypeError) as e:
             raise MetricValidationError(f"Failed to parse JSON: {e}")
 
         if not isinstance(data, list):
@@ -83,12 +83,10 @@ def render_health_dashboard(metrics_data: Dict[str, Any]) -> str:
 def validate_repo_health_metrics(metrics_data: Dict[str, Any]) -> Dict[str, Any]:
     """Интеграционная обертка для валидации метрик для дашборда и аудитора."""
     validator = RepoHealthMetricValidator()
-    
-    # Адаптируем под интеграционный тест, где ключи могут отличаться (health_score вместо score)
-    normalized_data = metrics_data.copy()
+
+    normalized_data = dict(metrics_data)
     if "health_score" in normalized_data and "score" not in normalized_data:
         normalized_data["score"] = normalized_data["health_score"]
-        metrics_data["score"] = normalized_data["health_score"]  # Обновляем оригинал для интеграционного теста
     if "run_id" in normalized_data and "metric_name" not in normalized_data:
         normalized_data["metric_name"] = normalized_data["run_id"]
     if "timestamp" not in normalized_data:
@@ -102,5 +100,5 @@ def validate_repo_health_metrics(metrics_data: Dict[str, Any]) -> Dict[str, Any]
 
     return {
         "is_valid": is_valid,
-        "metrics": metrics_data
+        "metrics": normalized_data
     }

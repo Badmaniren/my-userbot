@@ -3,12 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-## repo_health_anomaly_inspector (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## repo_health_incident_tracker (create) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: expected ':' (<unknown>, line 17)
-- Последняя ошибка перед фиксом: return repo_health_dispatcher.route(incident_type, payload)
+ute(incident_type, payload)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## repo_incident_tracker (create) — раундов: 4
@@ -287,4 +282,9 @@
 
 ## repo_health_visualizer (refactor) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_trend_calculator (refactor) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

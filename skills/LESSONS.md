@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-на эскалацию
-
-## repo_health_anomaly_remediation_pipeline (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: ImportError: cannot import name 'inspect_anomalies' from 'skills.repo_health_anomaly_inspector' (/home/runner/work/my-userbot/my-userbot/skills/repo_health_anomaly_inspector.py)
+еред фиксом: ImportError: cannot import name 'inspect_anomalies' from 'skills.repo_health_anomaly_inspector' (/home/runner/work/my-userbot/my-userbot/skills/repo_health_anomaly_inspector.py)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## repo_health_anomaly_remediation_pipeline (refactor) — раундов: 1
@@ -286,6 +283,9 @@
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## repo_health_trend_calculator (create) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## repo_health_trend_calculator (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## repo_health_trend_calculator (refactor) — раундов: 1

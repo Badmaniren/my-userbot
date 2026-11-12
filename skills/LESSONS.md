@@ -3,11 +3,6 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-n_pipeline (refactor) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 17); АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
-- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
 ## repo_health_anomaly_inspector (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
@@ -288,4 +283,8 @@ n_pipeline (refactor) — раундов: 4
 ## repo_health_trend_calculator (refactor) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid character '—' (U+2014) (<unknown>, line 3); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_visualizer (refactor) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

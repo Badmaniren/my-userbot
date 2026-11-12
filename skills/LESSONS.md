@@ -7,19 +7,6 @@
 ## repo_health_anomaly_inspector (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
-## repo_health_anomaly_remediation_pipeline (refactor) — раундов: 3
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: успешно прошёл тесты и влит в main
-
-## repo_health_anomaly_inspector (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## repo_health_anomaly_inspector (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## repo_health_anomaly_inspector (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
 ## repo_health_anomaly_inspector (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
@@ -301,4 +288,9 @@
 ## repo_health_trend_storage (create) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 30); Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 62)
 - Последняя ошибка перед фиксом: ======================================================================
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_trend_calculator (create) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: expected '(' (<unknown>, line 55); Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 26); Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 53)
+- Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.18/x64/lib/python3.11/unittest/loader.py", line 419, in _find_test_path
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

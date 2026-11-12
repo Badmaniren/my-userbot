@@ -3,8 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-epo_health_anomaly_remediation_pipeline (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: ----------------------------------------------------------------------
+------------
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## repo_health_anomaly_remediation_pipeline (refactor) — раундов: 4
@@ -302,3 +301,7 @@ epo_health_anomaly_remediation_pipeline (refactor) — раундов: 4
 
 ## repo_health_metric_validator (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## repo_health_incident_tracker (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

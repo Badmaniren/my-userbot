@@ -19,7 +19,6 @@ class RepoHealthMetricValidator:
         if not isinstance(metric_data, dict):
             raise MetricValidationError("Metric data must be a dictionary.")
 
-        # Проверяем обязательные поля
         if "metric_name" not in metric_data:
             raise MetricValidationError("Missing mandatory field: 'metric_name'")
         if "score" not in metric_data:

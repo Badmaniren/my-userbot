@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-------------
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## repo_health_anomaly_remediation_pipeline (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
+ред фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## repo_health_anomaly_remediation_pipeline (refactor) — раундов: 4
@@ -304,4 +300,8 @@
 
 ## repo_health_incident_tracker (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_trend_storage (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

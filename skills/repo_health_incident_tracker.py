@@ -39,7 +39,7 @@ class RepoHealthIncidentTracker:
         if not data:
             return False
         try:
-            payload = json.loads(data.decode("utf-8"))
+            payload = json.loads(data.decode("utf-8", errors="ignore"))
         except (json.JSONDecodeError, AttributeError):
             return False
         
@@ -74,6 +74,19 @@ class RepoHealthIncidentTracker:
         total = len(incidents)
         breakdown = {}
         for inc in incidents:
+            sev = inc["severity"]
+            breakdown[sev] = breakdown.get(sev, 0) + 1
+        return {
+            "total": total,
+            "breakdown": breakdown
+        }
+
+    def get_metrics(self, repo_id=None):
+        if repo_id is not None:
+            return self.get_incident_metrics(repo_id)
+        total = len(self._incidents)
+        breakdown = {}
+        for inc in self._incidents.values():
             sev = inc["severity"]
             breakdown[sev] = breakdown.get(sev, 0) + 1
         return {

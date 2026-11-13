@@ -81,6 +81,19 @@ class RepoHealthIncidentTracker:
             "breakdown": breakdown
         }
 
+    def get_metrics(self, repo_id=None):
+        if repo_id is not None:
+            return self.get_incident_metrics(repo_id)
+        total = len(self._incidents)
+        breakdown = {}
+        for inc in self._incidents.values():
+            sev = inc["severity"]
+            breakdown[sev] = breakdown.get(sev, 0) + 1
+        return {
+            "total": total,
+            "breakdown": breakdown
+        }
+
     def export_incident(self, incident_id, endpoint):
         incident = self.get_incident(incident_id)
         if not incident:

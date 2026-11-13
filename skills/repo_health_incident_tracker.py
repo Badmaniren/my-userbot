@@ -39,7 +39,7 @@ class RepoHealthIncidentTracker:
         if not data:
             return False
         try:
-            payload = json.loads(data.decode("utf-8"))
+            payload = json.loads(data.decode("utf-8", errors="ignore"))
         except (json.JSONDecodeError, AttributeError):
             return False
         

@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ацию
-
-## repo_health_incident_tracker (refactor) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 13); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 1)
+ическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid character '«' (U+00AB) (<unknown>, line 1)
 - Последняя ошибка перед фиксом: ?         -    -    -    -
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -292,5 +289,9 @@
 
 ## repo_security_vulnerability_bridge (create) — раундов: 4
 - Античит поймал: ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'repo_auditor'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.repo_auditor import ...'
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_security_audit_pipeline (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -87,10 +87,17 @@ class RepoHealthIncidentTracker:
         try:
             response = requests.post(endpoint, json=incident)
             return response.status_code == 200
-        except requests.RequestException:
+        except Exception:
             return False
 
-_default_tracker = RepoHealthIncidentTracker()
+# Глобальный инстанс для поддержки функции track_incident на уровне модуля
+_GLOBAL_TRACKER = RepoHealthIncidentTracker()
 
 def track_incident(repo_id, incident_type, severity, description, metadata=None):
-    return _default_tracker.track_incident(repo_id, incident_type, severity, description, metadata)
+    return _GLOBAL_TRACKER.track_incident(
+        repo_id=repo_id,
+        incident_type=incident_type,
+        severity=severity,
+        description=description,
+        metadata=metadata
+    )

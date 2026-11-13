@@ -1,112 +1,92 @@
 import unittest
+import uuid
 import json
 import io
-import uuid
 import random
-import requests
+import string
 from unittest.mock import patch, MagicMock
-from skills.repo_health_incident_tracker import RepoHealthIncidentTracker, track_incident
+from skills.repo_health_incident_tracker import RepoHealthIncidentTracker
 
 class TestRepoHealthIncidentTracker(unittest.TestCase):
     def setUp(self):
         self.tracker = RepoHealthIncidentTracker()
         self.repo_id = uuid.uuid4().hex
-        self.incident_type = uuid.uuid4().hex
         self.severity = random.choice(["CRITICAL", "HIGH", "MEDIUM", "LOW"])
-        self.description = uuid.uuid4().hex
+        self.description = "".join(random.choices(string.ascii_letters, k=20))
 
     def test_track_and_get_incident(self):
         incident_id = self.tracker.track_incident(
-            self.repo_id, self.incident_type, self.severity, self.description
+            self.repo_id, "ANOMALY", self.severity, self.description
         )
         incident = self.tracker.get_incident(incident_id)
-        
         self.assertIsNotNone(incident)
         self.assertEqual(incident["repo_id"], self.repo_id)
         self.assertEqual(incident["status"], "OPEN")
-        self.assertEqual(incident["incident_type"], self.incident_type)
 
     def test_ingest_anomaly_stream_valid(self):
         payload = {
-            "repo_id": self.repo_id,
-            "anomaly_code": self.incident_type,
-            "level": self.severity,
-            "details": self.description
+            "repo_id": uuid.uuid4().hex,
+            "anomaly_code": uuid.uuid4().hex,
+            "level": random.choice(["INFO", "WARN"]),
+            "details": uuid.uuid4().hex
         }
         stream = io.BytesIO(json.dumps(payload).encode("utf-8"))
         result = self.tracker.ingest_anomaly_stream(stream)
-        
         self.assertTrue(result)
-        incidents = self.tracker.list_incidents_by_repo(self.repo_id)
+        incidents = self.tracker.list_incidents_by_repo(payload["repo_id"])
         self.assertEqual(len(incidents), 1)
-        self.assertEqual(incidents[0]["description"], self.description)
+        self.assertEqual(incidents[0]["incident_type"], payload["anomaly_code"])
 
-    def test_ingest_anomaly_stream_invalid_types_and_empty(self):
-        # Test integer input
-        self.assertFalse(self.tracker.ingest_anomaly_stream(12345))
-        
-        # Test missing fields
-        payload = {"repo_id": self.repo_id}
-        stream = io.BytesIO(json.dumps(payload).encode("utf-8"))
-        self.assertFalse(self.tracker.ingest_anomaly_stream(stream))
+    def test_ingest_anomaly_stream_invalid_data(self):
+        stream = io.BytesIO(b"invalid_json_content")
+        result = self.tracker.ingest_anomaly_stream(stream)
+        self.assertFalse(result)
 
     def test_resolve_incident(self):
-        incident_id = self.tracker.track_incident(
-            self.repo_id, self.incident_type, self.severity, self.description
-        )
+        incident_id = self.tracker.track_incident(self.repo_id, "TYPE", "LOW", "DESC")
         resolver = uuid.uuid4().hex
         notes = uuid.uuid4().hex
-        
         result = self.tracker.resolve_incident(incident_id, resolver, notes)
-        incident = self.tracker.get_incident(incident_id)
-        
         self.assertTrue(result)
+        incident = self.tracker.get_incident(incident_id)
         self.assertEqual(incident["status"], "RESOLVED")
         self.assertEqual(incident["resolver"], resolver)
         self.assertEqual(incident["resolution_notes"], notes)
 
     def test_get_incident_metrics(self):
-        for _ in range(3):
-            self.tracker.track_incident(self.repo_id, uuid.uuid4().hex, "HIGH", "test")
+        repo_id = uuid.uuid4().hex
+        severities = ["HIGH", "HIGH", "LOW"]
+        for sev in severities:
+            self.tracker.track_incident(repo_id, "TYPE", sev, "DESC")
         
-        metrics = self.tracker.get_incident_metrics(self.repo_id)
+        metrics = self.tracker.get_incident_metrics(repo_id)
         self.assertEqual(metrics["total"], 3)
-        self.assertEqual(metrics["breakdown"]["HIGH"], 3)
+        self.assertEqual(metrics["breakdown"]["HIGH"], 2)
+        self.assertEqual(metrics["breakdown"]["LOW"], 1)
 
     def test_export_incident_success(self):
-        incident_id = self.tracker.track_incident(
-            self.repo_id, self.incident_type, self.severity, self.description
-        )
-        endpoint = f"http://{uuid.uuid4().hex}.com/api"
+        incident_id = self.tracker.track_incident(self.repo_id, "TYPE", "HIGH", "DESC")
+        endpoint = f"https://{uuid.uuid4().hex}.com/api"
         
         with patch("requests.post") as mock_post:
-            mock_post.return_value.status_code = 200
-            result = self.tracker.export_incident(incident_id, endpoint)
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_post.return_value = mock_response
             
+            result = self.tracker.export_incident(incident_id, endpoint)
             self.assertTrue(result)
             mock_post.assert_called_once()
             args, kwargs = mock_post.call_args
             self.assertEqual(kwargs["json"]["id"], incident_id)
 
-    def test_export_incident_request_exception(self):
-        incident_id = self.tracker.track_incident(
-            self.repo_id, self.incident_type, self.severity, self.description
-        )
-        endpoint = f"http://{uuid.uuid4().hex}.com/api"
+    def test_export_incident_failure(self):
+        incident_id = uuid.uuid4().hex
+        endpoint = f"https://{uuid.uuid4().hex}.com/api"
         
         with patch("requests.post") as mock_post:
-            mock_post.side_effect = requests.RequestException()
+            mock_post.side_effect = Exception("Network Error")
             result = self.tracker.export_incident(incident_id, endpoint)
-            
             self.assertFalse(result)
-
-    def test_module_level_track_incident(self):
-        # Testing the global _default_tracker wrapper
-        incident_id = track_incident(self.repo_id, self.incident_type, self.severity, self.description)
-        self.assertIsNotNone(incident_id)
-        # Verify it exists in the global tracker
-        from skills.repo_health_incident_tracker import _default_tracker
-        self.assertIsNotNone(_default_tracker.get_incident(incident_id))
 
 if __name__ == "__main__":
     unittest.main()

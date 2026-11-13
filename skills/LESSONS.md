@@ -3,15 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-mediation_pipeline' глобальной переменной!
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## repo_health_incident_tracker (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## repo_incident_resolver (compose) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
+тичит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: Expected: RepoHealthRestorer(repo_path='/var/repos/474ac0/36c252f2')
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -305,4 +297,9 @@ mediation_pipeline' глобальной переменной!
 ## repo_health_incident_tracker (refactor) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: expected '(' (<unknown>, line 6); Синтаксическая ошибка в коде: expected 'except' or 'finally' block (<unknown>, line 38)
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_automator (refactor) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 21); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 24)
+- Последняя ошибка перед фиксом: FAILED (errors=3)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

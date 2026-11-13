@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-следняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## repo_health_incident_tracker (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
+успешно прошёл тесты и влит в main
 
 ## repo_health_incident_tracker (refactor) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: expected 'except' or 'finally' block (<unknown>, line 39)
@@ -289,4 +285,8 @@
 ## repo_health_trend_calculator (refactor) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 147); Синтаксическая ошибка в коде: unterminated string literal (detected at line 98) (<unknown>, line 98)
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_visualizer (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

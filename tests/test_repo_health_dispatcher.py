@@ -1,215 +1,204 @@
 import io
 import os
 import random
-import string
 import unittest
 import uuid
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import MagicMock, patch
 
 from skills.repo_health_dispatcher import RepoHealthDispatcher
 
 
-def get_random_string(length=12):
-    return "".join(random.choices(string.ascii_letters + string.digits, k=length))
-
-
-def get_random_path():
-    return os.path.join(
-        "/",
-        get_random_string(6),
-        get_random_string(8),
-        f"{get_random_string(10)}.json",
-    )
-
-
 class TestRepoHealthDispatcher(unittest.TestCase):
 
-    def test_init(self):
-        fake_repo_path = get_random_path()
-        with (
-            patch(
-                "skills.repo_health_dispatcher.RepoHealthDashboard"
-            ) as mock_dashboard_cls,
-            patch(
-                "skills.repo_health_dispatcher.RepoNotifier"
-            ) as mock_notifier_cls,
-        ):
-            dispatcher = RepoHealthDispatcher(fake_repo_path)
-            self.assertEqual(dispatcher.repo_path, fake_repo_path)
-            mock_dashboard_cls.assert_called_once_with(fake_repo_path)
-            mock_notifier_cls.assert_called_once_with(fake_repo_path)
+    def setUp(self):
+        self.repo_path = os.path.join(
+            "/tmp", f"repo_{uuid.uuid4().hex[:8]}"
+        )
 
     def test_dispatch_health_and_notify_success(self):
-        fake_repo_path = get_random_path()
-        target_file_path = get_random_path()
-        expected_notify_result = random.choice([True, False])
+        random_file_path = os.path.join(
+            self.repo_path, f"{uuid.uuid4().hex}.json"
+        )
 
-        with (
-            patch(
-                "skills.repo_health_dispatcher.RepoHealthDashboard"
-            ) as mock_dash_cls,
-            patch(
-                "skills.repo_health_dispatcher.RepoNotifier"
-            ) as mock_notif_cls,
-        ):
-            mock_dash = mock_dash_cls.return_value
-            mock_notif = mock_notif_cls.return_value
+        with patch(
+            "skills.repo_health_dispatcher.RepoHealthDashboard"
+        ) as mock_dashboard_cls, patch(
+            "skills.repo_health_dispatcher.RepoNotifier"
+        ) as mock_notifier_cls:
 
-            mock_dash.export_dashboard.return_value = True
-            mock_notif.notify.return_value = expected_notify_result
+            mock_dashboard_instance = mock_dashboard_cls.return_value
+            mock_dashboard_instance.export_dashboard.return_value = True
 
-            dispatcher = RepoHealthDispatcher(fake_repo_path)
-            result = dispatcher.dispatch_health_and_notify(target_file_path)
+            mock_notifier_instance = mock_notifier_cls.return_value
+            expected_notify_result = random.choice([True, False])
+            mock_notifier_instance.notify.return_value = (
+                expected_notify_result
+            )
 
-            mock_dash.generate_dashboard.assert_called_once()
-            mock_dash.export_dashboard.assert_called_once_with(target_file_path)
-            mock_notif.notify.assert_called_once_with(target_file_path)
+            dispatcher = RepoHealthDispatcher(self.repo_path)
+            result = dispatcher.dispatch_health_and_notify(random_file_path)
+
+            mock_dashboard_instance.generate_dashboard.assert_called_once()
+            mock_dashboard_instance.export_dashboard.assert_called_once_with(
+                random_file_path
+            )
+            mock_notifier_instance.notify.assert_called_once_with(
+                random_file_path
+            )
             self.assertEqual(result, expected_notify_result)
 
     def test_dispatch_health_and_notify_export_failure(self):
-        fake_repo_path = get_random_path()
-        target_file_path = get_random_path()
+        random_file_path = os.path.join(
+            self.repo_path, f"{uuid.uuid4().hex}.json"
+        )
 
-        with (
-            patch(
-                "skills.repo_health_dispatcher.RepoHealthDashboard"
-            ) as mock_dash_cls,
-            patch(
-                "skills.repo_health_dispatcher.RepoNotifier"
-            ) as mock_notif_cls,
-        ):
-            mock_dash = mock_dash_cls.return_value
-            mock_notif = mock_notif_cls.return_value
+        with patch(
+            "skills.repo_health_dispatcher.RepoHealthDashboard"
+        ) as mock_dashboard_cls, patch(
+            "skills.repo_health_dispatcher.RepoNotifier"
+        ) as mock_notifier_cls:
 
-            mock_dash.export_dashboard.return_value = False
+            mock_dashboard_instance = mock_dashboard_cls.return_value
+            mock_dashboard_instance.export_dashboard.return_value = False
 
-            dispatcher = RepoHealthDispatcher(fake_repo_path)
-            result = dispatcher.dispatch_health_and_notify(target_file_path)
+            mock_notifier_instance = mock_notifier_cls.return_value
 
-            mock_dash.generate_dashboard.assert_called_once()
-            mock_dash.export_dashboard.assert_called_once_with(target_file_path)
-            mock_notif.notify.assert_not_called()
+            dispatcher = RepoHealthDispatcher(self.repo_path)
+            result = dispatcher.dispatch_health_and_notify(random_file_path)
+
+            mock_dashboard_instance.generate_dashboard.assert_called_once()
+            mock_dashboard_instance.export_dashboard.assert_called_once_with(
+                random_file_path
+            )
+            mock_notifier_instance.notify.assert_not_called()
             self.assertFalse(result)
 
-    def test_process_stream_and_dispatch_with_string_stream(self):
-        fake_repo_path = get_random_path()
-        target_file_path = get_random_path()
-        raw_text_stream = f"stream_data_{uuid.uuid4().hex}"
-        expected_notify_result = random.choice([True, False])
+    def test_process_stream_and_dispatch_with_string(self):
+        random_stream_content = uuid.uuid4().hex
+        random_file_path = os.path.join(
+            self.repo_path, f"{uuid.uuid4().hex}.report"
+        )
 
-        with (
-            patch(
-                "skills.repo_health_dispatcher.RepoHealthDashboard"
-            ) as mock_dash_cls,
-            patch(
-                "skills.repo_health_dispatcher.RepoNotifier"
-            ) as mock_notif_cls,
-        ):
-            mock_dash = mock_dash_cls.return_value
-            mock_notif = mock_notif_cls.return_value
-            mock_notif.notify.return_value = expected_notify_result
+        with patch(
+            "skills.repo_health_dispatcher.RepoHealthDashboard"
+        ) as mock_dashboard_cls, patch(
+            "skills.repo_health_dispatcher.RepoNotifier"
+        ) as mock_notifier_cls:
 
-            dispatcher = RepoHealthDispatcher(fake_repo_path)
+            mock_dashboard_instance = mock_dashboard_cls.return_value
+            mock_notifier_instance = mock_notifier_cls.return_value
+            expected_result = random.choice([True, False])
+            mock_notifier_instance.notify.return_value = expected_result
+
+            dispatcher = RepoHealthDispatcher(self.repo_path)
             result = dispatcher.process_stream_and_dispatch(
-                raw_text_stream, target_file_path
+                random_stream_content, random_file_path
             )
 
-            mock_dash.process_stream.assert_called_once()
-            passed_stream = mock_dash.process_stream.call_args[0][0]
-            self.assertIsInstance(passed_stream, io.BytesIO)
+            mock_dashboard_instance.process_stream.assert_called_once()
+            call_arg = mock_dashboard_instance.process_stream.call_args[0][0]
+            self.assertIsInstance(call_arg, io.BytesIO)
             self.assertEqual(
-                passed_stream.getvalue(), raw_text_stream.encode("utf-8")
+                call_arg.read(), random_stream_content.encode("utf-8")
             )
 
-            mock_dash.export_dashboard.assert_called_once_with(target_file_path)
-            mock_notif.notify.assert_called_once_with(target_file_path)
-            self.assertEqual(result, expected_notify_result)
+            mock_dashboard_instance.export_dashboard.assert_called_once_with(
+                random_file_path
+            )
+            mock_notifier_instance.notify.assert_called_once_with(
+                random_file_path
+            )
+            self.assertEqual(result, expected_result)
 
-    def test_process_stream_and_dispatch_with_bytes_stream(self):
-        fake_repo_path = get_random_path()
-        target_file_path = get_random_path()
+    def test_process_stream_and_dispatch_with_bytesio(self):
         random_bytes = uuid.uuid4().hex.encode("utf-8")
-        byte_stream = io.BytesIO(random_bytes)
-        expected_notify_result = random.choice([True, False])
+        stream = io.BytesIO(random_bytes)
+        random_file_path = os.path.join(
+            self.repo_path, f"{uuid.uuid4().hex}.report"
+        )
 
-        with (
-            patch(
-                "skills.repo_health_dispatcher.RepoHealthDashboard"
-            ) as mock_dash_cls,
-            patch(
-                "skills.repo_health_dispatcher.RepoNotifier"
-            ) as mock_notif_cls,
-        ):
-            mock_dash = mock_dash_cls.return_value
-            mock_notif = mock_notif_cls.return_value
-            mock_notif.notify.return_value = expected_notify_result
+        with patch(
+            "skills.repo_health_dispatcher.RepoHealthDashboard"
+        ) as mock_dashboard_cls, patch(
+            "skills.repo_health_dispatcher.RepoNotifier"
+        ) as mock_notifier_cls:
 
-            dispatcher = RepoHealthDispatcher(fake_repo_path)
+            mock_dashboard_instance = mock_dashboard_cls.return_value
+            mock_notifier_instance = mock_notifier_cls.return_value
+            expected_result = random.choice([True, False])
+            mock_notifier_instance.notify.return_value = expected_result
+
+            dispatcher = RepoHealthDispatcher(self.repo_path)
             result = dispatcher.process_stream_and_dispatch(
-                byte_stream, target_file_path
+                stream, random_file_path
             )
 
-            mock_dash.process_stream.assert_called_once_with(byte_stream)
-            mock_dash.export_dashboard.assert_called_once_with(target_file_path)
-            mock_notif.notify.assert_called_once_with(target_file_path)
-            self.assertEqual(result, expected_notify_result)
+            mock_dashboard_instance.process_stream.assert_called_once_with(
+                stream
+            )
+            mock_dashboard_instance.export_dashboard.assert_called_once_with(
+                random_file_path
+            )
+            mock_notifier_instance.notify.assert_called_once_with(
+                random_file_path
+            )
+            self.assertEqual(result, expected_result)
 
     def test_check_and_notify_critical(self):
-        fake_repo_path = get_random_path()
-        target_file_path = get_random_path()
         random_title = f"Title_{uuid.uuid4().hex}"
-        random_value = random.randint(1000, 9999)
-        rendered_widget_content = f"WidgetContent_{uuid.uuid4().hex}"
-        expected_notify_result = random.choice([True, False])
+        random_value = random.randint(1, 1000)
+        random_file_path = os.path.join(
+            self.repo_path, f"{uuid.uuid4().hex}.widget"
+        )
+        random_widget_str = f"<widget>{uuid.uuid4().hex}</widget>"
 
-        m_open = mock_open()
-        with (
-            patch(
-                "skills.repo_health_dispatcher.RepoHealthDashboard"
-            ) as mock_dash_cls,
-            patch(
-                "skills.repo_health_dispatcher.RepoNotifier"
-            ) as mock_notif_cls,
-            patch("builtins.open", m_open),
-        ):
-            mock_dash = mock_dash_cls.return_value
-            mock_notif = mock_notif_cls.return_value
+        with patch(
+            "skills.repo_health_dispatcher.RepoHealthDashboard"
+        ) as mock_dashboard_cls, patch(
+            "skills.repo_health_dispatcher.RepoNotifier"
+        ) as mock_notifier_cls, patch(
+            "builtins.open", new_callable=unittest.mock.mock_open
+        ) as mock_file:
 
-            mock_dash.render_widget.return_value = rendered_widget_content
-            mock_notif.notify_and_commit.return_value = expected_notify_result
-
-            dispatcher = RepoHealthDispatcher(fake_repo_path)
-            result = dispatcher.check_and_notify_critical(
-                random_title, random_value, target_file_path
+            mock_dashboard_instance = mock_dashboard_cls.return_value
+            mock_dashboard_instance.render_widget.return_value = (
+                random_widget_str
             )
 
-            mock_dash.render_widget.assert_called_once_with(
+            mock_notifier_instance = mock_notifier_cls.return_value
+            expected_result = random.choice([True, False])
+            mock_notifier_instance.notify_and_commit.return_value = (
+                expected_result
+            )
+
+            dispatcher = RepoHealthDispatcher(self.repo_path)
+            result = dispatcher.check_and_notify_critical(
+                random_title, random_value, random_file_path
+            )
+
+            mock_dashboard_instance.render_widget.assert_called_once_with(
                 random_title, random_value
             )
-            m_open.assert_called_once_with(target_file_path, "w", encoding="utf-8")
-            handle = m_open()
-            handle.write.assert_called_once_with(rendered_widget_content)
-            mock_notif.notify_and_commit.assert_called_once()
-            self.assertEqual(result, expected_notify_result)
+            mock_file.assert_called_once_with(
+                random_file_path, "w", encoding="utf-8"
+            )
+            mock_file().write.assert_called_once_with(random_widget_str)
+            mock_notifier_instance.notify_and_commit.assert_called_once()
+            self.assertEqual(result, expected_result)
 
     def test_dispatch(self):
-        fake_repo_path = get_random_path()
-        expected_report_path = os.path.join(fake_repo_path, "report.json")
-        expected_dispatch_result = random.choice([True, False])
+        with patch(
+            "skills.repo_health_dispatcher.RepoHealthDispatcher.dispatch_health_and_notify"
+        ) as mock_dispatch_health:
+            expected_result = random.choice([True, False])
+            mock_dispatch_health.return_value = expected_result
 
-        with (
-            patch("skills.repo_health_dispatcher.RepoHealthDashboard"),
-            patch("skills.repo_health_dispatcher.RepoNotifier"),
-        ):
-            dispatcher = RepoHealthDispatcher(fake_repo_path)
-            with patch.object(
-                dispatcher,
-                "dispatch_health_and_notify",
-                return_value=expected_dispatch_result,
-            ) as mock_dispatch_health:
-                result = dispatcher.dispatch()
-                mock_dispatch_health.assert_called_once_with(expected_report_path)
-                self.assertEqual(result, expected_dispatch_result)
+            dispatcher = RepoHealthDispatcher(self.repo_path)
+            result = dispatcher.dispatch()
+
+            expected_path = os.path.join(self.repo_path, "report.json")
+            mock_dispatch_health.assert_called_once_with(expected_path)
+            self.assertEqual(result, expected_result)
 
 
 if __name__ == "__main__":

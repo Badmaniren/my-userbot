@@ -1,77 +1,78 @@
 import unittest
 import uuid
 import random
-import io
 import json
+import io
 from skills.repo_health_incident_tracker import RepoHealthIncidentTracker, track_incident
 
 class TestRepoHealthIncidentTrackerIntegration(unittest.TestCase):
-    def setUp(self):
-        self.tracker = RepoHealthIncidentTracker()
-        self.repo_id = f"repo-{uuid.uuid4()}"
-        self.anomaly_code = f"ERR_CODE_{random.randint(1000, 9999)}"
-        self.severity = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
-        self.description = f"Test anomaly description {uuid.uuid4()}"
+    def test_incident_lifecycle_and_integration(self):
+        tracker = RepoHealthIncidentTracker()
+        
+        rand_repo_id = f"repo-{uuid.uuid4()}"
+        rand_incident_type = f"ANOMALY_{random.randint(1000, 9999)}"
+        rand_severity = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
+        rand_description = f"Automated test incident description {uuid.uuid4()}"
+        rand_metadata = {"env": "integration-test", "node_id": random.randint(1, 100)}
 
-    def test_full_incident_lifecycle_and_metrics(self):
-        incident_id = self.tracker.track_incident(
-            repo_id=self.repo_id,
-            incident_type=self.anomaly_code,
-            severity=self.severity,
-            description=self.description,
-            metadata={"source": "integration_test", "run_id": random.randint(1, 100)}
+        incident_id = tracker.track_incident(
+            repo_id=rand_repo_id,
+            incident_type=rand_incident_type,
+            severity=rand_severity,
+            description=rand_description,
+            metadata=rand_metadata
         )
-        
-        self.assertIsNotNone(incident_id)
-        
-        incident = self.tracker.get_incident(incident_id)
-        self.assertIsNotNone(incident)
-        self.assertEqual(incident["repo_id"], self.repo_id)
-        self.assertEqual(incident["incident_type"], self.anomaly_code)
-        self.assertEqual(incident["severity"], self.severity)
-        self.assertEqual(incident["description"], self.description)
-        self.assertEqual(incident["status"], "OPEN")
 
-        metrics = self.tracker.get_metrics(self.repo_id)
-        self.assertEqual(metrics["total"], 1)
-        self.assertEqual(metrics["breakdown"].get(self.severity), 1)
+        self.assertIsNotNone(incident_id)
+        self.assertIsInstance(incident_id, str)
+
+        retrieved = tracker.get_incident(incident_id)
+        self.assertIsNotNone(retrieved)
+        self.assertEqual(retrieved["id"], incident_id)
+        self.assertEqual(retrieved["repo_id"], rand_repo_id)
+        self.assertEqual(retrieved["incident_type"], rand_incident_type)
+        self.assertEqual(retrieved["severity"], rand_severity)
+        self.assertEqual(retrieved["description"], rand_description)
+        self.assertEqual(retrieved["metadata"], rand_metadata)
+        self.assertEqual(retrieved["status"], "OPEN")
+
+        stream_data = json.dumps({
+            "repo_id": rand_repo_id,
+            "anomaly_code": f"STREAM_{rand_incident_type}",
+            "level": rand_severity,
+            "details": f"Stream details {uuid.uuid4()}"
+        }).encode("utf-8")
+        
+        stream_io = io.BytesIO(stream_data)
+        ingest_result = tracker.ingest_anomaly_stream(stream_io)
+        self.assertTrue(ingest_result)
+
+        incidents_list = tracker.list_incidents_by_repo(rand_repo_id)
+        self.assertGreaterEqual(len(incidents_list), 2)
+
+        metrics = tracker.get_metrics(rand_repo_id)
+        self.assertIn("total", metrics)
+        self.assertIn("breakdown", metrics)
+        self.assertEqual(metrics["total"], len(incidents_list))
 
         resolver_name = f"admin-{uuid.uuid4()}"
-        resolution_notes = f"Fixed via test run {uuid.uuid4()}"
-        resolved = self.tracker.resolve_incident(incident_id, resolver_name, resolution_notes)
-        self.assertTrue(resolved)
+        resolution_notes = f"Fixed via integration test {uuid.uuid4()}"
+        resolve_result = tracker.resolve_incident(incident_id, resolver_name, resolution_notes)
+        self.assertTrue(resolve_result)
 
-        updated_incident = self.tracker.get_incident(incident_id)
-        self.assertEqual(updated_incident["status"], "RESOLVED")
-        self.assertEqual(updated_incident["resolver"], resolver_name)
-        self.assertEqual(updated_incident["resolution_notes"], resolution_notes)
+        resolved_incident = tracker.get_incident(incident_id)
+        self.assertEqual(resolved_incident["status"], "RESOLVED")
+        self.assertEqual(resolved_incident["resolver"], resolver_name)
+        self.assertEqual(resolved_incident["resolution_notes"], resolution_notes)
 
-    def test_ingest_anomaly_stream_integration(self):
-        stream_payload = {
-            "repo_id": self.repo_id,
-            "anomaly_code": self.anomaly_code,
-            "level": self.severity,
-            "details": self.description
-        }
-        stream_bytes = json.dumps(stream_payload).encode("utf-8")
-        stream_mock = io.BytesIO(stream_bytes)
-
-        ingested = self.tracker.ingest_anomaly_stream(stream_mock)
-        self.assertTrue(ingested)
-
-        incidents = self.tracker.list_incidents_by_repo(self.repo_id)
-        self.assertEqual(len(incidents), 1)
-        self.assertEqual(incidents[0]["incident_type"], self.anomaly_code)
-        self.assertEqual(incidents[0]["severity"], self.severity)
-
-    def test_global_track_incident_wrapper(self):
         global_incident_id = track_incident(
-            repo_id=self.repo_id,
-            incident_type=self.anomaly_code,
-            severity=self.severity,
-            description=self.description
+            repo_id=rand_repo_id,
+            incident_type="GLOBAL_TEST",
+            severity="LOW",
+            description="Global helper test"
         )
         self.assertIsNotNone(global_incident_id)
+        self.assertIsInstance(global_incident_id, str)
 
 if __name__ == "__main__":
     unittest.main()

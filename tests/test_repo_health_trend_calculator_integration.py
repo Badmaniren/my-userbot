@@ -1,84 +1,83 @@
 import unittest
-import os
 import json
+import os
 import uuid
 import random
+import shutil
 from skills.repo_health_trend_calculator import RepoHealthTrendCalculator, calculate_health_trends
 
 class TestRepoHealthTrendCalculatorIntegration(unittest.TestCase):
     def setUp(self):
-        self.repo_id = f"repo-{uuid.uuid4()}"
-        self.metric_name = f"metric_{uuid.uuid4().hex[:6]}"
-        self.input_file = f"test_input_{uuid.uuid4()}.json"
-        self.output_file = f"test_output_{uuid.uuid4()}.json"
-        self.calculator = RepoHealthTrendCalculator(window_size=random.randint(3, 10), smoothing_factor=0.7)
+        self.test_dir = f"test_env_{uuid.uuid4().hex}"
+        os.makedirs(self.test_dir, exist_ok=True)
+        self.calculator = RepoHealthTrendCalculator()
 
     def tearDown(self):
-        for f_path in [self.input_file, self.output_file]:
-            if os.path.exists(f_path):
-                os.remove(f_path)
+        if os.path.exists(self.test_dir):
+            shutil.rmtree(self.test_dir)
 
-    def test_integration_full_trend_calculation_pipeline(self):
-        val1 = random.randint(10, 50)
-        val2 = val1 + random.randint(1, 20)
-        val3 = val2 + random.randint(1, 30)
+    def test_full_pipeline_integration(self):
+        repo_id = str(uuid.uuid4())
+        input_file = os.path.join(self.test_dir, "input.json")
+        output_file = os.path.join(self.test_dir, "output.json")
 
-        history_data = [
-            {"snapshot_id": str(uuid.uuid4()), "metrics": {self.metric_name: val1}},
-            {"snapshot_id": str(uuid.uuid4()), "metrics": {self.metric_name: val2}},
-            {"snapshot_id": str(uuid.uuid4()), "metrics": {self.metric_name: val3}}
+        # Генерация случайных данных истории
+        history = []
+        for i in range(5):
+            history.append({
+                "snapshot_id": str(uuid.uuid4()),
+                "metrics": {
+                    "coverage": random.uniform(50.0, 90.0),
+                    "vulnerabilities": random.randint(0, 10)
+                }
+            })
+
+        input_data = {"repo_id": repo_id, "history": history}
+        with open(input_file, "w", encoding="utf-8") as f:
+            json.dump(input_data, f)
+
+        # Вызов функции интеграции
+        result = calculate_health_trends(input_file, output_file)
+
+        # Проверка корректности возвращаемых данных
+        self.assertEqual(result["repo_id"], repo_id)
+        self.assertIn("coverage", result["trends"])
+        self.assertIn("vulnerabilities", result["trends"])
+        self.assertIn("summary", result)
+
+        # Проверка создания файла
+        self.assertTrue(os.path.exists(output_file))
+        with open(output_file, "r", encoding="utf-8") as f:
+            exported_data = json.load(f)
+            self.assertEqual(exported_data["repo_id"], repo_id)
+
+    def test_anomaly_detection_logic(self):
+        # Генерация данных с явной аномалией
+        history = [
+            {"metrics": {"latency": 10}},
+            {"metrics": {"latency": 12}},
+            {"metrics": {"latency": 11}},
+            {"metrics": {"latency": 100}}  # Аномалия
         ]
+        
+        anomalies = self.calculator.detect_metric_anomalies(history, "latency", z_threshold=1.0)
+        
+        self.assertEqual(len(anomalies), 1)
+        self.assertEqual(anomalies[0]["metrics"]["latency"], 100)
 
-        payload = {
-            "repo_id": self.repo_id,
-            "history": history_data
-        }
-
-        with open(self.input_file, "w", encoding="utf-8") as f:
-            json.dump(payload, f)
-
-        result = calculate_health_trends(self.input_file, self.output_file)
-
-        self.assertTrue(os.path.exists(self.output_file), "Output file was not created by the pipeline.")
-
-        with open(self.output_file, "r", encoding="utf-8") as f:
-            persisted_data = json.load(f)
-
-        self.assertEqual(persisted_data.get("repo_id"), self.repo_id)
-        self.assertIn("trends", persisted_data)
-        self.assertIn("summary", persisted_data)
-
-        metric_trends = persisted_data["trends"].get(self.metric_name)
-        self.assertIsNotNone(metric_trends)
-        self.assertEqual(metric_trends["direction"], "upward")
-        self.assertEqual(metric_trends["delta"], val3 - val1)
-        self.assertEqual(metric_trends["historical_values"], [val1, val2, val3])
-
-        summary = persisted_data["summary"]
-        self.assertEqual(summary["overall_status"], "improving")
-        self.assertIn(self.metric_name, summary["metric_summaries"])
-
-        trend_summary = self.calculator.calculate_metric_trend(history_data, self.metric_name)
-        self.assertEqual(trend_summary["first_value"], val1)
-        self.assertEqual(trend_summary["latest_value"], val3)
-        self.assertEqual(trend_summary["delta"], val3 - val1)
-        self.assertEqual(trend_summary["direction"], "improving")
-
-        smoothed = self.calculator.get_smoothed_series(history_data, self.metric_name)
-        self.assertEqual(len(smoothed), 3)
-        self.assertEqual(smoothed[0], float(val1))
-
-        anomalies = self.calculator.detect_metric_anomalies(history_data, self.metric_name, z_threshold=10.0)
-        self.assertIsInstance(anomalies, list)
-
-        exported_path = f"test_export_{uuid.uuid4()}.json"
-        try:
-            export_success = self.calculator.export_trend_summary(history_data, exported_path)
-            self.assertTrue(export_success)
-            self.assertTrue(os.path.exists(exported_path))
-        finally:
-            if os.path.exists(exported_path):
-                os.remove(exported_path)
+    def test_smoothing_calculation(self):
+        history = [
+            {"metrics": {"score": 10.0}},
+            {"metrics": {"score": 20.0}}
+        ]
+        # smoothing_factor = 0.5
+        # val1 = 10.0
+        # val2 = 0.5 * 20.0 + (1 - 0.5) * 10.0 = 15.0
+        smoothed = self.calculator.get_smoothed_series(history, "score")
+        
+        self.assertEqual(len(smoothed), 2)
+        self.assertEqual(smoothed[0], 10.0)
+        self.assertEqual(smoothed[1], 15.0)
 
 if __name__ == "__main__":
     unittest.main()

@@ -208,6 +208,8 @@ def calculate_health_trends(input_file, output_file):
     output_dir = os.path.dirname(output_file)
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
+    else:
+        os.makedirs(".", exist_ok=True)
 
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(result, f, indent=2)

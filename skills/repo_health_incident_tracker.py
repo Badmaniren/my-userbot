@@ -35,7 +35,11 @@ class RepoHealthIncidentTracker:
     def ingest_anomaly_stream(self, stream):
         if isinstance(stream, int):
             return False
-        data = stream.read()
+        try:
+            data = stream.read()
+        except AttributeError:
+            return False
+            
         if not data:
             return False
         try:
@@ -43,6 +47,9 @@ class RepoHealthIncidentTracker:
         except (json.JSONDecodeError, AttributeError):
             return False
         
+        if not isinstance(payload, dict):
+            return False
+
         repo_id = payload.get("repo_id")
         anomaly_code = payload.get("anomaly_code")
         level = payload.get("level")

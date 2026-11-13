@@ -1,9 +1,9 @@
-import unittest
 import os
-import tempfile
+import unittest
 import uuid
-import random
+import tempfile
 from skills.repo_health_dispatcher import RepoHealthDispatcher
+
 
 class TestRepoHealthDispatcherIntegration(unittest.TestCase):
     def setUp(self):
@@ -11,57 +11,65 @@ class TestRepoHealthDispatcherIntegration(unittest.TestCase):
         self.repo_path = self.test_dir.name
         self.dispatcher = RepoHealthDispatcher(self.repo_path)
         
+        self.random_title = f"incident_{uuid.uuid4().hex[:8]}"
+        self.random_value = f"metric_val_{uuid.uuid4().hex[:8]}"
+        self.report_filename = f"report_{uuid.uuid4().hex[:8]}.json"
+        self.file_path = os.path.join(self.repo_path, self.report_filename)
+
     def tearDown(self):
         self.test_dir.cleanup()
 
     def test_dispatch_health_and_notify_integration(self):
-        unique_filename = f"report_{uuid.uuid4().hex}.json"
-        file_path = os.path.join(self.repo_path, unique_filename)
-        
-        result = self.dispatcher.dispatch_health_and_notify(file_path)
+        result = self.dispatcher.dispatch_health_and_notify(self.file_path)
         
         self.assertIsInstance(result, bool)
-        self.assertTrue(os.path.exists(file_path), f"Файл отчета не был создан: {file_path}")
-        
-        with open(file_path, "r", encoding="utf-8") as f:
-            content = f.read()
-            self.assertGreater(len(content), 0, "Созданный файл отчета пуст")
+        self.assertTrue(
+            os.path.exists(self.file_path),
+            f"Интеграционный сбой: файл отчета {self.file_path} не был создан реальными навыками."
+        )
 
     def test_process_stream_and_dispatch_integration(self):
-        unique_filename = f"stream_report_{uuid.uuid4().hex}.json"
-        file_path = os.path.join(self.repo_path, unique_filename)
+        stream_data = f'{{"metric": "{uuid.uuid4().hex}"}}'
         
-        random_metric_name = f"metric_{uuid.uuid4().hex[:8]}"
-        random_metric_value = random.randint(100, 9999)
-        stream_data = f'{{"title": "{random_metric_name}", "value": {random_metric_value}}}'
-        
-        result = self.dispatcher.process_stream_and_dispatch(stream_data, file_path)
+        result = self.dispatcher.process_stream_and_dispatch(stream_data, self.file_path)
         
         self.assertIsInstance(result, bool)
-        self.assertTrue(os.path.exists(file_path), f"Файл стрим-отчета не был создан: {file_path}")
+        self.assertTrue(
+            os.path.exists(self.file_path),
+            f"Интеграционный сбой: файл из стрима {self.file_path} не был сгенерирован."
+        )
 
     def test_check_and_notify_critical_integration(self):
-        unique_filename = f"critical_{uuid.uuid4().hex}.txt"
-        file_path = os.path.join(self.repo_path, unique_filename)
-        
-        critical_title = f"CRITICAL_INCIDENT_{uuid.uuid4().hex[:6]}"
-        critical_value = random.uniform(90.0, 100.0)
-        
-        result = self.dispatcher.check_and_notify_critical(critical_title, critical_value, file_path)
+        result = self.dispatcher.check_and_notify_critical(
+            self.random_title, 
+            self.random_value, 
+            self.file_path
+        )
         
         self.assertIsInstance(result, bool)
-        self.assertTrue(os.path.exists(file_path), f"Критический виджет не записан в файл: {file_path}")
+        self.assertTrue(
+            os.path.exists(self.file_path),
+            f"Интеграционный сбой: критический виджет не записан по пути {self.file_path}."
+        )
         
-        with open(file_path, "r", encoding="utf-8") as f:
-            file_content = f.read()
-            self.assertIn(critical_title, file_content)
+        with open(self.file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+            self.assertIn(
+                self.random_value, 
+                content, 
+                "Интеграционный сбой: случайное значение метрики не найдено в результирующем файле."
+            )
 
     def test_dispatch_default_integration(self):
+        default_report_path = os.path.join(self.repo_path, "report.json")
         result = self.dispatcher.dispatch()
         
         self.assertIsInstance(result, bool)
-        default_report_path = os.path.join(self.repo_path, "report.json")
-        self.assertTrue(os.path.exists(default_report_path), "Дефолтный отчет не сгенерирован методом dispatch()")
+        self.assertTrue(
+            os.path.exists(default_report_path),
+            "Интеграционный сбой: дефолтный метод dispatch() не создал 'report.json'."
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -38,7 +38,11 @@ class RepoHealthIncidentTracker:
         data = stream.read()
         if not data:
             return False
-        payload = json.loads(data.decode("utf-8"))
+        try:
+            payload = json.loads(data.decode("utf-8"))
+        except (json.JSONDecodeError, AttributeError):
+            return False
+        
         repo_id = payload.get("repo_id")
         anomaly_code = payload.get("anomaly_code")
         level = payload.get("level")

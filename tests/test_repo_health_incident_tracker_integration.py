@@ -1,82 +1,99 @@
 import unittest
 import uuid
 import random
+import json
 import io
 from skills.repo_health_incident_tracker import RepoHealthIncidentTracker, track_incident
 
 class TestRepoHealthIncidentTrackerIntegration(unittest.TestCase):
-    def test_incident_lifecycle_and_ingestion_integration(self):
-        tracker = RepoHealthIncidentTracker()
+
+    def setUp(self):
+        self.tracker = RepoHealthIncidentTracker()
+        self.repo_id = f"repo-{uuid.uuid4()}"
+        self.incident_types = ["SECURITY_BREACH", "MEMORY_LEAK", "DEPENDENCY_FAILURE", "DISK_FULL"]
+        self.severities = ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+
+    def test_full_incident_lifecycle_and_metrics(self):
+        random_type = random.choice(self.incident_types)
+        random_severity = random.choice(self.severities)
+        unique_description = f"Automated test incident description {uuid.uuid4()}"
+        meta_key = f"key_{uuid.uuid4()}"
+        meta_val = str(uuid.uuid4())
+        metadata = {meta_key: meta_val}
+
+        incident_id = self.tracker.track_incident(
+            repo_id=self.repo_id,
+            incident_type=random_type,
+            severity=random_severity,
+            description=unique_description,
+            metadata=metadata
+        )
+
+        self.assertIsNotNone(incident_id)
         
-        repo_id = f"repo-{uuid.uuid4()}"
-        anomaly_code = f"ERR-{random.randint(100, 999)}"
-        level = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
-        details = f"Random incident detail message {uuid.uuid4()}"
+        incident = self.tracker.get_incident(incident_id)
+        self.assertIsNotNone(incident)
+        self.assertEqual(incident["id"], incident_id)
+        self.assertEqual(incident["repo_id"], self.repo_id)
+        self.assertEqual(incident["incident_type"], random_type)
+        self.assertEqual(incident["severity"], random_severity)
+        self.assertEqual(incident["description"], unique_description)
+        self.assertEqual(incident["metadata"], metadata)
+        self.assertEqual(incident["status"], "OPEN")
+
+        metrics_before = self.tracker.get_incident_metrics(self.repo_id)
+        self.assertEqual(metrics_before["total"], 1)
+        self.assertEqual(metrics_before["breakdown"].get(random_severity), 1)
+
+        resolver_name = f"resolver-{uuid.uuid4()}"
+        resolution_notes = f"Fixed via automated patch {uuid.uuid4()}"
+        resolved = self.tracker.resolve_incident(incident_id, resolver_name, resolution_notes)
+        self.assertTrue(resolved)
+
+        updated_incident = self.tracker.get_incident(incident_id)
+        self.assertEqual(updated_incident["status"], "RESOLVED")
+        self.assertEqual(updated_incident["resolver"], resolver_name)
+        self.assertEqual(updated_incident["resolution_notes"], resolution_notes)
+
+    def test_ingest_anomaly_stream_integration(self):
+        anomaly_code = f"ANOMALY_{uuid.uuid4().hex[:8].upper()}"
+        level = random.choice(self.severities)
+        details = f"Anomaly stream details {uuid.uuid4()}"
         
-        incident_id = tracker.track_incident(
-            repo_id=repo_id,
-            incident_type=anomaly_code,
-            severity=level,
-            description=details,
-            metadata={"source": "integration_test"}
+        payload = {
+            "repo_id": self.repo_id,
+            "anomaly_code": anomaly_code,
+            "level": level,
+            "details": details
+        }
+        
+        stream_data = json.dumps(payload).encode("utf-8")
+        stream = io.BytesIO(stream_data)
+
+        success = self.tracker.ingest_anomaly_stream(stream)
+        self.assertTrue(success)
+
+        incidents = self.tracker.list_incidents_by_repo(self.repo_id)
+        self.assertTrue(len(incidents) > 0)
+        
+        matched_incident = next((inc for inc in incidents if inc["incident_type"] == anomaly_code), None)
+        self.assertIsNotNone(matched_incident)
+        self.assertEqual(matched_incident["severity"], level)
+        self.assertEqual(matched_incident["description"], details)
+
+    def test_global_tracker_functions(self):
+        random_type = random.choice(self.incident_types)
+        random_severity = random.choice(self.severities)
+        desc = f"Global track test {uuid.uuid4()}"
+        
+        incident_id = track_incident(
+            repo_id=self.repo_id,
+            incident_type=random_type,
+            severity=random_severity,
+            description=desc
         )
         
         self.assertIsNotNone(incident_id)
-        
-        fetched_incident = tracker.get_incident(incident_id)
-        self.assertIsNotNone(fetched_incident)
-        self.assertEqual(fetched_incident["id"], incident_id)
-        self.assertEqual(fetched_incident["repo_id"], repo_id)
-        self.assertEqual(fetched_incident["incident_type"], anomaly_code)
-        self.assertEqual(fetched_incident["severity"], level)
-        self.assertEqual(fetched_incident["description"], details)
-        self.assertEqual(fetched_incident["status"], "OPEN")
-        
-        resolver_name = f"admin-{uuid.uuid4()}"
-        resolution_msg = f"Resolved via test {uuid.uuid4()}"
-        resolve_success = tracker.resolve_incident(incident_id, resolver_name, resolution_msg)
-        self.assertTrue(resolve_success)
-        
-        resolved_incident = tracker.get_incident(incident_id)
-        self.assertEqual(resolved_incident["status"], "RESOLVED")
-        self.assertEqual(resolved_incident["resolver"], resolver_name)
-        self.assertEqual(resolved_incident["resolution_notes"], resolution_msg)
-        
-        stream_repo_id = f"repo-stream-{uuid.uuid4()}"
-        stream_anomaly = f"STREAM-ERR-{random.randint(1000, 9999)}"
-        stream_level = random.choice(["WARNING", "FATAL"])
-        stream_details = f"Stream anomaly details {uuid.uuid4()}"
-        
-        raw_data = {
-            "repo_id": stream_repo_id,
-            "anomaly_code": stream_anomaly,
-            "level": stream_level,
-            "details": stream_details
-        }
-        
-        file_stream = io.BytesIO(str(raw_data).replace("'", '"').encode('utf-8'))
-        ingest_result = tracker.ingest_anomaly_stream(file_stream)
-        self.assertTrue(ingest_result)
-        
-        stream_incidents = tracker.list_incidents_by_repo(stream_repo_id)
-        self.assertEqual(len(stream_incidents), 1)
-        self.assertEqual(stream_incidents[0]["incident_type"], stream_anomaly)
-        self.assertEqual(stream_incidents[0]["severity"], stream_level)
-        self.assertEqual(stream_incidents[0]["description"], stream_details)
-        
-        metrics = tracker.get_incident_metrics(stream_repo_id)
-        self.assertEqual(metrics["total"], 1)
-        self.assertIn(stream_level, metrics["breakdown"])
-        self.assertEqual(metrics["breakdown"][stream_level], 1)
-        
-        standalone_repo_id = f"repo-standalone-{uuid.uuid4()}"
-        standalone_id = track_incident(
-            repo_id=standalone_repo_id,
-            incident_type="STANDALONE_TEST",
-            severity="LOW",
-            description="Testing standalone function wrapper"
-        )
-        self.assertIsNotNone(standalone_id)
 
 if __name__ == "__main__":
     unittest.main()

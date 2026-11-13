@@ -3,9 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-поймал: Синтаксическая ошибка в коде: expected 'except' or 'finally' block (<unknown>, line 39)
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## repo_health_incident_tracker (refactor) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: expected '(' (<unknown>, line 6); Синтаксическая ошибка в коде: expected an indented block after function definition on line 30 (<unknown>, line 30)
@@ -290,3 +288,7 @@
 
 ## repo_health_trend_calculator (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## repo_health_predictor_pipeline (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

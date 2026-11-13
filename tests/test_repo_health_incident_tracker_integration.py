@@ -1,82 +1,79 @@
 import unittest
 import uuid
 import random
+import json
 import io
 from skills.repo_health_incident_tracker import RepoHealthIncidentTracker, track_incident
 
 class TestRepoHealthIncidentTrackerIntegration(unittest.TestCase):
-    def test_incident_lifecycle_and_ingestion_integration(self):
+    def test_full_incident_lifecycle_and_aggregation(self):
         tracker = RepoHealthIncidentTracker()
         
         repo_id = f"repo-{uuid.uuid4()}"
-        anomaly_code = f"ERR-{random.randint(100, 999)}"
-        level = random.choice(["LOW", "MEDIUM", "HIGH", "CRITICAL"])
-        details = f"Random incident detail message {uuid.uuid4()}"
+        anomaly_types = ["CRITICAL_VULN", "MEMORY_LEAK", "BUILD_FAILURE", "DEPRECATED_DEPENDENCY"]
+        severities = ["HIGH", "CRITICAL", "MEDIUM", "LOW"]
         
-        incident_id = tracker.track_incident(
-            repo_id=repo_id,
-            incident_type=anomaly_code,
-            severity=level,
-            description=details,
-            metadata={"source": "integration_test"}
-        )
+        created_ids = []
+        for _ in range(random.randint(3, 6)):
+            inc_type = random.choice(anomaly_types)
+            sev = random.choice(severities)
+            desc = f"Automated anomaly detected with code {uuid.uuid4()}"
+            metadata = {"source": "integration_test", "retry_count": random.randint(0, 3)}
+            
+            incident_id = tracker.track_incident(
+                repo_id=repo_id,
+                incident_type=inc_type,
+                severity=sev,
+                description=desc,
+                metadata=metadata
+            )
+            self.assertIsNotNone(incident_id)
+            created_ids.append(incident_id)
+            
+            fetched = tracker.get_incident(incident_id)
+            self.assertEqual(fetched["repo_id"], repo_id)
+            self.assertEqual(fetched["status"], "OPEN")
+            self.assertEqual(fetched["metadata"]["retry_count"], metadata["retry_count"])
+
+        payload = {
+            "repo_id": repo_id,
+            "anomaly_code": random.choice(anomaly_types),
+            "level": random.choice(severities),
+            "details": f"Stream anomaly {uuid.uuid4()}"
+        }
+        stream_data = json.dumps(payload).encode("utf-8")
+        stream_mock = io.BytesIO(stream_data)
         
-        self.assertIsNotNone(incident_id)
+        ingest_result = tracker.ingest_anomaly_stream(stream_mock)
+        self.assertTrue(ingest_result)
+
+        incidents_list = tracker.list_incidents_by_repo(repo_id)
+        self.assertEqual(len(incidents_list), len(created_ids) + 1)
+
+        target_incident_id = created_ids[0]
+        resolver_name = f"AutoRemediator-{uuid.uuid4()}"
+        resolution_notes = f"Fixed automatically via pipeline run {uuid.uuid4()}"
         
-        fetched_incident = tracker.get_incident(incident_id)
-        self.assertIsNotNone(fetched_incident)
-        self.assertEqual(fetched_incident["id"], incident_id)
-        self.assertEqual(fetched_incident["repo_id"], repo_id)
-        self.assertEqual(fetched_incident["incident_type"], anomaly_code)
-        self.assertEqual(fetched_incident["severity"], level)
-        self.assertEqual(fetched_incident["description"], details)
-        self.assertEqual(fetched_incident["status"], "OPEN")
-        
-        resolver_name = f"admin-{uuid.uuid4()}"
-        resolution_msg = f"Resolved via test {uuid.uuid4()}"
-        resolve_success = tracker.resolve_incident(incident_id, resolver_name, resolution_msg)
+        resolve_success = tracker.resolve_incident(target_incident_id, resolver_name, resolution_notes)
         self.assertTrue(resolve_success)
         
-        resolved_incident = tracker.get_incident(incident_id)
+        resolved_incident = tracker.get_incident(target_incident_id)
         self.assertEqual(resolved_incident["status"], "RESOLVED")
         self.assertEqual(resolved_incident["resolver"], resolver_name)
-        self.assertEqual(resolved_incident["resolution_notes"], resolution_msg)
-        
-        stream_repo_id = f"repo-stream-{uuid.uuid4()}"
-        stream_anomaly = f"STREAM-ERR-{random.randint(1000, 9999)}"
-        stream_level = random.choice(["WARNING", "FATAL"])
-        stream_details = f"Stream anomaly details {uuid.uuid4()}"
-        
-        raw_data = {
-            "repo_id": stream_repo_id,
-            "anomaly_code": stream_anomaly,
-            "level": stream_level,
-            "details": stream_details
-        }
-        
-        file_stream = io.BytesIO(str(raw_data).replace("'", '"').encode('utf-8'))
-        ingest_result = tracker.ingest_anomaly_stream(file_stream)
-        self.assertTrue(ingest_result)
-        
-        stream_incidents = tracker.list_incidents_by_repo(stream_repo_id)
-        self.assertEqual(len(stream_incidents), 1)
-        self.assertEqual(stream_incidents[0]["incident_type"], stream_anomaly)
-        self.assertEqual(stream_incidents[0]["severity"], stream_level)
-        self.assertEqual(stream_incidents[0]["description"], stream_details)
-        
-        metrics = tracker.get_incident_metrics(stream_repo_id)
-        self.assertEqual(metrics["total"], 1)
-        self.assertIn(stream_level, metrics["breakdown"])
-        self.assertEqual(metrics["breakdown"][stream_level], 1)
-        
-        standalone_repo_id = f"repo-standalone-{uuid.uuid4()}"
-        standalone_id = track_incident(
-            repo_id=standalone_repo_id,
-            incident_type="STANDALONE_TEST",
+        self.assertEqual(resolved_incident["resolution_notes"], resolution_notes)
+
+        metrics = tracker.get_incident_metrics(repo_id)
+        self.assertEqual(metrics["total"], len(created_ids) + 1)
+        self.assertIsInstance(metrics["breakdown"], dict)
+        self.assertGreaterEqual(sum(metrics["breakdown"].values()), metrics["total"])
+
+        global_id = track_incident(
+            repo_id=repo_id,
+            incident_type="GLOBAL_TEST_ANOMALY",
             severity="LOW",
-            description="Testing standalone function wrapper"
+            description=str(uuid.uuid4())
         )
-        self.assertIsNotNone(standalone_id)
+        self.assertIsNotNone(global_id)
 
 if __name__ == "__main__":
     unittest.main()

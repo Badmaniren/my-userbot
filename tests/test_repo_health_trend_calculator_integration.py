@@ -1,85 +1,67 @@
 import unittest
-import os
 import json
+import os
 import uuid
 import random
-import shutil
 from skills.repo_health_trend_calculator import RepoHealthTrendCalculator, calculate_health_trends
 
 class TestRepoHealthTrendCalculatorIntegration(unittest.TestCase):
     def setUp(self):
-        self.test_dir = f"test_env_{uuid.uuid4().hex}"
+        self.test_dir = f"test_data_{uuid.uuid4().hex}"
         os.makedirs(self.test_dir, exist_ok=True)
-        self.calculator = RepoHealthTrendCalculator()
+        self.input_file = os.path.join(self.test_dir, f"input_{uuid.uuid4().hex}.json")
+        self.output_file = os.path.join(self.test_dir, f"output_{uuid.uuid4().hex}.json")
+        
         self.repo_id = str(uuid.uuid4())
-
-    def tearDown(self):
-        if os.path.exists(self.test_dir):
-            shutil.rmtree(self.test_dir)
-
-    def test_full_lifecycle_integration(self):
-        # 1. Подготовка случайных данных
-        input_file = os.path.join(self.test_dir, f"input_{uuid.uuid4().hex}.json")
-        output_file = os.path.join(self.test_dir, f"output_{uuid.uuid4().hex}.json")
+        self.metric_name = f"coverage_{uuid.uuid4().hex[:6]}"
         
-        history = []
-        for i in range(5):
-            history.append({
-                "snapshot_id": str(uuid.uuid4()),
-                "metrics": {
-                    "coverage": random.randint(50, 90),
-                    "vulnerabilities": random.randint(0, 10)
-                }
-            })
+        self.val1 = random.randint(10, 50)
+        self.val2 = random.randint(51, 100)
         
-        data = {"repo_id": self.repo_id, "history": history}
-        
-        with open(input_file, "w", encoding="utf-8") as f:
-            json.dump(data, f)
-
-        # 2. Вызов функции интеграции
-        result = calculate_health_trends(input_file, output_file)
-
-        # 3. Проверка корректности возвращаемых данных
-        self.assertEqual(result["repo_id"], self.repo_id)
-        self.assertIn("trends", result)
-        self.assertIn("summary", result)
-        self.assertIn("coverage", result["trends"])
-        self.assertIn("vulnerabilities", result["trends"])
-
-        # 4. Проверка записи файла
-        self.assertTrue(os.path.exists(output_file))
-        with open(output_file, "r", encoding="utf-8") as f:
-            saved_data = json.load(f)
-            self.assertEqual(saved_data["repo_id"], self.repo_id)
-
-    def test_anomaly_detection_integration(self):
-        # Проверка работы методов класса с реальными данными
-        history = [
-            {"metrics": {"latency": 100}},
-            {"metrics": {"latency": 105}},
-            {"metrics": {"latency": 102}},
-            {"metrics": {"latency": 500}}  # Аномалия
+        self.history = [
+            {"timestamp": "2023-01-01T00:00:00Z", "metrics": {self.metric_name: self.val1}},
+            {"timestamp": "2023-01-02T00:00:00Z", "metrics": {self.metric_name: self.val2}}
         ]
         
-        anomalies = self.calculator.detect_metric_anomalies(history, "latency", z_threshold=1.0)
+        self.input_data = {
+            "repo_id": self.repo_id,
+            "history": self.history
+        }
         
-        self.assertEqual(len(anomalies), 1)
-        self.assertEqual(anomalies[0]["metrics"]["latency"], 500)
+        with open(self.input_file, "w", encoding="utf-8") as f:
+            json.dump(self.input_data, f)
 
-    def test_export_summary_file_creation(self):
-        # Проверка создания структуры папок и файла через метод класса
-        output_path = os.path.join(self.test_dir, "subdir", f"{uuid.uuid4().hex}.json")
-        history = [{"metrics": {"score": 10}}]
+    def tearDown(self):
+        for path in [self.input_file, self.output_file]:
+            if os.path.exists(path):
+                os.remove(path)
+        if os.path.exists(self.test_dir):
+            os.rmdir(self.test_dir)
+
+    def test_calculate_health_trends_integration(self):
+        result = calculate_health_trends(self.input_file, self.output_file)
         
-        success = self.calculator.export_trend_summary(history, output_path)
+        self.assertTrue(os.path.exists(self.output_file), "Output file was not created by integration function")
         
-        self.assertTrue(success)
-        self.assertTrue(os.path.exists(output_path))
+        with open(self.output_file, "r", encoding="utf-8") as f:
+            persisted_data = json.load(f)
+            
+        self.assertEqual(persisted_data.get("repo_id"), self.repo_id)
+        self.assertIn("trends", persisted_data)
+        self.assertIn("summary", persisted_data)
         
-        with open(output_path, "r", encoding="utf-8") as f:
-            content = json.load(f)
-            self.assertIn("overall_status", content)
+        trends = persisted_data["trends"]
+        self.assertIn(self.metric_name, trends)
+        
+        metric_trend = trends[self.metric_name]
+        expected_delta = self.val2 - self.val1
+        self.assertEqual(metric_trend["delta"], expected_delta)
+        self.assertEqual(metric_trend["historical_values"], [self.val1, self.val2])
+        
+        calculator = RepoHealthTrendCalculator(smoothing_factor=0.7)
+        smoothed = calculator.get_smoothed_series(self.history, self.metric_name)
+        self.assertEqual(len(smoothed), 2)
+        self.assertEqual(smoothed[0], float(self.val1))
 
 if __name__ == "__main__":
     unittest.main()

@@ -90,7 +90,6 @@ class RepoHealthIncidentTracker:
         except requests.RequestException:
             return False
 
-# Глобальный экземпляр по умолчанию для поддержки функции на уровне модуля
 _default_tracker = RepoHealthIncidentTracker()
 
 def track_incident(repo_id, incident_type, severity, description, metadata=None):

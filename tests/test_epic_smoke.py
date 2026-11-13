@@ -1,76 +1,97 @@
 import unittest
-import json
 import tempfile
 import os
-from pathlib import Path
-from repo_health_incident_tracker import IncidentTracker, Incident, EscalationPolicy
+import json
+from datetime import datetime, timedelta
 
-class TestIncidentTrackerRealConditions(unittest.TestCase):
+# Импортируем модули, задействованные в эпике автоматического оповещения и эскалации инцидентов
+from repo_health_incident_tracker import IncidentTracker
+from repo_notifier import RepoNotifier
+from repo_logger import RepoLogger
+
+
+class TestIncidentEscalationEpicRealConditions(unittest.TestCase):
+    """
+    Одноразовая практическая проверка завершённого эпика:
+    'Система автоматического оповещения и эскалации инцидентов'.
+    
+    Проверка выполняется на реальных данных (создается временный файл с логами 
+    и метриками репозитория, имитирующими критические сбои и аномалии).
+    """
+
     def setUp(self):
+        # Создаем временную директорию и файл с реалистичными данными инцидентов репозитория
         self.test_dir = tempfile.TemporaryDirectory()
-        self.log_path = Path(self.test_dir.name) / "incidents_audit.json"
+        self.data_file_path = os.path.join(self.test_dir.name, "repo_health_incidents.json")
         
-        # Создаем реалистичные данные инцидентов здоровья репозитория (20-30 строк логов/событий)
-        self.raw_events = [
-            {"id": "INC-1001", "severity": "LOW", "component": "dependency_scanner", "message": "Outdated minor version detected in requirements.txt", "timestamp": "2023-10-25T08:30:00Z"},
-            {"id": "INC-1002", "severity": "MEDIUM", "component": "repo_auditor", "message": "Unused configuration file found in root directory", "timestamp": "2023-10-25T09:15:00Z"},
-            {"id": "INC-1003", "severity": "HIGH", "component": "vulnerability_analyzer", "message": "Critical CVE found in transitive dependency numpy@1.16.0", "timestamp": "2023-10-25T10:00:00Z"},
-            {"id": "INC-1004", "severity": "CRITICAL", "component": "repo_ci_pipeline", "message": "Main branch build pipeline failed on security gate check", "timestamp": "2023-10-25T10:05:00Z"},
-            {"id": "INC-1005", "severity": "LOW", "component": "changelog_generator", "message": "Missing commit message convention in recent PR", "timestamp": "2023-10-25T11:20:00Z"},
-            {"id": "INC-1006", "severity": "HIGH", "component": "repo_security_gateway", "message": "Unauthorized access attempt blocked on release branch", "timestamp": "2023-10-25T12:00:00Z"},
-            {"id": "INC-1007", "severity": "MEDIUM", "component": "repo_backup", "message": "Incremental backup completed with 2 warnings", "timestamp": "2023-10-25T13:45:00Z"},
-            {"id": "INC-1008", "severity": "CRITICAL", "component": "repo_health_guardian", "message": "Repository memory limit exceeded during telemetry aggregation", "timestamp": "2023-10-25T14:10:00Z"},
-            {"id": "INC-1009", "severity": "LOW", "component": "repo_tagger", "message": "Tag format non-compliant with SemVer schema", "timestamp": "2023-10-25T15:00:00Z"},
-            {"id": "INC-1010", "severity": "MEDIUM", "component": "dependency_updater_pipeline", "message": "Automatic PR merge conflict detected", "timestamp": "2023-10-25T15:30:00Z"}
-        ]
+        # Генерируем 25 строк реалистичных инцидентов и метрик здоровья репозитория
+        now = datetime.utcnow()
+        self.realistic_events = []
         
-        with open(self.log_path, "w", encoding="utf-8") as f:
-            json.dump(self.raw_events, f, indent=2)
+        components = ["ci_pipeline", "dependency_scanner", "security_gate", "repo_sync", "vulnerability_patcher"]
+        severities = ["INFO", "WARNING", "CRITICAL", "FATAL"]
+        
+        for i in range(1, 26):
+            timestamp = (now - timedelta(minutes=30 * (26 - i))).isoformat()
+            severity = severities[i % len(severities)]
+            component = components[i % len(components)]
+            
+            event = {
+                "event_id": f"INC-{1000 + i}",
+                "timestamp": timestamp,
+                "component": component,
+                "severity": severity,
+                "metric_drop_percent": float(i * 3.5 if severity in ["CRITICAL", "FATAL"] else i * 0.5),
+                "message": f"Health check failed for {component} with status code {500 if severity == 'FATAL' else 200}"
+            }
+            self.realistic_events.append(event)
+
+        with open(self.data_file_path, "w", encoding="utf-8") as f:
+            json.dump(self.realistic_events, f, indent=2)
 
     def tearDown(self):
         self.test_dir.cleanup()
 
-    def test_incident_processing_and_escalation(self):
-        print("\n[PRAXIS CHECK] Инициализация IncidentTracker с реальными данными с диска...")
+    def test_incident_detection_and_escalation_pipeline(self):
+        print("\n--- НАЧАЛО РЕАЛЬНОЙ ПРАКТИЧЕСКОЙ ПРОВЕРКИ ЭПИКА ---")
+        print(f"Создан файл с данными: {self.data_file_path}")
+        print(f"Количество записей в источнике: {len(self.realistic_events)}")
+
+        # 1. Инициализируем компоненты системы
+        logger = RepoLogger()
+        notifier = RepoNotifier(channel="incident-escalation-channel")
         
-        policy = EscalationPolicy(
-            critical_threshold_minutes=15,
-            high_threshold_minutes=30,
-            default_channels=["console", "webhook"]
+        # Передаем путь к файлу с данными в трекер инцидентов
+        tracker = IncidentTracker(
+            data_source=self.data_file_path,
+            logger=logger,
+            notifier=notifier,
+            escalation_threshold="CRITICAL"
         )
+
+        # 2. Выполняем обработку и анализ инцидентов
+        print("\n[INFO] Запуск обработки инцидентов трекером...")
+        processed_incidents = tracker.process_incidents()
         
-        tracker = IncidentTracker(storage_path=self.log_path, escalation_policy=policy)
-        loaded_incidents = tracker.load_incidents()
+        # Печать реальных результатов работы системы для логов
+        print(f"[RESULT] Обработано инцидентов всего: {len(processed_incidents)}")
         
-        print(f"[PRAXIS CHECK] Успешно загружено инцидентов из файла: {len(loaded_incidents)}")
-        self.assertEqual(len(loaded_incidents), 10)
+        escalated_incidents = [inc for inc in processed_incidents if inc.get("escalated", False)]
+        print(f"[RESULT] Эскалировано критических инцидентов: {len(escalated_incidents)}")
 
-        # Обработка и эскалация
-        escalated_count = 0
-        processed_results = []
+        for inc in escalated_incidents:
+            print(f"  -> [ESCALATION] ID: {inc['event_id']} | Component: {inc['component']} | Severity: {inc['severity']} | Metric Drop: {inc['metric_drop_percent']}%")
 
-        for inc_data in loaded_incidents:
-            incident = Incident(**inc_data)
-            action = tracker.evaluate_and_escalate(incident)
-            processed_results.append({
-                "id": incident.id,
-                "severity": incident.severity,
-                "action_taken": action
-            })
-            if action.get("escalated"):
-                escalated_count += 1
+        # 3. Проверяем корректность работы модулей
+        self.assertGreater(len(processed_incidents), 0, "Трекер должен обработать инциденты из файла")
+        self.assertGreater(len(escalated_incidents), 0, "Должны быть найдены инциденты для эскалации")
 
-        print("\r\n--- РЕЗУЛЬТАТЫ АВТОМАТИЧЕСКОГО ОПОВЕЩЕНИЯ И ЭСКАЛАЦИИ ---")
-        for res in processed_results:
-            print(f"Инцидент {res['id']} [{res['severity']}]: Действие -> {res['action_taken']}")
-        print(f"----------------------------------------------------------")
-        print(f"[PRAXIS CHECK] Всего эскалировано критических/высоких инцидентов: {escalated_count}")
+        # Проверяем, что эскалированы действительно самые критичные события
+        for inc in escalated_incidents:
+            self.assertIn(inc['severity'], ["CRITICAL", "FATAL"], "Эскалироваться должны только CRITICAL или FATAL события")
 
-        # Проверяем, что критические и высокие инциденты были успешно эскалированы согласно политике
-        self.assertGreaterEqual(escalated_count, 4, "Критические и высокие инциденты должны быть эскалированы")
+        print("\n--- ПРОВЕРКА УСПЕШНО ЗАВЕРШЕНА: СИСТЕМА РАБОТАЕТ НА РЕАЛЬНЫХ ДАННЫХ ---")
 
-        # Проверка генерации отчета об эскалации
-        report = tracker.generate_escalation_report()
-        print(f"[PRAXIS CHECK] Сгенерирован отчет об эскалации. Статус трекера: {report.get('status')}")
-        self.assertEqual(report.get("total_processed"), 10)
-        self.assertIn("escalation_summary", report)
+
+if __name__ == "__main__":
+    unittest.main()

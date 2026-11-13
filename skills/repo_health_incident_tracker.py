@@ -33,28 +33,29 @@ class RepoHealthIncidentTracker:
         return self._incidents.get(incident_id)
 
     def ingest_anomaly_stream(self, stream):
-        try:
-            if isinstance(stream, int):
-                return False
-            data = stream.read()
-            if not data:
-                return False
-            payload = json.loads(data.decode("utf-8"))
-            repo_id = payload.get("repo_id")
-            anomaly_code = payload.get("anomaly_code")
-            level = payload.get("level")
-            details = payload.get("details")
-            if not repo_id or not anomaly_code:
-                return False
-            self.track_incident(
-                repo_id=repo_id,
-                incident_type=anomaly_code,
-                severity=level if level else "UNKNOWN",
-                description=details if details else ""
-            )
-            return True
-        except Exception:
+        if isinstance(stream, int):
             return False
+        data = stream.read()
+        if not data:
+            return False
+        try:
+            payload = json.loads(data.decode("utf-8"))
+        except (json.JSONDecodeError, AttributeError):
+            return False
+        
+        repo_id = payload.get("repo_id")
+        anomaly_code = payload.get("anomaly_code")
+        level = payload.get("level")
+        details = payload.get("details")
+        if not repo_id or not anomaly_code:
+            return False
+        self.track_incident(
+            repo_id=repo_id,
+            incident_type=anomaly_code,
+            severity=level if level else "UNKNOWN",
+            description=details if details else ""
+        )
+        return True
 
     def list_incidents_by_repo(self, repo_id):
         return [inc for inc in self._incidents.values() if inc["repo_id"] == repo_id]
@@ -84,11 +85,8 @@ class RepoHealthIncidentTracker:
         incident = self.get_incident(incident_id)
         if not incident:
             return False
-        try:
-            response = requests.post(endpoint, json=incident)
-            return response.status_code == 200
-        except Exception:
-            return False
+        response = requests.post(endpoint, json=incident)
+        return response.status_code == 200
 
 # Глобальный инстанс для поддержки функции track_incident на уровне модуля
 _GLOBAL_TRACKER = RepoHealthIncidentTracker()

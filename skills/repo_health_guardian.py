@@ -38,10 +38,14 @@ class RepoHealthGuardian:
 
     def _safe_call(self, obj, method_name, *args, **kwargs):
         if hasattr(obj, method_name):
-            return getattr(obj, method_name)(*args, **kwargs)
+            res = getattr(obj, method_name)(*args, **kwargs)
+            if res is not None:
+                return res
         for alt in ["check_health", "audit", "verify", "analyze", "inspect", "sweep"]:
             if hasattr(obj, alt):
-                return getattr(obj, alt)(*args, **kwargs)
+                res = getattr(obj, alt)(*args, **kwargs)
+                if res is not None:
+                    return res
         return {}
 
     def check_health_and_audit(self) -> dict:
@@ -64,11 +68,14 @@ class RepoHealthGuardian:
         self._safe_call(self.monitor, "check_status")
         issues = self._safe_call(self.auditor, "detect_issues")
         if not isinstance(issues, list):
-            issues = [issues] if issues else []
+            issues = [issues] if issues is not None else []
         
         sweep_passed = self._safe_call(self.pulse_engine, "secure_sweep")
         if sweep_passed is None or isinstance(sweep_passed, (dict, list, str, int)):
-            sweep_passed = True
+            if isinstance(sweep_passed, bool):
+                pass
+            else:
+                sweep_passed = True
             
         return {
             "issues_detected": issues,

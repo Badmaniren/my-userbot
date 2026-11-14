@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-пешно прошёл тесты и влит в main
-
-## repo_health_incident_tracker (refactor) — раундов: 2
-- Последняя ошибка перед фиксом: FAILED (errors=2)
+ибка перед фиксом: FAILED (errors=2)
 - Статус: успешно прошёл тесты и влит в main
 
 ## repo_health_trend_aggregator (create) — раундов: 4
@@ -320,4 +317,7 @@
 
 ## repo_health_collector (create) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: успешно прошёл тесты и влит в main
+
+## repo_health_predictor_pipeline (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

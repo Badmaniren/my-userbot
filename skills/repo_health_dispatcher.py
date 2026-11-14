@@ -10,6 +10,13 @@ class RepoHealthDispatcher:
         self.repo_health_dashboard = RepoHealthDashboard(repo_path)
         self.repo_notifier = RepoNotifier(repo_path)
 
+    def _notify_with_retry(self, notify_func, *args, **kwargs) -> bool:
+        max_retries = 3
+        for _ in range(max_retries):
+            if notify_func(*args, **kwargs):
+                return True
+        return False
+
     def dispatch_health_and_notify(self, file_path: str) -> bool:
         self.repo_health_dashboard.generate_dashboard()
         exported = self.repo_health_dashboard.export_dashboard(file_path)
@@ -17,7 +24,7 @@ class RepoHealthDispatcher:
         if not exported:
             return False
 
-        return self.repo_notifier.notify(file_path)
+        return self._notify_with_retry(self.repo_notifier.notify, file_path)
 
     def process_stream_and_dispatch(self, stream, file_path: str) -> bool:
         if isinstance(stream, str):
@@ -25,7 +32,7 @@ class RepoHealthDispatcher:
         self.repo_health_dashboard.process_stream(stream)
         self.repo_health_dashboard.export_dashboard(file_path)
 
-        return self.repo_notifier.notify(file_path)
+        return self._notify_with_retry(self.repo_notifier.notify, file_path)
 
     def check_and_notify_critical(self, title: str, value, file_path: str) -> bool:
         widget_str = self.repo_health_dashboard.render_widget(title, value)
@@ -33,7 +40,7 @@ class RepoHealthDispatcher:
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(widget_str)
 
-        return self.repo_notifier.notify_and_commit()
+        return self._notify_with_retry(self.repo_notifier.notify_and_commit)
 
     def dispatch(self) -> bool:
         return self.dispatch_health_and_notify(

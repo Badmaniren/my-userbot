@@ -3,16 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-line 1); Синтаксическая ошибка в коде: unterminated string literal (detected at line 26) (<unknown>, line 26)
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## repo_health_metric_validator (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## repo_health_trend_analyzer (create) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 5); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
-- Последняя ошибка перед фиксом: FAILED (errors=1)
+следняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## repo_health_incident_tracker (refactor) — раундов: 4
@@ -337,4 +328,9 @@ line 1); Синтаксическая ошибка в коде: unterminated str
 
 ## repo_health_dispatcher (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_threshold_monitor (create) — раундов: 4
+- Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.; АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.; Синтаксическая ошибка в коде: expected '(' (<unknown>, line 12)
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

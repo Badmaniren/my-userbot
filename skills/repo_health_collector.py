@@ -16,7 +16,6 @@ class RepoHealthCollector:
         if not os.path.exists(repo_path):
             raise RepoHealthError(f"Путь репозитория не существует: {repo_path}")
 
-        # Проверим файлы в директории на наличие логов с session_id, если передан
         collected_data = {}
         if session_id:
             for fname in os.listdir(repo_path):
@@ -39,7 +38,6 @@ class RepoHealthCollector:
         if expected_threshold is not None:
             report["threshold"] = expected_threshold
 
-        # Сохраним отчёт в json, как ожидает интеграционный тест
         if session_id:
             report_file_path = os.path.join(repo_path, f"report_{session_id}.json")
             try:

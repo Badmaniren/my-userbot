@@ -1,6 +1,7 @@
 import os
 import requests
 import json
+from skills.repo_logger import RepoLogger
 
 class RepoHealthRemediator:
     """
@@ -50,6 +51,11 @@ class RepoHealthRemediator:
                     "recommended_action": recommended_action,
                     "status": "success"
                 }, f)
+            
+            logger = RepoLogger(repo_path=repo_path)
+            if hasattr(logger, "log"):
+                logger.log(f"Remediation applied for {metric}")
+
             return {
                 "status": "success",
                 "repo_path": repo_path

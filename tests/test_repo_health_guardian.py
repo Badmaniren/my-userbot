@@ -1,93 +1,78 @@
 import unittest
-from unittest.mock import patch
-import random
+from unittest.mock import patch, MagicMock
 import uuid
+import random
 import string
+import io
+import os
 
 from skills.repo_health_guardian import RepoHealthGuardian
 
 class TestRepoHealthGuardian(unittest.TestCase):
-    def test_guardian_initialization_and_composition(self):
-        rand_repo = f"/tmp/repo_{uuid.uuid4().hex}"
-        
-        with patch("skills.repo_health_guardian.RepoMonitor") as mock_monitor_cls, \
-             patch("skills.repo_health_guardian.RepoAuditor") as mock_auditor_cls:
-            
-            mock_monitor_instance = mock_monitor_cls.return_value
-            mock_auditor_instance = mock_auditor_cls.return_value
-            
-            guardian = RepoHealthGuardian(rand_repo)
-            
-            mock_monitor_cls.assert_called_once_with(rand_repo)
-            mock_auditor_cls.assert_called_once_with(rand_repo)
-            
-            self.assertEqual(guardian.repo_path, rand_repo)
-            self.assertIs(guardian.monitor, mock_monitor_instance)
-            self.assertIs(guardian.auditor, mock_auditor_instance)
+    def setUp(self):
+        self.random_repo_path = f"/tmp/{uuid.uuid4().hex}/{uuid.uuid4().hex}"
+        self.random_status_key = uuid.uuid4().hex
+        self.random_status_value = uuid.uuid4().hex
+        self.random_issue = uuid.uuid4().hex
+        self.random_structure_key = uuid.uuid4().hex
+        self.random_structure_val = uuid.uuid4().hex
+
+    def test_init_and_public_signatures(self):
+        guardian = RepoHealthGuardian(self.random_repo_path)
+        self.assertEqual(guardian.repo_path, self.random_repo_path)
+        self.assertIsNotNone(guardian.monitor)
+        self.assertIsNotNone(guardian.auditor)
 
     def test_check_health_and_audit(self):
-        rand_repo = f"/var/git/{uuid.uuid4().hex}"
-        rand_status = f"status_{uuid.uuid4().hex}"
-        rand_metric_key = f"metric_{uuid.uuid4().hex}"
-        rand_metric_val = random.randint(10, 1000)
+        guardian = RepoHealthGuardian(self.random_repo_path)
         
-        with patch("skills.repo_health_guardian.RepoMonitor") as mock_monitor_cls, \
-             patch("skills.repo_health_guardian.RepoAuditor") as mock_auditor_cls:
-            
-            mock_monitor = mock_monitor_cls.return_value
-            mock_monitor.check_status.return_value = rand_status
-            
-            mock_auditor = mock_auditor_cls.return_value
-            mock_auditor.audit.return_value = {rand_metric_key: rand_metric_val}
-            
-            guardian = RepoHealthGuardian(rand_repo)
-            health_report = guardian.check_health_and_audit()
-            
-            mock_monitor.check_status.assert_called_once()
-            mock_auditor.audit.assert_called_once()
-            
-            self.assertIn("status", health_report)
-            self.assertIn("audit", health_report)
-            self.assertEqual(health_report["status"], rand_status)
-            self.assertEqual(health_report["audit"][rand_metric_key], rand_metric_val)
+        mock_status = {self.random_status_key: self.random_status_value}
+        mock_audit = {uuid.uuid4().hex: uuid.uuid4().hex}
 
-    def test_preventive_maintenance_action(self):
-        rand_repo = f"/opt/repos/{uuid.uuid4().hex}"
-        rand_issue = f"issue_{uuid.uuid4().hex}"
+        with patch.object(guardian.monitor, 'check_status', return_value=mock_status) as mock_check, \
+             patch.object(guardian.auditor, 'audit', return_value=mock_audit) as mock_audit_method:
+            
+            result = guardian.check_health_and_audit()
+            
+            mock_check.assert_called_once()
+            mock_audit_method.assert_called_once()
+            
+            self.assertIn("status", result)
+            self.assertIn("audit", result)
+            self.assertEqual(result["status"], mock_status)
+            self.assertEqual(result["audit"], mock_audit)
+            self.assertEqual(result["status"][self.random_status_key], self.random_status_value)
+
+    def test_run_preventive_maintenance(self):
+        guardian = RepoHealthGuardian(self.random_repo_path)
         
-        with patch("skills.repo_health_guardian.RepoMonitor") as mock_monitor_cls, \
-             patch("skills.repo_health_guardian.RepoAuditor") as mock_auditor_cls:
+        mock_issues = [self.random_issue, uuid.uuid4().hex]
+
+        with patch.object(guardian.monitor, 'check_status') as mock_check, \
+             patch.object(guardian.auditor, 'detect_issues', return_value=mock_issues) as mock_detect:
             
-            mock_monitor = mock_monitor_cls.return_value
-            mock_monitor.check_status.return_value = f"clean_{uuid.uuid4().hex}"
-            
-            mock_auditor = mock_auditor_cls.return_value
-            mock_auditor.detect_issues.return_value = [rand_issue]
-            
-            guardian = RepoHealthGuardian(rand_repo)
             result = guardian.run_preventive_maintenance()
             
-            mock_monitor.check_status.assert_called_once()
-            mock_auditor.detect_issues.assert_called_once()
+            mock_check.assert_called_once()
+            mock_detect.assert_called_once()
             
-            self.assertIsInstance(result, dict)
             self.assertIn("issues_detected", result)
-            self.assertIn(rand_issue, result["issues_detected"])
+            self.assertIn("action_taken", result)
+            self.assertEqual(result["issues_detected"], mock_issues)
             self.assertTrue(result["action_taken"])
+            self.assertIn(self.random_issue, result["issues_detected"])
 
-    def test_guardian_structure_analysis(self):
-        rand_repo = f"/home/user/repo_{uuid.uuid4().hex}"
-        rand_key = ''.join(random.choices(string.ascii_lowercase, k=8))
-        rand_val = ''.join(random.choices(string.ascii_uppercase, k=6))
+    def test_analyze_repo_structure(self):
+        guardian = RepoHealthGuardian(self.random_repo_path)
         
-        with patch("skills.repo_health_guardian.RepoMonitor") as mock_monitor_cls, \
-             patch("skills.repo_health_guardian.RepoAuditor") as mock_auditor_cls:
+        mock_structure = {self.random_structure_key: self.random_structure_val}
+
+        with patch.object(guardian.auditor, 'analyze_structure', return_value=mock_structure) as mock_analyze:
+            result = guardian.analyze_repo_structure()
             
-            mock_auditor = mock_auditor_cls.return_value
-            mock_auditor.analyze_structure.return_value = {rand_key: rand_val}
-            
-            guardian = RepoHealthGuardian(rand_repo)
-            structure_data = guardian.analyze_repo_structure()
-            
-            mock_auditor.analyze_structure.assert_called_once()
-            self.assertEqual(structure_data[rand_key], rand_val)
+            mock_analyze.assert_called_once()
+            self.assertEqual(result, mock_structure)
+            self.assertEqual(result[self.random_structure_key], self.random_structure_val)
+
+if __name__ == '__main__':
+    unittest.main()

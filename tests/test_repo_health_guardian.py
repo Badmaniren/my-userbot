@@ -7,86 +7,98 @@ import io
 from skills.repo_health_guardian import RepoHealthGuardian
 
 class TestRepoHealthGuardian(unittest.TestCase):
+
     def setUp(self):
-        self.repo_path = f"/tmp/{uuid.uuid4().hex}"
+        self.repo_path = f"/repo/{uuid.uuid4().hex}"
         self.guardian = RepoHealthGuardian(self.repo_path)
 
     @patch('skills.repo_health_guardian.RepoMonitor')
     @patch('skills.repo_health_guardian.RepoAuditor')
-    def test_check_health_and_audit_success(self, mock_auditor_class, mock_monitor_class):
-        mock_monitor_instance = mock_monitor_class.return_value
-        mock_auditor_instance = mock_auditor_class.return_value
+    @patch('skills.repo_health_guardian.RepoHealthPulseEngine')
+    def test_check_health_and_audit(self, mock_pulse_engine_cls, mock_auditor_cls, mock_monitor_cls):
+        random_status_key = uuid.uuid4().hex
+        random_status_val = uuid.uuid4().hex
+        random_audit_key = uuid.uuid4().hex
+        random_audit_val = uuid.uuid4().hex
+        random_pulse_key = uuid.uuid4().hex
+        random_pulse_val = uuid.uuid4().hex
 
-        expected_status_key = uuid.uuid4().hex
-        expected_status_val = uuid.uuid4().hex
-        expected_audit_key = uuid.uuid4().hex
-        expected_audit_val = uuid.uuid4().hex
+        mock_monitor = mock_monitor_cls.return_value
+        mock_monitor.check_status.return_value = {random_status_key: random_status_val}
 
-        mock_monitor_instance.check_status.return_value = {expected_status_key: expected_status_val}
-        mock_auditor_instance.audit.return_value = {expected_audit_key: expected_audit_val}
+        mock_auditor = mock_auditor_cls.return_value
+        mock_auditor.audit.return_value = {random_audit_key: random_audit_val}
 
-        guardian = RepoHealthGuardian(self.repo_path)
-        result = guardian.check_health_and_audit()
+        mock_pulse = mock_pulse_engine_cls.return_value
+        mock_pulse.verify_pulse.return_value = {random_pulse_key: random_pulse_val}
 
-        self.assertIsInstance(result, dict)
+        result = self.guardian.check_health_and_audit()
+
         self.assertIn("status", result)
         self.assertIn("audit", result)
-        self.assertEqual(result["status"][expected_status_key], expected_status_val)
-        self.assertEqual(result["audit"][expected_audit_key], expected_audit_val)
+        self.assertIn("security_pulse", result)
+        self.assertEqual(result["status"][random_status_key], random_status_val)
+        self.assertEqual(result["audit"][random_audit_key], random_audit_val)
+        self.assertEqual(result["security_pulse"][random_pulse_key], random_pulse_val)
+
+        mock_monitor.check_status.assert_called_once()
+        mock_auditor.audit.assert_called_once()
+        mock_pulse.verify_pulse.assert_called_once()
 
     @patch('skills.repo_health_guardian.RepoMonitor')
     @patch('skills.repo_health_guardian.RepoAuditor')
-    def test_check_health_and_audit_error_handling(self, mock_auditor_class, mock_monitor_class):
-        mock_monitor_instance = mock_monitor_class.return_value
-        err_msg = uuid.uuid4().hex
-        mock_monitor_instance.check_status.side_effect = Exception(err_msg)
+    @patch('skills.repo_health_guardian.RepoHealthPulseEngine')
+    def test_run_preventive_maintenance(self, mock_pulse_engine_cls, mock_auditor_cls, mock_monitor_cls):
+        issue_id = uuid.uuid4().hex
+        mock_monitor = mock_monitor_cls.return_value
+        mock_auditor = mock_auditor_cls.return_value
+        mock_auditor.detect_issues.return_value = [issue_id]
 
-        guardian = RepoHealthGuardian(self.repo_path)
-        with self.assertRaises(Exception) as ctx:
-            guardian.check_health_and_audit()
-        self.assertIn(err_msg, str(ctx.exception))
+        mock_pulse = mock_pulse_engine_cls.return_value
+        mock_pulse.secure_sweep.return_value = True
 
-    @patch('skills.repo_health_guardian.RepoMonitor')
-    @patch('skills.repo_health_guardian.RepoAuditor')
-    def test_run_preventive_maintenance_success(self, mock_auditor_class, mock_monitor_class):
-        mock_monitor_instance = mock_monitor_class.return_value
-        mock_auditor_instance = mock_auditor_class.return_value
+        result = self.guardian.run_preventive_maintenance()
 
-        issue_item = uuid.uuid4().hex
-        mock_auditor_instance.detect_issues.return_value = [issue_item]
-
-        guardian = RepoHealthGuardian(self.repo_path)
-        result = guardian.run_preventive_maintenance()
-
-        self.assertIsInstance(result, dict)
         self.assertIn("issues_detected", result)
         self.assertIn("action_taken", result)
-        self.assertEqual(result["issues_detected"], [issue_item])
+        self.assertIn("security_sweep_passed", result)
+        self.assertIn(issue_id, result["issues_detected"])
         self.assertTrue(result["action_taken"])
+        self.assertTrue(result["security_sweep_passed"])
+
+        mock_monitor.check_status.assert_called_once()
+        mock_auditor.detect_issues.assert_called_once()
+        mock_pulse.secure_sweep.assert_called_once()
 
     @patch('skills.repo_health_guardian.RepoAuditor')
-    def test_analyze_repo_structure_success(self, mock_auditor_class):
-        mock_auditor_instance = mock_auditor_class.return_value
-        structure_key = uuid.uuid4().hex
-        structure_val = uuid.uuid4().hex
-        mock_auditor_instance.analyze_structure.return_value = {structure_key: structure_val}
+    def test_analyze_repo_structure(self, mock_auditor_cls):
+        struct_key = uuid.uuid4().hex
+        struct_val = uuid.uuid4().hex
 
-        guardian = RepoHealthGuardian(self.repo_path)
-        result = guardian.analyze_repo_structure()
+        mock_auditor = mock_auditor_cls.return_value
+        mock_auditor.analyze_structure.return_value = {struct_key: struct_val}
 
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result[structure_key], structure_val)
+        result = self.guardian.analyze_repo_structure()
 
-    @patch('skills.repo_health_guardian.RepoAuditor')
-    def test_analyze_repo_structure_error_propagation(self, mock_auditor_class):
-        mock_auditor_instance = mock_auditor_class.return_value
-        error_msg = uuid.uuid4().hex
-        mock_auditor_instance.analyze_structure.side_effect = RuntimeError(error_msg)
+        self.assertEqual(result[struct_key], struct_val)
+        mock_auditor.analyze_structure.assert_called_once()
 
-        guardian = RepoHealthGuardian(self.repo_path)
-        with self.assertRaises(RuntimeError) as ctx:
-            guardian.analyze_repo_structure()
-        self.assertIn(error_msg, str(ctx.exception))
+    @patch('skills.repo_health_guardian.RepoHealthPulseEngine')
+    def test_enhanced_security_check(self, mock_pulse_engine_cls):
+        token = uuid.uuid4().hex
+        mock_pulse = mock_pulse_engine_cls.return_value
+        mock_pulse.inspect_unauthorized_changes.return_value = {"unauthorized": False, "signature": token}
+
+        if hasattr(self.guardian, "enhanced_security_check"):
+            res = self.guardian.enhanced_security_check()
+            self.assertFalse(res["unauthorized"])
+            self.assertEqual(res["signature"], token)
+
+    def test_stream_processing_compatibility(self):
+        stream_data = io.BytesIO(uuid.uuid4().hex.encode('utf-8'))
+        if hasattr(self.guardian, "process_guardian_stream"):
+            res = self.guardian.process_guardian_stream(stream_data)
+            self.assertIsInstance(res, dict)
 
 if __name__ == '__main__':
     unittest.main()

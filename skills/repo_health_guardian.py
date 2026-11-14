@@ -7,7 +7,10 @@ class RepoHealthGuardian:
         self.repo_path = repo_path
         self.monitor = RepoMonitor(repo_path)
         self.auditor = RepoAuditor(repo_path)
-        self.pulse_engine = RepoHealthPulseEngine(repo_path)
+        try:
+            self.pulse_engine = RepoHealthPulseEngine(repo_path)
+        except TypeError:
+            self.pulse_engine = RepoHealthPulseEngine()
 
     def check_health_and_audit(self) -> dict:
         status = self.monitor.check_status()

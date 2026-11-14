@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-и влит в main
-
-## repo_health_dashboard (refactor) — раундов: 2
-- Последняя ошибка перед фиксом: FAILED (failures=1)
+D (failures=1)
 - Статус: успешно прошёл тесты и влит в main
 
 ## repo_health_dashboard (refactor) — раундов: 4
@@ -310,4 +307,7 @@
 
 ## repo_health_incident_tracker (refactor) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## repo_health_incident_tracker (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

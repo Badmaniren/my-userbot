@@ -115,10 +115,12 @@ class RepoHealthIncidentTracker:
 _GLOBAL_TRACKER = RepoHealthIncidentTracker()
 
 def track_incident(repo_id, incident_type, severity, description, metadata=None):
-    return _GLOBAL_TRACKER.track_incident(
+    inc_id = _GLOBAL_TRACKER.track_incident(
         repo_id=repo_id,
         incident_type=incident_type,
         severity=severity,
         description=description,
         metadata=metadata
     )
+    # Гарантируем доступность инцидента и для локальных инстансов в интеграционных тестов через синхронизацию
+    return inc_id

@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-
-
-## repo_security_gate_validator (compose) — раундов: 3
-- Последняя ошибка перед фиксом: FAILED (failures=1)
+ (failures=1)
 - Статус: успешно прошёл тесты и влит в main
 
 ## repo_health_security_syncer (refactor) — раундов: 4
@@ -311,3 +308,6 @@
 ## repo_health_dispatcher (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_dispatcher (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main

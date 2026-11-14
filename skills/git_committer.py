@@ -6,12 +6,23 @@ class GitCommitter:
     def __init__(self, repo_path: str):
         self.repo_path = repo_path
 
+    def _ensure_git_identity(self) -> None:
+        """
+        Устанавливает дефолтные переменные окружения автора/коммитера Git,
+        если они не заданы глобально или в окружении.
+        """
+        os.environ.setdefault("GIT_AUTHOR_NAME", "Automated Committer")
+        os.environ.setdefault("GIT_AUTHOR_EMAIL", "auto-committer@noreply.github.com")
+        os.environ.setdefault("GIT_COMMITTER_NAME", "Automated Committer")
+        os.environ.setdefault("GIT_COMMITTER_EMAIL", "auto-committer@noreply.github.com")
+
     def commit(self, message: str) -> bool:
         """
         Выполняет git add . и git commit -m message.
         Совместим с юнит-тестами, где вызывается commit(random_message).
         """
         try:
+            self._ensure_git_identity()
             # Сначала делаем git add
             add_result = subprocess.run(
                 ["git", "-C", self.repo_path, "add", "."],
@@ -37,6 +48,7 @@ class GitCommitter:
         Совместим с интеграционными тестами.
         """
         try:
+            self._ensure_git_identity()
             # Проверяем существование файла относительно репозитория
             full_path = os.path.join(self.repo_path, file_path)
             if not os.path.exists(full_path):

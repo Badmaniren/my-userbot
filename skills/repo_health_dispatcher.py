@@ -40,7 +40,7 @@ class RepoHealthDispatcher:
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(widget_str)
 
-        return self.repo_notifier.notify_and_commit()
+        return self._notify_with_retry(self.repo_notifier.notify_and_commit)
 
     def dispatch(self) -> bool:
         return self.dispatch_health_and_notify(

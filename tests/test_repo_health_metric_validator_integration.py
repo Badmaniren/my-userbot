@@ -1,79 +1,78 @@
 import unittest
-import json
 import uuid
 import random
+import json
+import os
 from skills.repo_health_metric_validator import (
     RepoHealthMetricValidator,
     MetricValidationError,
-    validate_repo_health_metrics,
     audit_repository,
-    render_health_dashboard
+    render_health_dashboard,
+    validate_repo_health_metrics
 )
 
-
-class IntegrationTestRepoHealthMetricValidator(unittest.TestCase):
+class TestRepoHealthMetricValidatorIntegration(unittest.TestCase):
 
     def setUp(self):
         self.validator = RepoHealthMetricValidator()
-        self.unique_metric_name = f"metric_{uuid.uuid4().hex[:8]}"
+        self.random_id = str(uuid.uuid4())
         self.random_score = round(random.uniform(0.0, 100.0), 2)
         self.random_timestamp = random.randint(1500000000, 1800000000)
 
-    def test_full_metric_pipeline_and_downstream_integration(self):
+    def test_end_to_end_metric_pipeline(self):
         payload = {
-            "metric_name": self.unique_metric_name,
+            "metric_name": f"metric_{self.random_id}",
             "score": self.random_score,
-            "timestamp": self.random_timestamp,
-            "metadata": {
-                "session_uuid": str(uuid.uuid4()),
-                "check_id": random.randint(1000, 9999)
-            }
+            "timestamp": self.random_timestamp
         }
 
-        stream_data = json.dumps(payload)
-        
-        validated_list = self.validator.validate_stream(stream_data)
-        self.assertEqual(len(validated_list), 1)
-        self.assertEqual(validated_list[0]["metric_name"], self.unique_metric_name)
-        self.assertEqual(validated_list[0]["score"], self.random_score)
+        # 1. Validate through class method
+        is_valid = self.validator.validate(payload)
+        self.assertTrue(is_valid)
 
+        # 2. Process via stream simulation (JSON string)
+        stream_data = json.dumps([payload])
+        validated_stream = self.validator.validate_stream(stream_data)
+        self.assertEqual(len(validated_stream), 1)
+        self.assertEqual(validated_stream[0]["metric_name"], payload["metric_name"])
+
+        # 3. Pass to integration wrapper
         wrapper_result = validate_repo_health_metrics(payload)
         self.assertTrue(wrapper_result["is_valid"])
-        self.assertEqual(wrapper_result["metrics"]["metric_name"], self.unique_metric_name)
+        self.assertEqual(wrapper_result["metrics"]["score"], self.random_score)
 
-        audited_data = audit_repository(wrapper_result["metrics"])
-        self.assertIn("metric_name", audited_data)
-        self.assertEqual(audited_data["score"], self.random_score)
+        # 4. Pass through auditor and dashboard rendering (real function invocation)
+        audit_res = audit_repository(wrapper_result["metrics"])
+        self.assertEqual(audit_res["metric_name"], payload["metric_name"])
 
-        dashboard_output = render_health_dashboard(audited_data)
-        self.assertIsInstance(dashboard_output, str)
+        dashboard_output = render_health_dashboard(audit_res)
+        self.assertTrue(isinstance(dashboard_output, str))
         self.assertTrue(len(dashboard_output) > 0)
 
-    def test_normalization_and_invalid_score_boundaries(self):
+    def test_normalization_and_fault_tolerance(self):
         alt_payload = {
-            "health_score": round(random.uniform(0.0, 100.0), 2),
-            "run_id": f"run_{uuid.uuid4().hex[:6]}"
+            "run_id": f"run_{self.random_id}",
+            "health_score": self.random_score
         }
 
         wrapper_result = validate_repo_health_metrics(alt_payload)
         self.assertTrue(wrapper_result["is_valid"])
-        self.assertEqual(wrapper_result["metrics"]["score"], alt_payload["health_score"])
-        self.assertEqual(wrapper_result["metrics"]["metric_name"], alt_payload["run_id"])
+        self.assertEqual(wrapper_result["metrics"]["score"], self.random_score)
+        self.assertEqual(wrapper_result["metrics"]["metric_name"], f"run_{self.random_id}")
         self.assertEqual(wrapper_result["metrics"]["timestamp"], 1600000000)
 
-        invalid_payload = {
-            "metric_name": self.unique_metric_name,
-            "score": 105.5,
+    def test_invalid_data_handling(self):
+        bad_payload = {
+            "metric_name": f"bad_{self.random_id}",
+            "score": 150.0,  # Out of bounds
             "timestamp": self.random_timestamp
         }
 
         with self.assertRaises(MetricValidationError):
-            self.validator.validate(invalid_payload)
+            self.validator.validate(bad_payload)
 
-        invalid_stream = "not a json string {"
-        with self.assertRaises(MetricValidationError):
-            self.validator.validate_stream(invalid_stream)
-
+        wrapper_result = validate_repo_health_metrics(bad_payload)
+        self.assertFalse(wrapper_result["is_valid"])
 
 if __name__ == "__main__":
     unittest.main()

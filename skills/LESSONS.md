@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-AILED (failures=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## repo_health_security_syncer (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
+и влит в main
 
 ## repo_health_dashboard (refactor) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (failures=1)
@@ -310,4 +306,8 @@ AILED (failures=1)
 
 ## repo_health_dispatcher (refactor) — раундов: 3
 - Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## repo_health_incident_tracker (refactor) — раундов: 2
+- Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: успешно прошёл тесты и влит в main

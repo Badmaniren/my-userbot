@@ -108,6 +108,9 @@ class RepoHealthIncidentTracker:
         response = requests.post(endpoint, json=incident)
         return response.status_code == 200
 
+    def track_(self, *args, **kwargs):
+        return self.track_incident(*args, **kwargs)
+
 # Глобальный инстанс для поддержки функции track_incident на уровне модуля
 _GLOBAL_TRACKER = RepoHealthIncidentTracker()
 

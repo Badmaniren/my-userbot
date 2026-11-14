@@ -30,7 +30,10 @@ class RepoHealthDispatcher:
         if isinstance(stream, str):
             stream = io.BytesIO(stream.encode("utf-8"))
         self.repo_health_dashboard.process_stream(stream)
-        self.repo_health_dashboard.export_dashboard(file_path)
+        exported = self.repo_health_dashboard.export_dashboard(file_path)
+
+        if not exported:
+            return False
 
         return self._notify_with_retry(self.repo_notifier.notify, file_path)
 

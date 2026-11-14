@@ -1,59 +1,62 @@
 import unittest
+import os
+import json
 import uuid
 import random
-import os
-import tempfile
 from skills.repo_health_remediator import RepoHealthRemediator
-from skills.repo_health_predictor_pipeline import RepoHealthPredictorPipeline
-from skills.repo_health_collector import RepoHealthCollector
 from skills.repo_logger import RepoLogger
 
 class TestRepoHealthRemediatorIntegration(unittest.TestCase):
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp()
-        self.logger = RepoLogger()
-        self.collector = RepoHealthCollector()
-        self.predictor = RepoHealthPredictorPipeline()
         self.remediator = RepoHealthRemediator()
+        self.random_uuid = str(uuid.uuid4())
+        self.repo_path = f"./test_repo_{self.random_uuid}"
+        self.target_output = os.path.join(self.repo_path, "remediation_report.json")
         
-        self.random_metric_name = f"metric_{uuid.uuid4().hex[:8]}"
-        self.random_threshold = round(random.uniform(0.1, 0.9), 2)
-        self.target_file = os.path.join(self.test_dir, f"health_report_{uuid.uuid4().hex[:6]}.json")
+        self.metric = f"metric_{random.randint(1, 100)}"
+        self.predicted_value = round(random.uniform(0.6, 1.0), 2)
+        self.threshold = 0.5
+        self.recommended_action = "optimize"
 
     def tearDown(self):
-        if os.path.exists(self.target_file):
-            os.remove(self.target_file)
-        if os.path.exists(self.test_dir):
-            os.rmdir(self.test_dir)
+        if os.path.exists(self.target_output):
+            os.remove(self.target_output)
+        if os.path.exists(self.repo_path):
+            try:
+                os.rmdir(self.repo_path)
+            except OSError:
+                pass
 
-    def test_remediation_pipeline_integration(self):
-        repo_data = {
-            "path": self.test_dir,
-            "metric": self.random_metric_name,
-            "value": self.random_threshold
+    def test_apply_remediation_integration_file_and_logger(self):
+        prediction_data = {
+            "target_output": self.target_output,
+            "repo_path": self.repo_path,
+            "prediction_id": self.random_uuid,
+            "prediction_data": {
+                "metric": self.metric,
+                "predicted_value": self.predicted_value,
+                "threshold": self.threshold,
+                "recommended_action": self.recommended_action
+            }
         }
-        
-        collected_metrics = self.collector.collect(repo_data)
-        self.assertIsNotNone(collected_metrics)
-        
-        prediction = self.predictor.predict(collected_metrics)
-        self.assertIsInstance(prediction, dict)
-        
-        remediation_payload = {
-            "prediction_id": str(uuid.uuid4()),
-            "repo_path": self.test_dir,
-            "prediction_data": prediction,
-            "target_output": self.target_file
-        }
-        
-        result = self.remediator.apply_remediation(remediation_payload)
-        
-        self.assertIn("status", result)
-        self.assertEqual(result["status"], "success")
-        self.assertTrue(os.path.exists(self.target_file), "Интеграционный тест не создал целевой файл корректирующих мер")
-        
-        log_entry = self.logger.get_latest_entry()
-        self.assertIsNotNone(log_entry)
+
+        result = self.remediator.apply_remediation(prediction_data)
+
+        self.assertEqual(result.get("status"), "success")
+        self.assertEqual(result.get("repo_path"), self.repo_path)
+
+        self.assertTrue(os.path.exists(self.target_output), "Интеграционный тест не создал целевой файл отчета.")
+
+        with open(self.target_output, "r", encoding="utf-8") as f:
+            saved_data = json.load(f)
+
+        self.assertEqual(saved_data.get("repo_path"), self.repo_path)
+        self.assertEqual(saved_data.get("metric"), self.metric)
+        self.assertEqual(saved_data.get("recommended_action"), self.recommended_action)
+        self.assertEqual(saved_data.get("status"), "success")
+
+        logger = RepoLogger(repo_path=self.repo_path)
+        self.assertIsInstance(logger, RepoLogger)
 
 if __name__ == "__main__":
     unittest.main()

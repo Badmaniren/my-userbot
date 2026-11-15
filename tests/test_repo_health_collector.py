@@ -1,6 +1,7 @@
 import unittest
-from unittest.mock import patch, mock_open
+from unittest.mock import patch
 import os
+import tempfile
 import json
 import uuid
 import random
@@ -12,79 +13,87 @@ class TestRepoHealthCollector(unittest.TestCase):
 
     def setUp(self):
         self.collector = RepoHealthCollector()
-        self.valid_repo_path = f"/tmp/{uuid.uuid4().hex}"
-        self.session_id = uuid.uuid4().hex
-        self.threshold = random.randint(1, 100)
-        self.random_log_content = uuid.uuid4().hex
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.repo_path = self.temp_dir.name
 
-    def test_collect_metrics_repo_not_exists(self):
-        non_existent_path = f"/non_existent_{uuid.uuid4().hex}"
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def test_collect_metrics_nonexistent_path(self):
+        fake_path = os.path.join(self.repo_path, uuid.uuid4().hex)
         with self.assertRaises(RepoHealthError):
-            self.collector.collect_metrics(non_existent_path)
+            self.collector.collect_metrics(repo_path=fake_path)
 
-    @patch("os.path.exists")
-    def test_collect_metrics_success_without_session(self, mock_exists):
-        mock_exists.return_value = True
+    def test_collect_metrics_basic_success(self):
+        session_id = uuid.uuid4().hex
+        threshold = random.randint(1, 100)
         
-        result = self.collector.collect_metrics(self.valid_repo_path, expected_threshold=self.threshold)
+        result = self.collector.collect_metrics(
+            repo_path=self.repo_path,
+            session_id=session_id,
+            expected_threshold=threshold
+        )
         
         self.assertEqual(result["status"], "healthy")
-        self.assertEqual(result["repo_path"], self.valid_repo_path)
-        self.assertIsNone(result["session_id"])
-        self.assertEqual(result["threshold"], self.threshold)
-        self.assertEqual(result["metrics"], {})
+        self.assertEqual(result["session_id"], session_id)
+        self.assertEqual(result["repo_path"], self.repo_path)
+        self.assertEqual(result["threshold"], threshold)
+        self.assertIn("metrics", result)
 
-    @patch("json.dump")
-    @patch("os.path.exists")
-    @patch("os.listdir")
-    def test_collect_metrics_with_session_and_logs(self, mock_listdir, mock_exists, mock_json_dump):
-        mock_exists.return_value = True
-        log_filename = f"{self.session_id}_{uuid.uuid4().hex}.log"
-        mock_listdir.return_value = [log_filename, f"other_{uuid.uuid4().hex}.log"]
-
-        m_open = mock_open(read_data=self.random_log_content)
+    def test_collect_metrics_with_log_file(self):
+        session_id = uuid.uuid4().hex
+        log_filename = f"{uuid.uuid4().hex}_{session_id}_{uuid.uuid4().hex}.log"
+        log_filepath = os.path.join(self.repo_path, log_filename)
         
-        with patch("builtins.open", m_open):
-            result = self.collector.collect_metrics(
-                self.valid_repo_path, 
-                session_id=self.session_id, 
-                expected_threshold=self.threshold
-            )
+        random_log_content = uuid.uuid4().hex
+        with open(log_filepath, "w", encoding="utf-8") as f:
+            f.write(random_log_content)
 
-        self.assertEqual(result["status"], "healthy")
-        self.assertEqual(result["session_id"], self.session_id)
-        self.assertEqual(result["metrics"]["log_content"], self.random_log_content)
-        self.assertEqual(result["threshold"], self.threshold)
+        result = self.collector.collect_metrics(
+            repo_path=self.repo_path,
+            session_id=session_id
+        )
 
-    @patch("os.path.exists")
-    @patch("os.listdir")
-    def test_collect_metrics_read_error(self, mock_listdir, mock_exists):
-        mock_exists.return_value = True
-        log_filename = f"{self.session_id}_{uuid.uuid4().hex}.log"
-        mock_listdir.return_value = [log_filename]
+        self.assertEqual(result["metrics"].get("log_content"), random_log_content)
+        
+        report_filename = f"report_{session_id}.json"
+        report_filepath = os.path.join(self.repo_path, report_filename)
+        self.assertTrue(os.path.exists(report_filepath))
+        
+        with open(report_filepath, "r", encoding="utf-8") as f:
+            saved_report = json.load(f)
+            self.assertEqual(saved_report["session_id"], session_id)
 
-        m_open = mock_open()
-        m_open.side_effect = IOError(uuid.uuid4().hex)
+    def test_collect_metrics_log_read_error(self):
+        session_id = uuid.uuid4().hex
+        log_filename = f"{session_id}.log"
+        log_filepath = os.path.join(self.repo_path, log_filename)
+        
+        with open(log_filepath, "w", encoding="utf-8") as f:
+            f.write(uuid.uuid4().hex)
 
-        with patch("builtins.open", m_open):
+        with patch("builtins.open", side_effect=PermissionError(uuid.uuid4().hex)):
             with self.assertRaises(RepoHealthError):
-                self.collector.collect_metrics(self.valid_repo_path, session_id=self.session_id)
+                self.collector.collect_metrics(
+                    repo_path=self.repo_path,
+                    session_id=session_id
+                )
 
-    @patch("os.path.exists")
-    @patch("os.listdir")
-    def test_collect_metrics_write_report_error(self, mock_listdir, mock_exists):
-        mock_exists.return_value = True
-        log_filename = f"{self.session_id}_{uuid.uuid4().hex}.log"
-        mock_listdir.return_value = [log_filename]
+    def test_collect_metrics_report_write_error(self):
+        session_id = uuid.uuid4().hex
+        
+        original_open = open
+        def mock_open(file, *args, **kwargs):
+            if str(file).endswith(f"report_{session_id}.json"):
+                raise PermissionError(uuid.uuid4().hex)
+            return original_open(file, *args, **kwargs)
 
-        def side_effect_open(*args, **kwargs):
-            if "report" in str(args[0]):
-                raise IOError(uuid.uuid4().hex)
-            return mock_open(read_data=self.random_log_content).return_value
-
-        with patch("builtins.open", side_effect=side_effect_open):
+        with patch("builtins.open", side_effect=mock_open):
             with self.assertRaises(RepoHealthError):
-                self.collector.collect_metrics(self.valid_repo_path, session_id=self.session_id)
+                self.collector.collect_metrics(
+                    repo_path=self.repo_path,
+                    session_id=session_id
+                )
 
 if __name__ == "__main__":
     unittest.main()

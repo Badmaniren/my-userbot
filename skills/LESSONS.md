@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-м: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## repo_health_metric_validator (refactor) — раундов: 4
+dator (refactor) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: trailing comma not allowed without surrounding parentheses (<unknown>, line 5)
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
@@ -337,6 +334,9 @@
 ## repo_health_threshold_monitor (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_collector (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
 
 ## repo_health_collector (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

@@ -3,8 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ай ошибку осмысленно или пробрось наружу через raise.
-- Последняя ошибка перед фиксом: FAILED (errors=1)
+)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## repo_health_metric_validator (refactor) — раундов: 4
@@ -341,4 +340,7 @@
 
 ## repo_health_anomaly_inspector (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.18/x64/lib/python3.11/unittest/mock.py", line 1446, in __enter__
+- Статус: успешно прошёл тесты и влит в main
+
+## repo_health_anomaly_inspector (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

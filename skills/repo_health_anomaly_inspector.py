@@ -60,8 +60,14 @@ class RepoHealthAnomalyInspector:
         is_anomaly = len(anomalies) > 0
 
         # Расширенное логирование результатов судебной инспекции
-        if hasattr(self.logger, "info"):
+        if hasattr(self.logger, "info") and callable(self.logger.info):
             self.logger.info(
+                f"Inspected repo_id: {repo_id}, status: inspected, "
+                f"is_anomaly: {is_anomaly}, anomalies_count: {len(anomalies)}, "
+                f"deviation_score: {deviation_score}"
+            )
+        elif hasattr(self.logger, "log") and callable(self.logger.log):
+            self.logger.log(
                 f"Inspected repo_id: {repo_id}, status: inspected, "
                 f"is_anomaly: {is_anomaly}, anomalies_count: {len(anomalies)}, "
                 f"deviation_score: {deviation_score}"

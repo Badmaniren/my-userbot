@@ -1,9 +1,10 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, mock_open
 import io
 import os
 import uuid
 import random
+import string
 from skills.repo_health_dispatcher import RepoHealthDispatcher
 
 
@@ -11,176 +12,128 @@ class TestRepoHealthDispatcher(unittest.TestCase):
 
     def setUp(self):
         self.repo_path = f"/tmp/{uuid.uuid4().hex}"
-        self.file_path = os.path.join(self.repo_path, f"{uuid.uuid4().hex}.json")
-        self.title = uuid.uuid4().hex
-        self.value = random.randint(1, 1000)
+        self.dispatcher = RepoHealthDispatcher(self.repo_path)
 
-    @patch("skills.repo_health_dispatcher.RepoNotifier")
-    @patch("skills.repo_health_dispatcher.RepoHealthDashboard")
-    def test_notify_with_retry_success_on_first_try(self, mock_dashboard_cls, mock_notifier_cls):
-        mock_notifier = mock_notifier_cls.return_value
-        mock_notifier.notify.return_value = True
+    def test_init_sets_attributes(self):
+        self.assertEqual(self.dispatcher.repo_path, self.repo_path)
+        self.assertIsNotNone(self.dispatcher.repo_health_dashboard)
+        self.assertIsNotNone(self.dispatcher.repo_notifier)
 
-        dispatcher = RepoHealthDispatcher(self.repo_path)
-        func = mock_notifier.notify
-        result = dispatcher._notify_with_retry(func, self.file_path)
+    def test_notify_with_retry_success_on_first_try(self):
+        mock_func = unittest.mock.Mock(return_value=True)
+        arg1 = uuid.uuid4().hex
+        kwarg1 = uuid.uuid4().hex
 
-        self.assertTrue(result)
-        mock_notifier.notify.assert_called_once_with(self.file_path)
-
-    @patch("skills.repo_health_dispatcher.RepoNotifier")
-    @patch("skills.repo_health_dispatcher.RepoHealthDashboard")
-    def test_notify_with_retry_success_after_retries(self, mock_dashboard_cls, mock_notifier_cls):
-        mock_notifier = mock_notifier_cls.return_value
-        mock_notifier.notify.side_effect = [False, False, True]
-
-        dispatcher = RepoHealthDispatcher(self.repo_path)
-        func = mock_notifier.notify
-        result = dispatcher._notify_with_retry(func, self.file_path)
+        result = self.dispatcher._notify_with_retry(mock_func, arg1, key=kwarg1)
 
         self.assertTrue(result)
-        self.assertEqual(mock_notifier.notify.call_count, 3)
+        mock_func.assert_called_once_with(arg1, key=kwarg1)
 
-    @patch("skills.repo_health_dispatcher.RepoNotifier")
-    @patch("skills.repo_health_dispatcher.RepoHealthDashboard")
-    def test_notify_with_retry_all_fails(self, mock_dashboard_cls, mock_notifier_cls):
-        mock_notifier = mock_notifier_cls.return_value
-        mock_notifier.notify.return_value = False
+    def test_notify_with_retry_success_on_retry(self):
+        mock_func = unittest.mock.Mock(side_effect=[False, False, True])
+        arg1 = uuid.uuid4().hex
 
-        dispatcher = RepoHealthDispatcher(self.repo_path)
-        func = mock_notifier.notify
-        result = dispatcher._notify_with_retry(func, self.file_path)
+        result = self.dispatcher._notify_with_retry(mock_func, arg1)
+
+        self.assertTrue(result)
+        self.assertEqual(mock_func.call_count, 3)
+
+    def test_notify_with_retry_all_fails(self):
+        mock_func = unittest.mock.Mock(return_value=False)
+        arg1 = uuid.uuid4().hex
+
+        result = self.dispatcher._notify_with_retry(mock_func, arg1)
 
         self.assertFalse(result)
-        self.assertEqual(mock_notifier.notify.call_count, 3)
+        self.assertEqual(mock_func.call_count, 3)
 
-    @patch("skills.repo_health_dispatcher.RepoNotifier")
-    @patch("skills.repo_health_dispatcher.RepoHealthDashboard")
-    def test_dispatch_health_and_notify_success(self, mock_dashboard_cls, mock_notifier_cls):
-        mock_dashboard = mock_dashboard_cls.return_value
-        mock_dashboard.export_dashboard.return_value = True
+    def test_dispatch_health_and_notify_success(self):
+        file_path = f"/{uuid.uuid4().hex}/{uuid.uuid4().hex}.json"
+        
+        with patch.object(self.dispatcher.repo_health_dashboard, 'generate_dashboard') as mock_gen, \
+             patch.object(self.dispatcher.repo_health_dashboard, 'export_dashboard', return_value=True) as mock_exp, \
+             patch.object(self.dispatcher, '_notify_with_retry', return_value=True) as mock_retry:
 
-        mock_notifier = mock_notifier_cls.return_value
-        mock_notifier.notify.return_value = True
+            result = self.dispatcher.dispatch_health_and_notify(file_path)
 
-        dispatcher = RepoHealthDispatcher(self.repo_path)
-        result = dispatcher.dispatch_health_and_notify(self.file_path)
+            self.assertTrue(result)
+            mock_gen.assert_called_once()
+            mock_exp.assert_called_once_with(file_path)
+            mock_retry.assert_called_once_with(self.dispatcher.repo_notifier.notify, file_path)
 
-        self.assertTrue(result)
-        mock_dashboard.generate_dashboard.assert_called_once()
-        mock_dashboard.export_dashboard.assert_called_once_with(self.file_path)
-        mock_notifier.notify.assert_called_once_with(self.file_path)
+    def test_dispatch_health_and_notify_export_fail(self):
+        file_path = f"/{uuid.uuid4().hex}/{uuid.uuid4().hex}.json"
+        
+        with patch.object(self.dispatcher.repo_health_dashboard, 'generate_dashboard') as mock_gen, \
+             patch.object(self.dispatcher.repo_health_dashboard, 'export_dashboard', return_value=False) as mock_exp, \
+             patch.object(self.dispatcher, '_notify_with_retry') as mock_retry:
 
-    @patch("skills.repo_health_dispatcher.RepoNotifier")
-    @patch("skills.repo_health_dispatcher.RepoHealthDashboard")
-    def test_dispatch_health_and_notify_export_fail(self, mock_dashboard_cls, mock_notifier_cls):
-        mock_dashboard = mock_dashboard_cls.return_value
-        mock_dashboard.export_dashboard.return_value = False
+            result = self.dispatcher.dispatch_health_and_notify(file_path)
 
-        mock_notifier = mock_notifier_cls.return_value
+            self.assertFalse(result)
+            mock_gen.assert_called_once()
+            mock_exp.assert_called_once_with(file_path)
+            mock_retry.assert_not_called()
 
-        dispatcher = RepoHealthDispatcher(self.repo_path)
-        result = dispatcher.dispatch_health_and_notify(self.file_path)
+    def test_process_stream_and_dispatch_with_string(self):
+        stream_str = uuid.uuid4().hex
+        file_path = f"/{uuid.uuid4().hex}/{uuid.uuid4().hex}.json"
 
-        self.assertFalse(result)
-        mock_dashboard.generate_dashboard.assert_called_once()
-        mock_dashboard.export_dashboard.assert_called_once_with(self.file_path)
-        mock_notifier.notify.assert_not_called()
+        with patch.object(self.dispatcher.repo_health_dashboard, 'process_stream') as mock_proc, \
+             patch.object(self.dispatcher.repo_health_dashboard, 'export_dashboard', return_value=True) as mock_exp, \
+             patch.object(self.dispatcher, '_notify_with_retry', return_value=True) as mock_retry:
 
-    @patch("skills.repo_health_dispatcher.RepoNotifier")
-    @patch("skills.repo_health_dispatcher.RepoHealthDashboard")
-    def test_process_stream_and_dispatch_with_string_stream(self, mock_dashboard_cls, mock_notifier_cls):
-        mock_dashboard = mock_dashboard_cls.return_value
-        mock_dashboard.export_dashboard.return_value = True
+            result = self.dispatcher.process_stream_and_dispatch(stream_str, file_path)
 
-        mock_notifier = mock_notifier_cls.return_value
-        mock_notifier.notify.return_value = True
+            self.assertTrue(result)
+            mock_proc.assert_called_once()
+            args, _ = mock_proc.call_args
+            self.assertIsInstance(args[0], io.BytesIO)
+            self.assertEqual(args[0].read().decode("utf-8"), stream_str)
+            mock_exp.assert_called_once_with(file_path)
+            mock_retry.assert_called_once_with(self.dispatcher.repo_notifier.notify, file_path)
 
-        stream_data = uuid.uuid4().hex
-        dispatcher = RepoHealthDispatcher(self.repo_path)
-        result = dispatcher.process_stream_and_dispatch(stream_data, self.file_path)
+    def test_process_stream_and_dispatch_with_bytes_io(self):
+        stream_bytes = io.BytesIO(uuid.uuid4().hex.encode("utf-8"))
+        file_path = f"/{uuid.uuid4().hex}/{uuid.uuid4().hex}.json"
 
-        self.assertTrue(result)
-        mock_dashboard.process_stream.assert_called_once()
-        mock_dashboard.export_dashboard.assert_called_once_with(self.file_path)
-        mock_notifier.notify.assert_called_once_with(self.file_path)
+        with patch.object(self.dispatcher.repo_health_dashboard, 'process_stream') as mock_proc, \
+             patch.object(self.dispatcher.repo_health_dashboard, 'export_dashboard', return_value=False) as mock_exp, \
+             patch.object(self.dispatcher, '_notify_with_retry') as mock_retry:
 
-    @patch("skills.repo_health_dispatcher.RepoNotifier")
-    @patch("skills.repo_health_dispatcher.RepoHealthDashboard")
-    def test_process_stream_and_dispatch_with_bytes_stream(self, mock_dashboard_cls, mock_notifier_cls):
-        mock_dashboard = mock_dashboard_cls.return_value
-        mock_dashboard.export_dashboard.return_value = True
+            result = self.dispatcher.process_stream_and_dispatch(stream_bytes, file_path)
 
-        mock_notifier = mock_notifier_cls.return_value
-        mock_notifier.notify.return_value = True
+            self.assertFalse(result)
+            mock_proc.assert_called_once_with(stream_bytes)
+            mock_exp.assert_called_once_with(file_path)
+            mock_retry.assert_not_called()
 
-        stream_data = io.BytesIO(uuid.uuid4().hex.encode("utf-8"))
-        dispatcher = RepoHealthDispatcher(self.repo_path)
-        result = dispatcher.process_stream_and_dispatch(stream_data, self.file_path)
-
-        self.assertTrue(result)
-        mock_dashboard.process_stream.assert_called_once_with(stream_data)
-        mock_dashboard.export_dashboard.assert_called_once_with(self.file_path)
-        mock_notifier.notify.assert_called_once_with(self.file_path)
-
-    @patch("skills.repo_health_dispatcher.RepoNotifier")
-    @patch("skills.repo_health_dispatcher.RepoHealthDashboard")
-    def test_process_stream_and_dispatch_export_fail(self, mock_dashboard_cls, mock_notifier_cls):
-        mock_dashboard = mock_dashboard_cls.return_value
-        mock_dashboard.export_dashboard.return_value = False
-
-        mock_notifier = mock_notifier_cls.return_value
-
-        stream_data = uuid.uuid4().hex
-        dispatcher = RepoHealthDispatcher(self.repo_path)
-        result = dispatcher.process_stream_and_dispatch(stream_data, self.file_path)
-
-        self.assertFalse(result)
-        mock_dashboard.process_stream.assert_called_once()
-        mock_dashboard.export_dashboard.assert_called_once_with(self.file_path)
-        mock_notifier.notify.assert_not_called()
-
-    @patch("skills.repo_health_dispatcher.RepoNotifier")
-    @patch("skills.repo_health_dispatcher.RepoHealthDashboard")
-    @patch("builtins.open", new_callable=MagicMock)
-    def test_check_and_notify_critical(self, mock_open, mock_dashboard_cls, mock_notifier_cls):
-        mock_dashboard = mock_dashboard_cls.return_value
+    def test_check_and_notify_critical(self):
+        title = uuid.uuid4().hex
+        value = random.randint(100, 999)
+        file_path = f"/{uuid.uuid4().hex}/{uuid.uuid4().hex}.txt"
         rendered_widget = uuid.uuid4().hex
-        mock_dashboard.render_widget.return_value = rendered_widget
 
-        mock_notifier = mock_notifier_cls.return_value
-        mock_notifier.notify_and_commit.return_value = True
+        with patch.object(self.dispatcher.repo_health_dashboard, 'render_widget', return_value=rendered_widget) as mock_render, \
+             patch("builtins.open", new_callable=mock_open) as mock_file, \
+             patch.object(self.dispatcher, '_notify_with_retry', return_value=True) as mock_retry:
 
-        mock_file = MagicMock()
-        mock_open.return_value.__enter__.return_value = mock_file
+            result = self.dispatcher.check_and_notify_critical(title, value, file_path)
 
-        dispatcher = RepoHealthDispatcher(self.repo_path)
-        result = dispatcher.check_and_notify_critical(self.title, self.value, self.file_path)
+            self.assertTrue(result)
+            mock_render.assert_called_once_with(title, value)
+            mock_file.assert_called_once_with(file_path, "w", encoding="utf-8")
+            mock_file().write.assert_called_once_with(rendered_widget)
+            mock_retry.assert_called_once_with(self.dispatcher.repo_notifier.notify_and_commit)
 
-        self.assertTrue(result)
-        mock_dashboard.render_widget.assert_called_once_with(self.title, self.value)
-        mock_open.assert_called_once_with(self.file_path, "w", encoding="utf-8")
-        mock_file.write.assert_called_once_with(rendered_widget)
-        mock_notifier.notify_and_commit.assert_called()
+    def test_dispatch(self):
+        expected_path = os.path.join(self.repo_path, "report.json")
 
-    @patch("skills.repo_health_dispatcher.RepoNotifier")
-    @patch("skills.repo_health_dispatcher.RepoHealthDashboard")
-    def test_dispatch_calls_dispatch_health_and_notify(self, mock_dashboard_cls, mock_notifier_cls):
-        mock_dashboard = mock_dashboard_cls.return_value
-        mock_dashboard.export_dashboard.return_value = True
+        with patch.object(self.dispatcher, 'dispatch_health_and_notify', return_value=True) as mock_dispatch_hn:
+            result = self.dispatcher.dispatch()
 
-        mock_notifier = mock_notifier_cls.return_value
-        mock_notifier.notify.return_value = True
-
-        dispatcher = RepoHealthDispatcher(self.repo_path)
-        expected_report_path = os.path.join(self.repo_path, "report.json")
-
-        result = dispatcher.dispatch()
-
-        self.assertTrue(result)
-        mock_dashboard.generate_dashboard.assert_called_once()
-        mock_dashboard.export_dashboard.assert_called_once_with(expected_report_path)
-        mock_notifier.notify.assert_called_once_with(expected_report_path)
+            self.assertTrue(result)
+            mock_dispatch_hn.assert_called_once_with(expected_path)
 
 
 if __name__ == "__main__":

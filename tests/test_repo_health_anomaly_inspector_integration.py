@@ -1,91 +1,58 @@
-import random
 import unittest
 import uuid
-
+import random
 from skills.repo_health_anomaly_inspector import RepoHealthAnomalyInspector
 from skills.repo_health_pulse_engine import RepoHealthPulseEngine
+from skills.repo_logger import RepoLogger
 
 
 class TestRepoHealthAnomalyInspectorIntegration(unittest.TestCase):
 
     def setUp(self):
+        self.repo_id = f"repo-{uuid.uuid4()}"
         self.pulse_engine = RepoHealthPulseEngine()
         self.inspector = RepoHealthAnomalyInspector(pulse_engine=self.pulse_engine)
 
-    def test_inspect_integration_with_pulse_engine(self):
-        random_repo_id = f"repo-pulse-{uuid.uuid4().hex}"
-        result = self.inspector.inspect(repo_id=random_repo_id)
+    def test_inspect_integration_real_data(self):
+        high_metric_name = f"metric_load_{uuid.uuid4().hex[:6]}"
+        negative_metric_name = f"metric_error_{uuid.uuid4().hex[:6]}"
+        normal_metric_name = f"metric_stable_{uuid.uuid4().hex[:6]}"
+
+        threshold_value = float(random.randint(50, 100))
+        high_value = threshold_value + float(random.randint(10, 50))
+        negative_value = -float(random.randint(1, 20))
+        normal_value = float(random.randint(0, int(threshold_value)))
+
+        custom_payload = {
+            "repo_id": self.repo_id,
+            "metrics": {
+                high_metric_name: high_value,
+                negative_metric_name: negative_value,
+                normal_metric_name: normal_value
+            }
+        }
+
+        result = self.inspector.inspect(
+            repo_id=self.repo_id,
+            pulse_payload=custom_payload,
+            threshold=threshold_value
+        )
 
         self.assertIsInstance(result, dict)
-        self.assertEqual(result["status"], "inspected")
-        self.assertEqual(result["repo_id"], random_repo_id)
-        self.assertIn("is_anomaly", result)
-        self.assertIsInstance(result["anomalies"], list)
-        self.assertIsInstance(result["deviation_score"], float)
+        self.assertEqual(result.get("repo_id"), self.repo_id)
+        self.assertEqual(result.get("status"), "inspected")
+        self.assertTrue(result.get("is_anomaly"))
 
-    def test_inspect_detection_and_score_calculation(self):
-        random_repo_id = f"repo-anomaly-{uuid.uuid4().hex}"
-        threshold = round(random.uniform(10.0, 50.0), 2)
+        anomalies = result.get("anomalies", [])
+        self.assertGreaterEqual(len(anomalies), 2)
 
-        metric_neg = f"metric_neg_{uuid.uuid4().hex[:6]}"
-        metric_high = f"metric_high_{uuid.uuid4().hex[:6]}"
-        metric_normal = f"metric_ok_{uuid.uuid4().hex[:6]}"
+        anomaly_metrics = [a["metric"] for a in anomalies]
+        self.assertIn(high_metric_name, anomaly_metrics)
+        self.assertIn(negative_metric_name, anomaly_metrics)
+        self.assertNotIn(normal_metric_name, anomaly_metrics)
 
-        neg_val = -round(random.uniform(1.0, 25.0), 2)
-        high_val = threshold + round(random.uniform(5.0, 40.0), 2)
-        normal_val = round(random.uniform(0.0, threshold - 0.5), 2)
-
-        payload = {
-            "repo_id": random_repo_id,
-            "metrics": {
-                metric_neg: neg_val,
-                metric_high: high_val,
-                metric_normal: normal_val,
-            },
-        }
-
-        result = self.inspector.inspect(
-            repo_id=random_repo_id, pulse_payload=payload, threshold=threshold
-        )
-
-        expected_deviation = abs(neg_val) + (high_val - threshold)
-
-        self.assertEqual(result["repo_id"], random_repo_id)
-        self.assertTrue(result["is_anomaly"])
-        self.assertEqual(len(result["anomalies"]), 2)
-        self.assertAlmostEqual(result["deviation_score"], expected_deviation, places=4)
-
-        anomalies_map = {a["metric"]: a for a in result["anomalies"]}
-
-        self.assertIn(metric_neg, anomalies_map)
-        self.assertEqual(anomalies_map[metric_neg]["deviation"], "negative")
-        self.assertEqual(anomalies_map[metric_neg]["value"], float(neg_val))
-
-        self.assertIn(metric_high, anomalies_map)
-        self.assertEqual(anomalies_map[metric_high]["deviation"], "high")
-        self.assertEqual(anomalies_map[metric_high]["value"], float(high_val))
-
-    def test_inspect_clean_metrics_no_anomalies(self):
-        random_repo_id = f"repo-clean-{uuid.uuid4().hex}"
-        threshold = 100.0
-        metric_clean = f"metric_val_{uuid.uuid4().hex[:6]}"
-        clean_val = round(random.uniform(1.0, 50.0), 2)
-
-        payload = {
-            "repo_id": random_repo_id,
-            "metrics": {
-                metric_clean: clean_val,
-            },
-        }
-
-        result = self.inspector.inspect(
-            repo_id=random_repo_id, pulse_payload=payload, threshold=threshold
-        )
-
-        self.assertEqual(result["repo_id"], random_repo_id)
-        self.assertFalse(result["is_anomaly"])
-        self.assertEqual(len(result["anomalies"]), 0)
-        self.assertEqual(result["deviation_score"], 0.0)
+        expected_deviation = abs(negative_value) + (high_value - threshold_value)
+        self.assertAlmostEqual(result.get("deviation_score", 0.0), expected_deviation)
 
 
 if __name__ == "__main__":

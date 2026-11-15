@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## repo_health_metric_validator (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
+и влит в main
 
 ## repo_health_trend_storage (create) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 30); Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 62)
@@ -341,5 +337,9 @@ ILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
 ## repo_health_incident_tracker (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_dispatcher (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

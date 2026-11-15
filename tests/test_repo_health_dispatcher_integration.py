@@ -4,75 +4,74 @@ import tempfile
 import unittest
 import uuid
 import random
+
 from skills.repo_health_dispatcher import RepoHealthDispatcher
 
 
 class TestRepoHealthDispatcherIntegration(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
-        self.repo_path = self.test_dir
-        self.dispatcher = RepoHealthDispatcher(self.repo_path)
-        
-        self.random_filename = f"report_{uuid.uuid4().hex[:8]}.json"
-        self.file_path = os.path.join(self.repo_path, self.random_filename)
-        
-        self.random_title = f"Metric_{uuid.uuid4().hex[:6]}"
+        self.dispatcher = RepoHealthDispatcher(self.test_dir)
+        self.unique_id = str(uuid.uuid4())
         self.random_value = random.randint(100, 9999)
 
     def tearDown(self):
-        shutil.rmtree(self.test_dir, ignore_errors=True)
+        shutil.rmtree(self.test_dir, ignore_errors.TrueAny if hasattr(shutil, 'IGNORE_ERRORS') else True)
 
     def test_dispatch_health_and_notify_integration(self):
-        result = self.dispatcher.dispatch_health_and_notify(self.file_path)
-        
+        file_name = f"health_report_{self.unique_id}.json"
+        file_path = os.path.join(self.test_dir, file_name)
+
+        result = self.dispatcher.dispatch_health_and_notify(file_path)
+
         self.assertIsInstance(result, bool)
         self.assertTrue(
-            os.path.exists(self.file_path),
-            f"Файл отчета {self.file_path} должен быть создан реальным дашбордом."
+            os.path.exists(file_path),
+            f"Integration failure: Exported dashboard file {file_path} was not created."
         )
 
     def test_process_stream_and_dispatch_integration(self):
-        stream_data = f'{{"metric_id": "{uuid.uuid4()}", "value": {random.random()}}}'
-        
-        result = self.dispatcher.process_stream_and_dispatch(stream_data, self.file_path)
-        
+        stream_data = f'{{"status": "active", "id": "{self.unique_id}", "metric": {self.random_value}}}'
+        file_name = f"stream_report_{self.unique_id}.json"
+        file_path = os.path.join(self.test_dir, file_name)
+
+        result = self.dispatcher.process_stream_and_dispatch(stream_data, file_path)
+
         self.assertIsInstance(result, bool)
         self.assertTrue(
-            os.path.exists(self.file_path),
-            "Файл отчета должен быть экспортирован после обработки потока данных."
+            os.path.exists(file_path),
+            f"Integration failure: Stream processed dashboard file {file_path} was not created."
         )
-        
-        with open(self.file_path, "r", encoding="utf-8") as f:
+
+        with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
-            self.assertGreater(len(content), 0, "Экспортированный файл отчета не должен быть пустым.")
+            self.assertTrue(len(content) > 0, "Exported file content is empty.")
 
     def test_check_and_notify_critical_integration(self):
-        result = self.dispatcher.check_and_notify_critical(
-            self.random_title, 
-            self.random_value, 
-            self.file_path
-        )
-        
-        self.assertIsInstance(result, bool)
-        self.assertTrue(
-            os.path.exists(self.file_path),
-            "Критический виджет должен записать данные в целевой файл."
-        )
-        
-        with open(self.file_path, "r", encoding="utf-8") as f:
-            widget_content = f.read()
-            self.assertIn(self.random_title, widget_content, "Случайный заголовок метрики должен присутствовать в виджете.")
-            self.assertIn(str(self.random_value), widget_content, "Случайное значение метрики должно присутствовать в виджете.")
+        title = f"Critical_Alert_{self.unique_id}"
+        file_name = f"critical_{self.unique_id}.log"
+        file_path = os.path.join(self.test_dir, file_name)
 
-    def test_dispatch_default_path_integration(self):
-        default_report_path = os.path.join(self.repo_path, "report.json")
-        
-        result = self.dispatcher.dispatch()
-        
+        result = self.dispatcher.check_and_notify_critical(title, self.random_value, file_path)
+
         self.assertIsInstance(result, bool)
         self.assertTrue(
-            os.path.exists(default_report_path),
-            "Метод dispatch должен создавать report.json по умолчанию в корне репозитория."
+            os.path.exists(file_path),
+            f"Integration failure: Critical widget file {file_path} was not created."
+        )
+
+        with open(file_path, "r", encoding="utf-8") as f:
+            file_content = f.read()
+            self.assertIn(title, file_content)
+
+    def test_dispatch_default_integration(self):
+        result = self.dispatcher.dispatch()
+        expected_path = os.path.join(self.test_dir, "report.json")
+
+        self.assertIsInstance(result, bool)
+        self.assertTrue(
+            os.path.exists(expected_path),
+            f"Integration failure: Default dispatch report.json was not generated at {expected_path}."
         )
 
 

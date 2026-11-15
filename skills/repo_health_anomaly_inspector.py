@@ -11,6 +11,12 @@ class RepoHealthAnomalyInspector:
     def __init__(self, pulse_engine=None):
         self.pulse_engine = pulse_engine if pulse_engine is not None else RepoHealthPulseEngine()
         self.logger = RepoLogger(repo_path=".")
+        # Обеспечиваем наличие метода info у логгера для совместимости с юнит-тестами, патчащими inspector.logger.info
+        if not hasattr(self.logger, "info"):
+            if hasattr(self.logger, "log") and callable(getattr(self.logger, "log")):
+                setattr(self.logger, "info", self.logger.log)
+            else:
+                setattr(self.logger, "info", lambda msg, *args, **kwargs: None)
 
     def inspect(self, repo_id=None, pulse_payload=None, threshold=None):
         # Если payload не передан или не является словарем, пытаемся получить его из движка пульса

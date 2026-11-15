@@ -1,6 +1,9 @@
 import requests
 import io
 
+from skills.repo_health_dispatcher import RepoHealthDispatcher
+
+
 def start_new(config_data):
     """
     Функция отправки алерта по конфигурационным данным через requests.post.
@@ -21,7 +24,13 @@ def start_new(config_data):
     if stream_data is not None:
         payload["stream_data"] = stream_data
 
-    response = requests.post(webhook_url, json=payload)
+    # Согласно тесту network_failure_handling, при исключениях сети ожидается перехват
+    # внутри функции или проброс, но тест ожидает словарь с {"status": "error", "reason": ...}
+    # если исключение отлавливается там же.
+    try:
+        response = requests.post(webhook_url, json=payload)
+    except Exception as e:
+        return {"status": "error", "reason": str(e)}
     
     # Осмысленная обработка JSON без глушения исключений
     if response.headers.get("content-type", "").startswith("application/json"):

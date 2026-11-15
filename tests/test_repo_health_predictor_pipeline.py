@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import patch, mock_open
 import io
+import json
 import uuid
 import random
 import string
@@ -10,67 +11,76 @@ from skills.repo_health_predictor_pipeline import RepoHealthPredictorPipeline, r
 class TestRepoHealthPredictorPipeline(unittest.TestCase):
 
     def setUp(self):
-        self.random_endpoint = f"https://{uuid.uuid4().hex}.internal/api/v{random.randint(1, 9)}"
+        self.random_endpoint = f"https://{uuid.uuid4().hex}.api/v1/health"
         self.random_threshold = round(random.uniform(0.1, 0.9), 2)
         self.pipeline = RepoHealthPredictorPipeline(
             endpoint=self.random_endpoint,
             threshold=self.random_threshold
         )
 
-    def test_init_state(self):
+    def test_init_properties(self):
         self.assertEqual(self.pipeline.endpoint, self.random_endpoint)
         self.assertEqual(self.pipeline.threshold, self.random_threshold)
 
-    def test_analyze_health_empty_data(self):
-        with self.assertRaises(ValueError):
-            self.pipeline.analyze_health({})
-
     def test_analyze_health_valid_data(self):
-        rand_key = uuid.uuid4().hex
-        rand_val = uuid.uuid4().hex
-        raw_data = {rand_key: rand_val}
+        random_key = uuid.uuid4().hex
+        random_value = "".join(random.choices(string.ascii_letters, k=10))
+        raw_data = {random_key: random_value}
 
         result = self.pipeline.analyze_health(raw_data)
         self.assertIsInstance(result, dict)
         self.assertEqual(result.get("status"), "predicted")
         self.assertIn("score", result)
         self.assertIsInstance(result["score"], float)
+        self.assertTrue(0.0 <= result["score"] <= 1.0)
 
-    def test_run_pipeline_empty_stream(self):
-        empty_stream = io.BytesIO(b"")
-        res = self.pipeline.run_pipeline(empty_stream)
-        self.assertFalse(res)
+    def test_analyze_health_empty_data(self):
+        with self.assertRaises(ValueError) as ctx:
+            self.pipeline.analyze_health({})
+        self.assertEqual(str(ctx.exception), "Empty raw data")
 
-    def test_run_pipeline_valid_stream(self):
-        random_payload = "".join(random.choices(string.ascii_letters + string.digits, k=64)).encode("utf-8")
-        stream = io.BytesIO(random_payload)
-        res = self.pipeline.run_pipeline(stream)
-        self.assertTrue(res)
+    def test_run_pipeline_with_content(self):
+        random_payload = "".join(random.choices(string.ascii_letters + string.digits, k=32)).encode('utf-8')
+        mock_stream = io.BytesIO(random_payload)
 
-    def test_functional_predictor_empty_data(self):
-        with self.assertRaises(ValueError):
-            repo_health_predictor_pipeline({})
+        is_success = self.pipeline.run_pipeline(mock_stream)
+        self.assertTrue(is_success)
 
-    def test_functional_predictor_creates_report_file(self):
-        repo_id = uuid.uuid4().hex
-        metric_key = uuid.uuid4().hex
-        metric_val = random.randint(100, 999)
-        raw_data = {
-            "repository_id": repo_id,
-            metric_key: metric_val
-        }
+    def test_run_pipeline_empty_content(self):
+        mock_stream = io.BytesIO(b"")
 
-        with patch("os.makedirs") as mock_makedirs, \
-             patch("builtins.open", mock_open()) as mock_file:
-            
+        is_success = self.pipeline.run_pipeline(mock_stream)
+        self.assertFalse(is_success)
+
+    def test_functional_pipeline_success(self):
+        random_repo_id = uuid.uuid4().hex
+        raw_data = {"repository_id": random_repo_id, "metrics": random.randint(100, 999)}
+
+        mock_file_handle = mock_open()
+        
+        with patch("skills.repo_health_predictor_pipeline.os.makedirs") as mock_makedirs, \
+             patch("skills.repo_health_predictor_pipeline.open", mock_file_handle) as mock_file, \
+             patch("skills.repo_health_predictor_pipeline.json.dump") as mock_json_dump:
+
             result = repo_health_predictor_pipeline(raw_data)
 
             mock_makedirs.assert_called_once_with("reports", exist_ok=True)
-            mock_file.assert_called_once_with(f"reports/health_prediction_{repo_id}.json", "w", encoding="utf-8")
+            expected_path = f"reports/health_prediction_{random_repo_id}.json"
+            mock_file.assert_called_once_with(expected_path, "w", encoding="utf-8")
             
-            self.assertEqual(result["repository_id"], repo_id)
-            self.assertEqual(result["status"], "success")
-            self.assertIn("prediction_score", result)
+            mock_json_dump.assert_called_once()
+            dumped_args = mock_json_dump.call_args[0]
+            dumped_data = dumped_args[0]
+            
+            self.assertEqual(dumped_data["repository_id"], random_repo_id)
+            self.assertEqual(dumped_data["status"], "success")
+            self.assertIn("prediction_score", dumped_data)
+            self.assertEqual(result, dumped_data)
+
+    def test_functional_pipeline_empty_data(self):
+        with self.assertRaises(ValueError) as ctx:
+            repo_health_predictor_pipeline({})
+        self.assertEqual(str(ctx.exception), "Empty raw data")
 
 
 if __name__ == "__main__":

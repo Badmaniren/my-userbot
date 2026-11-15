@@ -3,12 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-e 30); Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 62)
-- Последняя ошибка перед фиксом: ======================================================================
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## repo_health_trend_calculator (create) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: expected '(' (<unknown>, line 55); Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 26); Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 53)
+интаксическая ошибка в коде: '(' was never closed (<unknown>, line 26); Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 53)
 - Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.18/x64/lib/python3.11/unittest/loader.py", line 419, in _find_test_path
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -343,4 +338,9 @@ e 30); Синтаксическая ошибка в коде: '(' was never clos
 
 ## repo_health_alert_channel (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_dispatcher (refactor) — раундов: 4
+- Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
+- Последняя ошибка перед фиксом: self.assertTrue(success, "Dispatcher failed to process stream and dispatch.")
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

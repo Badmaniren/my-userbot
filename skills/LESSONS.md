@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-дняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.18/x64/lib/python3.11/unittest/loader.py", line 419, in _find_test_path
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## repo_health_trend_storage (create) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 105); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+1); Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 105); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Последняя ошибка перед фиксом: FAILED (failures=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -346,4 +342,9 @@
 
 ## repo_health_dispatcher (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_dispatcher (refactor) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Последняя ошибка перед фиксом: File "/home/runner/work/my-userbot/my-userbot/skills/repo_health_dispatcher.py", line 15, in __init__
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

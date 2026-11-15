@@ -3,16 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## repo_health_metric_validator (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## repo_health_metric_validator (refactor) — раундов: 3
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: успешно прошёл тесты и влит в main
+ влит в main
 
 ## repo_health_trend_calculator (create) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: '{' was never closed (<unknown>, line 126)
@@ -344,3 +335,8 @@
 
 ## repo_health_anomaly_inspector (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## repo_health_predictor_pipeline (refactor) — раундов: 4
+- Античит поймал: ЧИТЕРСТВО ОБНАРУЖЕНО: Объявлен фиктивный 'repo_health_collector'! Запрещено создавать заглушки. Используй честный импорт: 'from skills.repo_health_collector import ...'
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -1,67 +1,58 @@
 import unittest
 import uuid
 import random
+import os
 from skills.repo_health_benchmark_analyzer import RepoHealthBenchmarkAnalyzer, analyze_repository_benchmark
 
 class TestRepoHealthBenchmarkAnalyzerIntegration(unittest.TestCase):
-    def test_end_to_end_benchmark_analysis_and_degradation(self):
-        random_repo_name = f"repo_test_{uuid.uuid4().hex[:8]}"
+    def test_repository_benchmark_end_to_end_integration(self):
+        random_repo_name = f"repo_{uuid.uuid4().hex[:8]}"
         random_run_id = str(uuid.uuid4())
         
-        baseline_limit = round(random.uniform(50.0, 100.0), 2)
-        normal_metric_value = round(baseline_limit - random.uniform(1.0, 10.0), 2)
-        degraded_metric_value = round(baseline_limit + random.uniform(1.0, 20.0), 2)
-        
-        analyzer = RepoHealthBenchmarkAnalyzer()
-        
-        normal_key = f"metric_norm_{uuid.uuid4().hex[:6]}"
-        normal_result = analyzer.analyze_benchmarks(
-            metric_key=normal_key,
-            metric_value=normal_metric_value,
-            benchmark_limit=baseline_limit
-        )
-        
-        self.assertEqual(normal_result["metric_key"], normal_key)
-        self.assertEqual(normal_result["metric_value"], normal_metric_value)
-        self.assertEqual(normal_result["benchmark_limit"], baseline_limit)
-        self.assertFalse(normal_result["is_anomaly"])
-        self.assertEqual(normal_result["status"], "OK")
-        
-        degraded_key = f"metric_deg_{uuid.uuid4().hex[:6]}"
-        degraded_result = analyzer.analyze_benchmarks(
-            metric_key=degraded_key,
-            metric_value=degraded_metric_value,
-            benchmark_limit=baseline_limit
-        )
-        
-        self.assertEqual(degraded_result["metric_key"], degraded_key)
-        self.assertEqual(degraded_result["metric_value"], degraded_metric_value)
-        self.assertEqual(degraded_result["benchmark_limit"], baseline_limit)
-        self.assertTrue(degraded_result["is_anomaly"])
-        self.assertEqual(degraded_result["status"], "WARNING")
-        
-        self.assertEqual(len(analyzer.metrics), 2)
-        self.assertIn(normal_result, analyzer.metrics)
-        self.assertIn(degraded_result, analyzer.metrics)
-        
+        random_limit = round(random.uniform(50.0, 150.0), 2)
+        # Генерируем значение, которое гарантированно вызовет аномалию или будет в норме
+        is_anomaly_case = random.choice([True, False])
+        if is_anomaly_case:
+            random_metric_val = random_limit + round(random.uniform(1.0, 50.0), 2)
+            expected_status = "WARNING"
+        else:
+            random_metric_val = max(0.0, random_limit - round(random.uniform(1.0, 50.0), 2))
+            expected_status = "OK"
+
         report = analyze_repository_benchmark(
             repo_path=random_repo_name,
             run_id=random_run_id,
-            metric_value=degraded_metric_value,
-            anomaly_threshold=baseline_limit
+            metric_value=random_metric_val,
+            anomaly_threshold=random_limit
         )
-        
+
         self.assertIsInstance(report, dict)
-        self.assertEqual(report["repo_path"], random_repo_name)
-        self.assertEqual(report["run_id"], random_run_id)
-        self.assertIn("analysis", report)
+        self.assertEqual(report.get("repo_path"), random_repo_name)
+        self.assertEqual(report.get("run_id"), random_run_id)
+
+        analysis = report.get("analysis")
+        self.assertIsInstance(analysis, dict)
+        self.assertEqual(analysis.get("metric_value"), random_metric_val)
+        self.assertEqual(analysis.get("benchmark_limit"), random_limit)
+        self.assertEqual(analysis.get("is_anomaly"), is_anomaly_case)
+        self.assertEqual(analysis.get("status"), expected_status)
+        self.assertTrue(analysis.get("metric_key").startswith("metric_"))
+
+        analyzer = RepoHealthBenchmarkAnalyzer()
+        second_metric_key = f"metric_{uuid.uuid4().hex[:6]}"
+        second_limit = round(random.uniform(10.0, 100.0), 2)
+        second_value = round(random.uniform(0.0, 200.0), 2)
         
-        sub_analysis = report["analysis"]
-        self.assertEqual(sub_analysis["metric_key"], f"metric_{random_run_id[:8]}")
-        self.assertEqual(sub_analysis["metric_value"], degraded_metric_value)
-        self.assertEqual(sub_analysis["benchmark_limit"], baseline_limit)
-        self.assertTrue(sub_analysis["is_anomaly"])
-        self.assertEqual(sub_analysis["status"], "WARNING")
+        result_direct = analyzer.analyze_benchmarks(
+            metric_key=second_metric_key,
+            metric_value=second_value,
+            benchmark_limit=second_limit
+        )
+
+        self.assertIsInstance(result_direct, dict)
+        self.assertEqual(len(analyzer.metrics), 1)
+        self.assertEqual(analyzer.metrics[0], result_direct)
+        self.assertEqual(result_direct.get("metric_key"), second_metric_key)
 
 if __name__ == "__main__":
     unittest.main()

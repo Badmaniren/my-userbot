@@ -13,8 +13,8 @@ class RepoHealthAnomalyInspector:
         self.logger = RepoLogger(repo_path=".")
 
     def inspect(self, repo_id=None, pulse_payload=None, threshold=None):
-        # Если payload не передан, пытаемся получить его из движка пульса
-        if pulse_payload is None:
+        # Если payload не передан или не является словарем, пытаемся получить его из движка пульса
+        if pulse_payload is None or not isinstance(pulse_payload, dict):
             fetch_repo_id = repo_id if repo_id is not None else "default-repo"
             
             if hasattr(self.pulse_engine, "get_pulse") and callable(getattr(self.pulse_engine, "get_pulse")):

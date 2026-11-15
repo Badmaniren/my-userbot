@@ -1,72 +1,60 @@
 import unittest
 import os
-import json
+import tempfile
 import uuid
 import random
+import json
+
 from skills.repo_health_collector import RepoHealthCollector, RepoHealthError
 
 class TestRepoHealthCollectorIntegration(unittest.TestCase):
-    
     def setUp(self):
+        self.test_dir = tempfile.TemporaryDirectory()
         self.collector = RepoHealthCollector()
-        self.test_repo_path = f"test_repo_{uuid.uuid4().hex}"
-        os.makedirs(self.test_repo_path, exist_ok=True)
-        
+
     def tearDown(self):
-        if os.path.exists(self.test_repo_path):
-            for filename in os.listdir(self.test_repo_path):
-                file_path = os.path.join(self.test_repo_path, filename)
-                try:
-                    if os.path.isfile(file_path):
-                        os.unlink(file_path)
-                except Exception:
-                    pass
-            try:
-                os.rmdir(self.test_repo_path)
-            except Exception:
-                pass
+        self.test_dir.cleanup()
 
     def test_collect_metrics_integration_flow(self):
-        session_id = uuid.uuid4().hex
-        random_log_content = f"latency_benchmark_{random.randint(100, 999)}ms"
-        expected_threshold = random.randint(50, 500)
-        
+        repo_path = self.test_dir.name
+        session_id = str(uuid.uuid4())
+        random_threshold = random.randint(10, 100)
+        random_log_content = f"integration_test_log_message_{uuid.uuid4()}"
+
         log_filename = f"session_{session_id}.log"
-        log_file_path = os.path.join(self.test_repo_path, log_filename)
+        log_filepath = os.path.join(repo_path, log_filename)
         
-        with open(log_file_path, "w", encoding="utf-8") as f:
+        with open(log_filepath, "w", encoding="utf-8") as f:
             f.write(random_log_content)
-            
+
         report = self.collector.collect_metrics(
-            repo_path=self.test_repo_path,
+            repo_path=repo_path,
             session_id=session_id,
-            expected_threshold=expected_threshold
+            expected_threshold=random_threshold
         )
-        
+
         self.assertEqual(report["status"], "healthy")
         self.assertEqual(report["session_id"], session_id)
-        self.assertEqual(report["repo_path"], self.test_repo_path)
-        self.assertEqual(report["threshold"], expected_threshold)
+        self.assertEqual(report["repo_path"], repo_path)
+        self.assertEqual(report["threshold"], random_threshold)
         self.assertIn("log_content", report["metrics"])
         self.assertEqual(report["metrics"]["log_content"], random_log_content)
-        
-        report_filename = f"report_{session_id}.json"
-        report_file_path = os.path.join(self.test_repo_path, report_filename)
-        self.assertTrue(os.path.exists(report_file_path), "Файл отчета должен быть создан на диске.")
-        
-        with open(report_file_path, "r", encoding="utf-8") as f:
-            saved_report = json.load(f)
-            
-        self.assertEqual(saved_report["session_id"], session_id)
-        self.assertEqual(saved_report["threshold"], expected_threshold)
-        self.assertEqual(saved_report["metrics"]["log_content"], random_log_content)
+
+        expected_report_filename = f"report_{session_id}.json"
+        expected_report_filepath = os.path.join(repo_path, expected_report_filename)
+        self.assertTrue(os.path.exists(expected_report_filepath))
+
+        with open(expected_report_filepath, "r", encoding="utf-8") as f:
+            saved_data = json.load(f)
+
+        self.assertEqual(saved_data["session_id"], session_id)
+        self.assertEqual(saved_data["threshold"], random_threshold)
+        self.assertEqual(saved_data["metrics"]["log_content"], random_log_content)
 
     def test_collect_metrics_invalid_path(self):
-        invalid_path = f"nonexistent_repo_{uuid.uuid4().hex}"
-        session_id = uuid.uuid4().hex
-        
+        invalid_path = os.path.join(self.test_dir.name, str(uuid.uuid4()))
         with self.assertRaises(RepoHealthError):
-            self.collector.collect_metrics(repo_path=invalid_path, session_id=session_id)
+            self.collector.collect_metrics(repo_path=invalid_path)
 
 if __name__ == "__main__":
     unittest.main()

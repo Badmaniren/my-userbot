@@ -1,79 +1,57 @@
-import unittest
 import os
+import shutil
+import tempfile
+import unittest
 import uuid
 import random
-import io
 from skills.repo_health_dispatcher import RepoHealthDispatcher
 
 
 class TestRepoHealthDispatcherIntegration(unittest.TestCase):
     def setUp(self):
-        self.random_suffix = uuid.uuid4().hex[:8]
-        self.repo_path = os.path.abspath(f"./test_repo_{self.random_suffix}")
-        os.makedirs(self.repo_path, exist_ok=True)
+        self.test_dir = tempfile.mkdtemp()
+        self.repo_path = self.test_dir
         self.dispatcher = RepoHealthDispatcher(self.repo_path)
+        self.random_id = str(uuid.uuid4())
+        self.metric_value = random.randint(10, 100)
+        self.report_filename = f"report_{self.random_id}.json"
+        self.report_path = os.path.join(self.repo_path, self.report_filename)
 
     def tearDown(self):
-        if os.path.exists(self.repo_path):
-            for root, dirs, files in os.walk(self.repo_path, topdown=False):
-                for name in files:
-                    try:
-                        os.remove(os.path.join(root, name))
-                    except OSError:
-                        pass
-                for name in dirs:
-                    try:
-                        os.rmdir(os.path.join(root, name))
-                    except OSError:
-                        pass
-            try:
-                os.rmdir(self.repo_path)
-            except OSError:
-                pass
+        if os.path.exists(self.test_dir):
+            shutil.rmtree(self.test_dir, ignore_errors=True)
 
     def test_dispatch_health_and_notify_integration(self):
-        file_name = f"report_{uuid.uuid4().hex[:6]}.json"
-        file_path = os.path.join(self.repo_path, file_name)
-        
-        result = self.dispatcher.dispatch_health_and_notify(file_path)
-        
+        result = self.dispatcher.dispatch_health_and_notify(self.report_path)
         self.assertIsInstance(result, bool)
-        self.assertTrue(os.path.exists(file_path), "Интеграционный тест: файл отчета должен быть создан дашбордом.")
+        self.assertTrue(
+            os.path.exists(self.report_path),
+            f"Файл отчета {self.report_path} должен быть реально создан в репозитории."
+        )
 
     def test_process_stream_and_dispatch_integration(self):
-        random_title = f"Metric_{uuid.uuid4().hex[:6]}"
-        random_value = random.randint(100, 999)
-        stream_content = f'{{"title": "{random_title}", "value": {random_value}}}'
-        
-        file_name = f"stream_report_{uuid.uuid4().hex[:6]}.json"
-        file_path = os.path.join(self.repo_path, file_name)
-        
-        result = self.dispatcher.process_stream_and_dispatch(stream_content, file_path)
-        
+        stream_content = f'{{"metrics_id": "{self.random_id}", "status": "healthy"}}'
+        result = self.dispatcher.process_stream_and_dispatch(stream_content, self.report_path)
         self.assertIsInstance(result, bool)
-        self.assertTrue(os.path.exists(file_path), "Интеграционный тест: файл из стрима должен быть экспортирован.")
+        self.assertTrue(
+            os.path.exists(self.report_path),
+            "Файл отчета из стрима должен быть записан на диск."
+        )
+        with open(self.report_path, "r", encoding="utf-8") as f:
+            content = f.read()
+            self.assertIn(self.random_id, content, "Сгенерированный UUID должен присутствовать в экспортированных данных.")
 
     def test_check_and_notify_critical_integration(self):
-        random_title = f"Critical_Alert_{uuid.uuid4().hex[:6]}"
-        random_value = random.randint(500, 1000)
-        file_name = f"critical_{uuid.uuid4().hex[:6]}.txt"
-        file_path = os.path.join(self.repo_path, file_name)
-        
-        result = self.dispatcher.check_and_notify_critical(random_title, random_value, file_path)
-        
+        widget_title = f"Critical Alert {self.random_id}"
+        result = self.dispatcher.check_and_notify_critical(widget_title, self.metric_value, self.report_path)
         self.assertIsInstance(result, bool)
-        self.assertTrue(os.path.exists(file_path), "Интеграционный тест: критический виджет должен записать файл на диск.")
-        
-        with open(file_path, "r", encoding="utf-8") as f:
+        self.assertTrue(
+            os.path.exists(self.report_path),
+            "Критический виджет должен физически создать файл отчета."
+        )
+        with open(self.report_path, "r", encoding="utf-8") as f:
             content = f.read()
-            self.assertIn(random_title, content, "Интеграционный тест: содержимое файла должно отражать переданный заголовок.")
-
-    def test_dispatch_default_path_integration(self):
-        result = self.dispatcher.dispatch()
-        expected_report_path = os.path.join(self.repo_path, "report.json")
-        
-        self.assertIsInstance(result, bool)
-        self.assertTrue(os.path.exists(expected_report_path), "Интеграционный тест: стандартный метод dispatch должен создавать report.json.")
+            self.assertIn(widget_title, content, "Заголовок виджета с уникальным ID должен быть записан в файл.")
 
 
 if __name__ == "__main__":

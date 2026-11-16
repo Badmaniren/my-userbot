@@ -46,9 +46,9 @@ class RepoHealthDispatcher:
         
         os.makedirs(os.path.dirname(os.path.abspath(file_path)), exist_ok=True)
         with open(file_path, "w", encoding="utf-8") as f:
-            f.write(rendered_widget)
+            f.write(str(rendered_widget))
             
-        return self._notify_with_retry(self.repo_notifier.notify_and_commit)
+        return self._notify_with_retry(self.repo_notifier.notify_and_commit, file_path)
 
     def dispatch(self) -> bool:
         expected_report_path = os.path.join(self.repo_path, "report.json")

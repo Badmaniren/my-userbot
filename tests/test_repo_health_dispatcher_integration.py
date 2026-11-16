@@ -1,63 +1,58 @@
-import os
-import shutil
 import unittest
+import os
 import uuid
 import random
+import tempfile
 from skills.repo_health_dispatcher import RepoHealthDispatcher
-
 
 class TestRepoHealthDispatcherIntegration(unittest.TestCase):
     def setUp(self):
-        self.test_dir = os.path.abspath(f"test_repo_env_{uuid.uuid4().hex}")
-        os.makedirs(self.test_dir, exist_ok=True)
+        self.test_dir = tempfile.mkdtemp()
         self.dispatcher = RepoHealthDispatcher(self.test_dir)
+        self.unique_id = str(uuid.uuid4())
+        self.random_value = random.randint(100, 9999)
+        self.file_path = os.path.join(self.test_dir, f"report_{self.unique_id}.json")
 
     def tearDown(self):
-        if os.path.exists(self.test_dir):
-            shutil.rmtree(self.test_dir, ignore_errors=True)
+        if os.path.exists(self.file_path):
+            try:
+                os.remove(self.file_path)
+            except OSError:
+                pass
 
     def test_dispatch_health_and_notify_integration(self):
-        unique_filename = f"report_{uuid.uuid4().hex}.json"
-        file_path = os.path.join(self.test_dir, unique_filename)
-        
-        result = self.dispatcher.dispatch_health_and_notify(file_path)
-        
+        result = self.dispatcher.dispatch_health_and_notify(self.file_path)
         self.assertIsInstance(result, bool)
-        self.assertTrue(os.path.exists(file_path), "Файл отчета должен быть реально создан в файловой системе.")
+        self.assertTrue(os.path.exists(self.file_path), "Dashboard export file must be created during real integration execution")
 
     def test_process_stream_and_dispatch_integration(self):
-        stream_content = f"metrics_stream_data_{uuid.uuid4().hex}"
-        unique_filename = f"stream_report_{uuid.uuid4().hex}.json"
-        file_path = os.path.join(self.test_dir, unique_filename)
-
-        result = self.dispatcher.process_stream_and_dispatch(stream_content, file_path)
-
+        stream_content = f'{{"metric": "{self.unique_id}", "value": {self.random_value}}}'
+        result = self.dispatcher.process_stream_and_dispatch(stream_content, self.file_path)
         self.assertIsInstance(result, bool)
-        self.assertTrue(os.path.exists(file_path), "Файл отчета из стрима должен быть записан на диск.")
+        self.assertTrue(os.path.exists(self.file_path), "Stream processing must successfully export the dashboard to the target file")
 
     def test_check_and_notify_critical_integration(self):
-        widget_title = f"Critical_Metric_{uuid.uuid4().hex}"
-        widget_value = random.randint(100, 9999)
-        unique_filename = f"critical_{uuid.uuid4().hex}.txt"
-        file_path = os.path.join(self.test_dir, "widgets", unique_filename)
-
-        result = self.dispatcher.check_and_notify_critical(widget_title, widget_value, file_path)
-
+        title = f"CriticalAlert_{self.unique_id}"
+        result = self.dispatcher.check_and_notify_critical(title, self.random_value, self.file_path)
         self.assertIsInstance(result, bool)
-        self.assertTrue(os.path.exists(file_path), "Критический виджет должен создать файл отчета.")
+        self.assertTrue(os.path.exists(self.file_path), "Critical check must render and persist the widget to the file system")
         
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(self.file_path, "r", encoding="utf-8") as f:
             content = f.read()
-            self.assertIn(widget_title, content, "Содержимое файла должно содержать переданный заголовок.")
-            self.assertIn(str(widget_value), content, "Содержимое файла должно содержать переданное числовое значение.")
+            self.assertIn(title, content, "Rendered widget file must contain the dynamically generated title")
 
     def test_default_dispatch_integration(self):
-        result = self.dispatcher.dispatch()
-        
         expected_report_path = os.path.join(self.test_dir, "report.json")
-        self.assertIsInstance(result, bool)
-        self.assertTrue(os.path.exists(expected_report_path), "Дефолтный метод dispatch должен создавать report.json.")
-
+        try:
+            result = self.dispatcher.dispatch()
+            self.assertIsInstance(result, bool)
+            self.assertTrue(os.path.exists(expected_report_path), "Default dispatch must generate report.json in the repository path")
+        finally:
+            if os.path.exists(expected_report_path):
+                try:
+                    os.remove(expected_report_path)
+                except OSError:
+                    pass
 
 if __name__ == "__main__":
     unittest.main()

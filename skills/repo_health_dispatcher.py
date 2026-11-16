@@ -1,8 +1,11 @@
 import io
+import logging
 import os
 from typing import Union
 from skills.repo_health_dashboard import RepoHealthDashboard
 from skills.repo_notifier import RepoNotifier
+
+logger = logging.getLogger(__name__)
 
 
 class RepoHealthDispatcher:
@@ -13,9 +16,12 @@ class RepoHealthDispatcher:
 
     def _notify_with_retry(self, notify_func, *args, **kwargs) -> bool:
         max_retries = 3
-        for _ in range(max_retries):
-            if notify_func(*args, **kwargs):
-                return True
+        for attempt in range(1, max_retries + 1):
+            try:
+                if notify_func(*args, **kwargs):
+                    return True
+            except Exception as e:
+                logger.error("Notification attempt %d failed with error: %s", attempt, e)
         return False
 
     def dispatch_health_and_notify(self, file_path: str) -> bool:
@@ -37,8 +43,11 @@ class RepoHealthDispatcher:
 
     def check_and_notify_critical(self, title: str, value: int, file_path: str) -> bool:
         rendered_widget = self.repo_health_dashboard.render_widget(title, value)
+        
+        os.makedirs(os.path.dirname(os.path.abspath(file_path)), exist_ok=True)
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(rendered_widget)
+            
         return self._notify_with_retry(self.repo_notifier.notify_and_commit)
 
     def dispatch(self) -> bool:

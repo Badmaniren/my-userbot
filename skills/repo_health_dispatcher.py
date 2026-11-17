@@ -44,7 +44,10 @@ class RepoHealthDispatcher:
     def check_and_notify_critical(self, title: str, value: int, file_path: str) -> bool:
         rendered_widget = self.repo_health_dashboard.render_widget(title, value)
         
-        os.makedirs(os.path.dirname(os.path.abspath(file_path)), exist_ok=True)
+        dir_name = os.path.dirname(os.path.abspath(file_path))
+        if dir_name:
+            os.makedirs(dir_name, exist_ok=True)
+            
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(str(rendered_widget))
             

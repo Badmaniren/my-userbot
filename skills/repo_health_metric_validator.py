@@ -27,18 +27,18 @@ class RepoHealthMetricValidator:
         return True
 
     def validate_stream(self, stream: Union[IO[bytes], IO[str], str, bytes]) -> List[Dict[str, Any]]:
+        if isinstance(stream, bytes):
+            content = stream.decode('utf-8')
+        elif hasattr(stream, 'read'):
+            content = stream.read()
+            if isinstance(content, bytes):
+                content = content.decode('utf-8')
+        else:
+            content = str(stream)
+        
         try:
-            if isinstance(stream, bytes):
-                content = stream.decode('utf-8')
-            elif hasattr(stream, 'read'):
-                content = stream.read()
-                if isinstance(content, bytes):
-                    content = content.decode('utf-8')
-            else:
-                content = str(stream)
-            
             data = json.loads(content)
-        except (UnicodeDecodeError, json.JSONDecodeError, Exception) as e:
+        except (UnicodeDecodeError, json.JSONDecodeError) as e:
             raise MetricValidationError(f"Failed to parse stream: {e}")
 
         if isinstance(data, dict):

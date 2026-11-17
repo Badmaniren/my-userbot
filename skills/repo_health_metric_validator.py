@@ -63,35 +63,34 @@ class RepoHealthMetricValidator:
 
         return validated_metrics
 
-    def dispatch_and_validate_remote(self, payload: Dict[str, Any], endpoint_url: str) -> Dict[str, Any]:
-        """Отправляет метрики на внешний шлюз и возвращает ответ."""
-        response = requests.post(endpoint_url, json=payload)
+    def dispatch_and_validate_remote(self, payload: Dict[str, Any], endpoint: str) -> Dict[str, Any]:
+        """Отправляет метрику на удаленный эндпоинт и возвращает ответ."""
+        self.validate(payload)
+        response = requests.post(endpoint, json=payload)
         return response.json()
 
 
-def audit_repository(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Аудит репозитория с использованием переданных метрик."""
+def audit_repository(metric_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Аудит репозитория: валидирует метрику и возвращает её обратно при успехе."""
     validator = RepoHealthMetricValidator()
-    validator.validate(payload)
-    return payload
+    validator.validate(metric_data)
+    return metric_data
 
 
-def render_health_dashboard(payload: Dict[str, Any]) -> str:
-    """Рендеринг дашборда здоровья на основе метрик."""
-    return f"Health Dashboard for {payload.get('metric_name', 'unknown')}: Score = {payload.get('score', 0)}"
+def render_health_dashboard(metric_data: Dict[str, Any]) -> str:
+    """Рендерит дашборд здоровья репозитория на основе переданных данных."""
+    metric_name = metric_data.get("metric_name", "unknown")
+    score = metric_data.get("score", 0)
+    return f"Dashboard - Metric: {metric_name}, Score: {score}"
 
 
 def validate_repo_health_metrics(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Нормализует и проверяет метрики здоровья репозитория из альтернативных форматов."""
-    metric_name = payload.get("run_id") or payload.get("metric_name", "default_metric")
-    score = payload.get("health_score", payload.get("score", 0.0))
-    timestamp = payload.get("timestamp", 1600000000)
-
-    normalized = {
-        "metric_name": metric_name,
-        "score": score,
-        "timestamp": timestamp
-    }
+    """Нормализует альтернативные ключи и проверяет валидность метрик."""
+    normalized = payload.copy()
+    if "run_id" in normalized and "metric_name" not in normalized:
+        normalized["metric_name"] = normalized["run_id"]
+    if "health_score" in normalized and "score" not in normalized:
+        normalized["score"] = normalized["health_score"]
 
     validator = RepoHealthMetricValidator()
     try:

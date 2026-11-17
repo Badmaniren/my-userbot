@@ -11,64 +11,51 @@ from skills.repo_health_metric_validator import (
 )
 
 class TestRepoHealthMetricValidatorIntegration(unittest.TestCase):
-
     def setUp(self):
         self.validator = RepoHealthMetricValidator()
-        self.metric_name = f"metric_{uuid.uuid4().hex[:8]}"
-        self.score = round(random.uniform(0.0, 100.0), 2)
-        self.timestamp = f"2023-10-{random.randint(10, 28)}T12:00:00Z"
-        
-        self.valid_payload = {
-            "metric_name": self.metric_name,
-            "score": self.score,
-            "timestamp": self.timestamp
+        self.random_metric_name = f"metric_{uuid.uuid4().hex[:8]}"
+        self.random_score = round(random.uniform(0.0, 100.0), 2)
+        self.random_timestamp = int(random.randint(1600000000, 1700000000))
+
+    def test_end_to_end_metric_lifecycle(self):
+        payload = {
+            "run_id": self.random_metric_name,
+            "health_score": self.random_score,
+            "timestamp": self.random_timestamp
         }
 
-    def test_full_metric_lifecycle_and_dashboard_rendering(self):
-        # 1. Validate through class method
-        is_valid = self.validator.validate(self.valid_payload)
-        self.assertTrue(is_valid)
+        validation_result = validate_repo_health_metrics(payload)
+        self.assertTrue(validation_result["is_valid"])
+        
+        normalized_metric = validation_result["metrics"]
+        self.assertEqual(normalized_metric["metric_name"], self.random_metric_name)
+        self.assertEqual(normalized_metric["score"], self.random_score)
 
-        # 2. Audit repository integration step
-        audited_data = audit_repository(self.valid_payload)
-        self.assertEqual(audited_data["metric_name"], self.metric_name)
-        self.assertEqual(audited_data["score"], self.score)
+        audited_metric = audit_repository(normalized_metric)
+        self.assertEqual(audited_metric, normalized_metric)
 
-        # 3. Stream validation integration
-        stream_data = json.dumps([self.valid_payload])
+        dashboard_output = render_health_dashboard(audited_metric)
+        self.assertIn(self.random_metric_name, dashboard_output)
+        self.assertIn(str(self.random_score), dashboard_output)
+
+        stream_data = json.dumps([normalized_metric])
         validated_stream = self.validator.validate_stream(stream_data)
         self.assertEqual(len(validated_stream), 1)
-        self.assertEqual(validated_stream[0]["metric_name"], self.metric_name)
+        self.assertEqual(validated_stream[0]["metric_name"], self.random_metric_name)
 
-        # 4. Alternative keys normalization integration
-        alt_payload = {
-            "run_id": f"run_{uuid.uuid4().hex[:6]}",
-            "health_score": self.score,
-            "timestamp": self.timestamp
+    def test_invalid_metric_handling(self):
+        bad_score = round(random.uniform(101.0, 200.0), 2)
+        payload = {
+            "metric_name": f"err_{uuid.uuid4().hex[:6]}",
+            "score": bad_score,
+            "timestamp": self.random_timestamp
         }
-        normalization_result = validate_repo_health_metrics(alt_payload)
-        self.assertTrue(normalization_result["is_valid"])
-        self.assertEqual(normalization_result["metrics"]["metric_name"], alt_payload["run_id"])
-        self.assertEqual(normalization_result["metrics"]["score"], self.score)
 
-        # 5. Dashboard rendering integration
-        dashboard_output = render_health_dashboard(normalization_result["metrics"])
-        self.assertIn(alt_payload["run_id"], dashboard_output)
-        self.assertIn(str(self.score), dashboard_output)
-
-    def test_validation_failure_propagation(self):
-        invalid_score = round(random.uniform(101.0, 200.0), 2)
-        invalid_payload = {
-            "metric_name": f"bad_metric_{uuid.uuid4().hex[:6]}",
-            "score": invalid_score,
-            "timestamp": self.timestamp
-        }
+        validation_result = validate_repo_health_metrics(payload)
+        self.assertFalse(validation_result["is_valid"])
 
         with self.assertRaises(MetricValidationError):
-            self.validator.validate(invalid_payload)
-
-        normalization_result = validate_repo_health_metrics(invalid_payload)
-        self.assertFalse(normalization_result["is_valid"])
+            self.validator.validate(payload)
 
 if __name__ == "__main__":
     unittest.main()

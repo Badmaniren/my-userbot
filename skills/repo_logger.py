@@ -34,9 +34,12 @@ class RepoLogger:
         self.logger.error(message)
         return True
 
-    def log_error(self, error_code: str, error_msg: str) -> None:
+    def log_error(self, error_code: str, error_msg: str = "") -> None:
         """Логирует критическую ошибку."""
-        message = f"Repo: {self.repo_path} | Error [{error_code}]: {error_msg}"
+        if not error_msg:
+            message = f"Repo: {self.repo_path} | Error [{error_code}]: {error_code}"
+        else:
+            message = f"Repo: {self.repo_path} | Error [{error_code}]: {error_msg}"
         self.logger.error(message)
 
     def process_log_stream(self, stream: Any) -> bool:

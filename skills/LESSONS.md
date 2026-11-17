@@ -3,21 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ёл тесты и влит в main
-
-## repo_health_dispatcher (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## repo_health_dispatcher (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (failures=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## repo_health_dispatcher (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## repo_health_dispatcher (refactor) — раундов: 3
-- Последняя ошибка перед фиксом: FAILED (failures=1)
-- Статус: успешно прошёл тесты и влит в main
+сты и влит в main
 
 ## repo_health_incident_tracker (refactor) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (errors=1)
@@ -333,5 +319,10 @@
 
 ## repo_health_webhook_bridge (create) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_webhook_client (create) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: unterminated triple-quoted string literal (detected at line 6) (<unknown>, line 6); Синтаксическая ошибка в коде: '(' was never closed (<unknown>, line 8); АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

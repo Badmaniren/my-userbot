@@ -11,50 +11,40 @@ class MetricValidationError(Exception):
 class RepoHealthMetricValidator:
     """Класс для проверки валидности и корректности собранных метрик здоровья репозитория."""
 
-    def __init__(self):
-        pass
-
-    def validate(self, metric_data: Dict[str, Any]) -> bool:
-        """Проверяет отдельный словарь с метрикой на наличие обязательных полей и корректность значений."""
-        if not isinstance(metric_data, dict):
-            raise MetricValidationError("Metric data must be a dictionary.")
-
-        if "metric_name" not in metric_data:
-            raise MetricValidationError("Missing mandatory field: 'metric_name'")
-        if "score" not in metric_data:
-            raise MetricValidationError("Missing mandatory field: 'score'")
-        if "timestamp" not in metric_data:
-            raise MetricValidationError("Missing mandatory field: 'timestamp'")
-
-        score = metric_data["score"]
-        if not isinstance(score, (int, float)) or isinstance(score, bool):
-            raise MetricValidationError("Score must be a number.")
-
-        if score < 0.0 or score > 100.0:
-            raise MetricValidationError(f"score is out of bounds [0.0, 100.0]. Value: {score}")
-
+    def validate(self, metric: Dict[str, Any]) -> bool:
+        if not isinstance(metric, dict):
+            raise MetricValidationError("Metric must be a dictionary")
+        
+        required_fields = ["metric_name", "score", "timestamp"]
+        for field in required_fields:
+            if field not in metric:
+                raise MetricValidationError(f"Missing required field: {field}")
+        
+        score = metric["score"]
+        if not isinstance(score, (int, float)) or not (0.0 <= score <= 100.0):
+            raise MetricValidationError(f"Invalid score value: {score}")
+            
         return True
 
     def validate_stream(self, stream: Union[IO[bytes], IO[str], str, bytes]) -> List[Dict[str, Any]]:
-        """Читает поток данных (стрим), парсит JSON и валидирует каждую метрику."""
-        if hasattr(stream, "read"):
-            content = stream.read()
-        else:
-            content = stream
-
-        if isinstance(content, bytes):
-            try:
-                content = content.decode('utf-8')
-            except UnicodeDecodeError as e:
-                raise MetricValidationError(f"Failed to decode stream bytes: {e}")
-
         try:
+            if isinstance(stream, bytes):
+                content = stream.decode('utf-8')
+            elif hasattr(stream, 'read'):
+                content = stream.read()
+                if isinstance(content, bytes):
+                    content = content.decode('utf-8')
+            else:
+                content = str(stream)
+            
             data = json.loads(content)
-        except (json.JSONDecodeError, TypeError) as e:
-            raise MetricValidationError(f"Failed to parse JSON: {e}")
+        except (UnicodeDecodeError, json.JSONDecodeError, Exception) as e:
+            raise MetricValidationError(f"Failed to parse stream: {e}")
 
-        if not isinstance(data, list):
+        if isinstance(data, dict):
             data = [data]
+        elif not isinstance(data, list):
+            raise MetricValidationError("Stream content must be a JSON array or object")
 
         validated_metrics = []
         for item in data:
@@ -63,43 +53,35 @@ class RepoHealthMetricValidator:
 
         return validated_metrics
 
-    def dispatch_and_validate_remote(self, payload: Dict[str, Any], endpoint: str) -> Dict[str, Any]:
-        """Отправляет метрику на удаленный эндпоинт и возвращает ответ."""
-        self.validate(payload)
-        response = requests.post(endpoint, json=payload)
+    def dispatch_and_validate_remote(self, metric: Dict[str, Any], endpoint: str) -> Dict[str, Any]:
+        self.validate(metric)
+        response = requests.post(endpoint, json=metric)
         return response.json()
 
 
-def audit_repository(metric_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Аудит репозитория: валидирует метрику и возвращает её обратно при успехе."""
+def audit_repository(metric: Dict[str, Any]) -> Dict[str, Any]:
     validator = RepoHealthMetricValidator()
-    validator.validate(metric_data)
-    return metric_data
+    validator.validate(metric)
+    return metric
 
 
-def render_health_dashboard(metric_data: Dict[str, Any]) -> str:
-    """Рендерит дашборд здоровья репозитория на основе переданных данных."""
-    metric_name = metric_data.get("metric_name", "unknown")
-    score = metric_data.get("score", 0)
-    return f"Dashboard - Metric: {metric_name}, Score: {score}"
+def render_health_dashboard(metric: Dict[str, Any]) -> str:
+    name = metric.get("metric_name", "Unknown")
+    score = metric.get("score", 0.0)
+    return f"Dashboard - Metric: {name}, Score: {score}"
 
 
 def validate_repo_health_metrics(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Нормализует альтернативные ключи и проверяет валидность метрик."""
-    normalized = payload.copy()
-    if "run_id" in normalized and "metric_name" not in normalized:
-        normalized["metric_name"] = normalized["run_id"]
-    if "health_score" in normalized and "score" not in normalized:
-        normalized["score"] = normalized["health_score"]
+    if "run_id" in payload and "metric_name" not in payload:
+        payload = payload.copy()
+        payload["metric_name"] = payload["run_id"]
+    if "health_score" in payload and "score" not in payload:
+        payload = payload.copy()
+        payload["score"] = payload["health_score"]
 
     validator = RepoHealthMetricValidator()
     try:
-        validator.validate(normalized)
-        is_valid = True
+        validator.validate(payload)
+        return {"is_valid": True, "metrics": payload}
     except MetricValidationError:
-        is_valid = False
-
-    return {
-        "is_valid": is_valid,
-        "metrics": normalized
-    }
+        return {"is_valid": False, "metrics": payload}

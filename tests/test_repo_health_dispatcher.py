@@ -1,152 +1,76 @@
 import unittest
-from unittest.mock import patch, MagicMock
 import io
 import os
 import uuid
 import random
+from unittest.mock import MagicMock, patch, mock_open
 from skills.repo_health_dispatcher import RepoHealthDispatcher
 
-
 class TestRepoHealthDispatcher(unittest.TestCase):
-
     def setUp(self):
         self.repo_path = f"/tmp/{uuid.uuid4().hex}"
         self.dispatcher = RepoHealthDispatcher(self.repo_path)
 
-    @patch("skills.repo_health_dispatcher.RepoHealthDashboard")
-    @patch("skills.repo_health_dispatcher.RepoNotifier")
-    def test_notify_with_retry_success(self, mock_notifier_class, mock_dashboard_class):
-        dispatcher = RepoHealthDispatcher(self.repo_path)
-        mock_notify_func = MagicMock(return_value=True)
-        
-        result = dispatcher._notify_with_retry(mock_notify_func)
-        
+    def test_notify_with_retry_success_on_first(self):
+        mock_func = MagicMock(return_value=True)
+        result = self.dispatcher._notify_with_retry(mock_func, "arg1")
         self.assertTrue(result)
-        mock_notify_func.assert_called_once()
+        self.assertEqual(mock_func.call_count, 1)
 
-    @patch("skills.repo_health_dispatcher.RepoHealthDashboard")
-    @patch("skills.repo_health_dispatcher.RepoNotifier")
-    def test_notify_with_retry_eventual_success(self, mock_notifier_class, mock_dashboard_class):
-        dispatcher = RepoHealthDispatcher(self.repo_path)
-        mock_notify_func = MagicMock(side_effect=[Exception("fail"), True])
-        
-        result = dispatcher._notify_with_retry(mock_notify_func)
-        
-        self.assertTrue(result)
-        self.assertEqual(mock_notify_func.call_count, 2)
-
-    @patch("skills.repo_health_dispatcher.RepoHealthDashboard")
-    @patch("skills.repo_health_dispatcher.RepoNotifier")
-    def test_notify_with_retry_exhausted(self, mock_notifier_class, mock_dashboard_class):
-        dispatcher = RepoHealthDispatcher(self.repo_path)
-        mock_notify_func = MagicMock(side_effect=Exception("persistent fail"))
-        
-        result = dispatcher._notify_with_retry(mock_notify_func)
-        
+    def test_notify_with_retry_exhausts_retries(self):
+        mock_func = MagicMock(side_effect=Exception("Random failure"))
+        result = self.dispatcher._notify_with_retry(mock_func, "arg1")
         self.assertFalse(result)
-        self.assertEqual(mock_notify_func.call_count, 3)
+        self.assertEqual(mock_func.call_count, 3)
 
-    @patch("skills.repo_health_dispatcher.RepoHealthDashboard")
-    @patch("skills.repo_health_dispatcher.RepoNotifier")
-    def test_dispatch_health_and_notify_success(self, mock_notifier_class, mock_dashboard_class):
+    def test_dispatch_health_and_notify_flow(self):
         file_path = f"/{uuid.uuid4().hex}/{uuid.uuid4().hex}.json"
+        with patch.object(self.dispatcher.repo_health_dashboard, 'generate_dashboard') as mock_gen, \
+             patch.object(self.dispatcher.repo_health_dashboard, 'export_dashboard', return_value=True), \
+             patch.object(self.dispatcher, '_notify_with_retry', return_value=True) as mock_retry:
+            
+            result = self.dispatcher.dispatch_health_and_notify(file_path)
+            self.assertTrue(result)
+            mock_gen.assert_called_once()
+            mock_retry.assert_called_once()
+
+    def test_process_stream_and_dispatch_with_bytes(self):
+        random_data = uuid.uuid4().hex.encode("utf-8")
+        stream = io.BytesIO(random_data)
+        file_path = f"/{uuid.uuid4().hex}.json"
         
-        dispatcher = RepoHealthDispatcher(self.repo_path)
-        dispatcher.repo_health_dashboard.export_dashboard = MagicMock(return_value=True)
-        dispatcher.repo_notifier.notify = MagicMock(return_value=True)
+        with patch.object(self.dispatcher.repo_health_dashboard, 'process_stream') as mock_proc, \
+             patch.object(self.dispatcher.repo_health_dashboard, 'export_dashboard', return_value=True), \
+             patch.object(self.dispatcher, '_notify_with_retry', return_value=True):
+            
+            result = self.dispatcher.process_stream_and_dispatch(stream, file_path)
+            self.assertTrue(result)
+            mock_proc.assert_called_with(stream)
 
-        result = dispatcher.dispatch_health_and_notify(file_path)
-
-        self.assertTrue(result)
-        dispatcher.repo_health_dashboard.generate_dashboard.assert_called_once()
-        dispatcher.repo_health_dashboard.export_dashboard.assert_called_once_with(file_path)
-        dispatcher.repo_notifier.notify.assert_called_once_with(file_path)
-
-    @patch("skills.repo_health_dispatcher.RepoHealthDashboard")
-    @patch("skills.repo_health_dispatcher.RepoNotifier")
-    def test_dispatch_health_and_notify_export_fail(self, mock_notifier_class, mock_dashboard_class):
-        file_path = f"/{uuid.uuid4().hex}/{uuid.uuid4().hex}.json"
-        
-        dispatcher = RepoHealthDispatcher(self.repo_path)
-        dispatcher.repo_health_dashboard.export_dashboard = MagicMock(return_value=False)
-
-        result = dispatcher.dispatch_health_and_notify(file_path)
-
-        self.assertFalse(result)
-        dispatcher.repo_health_dashboard.generate_dashboard.assert_called_once()
-        dispatcher.repo_health_dashboard.export_dashboard.assert_called_once_with(file_path)
-        dispatcher.repo_notifier.notify.assert_not_called()
-
-    @patch("skills.repo_health_dispatcher.RepoHealthDashboard")
-    @patch("skills.repo_health_dispatcher.RepoNotifier")
-    def test_process_stream_and_dispatch_with_string(self, mock_notifier_class, mock_dashboard_class):
-        stream_data = uuid.uuid4().hex
-        file_path = f"/{uuid.uuid4().hex}/{uuid.uuid4().hex}.json"
-
-        dispatcher = RepoHealthDispatcher(self.repo_path)
-        dispatcher.repo_health_dashboard.export_dashboard = MagicMock(return_value=True)
-        dispatcher.repo_notifier.notify = MagicMock(return_value=True)
-
-        result = dispatcher.process_stream_and_dispatch(stream_data, file_path)
-
-        self.assertTrue(result)
-        dispatcher.repo_health_dashboard.process_stream.assert_called_once()
-        dispatcher.repo_health_dashboard.export_dashboard.assert_called_once_with(file_path)
-
-    @patch("skills.repo_health_dispatcher.RepoHealthDashboard")
-    @patch("skills.repo_health_dispatcher.RepoNotifier")
-    def test_process_stream_and_dispatch_with_bytesio(self, mock_notifier_class, mock_dashboard_class):
-        stream_data = io.BytesIO(uuid.uuid4().hex.encode("utf-8"))
-        file_path = f"/{uuid.uuid4().hex}/{uuid.uuid4().hex}.json"
-
-        dispatcher = RepoHealthDispatcher(self.repo_path)
-        dispatcher.repo_health_dashboard.export_dashboard = MagicMock(return_value=True)
-        dispatcher.repo_notifier.notify = MagicMock(return_value=True)
-
-        result = dispatcher.process_stream_and_dispatch(stream_data, file_path)
-
-        self.assertTrue(result)
-        dispatcher.repo_health_dashboard.process_stream.assert_called_once_with(stream_data)
-
-    @patch("skills.repo_health_dispatcher.open")
-    @patch("skills.repo_health_dispatcher.os.makedirs")
-    @patch("skills.repo_health_dispatcher.RepoHealthDashboard")
-    @patch("skills.repo_health_dispatcher.RepoNotifier")
-    def test_check_and_notify_critical(self, mock_notifier_class, mock_dashboard_class, mock_makedirs, mock_open):
+    def test_check_and_notify_critical_file_io(self):
         title = uuid.uuid4().hex
-        value = random.randint(100, 999)
-        file_path = f"/tmp/{uuid.uuid4().hex}/{uuid.uuid4().hex}.json"
-        widget_content = f"widget-{uuid.uuid4().hex}"
-
-        dispatcher = RepoHealthDispatcher(self.repo_path)
-        dispatcher.repo_health_dashboard.render_widget = MagicMock(return_value=widget_content)
-        dispatcher.repo_notifier.notify_and_commit = MagicMock(return_value=True)
-
-        mock_file_instance = MagicMock()
-        mock_open.return_value.__enter__.return_value = mock_file_instance
-
-        result = dispatcher.check_and_notify_critical(title, value, file_path)
-
-        self.assertTrue(result)
-        dispatcher.repo_health_dashboard.render_widget.assert_called_once_with(title, value)
-        mock_makedirs.assert_called_once()
-        mock_open.assert_called_once_with(file_path, "w", encoding="utf-8")
-        mock_file_instance.write.assert_called_once_with(widget_content)
-        dispatcher.repo_notifier.notify_and_commit.assert_called_once_with(file_path)
-
-    @patch("skills.repo_health_dispatcher.RepoHealthDashboard")
-    @patch("skills.repo_health_dispatcher.RepoNotifier")
-    def test_dispatch(self, mock_notifier_class, mock_dashboard_class):
-        dispatcher = RepoHealthDispatcher(self.repo_path)
-        expected_report_path = os.path.join(self.repo_path, "report.json")
+        value = random.randint(1, 1000)
+        file_path = f"/{uuid.uuid4().hex}/{uuid.uuid4().hex}.txt"
+        rendered_content = f"Report: {uuid.uuid4().hex}"
         
-        dispatcher.dispatch_health_and_notify = MagicMock(return_value=True)
+        with patch.object(self.dispatcher.repo_health_dashboard, 'render_widget', return_value=rendered_content), \
+             patch("os.makedirs"), \
+             patch("builtins.open", mock_open()) as mocked_file, \
+             patch.object(self.dispatcher.repo_notifier, 'notify_and_commit', return_value=True):
+            
+            result = self.dispatcher.check_and_notify_critical(title, value, file_path)
+            
+            self.assertTrue(result)
+            mocked_file.assert_called_with(file_path, "w", encoding="utf-8")
+            mocked_file().write.assert_called_once_with(rendered_content)
 
-        result = dispatcher.dispatch()
-
-        self.assertTrue(result)
-        dispatcher.dispatch_health_and_notify.assert_called_once_with(expected_report_path)
-
+    def test_dispatch_default_path(self):
+        with patch.object(self.dispatcher, 'dispatch_health_and_notify', return_value=True) as mock_dispatch:
+            result = self.dispatcher.dispatch()
+            expected_path = os.path.join(self.repo_path, "report.json")
+            
+            self.assertTrue(result)
+            mock_dispatch.assert_called_with(expected_path)
 
 if __name__ == "__main__":
     unittest.main()

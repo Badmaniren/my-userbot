@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ctor (create) — раундов: 3
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: успешно прошёл тесты и влит в main
-
-## repo_health_predictor_pipeline (refactor) — раундов: 1
+line (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## repo_health_remediator (create) — раундов: 4
@@ -317,3 +313,7 @@ ctor (create) — раундов: 3
 ## repo_health_metric_validator (refactor) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_metric_validator (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: успешно прошёл тесты и влит в main

@@ -69,35 +69,38 @@ class RepoHealthMetricValidator:
         return response.json()
 
 
-def audit_repository(metrics_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Аудит репозитория, возвращает переданные метрики."""
-    return metrics_data
-
-
-def render_health_dashboard(metrics_data: Dict[str, Any]) -> str:
-    """Рендеринг дэшборда, возвращает строку-путь или описание."""
-    return "dashboard_output.html"
-
-
-def validate_repo_health_metrics(metrics_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Интеграционная обертка для валидации метрик для дашборда и аудитора."""
+def audit_repository(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Аудит репозитория с использованием переданных метрик."""
     validator = RepoHealthMetricValidator()
+    validator.validate(payload)
+    return payload
 
-    normalized_data = dict(metrics_data)
-    if "health_score" in normalized_data and "score" not in normalized_data:
-        normalized_data["score"] = normalized_data["health_score"]
-    if "run_id" in normalized_data and "metric_name" not in normalized_data:
-        normalized_data["metric_name"] = normalized_data["run_id"]
-    if "timestamp" not in normalized_data:
-        normalized_data["timestamp"] = 1600000000
 
+def render_health_dashboard(payload: Dict[str, Any]) -> str:
+    """Рендеринг дашборда здоровья на основе метрик."""
+    return f"Health Dashboard for {payload.get('metric_name', 'unknown')}: Score = {payload.get('score', 0)}"
+
+
+def validate_repo_health_metrics(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Нормализует и проверяет метрики здоровья репозитория из альтернативных форматов."""
+    metric_name = payload.get("run_id") or payload.get("metric_name", "default_metric")
+    score = payload.get("health_score", payload.get("score", 0.0))
+    timestamp = payload.get("timestamp", 1600000000)
+
+    normalized = {
+        "metric_name": metric_name,
+        "score": score,
+        "timestamp": timestamp
+    }
+
+    validator = RepoHealthMetricValidator()
     try:
-        validator.validate(normalized_data)
+        validator.validate(normalized)
         is_valid = True
     except MetricValidationError:
         is_valid = False
 
     return {
         "is_valid": is_valid,
-        "metrics": normalized_data
+        "metrics": normalized
     }

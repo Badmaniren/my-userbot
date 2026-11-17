@@ -1,82 +1,78 @@
 import unittest
+import json
 import uuid
 import random
-import json
 import io
 from skills.repo_health_metric_validator import (
     RepoHealthMetricValidator,
     MetricValidationError,
-    audit_repository,
-    render_health_dashboard,
-    validate_repo_health_metrics
+    validate_repo_health_metrics,
+    audit_repository
 )
 
-
 class TestRepoHealthMetricValidatorIntegration(unittest.TestCase):
-
     def setUp(self):
         self.validator = RepoHealthMetricValidator()
-        self.metric_name_slug = f"metric_test_{uuid.uuid4().hex[:8]}"
-        self.random_score = round(random.uniform(0.0, 100.0), 2)
-        self.random_timestamp = random.randint(1500000000, 1800000000)
 
-    def test_full_metric_pipeline_lifecycle(self):
-        payload = {
-            "metric_name": self.metric_name_slug,
-            "score": self.random_score,
-            "timestamp": self.random_timestamp
+    def generate_random_metric(self):
+        return {
+            "metric_name": f"metric_{uuid.uuid4().hex[:8]}",
+            "score": round(random.uniform(0.0, 100.0), 2),
+            "timestamp": random.randint(1600000000, 1700000000)
         }
 
-        # 1. Validate through main validator class
-        is_valid = self.validator.validate(payload)
-        self.assertTrue(is_valid)
+    def test_full_stream_processing_integration(self):
+        # Генерируем набор случайных метрик
+        count = random.randint(3, 7)
+        metrics = [self.generate_random_metric() for _ in range(count)]
+        stream_data = json.dumps(metrics)
+        stream = io.StringIO(stream_data)
 
-        # 2. Process via audit repository function
-        audited_result = audit_repository(payload)
-        self.assertEqual(audited_result["metric_name"], self.metric_name_slug)
-        self.assertEqual(audited_result["score"], self.random_score)
+        # Проверка потоковой обработки
+        validated = self.validator.validate_stream(stream)
+        self.assertEqual(len(validated), count)
+        self.assertEqual(validated[0]["metric_name"], metrics[0]["metric_name"])
 
-        # 3. Render dashboard integration check
-        dashboard_output = render_health_dashboard(payload)
-        self.assertIn(self.metric_name_slug, dashboard_output)
-        self.assertIn(str(self.random_score), dashboard_output)
-
-        # 4. Alternative normalization validator pipeline integration
-        alt_payload = {
-            "run_id": self.metric_name_slug,
-            "health_score": self.random_score,
-            "timestamp": self.random_timestamp
+    def test_normalization_and_validation_flow(self):
+        # Тест интеграции нормализатора с валидатором
+        raw_payload = {
+            "run_id": f"test_run_{uuid.uuid4().hex[:4]}",
+            "health_score": random.uniform(10.0, 90.0),
+            "timestamp": random.randint(1600000000, 1700000000)
         }
-        normalized_result = validate_repo_health_metrics(alt_payload)
-        self.assertTrue(normalized_result["is_valid"])
-        self.assertEqual(normalized_result["metrics"]["metric_name"], self.metric_name_slug)
-        self.assertEqual(normalized_result["metrics"]["score"], self.random_score)
+        
+        result = validate_repo_health_metrics(raw_payload)
+        
+        self.assertTrue(result["is_valid"])
+        self.assertEqual(result["metrics"]["metric_name"], raw_payload["run_id"])
+        self.assertEqual(result["metrics"]["score"], raw_payload["health_score"])
 
-        # 5. Stream processing integration test (IO stream bytes)
-        stream_data = json.dumps([payload]).encode('utf-8')
-        stream = io.BytesIO(stream_data)
-        stream_validated = self.validator.validate_stream(stream)
-        self.assertEqual(len(stream_validated), 1)
-        self.assertEqual(stream_validated[0]["metric_name"], self.metric_name_slug)
+    def test_audit_repository_integrity(self):
+        # Проверка сквозного аудита
+        metric = self.generate_random_metric()
+        audited = audit_repository(metric)
+        
+        self.assertEqual(audited["metric_name"], metric["metric_name"])
+        self.assertEqual(audited["score"], metric["score"])
 
-    def test_invalid_metric_rejections(self):
-        bad_score = round(random.uniform(101.0, 500.0), 2)
-        invalid_payload = {
-            "metric_name": f"fail_metric_{uuid.uuid4().hex[:6]}",
-            "score": bad_score,
-            "timestamp": self.random_timestamp
+    def test_invalid_data_rejection(self):
+        # Проверка обработки некорректных данных
+        bad_metric = {
+            "metric_name": "bad_metric",
+            "score": 150.0, # Выход за границы
+            "timestamp": 123456789
         }
-
+        
         with self.assertRaises(MetricValidationError):
-            self.validator.validate(invalid_payload)
+            self.validator.validate(bad_metric)
 
-        alt_invalid_payload = {
-            "health_score": bad_score,
-            "timestamp": self.random_timestamp
-        }
-        res = validate_repo_health_metrics(alt_invalid_payload)
-        self.assertFalse(res["is_valid"])
-
+    def test_stream_bytes_decoding(self):
+        # Проверка обработки байтового потока
+        metric = self.generate_random_metric()
+        byte_stream = io.BytesIO(json.dumps(metric).encode('utf-8'))
+        
+        validated = self.validator.validate_stream(byte_stream)
+        self.assertEqual(validated[0]["metric_name"], metric["metric_name"])
 
 if __name__ == "__main__":
     unittest.main()

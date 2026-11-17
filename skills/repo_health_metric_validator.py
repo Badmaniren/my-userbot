@@ -67,3 +67,40 @@ class RepoHealthMetricValidator:
         """Отправляет метрики на внешний шлюз и возвращает ответ."""
         response = requests.post(endpoint_url, json=payload)
         return response.json()
+
+
+def audit_repository(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Аудит репозитория с использованием переданных метрик."""
+    validator = RepoHealthMetricValidator()
+    validator.validate(payload)
+    return payload
+
+
+def render_health_dashboard(payload: Dict[str, Any]) -> str:
+    """Рендеринг дашборда здоровья на основе метрик."""
+    return f"Health Dashboard for {payload.get('metric_name', 'unknown')}: Score = {payload.get('score', 0)}"
+
+
+def validate_repo_health_metrics(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Нормализует и проверяет метрики здоровья репозитория из альтернативных форматов."""
+    metric_name = payload.get("run_id") or payload.get("metric_name", "default_metric")
+    score = payload.get("health_score", payload.get("score", 0.0))
+    timestamp = payload.get("timestamp", 1600000000)
+
+    normalized = {
+        "metric_name": metric_name,
+        "score": score,
+        "timestamp": timestamp
+    }
+
+    validator = RepoHealthMetricValidator()
+    try:
+        validator.validate(normalized)
+        is_valid = True
+    except MetricValidationError:
+        is_valid = False
+
+    return {
+        "is_valid": is_valid,
+        "metrics": normalized
+    }

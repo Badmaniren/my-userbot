@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-4)
-- Последняя ошибка перед фиксом: FAILED (errors=3)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## repo_health_incident_tracker (refactor) — раундов: 3
+дов: 3
 - Последняя ошибка перед фиксом: FAILED (errors=3)
 - Статус: успешно прошёл тесты и влит в main
 
@@ -345,4 +341,8 @@
 ## repo_health_collector (refactor) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: unterminated triple-quoted string literal (detected at line 6) (<unknown>, line 6); Синтаксическая ошибка в коде: unterminated triple-quoted string literal (detected at line 6) (<unknown>, line 6)
 - Последняя ошибка перед фиксом: FAILED (errors=2)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_dispatcher (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

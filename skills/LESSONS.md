@@ -3,12 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-line 6); Синтаксическая ошибка в коде: expected 'except' or 'finally' block (<unknown>, line 38)
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## repo_health_automator (refactor) — раундов: 4
-- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 21); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 24)
+4)
 - Последняя ошибка перед фиксом: FAILED (errors=3)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -345,4 +340,9 @@ line 6); Синтаксическая ошибка в коде: expected 'except
 
 ## repo_health_webhook_bridge (create) — раундов: 4
 - Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_collector (refactor) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: unterminated triple-quoted string literal (detected at line 6) (<unknown>, line 6); Синтаксическая ошибка в коде: unterminated triple-quoted string literal (detected at line 6) (<unknown>, line 6)
+- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

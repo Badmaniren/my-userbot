@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-лит в main
-
-## repo_health_benchmark_analyzer (create) — раундов: 3
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: успешно прошёл тесты и влит в main
+т в main
 
 ## repo_health_dispatcher (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1)
@@ -312,3 +308,7 @@
 
 ## repo_health_metric_validator (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## repo_health_metric_validator (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

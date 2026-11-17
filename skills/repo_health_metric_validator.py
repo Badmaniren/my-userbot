@@ -72,16 +72,18 @@ def render_health_dashboard(metric: Dict[str, Any]) -> str:
 
 
 def validate_repo_health_metrics(payload: Dict[str, Any]) -> Dict[str, Any]:
-    if "run_id" in payload and "metric_name" not in payload:
-        payload = payload.copy()
-        payload["metric_name"] = payload["run_id"]
-    if "health_score" in payload and "score" not in payload:
-        payload = payload.copy()
-        payload["score"] = payload["health_score"]
+    if not isinstance(payload, dict):
+        return {"is_valid": False, "metrics": payload}
+        
+    working_payload = payload.copy()
+    if "run_id" in working_payload and "metric_name" not in working_payload:
+        working_payload["metric_name"] = working_payload["run_id"]
+    if "health_score" in working_payload and "score" not in working_payload:
+        working_payload["score"] = working_payload["health_score"]
 
     validator = RepoHealthMetricValidator()
     try:
-        validator.validate(payload)
-        return {"is_valid": True, "metrics": payload}
+        validator.validate(working_payload)
+        return {"is_valid": True, "metrics": working_payload}
     except MetricValidationError:
         return {"is_valid": False, "metrics": payload}

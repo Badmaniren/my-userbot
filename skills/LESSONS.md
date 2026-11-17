@@ -3,15 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-ибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.; Синтаксическая ошибка в коде: expected '(' (<unknown>, line 12)
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## repo_health_threshold_monitor (create) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=2)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## repo_health_threshold_monitor (create) — раундов: 4
+repo_health_threshold_monitor (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -315,4 +307,9 @@
 
 ## repo_health_analytics_reporter (create) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
+
+## repo_health_analytics_aggregator (create) — раундов: 4
+- Античит поймал: Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 1); Синтаксическая ошибка в коде: unterminated string literal (detected at line 13) (<unknown>, line 13)
+- Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.18/x64/lib/python3.11/unittest/mock.py", line 1446, in __enter__
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию

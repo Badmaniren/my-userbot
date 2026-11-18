@@ -6,9 +6,9 @@ import logging
 if not logging.getLogger("repo_logger").handlers:
     logging.getLogger("repo_logger").addHandler(logging.NullHandler())
 
-import vulnerability_analyzer
-import dependency_updater_pipeline
-import repo_reporter
+import skills.vulnerability_analyzer as vulnerability_analyzer
+import skills.dependency_updater_pipeline as dependency_updater_pipeline
+import skills.repo_reporter as repo_reporter
 
 
 def start_new(repo_path=None, branch=None, stream_source=None):
@@ -56,9 +56,14 @@ def aggregate_dependencies(repo_path, output_report_name=None, cve_identifier=No
     req_file = os.path.join(repo_path, "requirements.txt")
     if os.path.exists(req_file):
         with open(req_file, "r", encoding="utf-8") as f:
-            line = f.readline().strip()
-            if "==" in line:
-                pkg_name = line.split("==")[0]
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    if "==" in line:
+                        pkg_name = line.split("==")[0].strip()
+                    else:
+                        pkg_name = line.split()[0].strip()
+                    break
 
     report_data = {
         "package": pkg_name,

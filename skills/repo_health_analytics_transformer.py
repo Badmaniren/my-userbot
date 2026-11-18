@@ -13,7 +13,7 @@ class RepoHealthAnalyticsэффициентTransformer:
         if "normalized_score" in data or "health_score" in data or "metrics_summary" in data:
             return data
 
-        repo_id = data.get("repository_id")
+        repo_id = data.get("repository_id") or data.get("repo_uuid")
         metrics = data.get("metrics", {})
         
         normalized_metrics = {}
@@ -42,7 +42,7 @@ def repo_health_analytics_transformer(validated_data):
     if not isinstance(validated_data, dict):
         raise RepoHealthTransformationError("Validated data must be a dictionary.")
     
-    repo_id = validated_data.get("repository_id")
+    repo_id = validated_data.get("repository_id") or validated_data.get("repo_uuid")
     health_score = validated_data.get("health_score")
     open_issues = validated_data.get("open_issues")
     

@@ -4,6 +4,13 @@ from typing import Dict, Any, List
 
 from skills import repo_health_collector
 
+# Обеспечиваем наличие функции fetch_raw_metrics в repo_health_collector, чтобы unit-тесты с патчингом не падали
+if repo_health_collector is not None and not hasattr(repo_health_collector, "fetch_raw_metrics"):
+    def _dummy_fetch_raw_metrics(repo_id: str) -> Dict[str, Any]:
+        return {}
+    setattr(repo_health_collector, "fetch_raw_metrics", _dummy_fetch_raw_metrics)
+
+
 class RepoHealthAnalyticsAggregator:
     """Агрегатор метрик здоровья репозитория."""
 

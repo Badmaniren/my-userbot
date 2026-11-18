@@ -2,13 +2,7 @@ import json
 import datetime
 from typing import Dict, Any, List
 
-try:
-    from skills import repo_health_collector
-except ImportError:
-    repo_health_collector = None
-
-if repo_health_collector is not None and not hasattr(repo_health_collector, "fetch_raw_metrics"):
-    setattr(repo_health_collector, "fetch_raw_metrics", lambda repo_id: {})
+from skills import repo_health_collector
 
 class RepoHealthAnalyticsAggregator:
     """Агрегатор метрик здоровья репозитория."""

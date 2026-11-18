@@ -82,3 +82,12 @@ def aggregate_repo_health_analytics(raw_data: Dict[str, Any]) -> Dict[str, Any]:
 
     report_data["report_file_path"] = report_path
     return report_data
+
+
+def collect_repo_health(repo_id: str, commit_count: int = 0, open_issues: int = 0, vulnerabilities: int = 0) -> Dict[str, Any]:
+    return {
+        "repo_id": repo_id,
+        "commit_count": commit_count,
+        "open_issues": open_issues,
+        "vulnerabilities": vulnerabilities
+    }

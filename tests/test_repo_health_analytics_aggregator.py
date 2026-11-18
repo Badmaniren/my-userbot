@@ -1,168 +1,181 @@
 import unittest
-from unittest.mock import patch, mock_open
-import uuid
-import random
+from unittest.mock import patch
 import json
+import datetime
 import io
 import os
-
+import random
+import uuid
 from skills.repo_health_analytics_aggregator import (
     RepoHealthAnalyticsAggregator,
     aggregate_repo_health_analytics,
     collect_repo_health
 )
 
-
 class TestRepoHealthAnalyticsAggregator(unittest.TestCase):
 
-    def test_aggregate_success(self):
-        r_id = str(uuid.uuid4())
-        r_commits = random.randint(10, 500)
-        r_issues = random.randint(0, 10)
-        r_vuln = random.randint(0, 3)
-        r_status = random.choice(["active", "stable", "degraded"])
+    def setUp(self):
+        self.aggregator = RepoHealthAnalyticsAggregator()
+        self.random_repo_id = f"repo_{uuid.uuid4().hex[:8]}"
+        self.random_file_path = f"stream_{uuid.uuid4().hex[:8]}.json"
 
-        mock_raw = {
-            "repo_id": r_id,
-            "commits": r_commits,
-            "issues": r_issues,
-            "vulnerabilities": r_vuln,
-            "status": r_status
-        }
-
-        with patch("skills.repo_health_collector.fetch_raw_metrics", return_value=mock_raw) as mocked_fetch:
-            aggregator = RepoHealthAnalyticsAggregator()
-            result = aggregator.aggregate(r_id)
-
-            mocked_fetch.assert_called_once_with(r_id)
-            self.assertEqual(result["repo_id"], r_id)
-            self.assertEqual(result["metrics"]["commits"], r_commits)
-            self.assertEqual(result["metrics"]["issues"], r_issues)
-            self.assertEqual(result["metrics"]["vulnerabilities"], r_vuln)
-            self.assertEqual(result["metrics"]["status"], r_status)
-            self.assertIn("aggregated_at", result)
-
-    def test_aggregate_from_stream(self):
-        r_id = str(uuid.uuid4())
-        r_val = random.randint(100, 999)
-        payload = {
-            "repo_id": r_id,
-            "random_metric": r_val
-        }
-        json_data = json.dumps(payload).encode('utf-8')
-        mock_file_path = f"{uuid.uuid4().hex}.json"
-
-        with patch("builtins.open", mock_open(read_data=json_data)) as mocked_file:
-            aggregator = RepoHealthAnalyticsAggregator()
-            result = aggregator.aggregate_from_stream(mock_file_path)
-
-            mocked_file.assert_called_once_with(mock_file_path, 'rb')
-            self.assertEqual(result["repo_id"], r_id)
-            self.assertEqual(result["random_metric"], r_val)
-
-    def test_calculate_health_score(self):
-        aggregator = RepoHealthAnalyticsAggregator()
+    def tearDown(self):
+        if os.path.exists(self.random_file_path):
+            try:
+                os.remove(self.random_file_path)
+            except OSError:
+                pass
         
-        c = random.randint(0, 50)
-        i = random.randint(0, 2)
-        v = random.randint(0, 1)
+        report_path = f"report_{self.random_repo_id}.json"
+        if os.path.exists(report_path):
+            try:
+                os.remove(report_path)
+            except OSError:
+                pass
 
-        metrics = {
-            "commits": c,
-            "issues": i,
-            "vulnerabilities": v
-        }
-
-        expected = 100.0 - (i * 2.0) - (v * 10.0) + (min(c, 100) * 0.1)
-        score = aggregator._calculate_health_score(metrics)
-        self.assertAlmostEqual(score, expected)
-
-    def test_calculate_health_score_bounds(self):
-        aggregator = RepoHealthAnalyticsAggregator()
-
-        metrics_min = {
-            "commits": 0,
-            "issues": 100,
-            "vulnerabilities": 100
-        }
-        self.assertEqual(aggregator._calculate_health_score(metrics_min), 0.0)
-
-        metrics_max = {
-            "commits": 5000,
-            "issues": 0,
-            "vulnerabilities": 0
-        }
-        self.assertEqual(aggregator._calculate_health_score(metrics_max), 100.0)
-
-    def test_aggregate_batch(self):
-        repo_ids = [str(uuid.uuid4()), str(uuid.uuid4())]
-        r_commits = random.randint(5, 50)
-        r_issues = random.randint(1, 5)
-        r_vuln = random.randint(0, 2)
-
-        mock_raw = {
-            "commits": r_commits,
-            "issues": r_issues,
-            "vulnerabilities": r_vuln
-        }
-
-        with patch("skills.repo_health_collector.fetch_raw_metrics", return_value=mock_raw) as mocked_fetch:
-            aggregator = RepoHealthAnalyticsAggregator()
-            results = aggregator.aggregate_batch(repo_ids)
-
-            self.assertEqual(len(results), 2)
-            for idx, rid in enumerate(repo_ids):
-                self.assertEqual(results[idx]["repo_id"], rid)
-                self.assertEqual(results[idx]["metrics"]["commits"], r_commits)
-                self.assertEqual(results[idx]["metrics"]["issues"], r_issues)
-                self.assertEqual(results[idx]["metrics"]["vulnerabilities"], r_vuln)
-            
-            self.assertEqual(mocked_fetch.call_count, 2)
-
-    def test_aggregate_repo_health_analytics(self):
-        r_id = str(uuid.uuid4())
-        commits = random.randint(10, 100)
-        issues = random.randint(0, 5)
-        vulnerabilities = random.randint(0, 2)
+    def test_aggregate_success(self):
+        mock_commits = random.randint(10, 500)
+        mock_issues = random.randint(0, 10)
+        mock_vulnerabilities = random.randint(0, 5)
+        mock_status = random.choice(["healthy", "warning", "critical"])
 
         raw_data = {
-            "repo_id": r_id,
-            "commit_count": commits,
-            "open_issues": issues,
+            "repo_id": self.random_repo_id,
+            "commits": mock_commits,
+            "issues": mock_issues,
+            "vulnerabilities": mock_vulnerabilities,
+            "status": mock_status
+        }
+
+        with patch("skills.repo_health_collector.fetch_raw_metrics", return_value=raw_data) as mock_fetch:
+            result = self.aggregator.aggregate(self.random_repo_id)
+            mock_fetch.assert_called_once_with(self.random_repo_id)
+
+        self.assertEqual(result["repo_id"], self.random_repo_id)
+        self.assertEqual(result["metrics"]["commits"], mock_commits)
+        self.assertEqual(result["metrics"]["issues"], mock_issues)
+        self.assertEqual(result["metrics"]["vulnerabilities"], mock_vulnerabilities)
+        self.assertEqual(result["metrics"]["status"], mock_status)
+        self.assertIn("aggregated_at", result)
+
+    def test_aggregate_from_stream_success(self):
+        nested_data = {
+            "stream_id": uuid.uuid4().hex,
+            "repo_id": self.random_repo_id,
+            "payload": {
+                "metrics": {
+                    "commits": random.randint(1, 100)
+                }
+            }
+        }
+        json_bytes = json.dumps(nested_data).encode("utf-8")
+
+        with patch("builtins.open", return_value=io.BytesIO(json_bytes)) as mock_open:
+            result = self.aggregator.aggregate_from_stream(self.random_file_path)
+            mock_open.assert_called_once_with(self.random_file_path, 'rb')
+
+        self.assertEqual(result["repo_id"], self.random_repo_id)
+        self.assertEqual(result["payload"]["metrics"]["commits"], nested_data["payload"]["metrics"]["commits"])
+
+    def test_calculate_health_score_logic(self):
+        commits = random.randint(50, 150)
+        issues = random.randint(1, 5)
+        vulnerabilities = random.randint(0, 2)
+
+        metrics = {
+            "commits": commits,
+            "issues": issues,
             "vulnerabilities": vulnerabilities
         }
 
-        m_open = mock_open()
-        with patch("builtins.open", m_open):
-            with patch("json.dump") as mocked_json_dump:
-                result = aggregate_repo_health_analytics(raw_data)
+        expected_score = 100.0 - (issues * 2.0) - (vulnerabilities * 10.0) + (min(commits, 100) * 0.1)
+        score = self.aggregator._calculate_health_score(metrics)
+        self.assertAlmostEqual(score, expected_score)
 
-                self.assertEqual(result["repo_id"], r_id)
-                self.assertEqual(result["metrics_summary"]["commit_count"], commits)
-                self.assertEqual(result["metrics_summary"]["open_issues"], issues)
-                self.assertEqual(result["metrics_summary"]["vulnerabilities"], vulnerabilities)
-                self.assertIn("report_file_path", result)
-                m_open.assert_called_once_with(f"report_{r_id}.json", "w", encoding="utf-8")
-                mocked_json_dump.assert_called_once()
+    def test_calculate_health_score_bounds_min(self):
+        metrics = {
+            "commits": 0,
+            "issues": 100,
+            "vulnerabilities": 50
+        }
+        score = self.aggregator._calculate_health_score(metrics)
+        self.assertEqual(score, 0.0)
 
-    def test_collect_repo_health(self):
-        r_id = str(uuid.uuid4())
-        commits = random.randint(1, 100)
-        issues = random.randint(0, 10)
-        vulnerabilities = random.randint(0, 5)
+    def test_calculate_health_score_bounds_max(self):
+        metrics = {
+            "commits": 1000,
+            "issues": 0,
+            "vulnerabilities": 0
+        }
+        score = self.aggregator._calculate_health_score(metrics)
+        self.assertEqual(score, 100.0)
 
-        res = collect_repo_health(
-            repo_id=r_id,
-            commit_count=commits,
-            open_issues=issues,
+    def test_aggregate_batch_success(self):
+        repo_ids = [f"repo_{uuid.uuid4().hex[:6]}" for _ in range(3)]
+        mock_return_values = {}
+        for rid in repo_ids:
+            mock_return_values[rid] = {
+                "repo_id": rid,
+                "commits": random.randint(1, 50),
+                "issues": random.randint(0, 5),
+                "vulnerabilities": 0
+            }
+
+        def side_effect(r_id):
+            return mock_return_values.get(r_id, {})
+
+        with patch("skills.repo_health_collector.fetch_raw_metrics", side_effect=side_effect) as mock_fetch:
+            results = self.aggregator.aggregate_batch(repo_ids)
+            self.assertEqual(mock_fetch.call_count, len(repo_ids))
+
+        self.assertEqual(len(results), len(repo_ids))
+        for res in results:
+            rid = res["repo_id"]
+            self.assertIn(rid, repo_ids)
+            self.assertEqual(res["metrics"]["commits"], mock_return_values[rid]["commits"])
+
+    def test_aggregate_repo_health_analytics_writes_file(self):
+        commit_count = random.randint(10, 200)
+        open_issues = random.randint(0, 5)
+        vulnerabilities = random.randint(0, 3)
+
+        raw_data = {
+            "repo_id": self.random_repo_id,
+            "commit_count": commit_count,
+            "open_issues": open_issues,
+            "vulnerabilities": vulnerabilities
+        }
+
+        result = aggregate_repo_health_analytics(raw_data)
+
+        self.assertEqual(result["repo_id"], self.random_repo_id)
+        self.assertIn("report_file_path", result)
+        self.assertTrue(os.path.exists(result["report_file_path"]))
+
+        with open(result["report_file_path"], "r", encoding="utf-8") as f:
+            file_content = json.load(f)
+
+        self.assertEqual(file_content["repo_id"], self.random_repo_id)
+        self.assertEqual(file_content["metrics_summary"]["commit_count"], commit_count)
+        self.assertEqual(file_content["metrics_summary"]["open_issues"], open_issues)
+        self.assertEqual(file_content["metrics_summary"]["vulnerabilities"], vulnerabilities)
+
+    def test_collect_repo_health_structure(self):
+        commit_count = random.randint(5, 50)
+        open_issues = random.randint(0, 3)
+        vulnerabilities = random.randint(0, 1)
+
+        data = collect_repo_health(
+            repo_id=self.random_repo_id,
+            commit_count=commit_count,
+            open_issues=open_issues,
             vulnerabilities=vulnerabilities
         )
 
-        self.assertEqual(res["repo_id"], r_id)
-        self.assertEqual(res["commit_count"], commits)
-        self.assertEqual(res["open_issues"], issues)
-        self.assertEqual(res["vulnerabilities"], vulnerabilities)
+        self.assertEqual(data["repo_id"], self.random_repo_id)
+        self.assertEqual(data["commit_count"], commit_count)
+        self.assertEqual(data["open_issues"], open_issues)
+        self.assertEqual(data["vulnerabilities"], vulnerabilities)
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

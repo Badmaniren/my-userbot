@@ -2,80 +2,48 @@ import unittest
 import os
 import uuid
 import random
-import json
-from skills.repo_health_analytics_aggregator import (
-    RepoHealthAnalyticsAggregator,
-    aggregate_repo_health_analytics,
-    collect_repo_health
-)
 from skills import repo_health_collector
+from skills import repo_health_analytics_aggregator
 
 class TestRepoHealthAnalyticsAggregatorIntegration(unittest.TestCase):
+    def test_end_to_end_analytics_pipeline(self):
+        random_repo_id = f"repo-{uuid.uuid4()}"
+        random_commits = random.randint(10, 500)
+        random_issues = random.randint(0, 15)
+        random_vulns = random.randint(0, 5)
 
-    def setUp(self):
-        self.aggregator = RepoHealthAnalyticsAggregator()
-        self.test_repo_id = f"repo-{uuid.uuid4()}"
-        self.test_commits = random.randint(10, 500)
-        self.test_issues = random.randint(0, 15)
-        self.test_vulnerabilities = random.randint(0, 5)
-        self.report_file = f"report_{self.test_repo_id}.json"
-
-    def tearDown(self):
-        if os.path.exists(self.report_file):
-            try:
-                os.remove(self.report_file)
-            except OSError:
-                pass
-
-    def test_end_to_end_aggregation_and_file_creation(self):
-        raw_data = collect_repo_health(
-            repo_id=self.test_repo_id,
-            commit_count=self.test_commits,
-            open_issues=self.test_issues,
-            vulnerabilities=self.test_vulnerabilities
+        raw_data = repo_health_collector.collect_repo_health(
+            repo_id=random_repo_id,
+            commit_count=random_commits,
+            open_issues=random_issues,
+            vulnerabilities=random_vulns
         )
 
-        result = aggregate_repo_health_analytics(raw_data)
+        self.assertEqual(raw_data["repo_id"], random_repo_id)
+        self.assertEqual(raw_data["commit_count"], random_commits)
 
-        self.assertEqual(result.get("repo_id"), self.test_repo_id)
-        self.assertIn("aggregated_score", result)
-        self.assertTrue(os.path.exists(result.get("report_file_path", self.report_file)))
+        report_data = repo_health_analytics_aggregator.aggregate_repo_health_analytics(raw_data)
 
-        with open(result.get("report_file_path", self.report_file), "r", encoding="utf-8") as f:
-            file_content = json.load(f)
+        self.assertEqual(report_data["repo_id"], random_repo_id)
+        self.assertEqual(report_data["metrics_summary"]["commit_count"], random_commits)
+        self.assertEqual(report_data["metrics_summary"]["open_issues"], random_issues)
+        self.assertEqual(report_data["metrics_summary"]["vulnerabilities"], random_vulns)
 
-        self.assertEqual(file_content.get("repo_id"), self.test_repo_id)
-        self.assertEqual(file_content["metrics_summary"]["commit_count"], self.test_commits)
-        self.assertEqual(file_content["metrics_summary"]["open_issues"], self.test_issues)
-        self.assertEqual(file_content["metrics_summary"]["vulnerabilities"], self.test_vulnerabilities)
+        expected_score = 100.0 - (random_issues * 2.0) - (random_vulns * 10.0)
+        if expected_score < 0.0:
+            expected_score = 0.0
+        self.assertEqual(report_data["aggregated_score"], expected_score)
 
-    def test_aggregator_class_flow_without_mocks(self):
-        if hasattr(repo_health_collector, "fetch_raw_metrics"):
-            try:
-                result = self.aggregator.aggregate(self.test_repo_id)
-                self.assertIsInstance(result, dict)
-                self.assertIn("repo_id", result)
-                self.assertIn("metrics", result)
-            except Exception:
-                pass
+        report_file_path = report_data.get("report_file_path")
+        self.assertTrue(os.path.exists(report_file_path))
 
-        batch_ids = [f"repo-{uuid.uuid4()}" for _ in range(3)]
-        if hasattr(repo_health_collector, "fetch_raw_metrics"):
-            try:
-                batch_results = self.aggregator.aggregate_batch(batch_ids)
-                self.assertEqual(len(batch_results), 3)
-            except Exception:
-                pass
+        aggregator = repo_health_analytics_aggregator.RepoHealthAnalyticsAggregator()
+        stream_data = aggregator.aggregate_from_stream(report_file_path)
+        self.assertEqual(stream_data["repo_id"], random_repo_id)
+        self.assertEqual(stream_data["aggregated_score"], expected_score)
 
-        metrics_sample = {
-            "commits": self.test_commits,
-            "issues": self.test_issues,
-            "vulnerabilities": self.test_vulnerabilities
-        }
-        score = self.aggregator._calculate_health_score(metrics_sample)
-        self.assertIsInstance(score, float)
-        self.assertGreaterEqual(score, 0.0)
-        self.assertLessEqual(score, 100.0)
+        if os.path.exists(report_file_path):
+            os.remove(report_file_path)
 
 if __name__ == "__main__":
     unittest.main()

@@ -49,7 +49,6 @@ class RepoHealthAnalyticsAggregator:
             data = json.load(f)
         
         repo_id = data.get("repo_id", "")
-        # Если это поток/файл, который содержит собранные метрики или исходные данные
         return self.aggregate(repo_id) if repo_id else {"repo_id": "", "metrics": {}, "aggregated_at": datetime.datetime.utcnow().isoformat()}
 
     def _calculate_health_score(self, metrics: Dict[str, Any]) -> float:
@@ -57,7 +56,6 @@ class RepoHealthAnalyticsAggregator:
         issues = metrics.get("issues", 0)
         vulnerabilities = metrics.get("vulnerabilities", 0)
 
-        # Логика расчета счета здоровья репозитория
         score = 100.0 - (issues * 2.0) - (vulnerabilities * 10.0)
         if score < 0.0:
             score = 0.0

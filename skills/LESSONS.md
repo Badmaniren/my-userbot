@@ -3,10 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-
-
-## repo_health_alert_channel (start_new) — раундов: 4
-- Античит поймал: АНТИЧИТ: Запрещено молча глушить ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.; Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 4)
+ ошибки через `except Exception: pass/continue`! Обработай ошибку осмысленно или пробрось наружу через raise.; Синтаксическая ошибка в коде: invalid syntax (<unknown>, line 4)
 - Последняя ошибка перед фиксом: FAILED (errors=1)
 - Статус: ПРОВАЛЕН Унгой, передан на эскалацию
 
@@ -315,4 +312,7 @@
 ## repo_health_analytics_aggregator (refactor) — раундов: 3
 - Античит поймал: Синтаксическая ошибка в коде: expected ':' (<unknown>, line 20)
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## repo_health_analytics_aggregator (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

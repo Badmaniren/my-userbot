@@ -1,5 +1,4 @@
 import json
-from skills.repo_health_metric_validator import repo_health_metric_validator
 
 class RepoHealthTransformationError(Exception):
     """Исключение при ошибке трансформации метрик здоровья репозитория."""

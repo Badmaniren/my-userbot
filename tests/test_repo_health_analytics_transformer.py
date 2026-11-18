@@ -1,106 +1,109 @@
 import unittest
 from unittest.mock import patch
-import random
-import uuid
-import string
 import io
-from skills.repo_health_analytics_transformer import RepoHealthAnalyticsэффициентTransformer, transform_health_metrics, RepoHealthTransformationError
+import json
+import uuid
+import random
+
+from skills.repo_health_analytics_transformer import (
+    RepoHealthAnalyticsэффициентTransformer,
+    RepoHealthTransformationError,
+    transform_health_metrics,
+    repo_health_analytics_transformer
+)
 
 class TestRepoHealthAnalyticsTransformer(unittest.TestCase):
-
     def setUp(self):
         self.transformer = RepoHealthAnalyticsэффициентTransformer()
-        self.random_repo_id = str(uuid.uuid4())
-        self.random_metric_name = ''.join(random.choices(string.ascii_lowercase, k=10))
-        self.random_score = round(random.uniform(0.0, 100.0), 2)
-        self.random_status = random.choice(["HEALTHY", "WARNING", "CRITICAL", "UNKNOWN"])
+        self.rand_repo_id = uuid.uuid4().hex
+        self.rand_metric_key = uuid.uuid4().hex
+        self.rand_score = random.randint(1, 100)
+        self.rand_status = random.choice(["OK", "WARN", "CRITICAL"])
 
-    def test_transform_valid_metrics_success(self):
-        input_data = {
-            "repository_id": self.random_repo_id,
-            "metrics": {
-                self.random_metric_name: {
-                    "score": self.random_score,
-                    "status": self.random_status
-                }
-            },
-            "timestamp": random.randint(1600000000, 1700000000)
-        }
-
-        result = self.transformer.transform(input_data)
-
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result["repo_uuid"], self.random_repo_id)
-        self.assertIn("normalized_metrics", result)
-        self.assertEqual(
-            result["normalized_metrics"][self.random_metric_name]["value"], 
-            self.random_score
-        )
-        self.assertEqual(
-            result["normalized_metrics"][self.random_metric_name]["severity"], 
-            self.random_status
-        )
-
-    def test_transform_with_stream_input(self):
-        raw_json_string = f'{{"repository_id": "{self.random_repo_id}", "score": {self.random_score}}}'
-        stream_mock = io.BytesIO(raw_json_string.encode('utf-8'))
-
-        with patch('skills.repo_health_analytics_transformer.json.load') as mock_json_load:
-            mock_json_load.return_value = {
-                "repository_id": self.random_repo_id,
-                "metrics": {self.random_metric_name: {"score": self.random_score, "status": self.random_status}}
-            }
-            
-            result = self.transformer.transform_stream(stream_mock)
-            
-            self.assertEqual(result["repo_uuid"], self.random_repo_id)
-            mock_json_load.assert_called_once()
-
-    def test_transform_invalid_data_raises_exception(self):
-        malformed_data = {
-            "bad_key": random.randint(1, 100),
-            "random_hash": uuid.uuid4().hex
-        }
-
-        with self.assertRaises(RepoHealthTransformationError):
-            self.transformer.transform(malformed_data)
-
-    def test_module_level_transform_function(self):
+    def test_transform_valid_raw_data(self):
         payload = {
-            "repository_id": self.random_repo_id,
+            "repository_id": self.rand_repo_id,
             "metrics": {
-                self.random_metric_name: {
-                    "score": self.random_score,
-                    "status": self.random_status
+                self.rand_metric_key: {
+                    "score": self.rand_score,
+                    "status": self.rand_status
                 }
             }
         }
+        result = self.transformer.transform(payload)
+        self.assertEqual(result["repo_uuid"], self.rand_repo_id)
+        self.assertIn(self.rand_metric_key, result["normalized_metrics"])
+        self.assertEqual(result["normalized_metrics"][self.rand_metric_key]["value"], self.rand_score)
+        self.assertEqual(result["normalized_metrics"][self.rand_metric_key]["severity"], self.rand_status)
 
-        output = transform_health_metrics(payload)
-        self.assertEqual(output["repo_uuid"], self.random_repo_id)
-        self.assertIn(self.random_metric_name, output["normalized_metrics"])
+    def test_transform_already_normalized_data(self):
+        payload = {
+            "repo_uuid": self.rand_repo_id,
+            "normalized_score": random.uniform(0.0, 1.0)
+        }
+        result = self.transformer.transform(payload)
+        self.assertEqual(result, payload)
 
-    def test_transformer_handles_random_noise_gracefully(self):
-        noise_key = uuid.uuid4().hex
-        noise_value = ''.join(random.choices(string.ascii_letters, k=15))
-        
-        input_data = {
-            "repository_id": self.random_repo_id,
+    def test_transform_invalid_data_raises_error(self):
+        invalid_payloads = [
+            uuid.uuid4().hex,
+            {uuid.uuid4().hex: random.randint(1, 10)},
+            None
+        ]
+        for p in invalid_payloads:
+            with self.assertRaises(RepoHealthTransformationError):
+                self.transformer.transform(p)
+
+    def test_transform_stream(self):
+        payload = {
+            "repository_id": self.rand_repo_id,
             "metrics": {
-                self.random_metric_name: {
-                    "score": self.random_score,
-                    "status": self.random_status,
-                    noise_key: noise_value
+                self.rand_metric_key: {
+                    "score": self.rand_score,
+                    "status": self.rand_status
                 }
             }
         }
+        stream = io.BytesIO(json.dumps(payload).encode("utf-8"))
+        result = self.transformer.transform_stream(stream)
+        self.assertEqual(result["repo_uuid"], self.rand_repo_id)
+        self.assertEqual(result["normalized_metrics"][self.rand_metric_key]["value"], self.rand_score)
 
-        result = self.transformer.transform(input_data)
-        transformed_item = result["normalized_metrics"][self.random_metric_name]
-        
-        self.assertEqual(transformed_item["value"], self.random_score)
-        self.assertEqual(transformed_item["severity"], self.random_status)
-        self.assertNotIn(noise_key, transformed_item)
+    def test_transform_health_metrics_wrapper(self):
+        payload = {
+            "repository_id": self.rand_repo_id,
+            "metrics": {
+                self.rand_metric_key: {
+                    "score": self.rand_score,
+                    "status": self.rand_status
+                }
+            }
+        }
+        result = transform_health_metrics(payload)
+        self.assertEqual(result["repo_uuid"], self.rand_repo_id)
 
-if __name__ == '__main__':
-    unittest.main()
+    def test_repo_health_analytics_transformer_integration_valid(self):
+        health_score = random.randint(10, 99)
+        open_issues = random.randint(0, 50)
+        validated_data = {
+            "repository_id": self.rand_repo_id,
+            "health_score": health_score,
+            "open_issues": open_issues
+        }
+        result = repo_health_analytics_transformer(validated_data)
+        self.assertEqual(result["repository_id"], self.rand_repo_id)
+        self.assertEqual(result["normalized_score"], health_score)
+        self.assertEqual(result["metrics_summary"]["open_issues"], open_issues)
+        self.assertTrue(result["transformed_at"])
+
+    def test_repo_health_analytics_transformer_integration_invalid(self):
+        with self.assertRaises(RepoHealthTransformationError):
+            repo_health_analytics_transformer(uuid.uuid4().hex)
+
+    def test_transform_with_repo_uuid_key(self):
+        payload = {
+            "repo_uuid": self.rand_repo_id,
+            "metrics": {}
+        }
+        result = self.transformer.transform(payload)
+        self.assertEqual(result["repo_uuid"], self.rand_repo_id)

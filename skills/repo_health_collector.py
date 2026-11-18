@@ -1,5 +1,6 @@
 import os
 import json
+from skills.repo_logger import RepoLogger
 
 class RepoHealthError(Exception):
     """Кастомное исключение для ошибок сбора метрик здоровья репозитория."""
@@ -9,7 +10,7 @@ class RepoHealthCollector:
     """Класс для сбора агрегированных метрик здоровья репозитория."""
     
     def __init__(self):
-        pass
+        self.logger = RepoLogger()
 
     def collect_metrics(self, repo_path: str, session_id: str = None, expected_threshold: int = None) -> dict:
         """Собирает метрики здоровья репозитория, анализируя лог-файлы и используя аудитора."""

@@ -2,6 +2,9 @@ import io
 import json
 import os
 
+from skills.repo_health_collector import collect_repo_health_metrics
+from skills.repo_health_trend_calculator import calculate_repo_health_trends
+
 class RepoHealthAnalyticsReporter:
     def generate_report(self, data: dict) -> dict:
         if not isinstance(data, dict):

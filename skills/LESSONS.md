@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-alth_predictor_pipeline (refactor) — раундов: 4
-- Последняя ошибка перед фиксом: FAILED (errors=1)
-- Статус: ПРОВАЛЕН Унгой, передан на эскалацию
-
-## repo_health_predictor_pipeline (refactor) — раундов: 1
+_predictor_pipeline (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## repo_health_dispatcher (refactor) — раундов: 4
@@ -316,3 +312,7 @@ alth_predictor_pipeline (refactor) — раундов: 4
 
 ## repo_health_analytics_aggregator (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
+
+## repo_health_analytics_aggregator (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1)
+- Статус: ПРОВАЛЕН Унгой, передан на эскалацию

@@ -3,11 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-alth_anomaly_inspector (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## repo_health_anomaly_inspector (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
+тус: успешно прошёл тесты и влит в main
 
 ## repo_health_anomaly_inspector (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: File "/opt/hostedtoolcache/Python/3.11.18/x64/lib/python3.11/unittest/mock.py", line 1446, in __enter__
@@ -309,4 +305,8 @@ alth_anomaly_inspector (refactor) — раундов: 1
 
 ## repo_health_collector (refactor) — раундов: 4
 - Последняя ошибка перед фиксом: FAILED (failures=1, errors=2)
+- Статус: успешно прошёл тесты и влит в main
+
+## repo_health_analytics_aggregator (create) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (errors=2)
 - Статус: успешно прошёл тесты и влит в main

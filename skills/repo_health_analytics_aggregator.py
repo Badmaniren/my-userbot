@@ -27,7 +27,10 @@ class RepoHealthAnalyticsAggregator:
 
     def aggregate(self, repo_id: str) -> Dict[str, Any]:
         if repo_health_collector is not None and hasattr(repo_health_collector, "fetch_raw_metrics"):
-            raw_data = repo_health_collector.fetch_raw_metrics(repo_id)
+            try:
+                raw_data = repo_health_collector.fetch_raw_metrics(repo_id)
+            except AttributeError:
+                raw_data = {}
         else:
             raw_data = {}
 

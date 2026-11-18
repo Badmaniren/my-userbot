@@ -3,12 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-пешно прошёл тесты и влит в main
-
-## repo_health_anomaly_remediation_pipeline (refactor) — раундов: 1
-- Статус: успешно прошёл тесты и влит в main
-
-## repo_health_anomaly_inspector (refactor) — раундов: 1
+alth_anomaly_inspector (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
 
 ## repo_health_anomaly_inspector (refactor) — раундов: 1
@@ -310,4 +305,8 @@
 - Статус: успешно прошёл тесты и влит в main
 
 ## repo_health_collector (refactor) — раундов: 1
+- Статус: успешно прошёл тесты и влит в main
+
+## repo_health_collector (refactor) — раундов: 4
+- Последняя ошибка перед фиксом: FAILED (failures=1, errors=2)
 - Статус: успешно прошёл тесты и влит в main

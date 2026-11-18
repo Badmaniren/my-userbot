@@ -1,5 +1,6 @@
 import os
 import json
+from skills.repo_logger import RepoLogger
 
 class RepoHealthError(Exception):
     """Кастомное исключение для ошибок сбора метрик здоровья репозитория."""
@@ -8,11 +9,17 @@ class RepoHealthError(Exception):
 class RepoHealthCollector:
     """Класс для сбора агрегированных метрик здоровья репозитория."""
     
-    def __init__(self):
-        pass
+    def __init__(self, repo_path: str = None):
+        if repo_path is not None:
+            self.logger = RepoLogger(repo_path)
+        else:
+            self.logger = None
 
     def collect_metrics(self, repo_path: str, session_id: str = None, expected_threshold: int = None) -> dict:
         """Собирает метрики здоровья репозитория, анализируя лог-файлы и используя аудитора."""
+        if self.logger is None:
+            self.logger = RepoLogger(repo_path)
+
         if not os.path.exists(repo_path):
             raise RepoHealthError(f"Путь репозитория не существует: {repo_path}")
 

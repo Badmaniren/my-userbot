@@ -1,0 +1,126 @@
+{
+  "log": {
+    "level": "warn",
+    "timestamp": true
+  },
+  "dns": {
+    "servers": [
+      {
+        "tag": "dns-remote",
+        "address": "https://1.1.1.1/dns-query",
+        "address_Resolver": "dns-direct",
+        "detour": "🚀 АНТИ-ТСПУ ПРОКСИ"
+      },
+      {
+        "tag": "dns-direct",
+        "address": "77.88.8.8",
+        "detour": "direct"
+      }
+    ],
+    "rules": [
+      {
+        "domain_suffix": [
+          ".ru",
+          ".su",
+          ".xn--p1ai"
+        ],
+        "server": "dns-direct"
+      }
+    ],
+    "final": "dns-remote"
+  },
+  "inbounds": [
+    {
+      "type": "tun",
+      "tag": "tun-in",
+      "inet4_address": "172.19.0.1/30",
+      "mtu": 1400,
+      "auto_route": true,
+      "strict_route": true,
+      "sniff": true,
+      "sniff_override_destination": false
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "selector",
+      "tag": "🚀 АНТИ-ТСПУ ПРОКСИ",
+      "outbounds": [
+        "⚡ АВТО-ПИНГ (Failover)",
+        "⚡ Cloudflare WARP (162.159.195.1)",
+        "direct"
+      ],
+      "default": "⚡ АВТО-ПИНГ (Failover)"
+    },
+    {
+      "type": "urltest",
+      "tag": "⚡ АВТО-ПИНГ (Failover)",
+      "outbounds": [
+        "⚡ Cloudflare WARP (162.159.195.1)"
+      ],
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": "2m",
+      "tolerance": 60
+    },
+    {
+      "type": "wireguard",
+      "tag": "⚡ Cloudflare WARP (162.159.195.1)",
+      "server": "162.159.195.1",
+      "server_port": 4500,
+      "local_address": [
+        "172.16.0.2/32",
+        "2606:4700:110:8fe7:33b5:5176:2df9:5a20/128"
+      ],
+      "private_key": "II20ag9oIMhdh+ekSJwG0W5SETocPZ17GzooCzVsTGE=",
+      "peer_public_key": "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
+      "reserved": [
+        30,
+        253,
+        62
+      ],
+      "mtu": 1280
+    },
+    {
+      "type": "direct",
+      "tag": "direct"
+    },
+    {
+      "type": "block",
+      "tag": "block"
+    },
+    {
+      "type": "dns",
+      "tag": "dns-out"
+    }
+  ],
+  "route": {
+    "auto_detect_interface": true,
+    "rules": [
+      {
+        "protocol": "dns",
+        "outbound": "dns-out"
+      },
+      {
+        "ip_is_private": true,
+        "outbound": "direct"
+      },
+      {
+        "domain_suffix": [
+          ".ru",
+          ".su",
+          ".xn--p1ai",
+          "yandex.net",
+          "vk.com",
+          "userapi.com",
+          "ozon.ru",
+          "wb.ru",
+          "sberbank.ru",
+          "tbank.ru",
+          "gosuslugi.ru"
+        ],
+        "outbound": "direct"
+      }
+    ],
+    "final": "🚀 АНТИ-ТСПУ ПРОКСИ"
+  }
+}

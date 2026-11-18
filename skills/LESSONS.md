@@ -3,8 +3,7 @@
 Это файл, который бот пишет и читает сам.
 
 ...(старые уроки обрезаны)...
-/Python/3.11.18/x64/lib/python3.11/unittest/mock.py", line 1446, in __enter__
-- Статус: успешно прошёл тесты и влит в main
+ты и влит в main
 
 ## repo_health_anomaly_inspector (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main
@@ -310,4 +309,7 @@
 
 ## repo_health_analytics_aggregator (refactor) — раундов: 2
 - Последняя ошибка перед фиксом: FAILED (errors=1)
+- Статус: успешно прошёл тесты и влит в main
+
+## repo_health_analytics_aggregator (refactor) — раундов: 1
 - Статус: успешно прошёл тесты и влит в main

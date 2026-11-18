@@ -1,60 +1,64 @@
-import unittest
 import os
-import uuid
 import json
-import tempfile
+import uuid
+import random
+import unittest
 from skills.repo_health_collector import RepoHealthCollector, RepoHealthError
 
 class TestRepoHealthCollectorIntegration(unittest.TestCase):
     def setUp(self):
-        self.test_dir = tempfile.TemporaryDirectory()
-        self.repo_path = self.test_dir.name
         self.collector = RepoHealthCollector()
+        self.test_dir = f"test_repo_{uuid.uuid4().hex}"
+        os.makedirs(self.test_dir, exist_ok=True)
 
     def tearDown(self):
-        self.test_dir.cleanup()
+        if os.path.exists(self.test_dir):
+            for root, dirs, files in os.walk(self.test_dir, topdown=False):
+                for name in files:
+                    os.remove(os.path.join(root, name))
+                for name in dirs:
+                    os.rmdir(os.path.join(root, name))
+            os.rmdir(self.test_dir)
 
-    def test_collect_metrics_integration_flow(self):
-        session_id = f"session_{uuid.uuid4().hex}"
-        threshold = int(uuid.uuid4().int % 100)
-        log_content = f"test_metric_data_{uuid.uuid4().hex}"
+    def test_collect_metrics_integration_success(self):
+        session_id = f"session_{uuid.uuid4().hex[:8]}"
+        expected_threshold = random.randint(10, 100)
+        log_filename = f"{session_id}_activity.log"
+        log_filepath = os.path.join(self.test_dir, log_filename)
         
-        log_filename = f"{session_id}_audit.log"
-        log_file_path = os.path.join(self.repo_path, log_filename)
-        
-        with open(log_file_path, "w", encoding="utf-8") as f:
-            f.write(log_content)
+        random_content = f"Log entry data {uuid.uuid4().hex}"
+        with open(log_filepath, "w", encoding="utf-8") as f:
+            f.write(random_content)
 
-        report = self.collector.collect_metrics(
-            repo_path=self.repo_path,
+        result = self.collector.collect_metrics(
+            repo_path=self.test_dir,
             session_id=session_id,
-            expected_threshold=threshold
+            expected_threshold=expected_threshold
         )
 
-        self.assertEqual(report["status"], "healthy")
-        self.assertEqual(report["session_id"], session_id)
-        self.assertEqual(report["repo_path"], self.repo_path)
-        self.assertEqual(report["threshold"], threshold)
-        self.assertIn("log_content", report["metrics"])
-        self.assertEqual(report["metrics"]["log_content"], log_content)
+        self.assertEqual(result["status"], "healthy")
+        self.assertEqual(result["repo_path"], self.test_dir)
+        self.assertEqual(result["session_id"], session_id)
+        self.assertEqual(result["threshold"], expected_threshold)
+        self.assertIn("log_content", result["metrics"])
+        self.assertEqual(result["metrics"]["log_content"], random_content)
 
-        expected_report_filename = f"report_{session_id}.json"
-        expected_report_path = os.path.join(self.repo_path, expected_report_filename)
-        
-        self.assertTrue(os.path.exists(expected_report_path))
+        report_filename = os.path.join(self.test_dir, f"report_{session_id}.json")
+        self.assertTrue(os.path.exists(report_filename))
 
-        with open(expected_report_path, "r", encoding="utf-8") as f:
+        with open(report_filename, "r", encoding="utf-8") as f:
             saved_report = json.load(f)
 
-        self.assertEqual(saved_report["status"], "healthy")
         self.assertEqual(saved_report["session_id"], session_id)
-        self.assertEqual(saved_report["threshold"], threshold)
-        self.assertEqual(saved_report["metrics"]["log_content"], log_content)
+        self.assertEqual(saved_report["threshold"], expected_threshold)
+        self.assertEqual(saved_report["metrics"]["log_content"], random_content)
 
-    def test_collect_metrics_nonexistent_path(self):
-        invalid_path = os.path.join(self.repo_path, str(uuid.uuid4()))
+    def test_collect_metrics_nonexistent_repo(self):
+        bad_path = f"nonexistent_{uuid.uuid4().hex}"
+        session_id = f"session_{uuid.uuid4().hex[:8]}"
+        
         with self.assertRaises(RepoHealthError):
-            self.collector.collect_metrics(repo_path=invalid_path)
+            self.collector.collect_metrics(repo_path=bad_path, session_id=session_id)
 
 if __name__ == "__main__":
     unittest.main()

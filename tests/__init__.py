@@ -1,1 +1,1 @@
-# unga tests package
+# homo sapiens tests

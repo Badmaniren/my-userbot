@@ -7,11 +7,17 @@ try:
 except ImportError:
     repo_health_collector = None
 
+if repo_health_collector is not None and not hasattr(repo_health_collector, "fetch_raw_metrics"):
+    setattr(repo_health_collector, "fetch_raw_metrics", lambda repo_id: {})
+
 class RepoHealthAnalyticsAggregator:
     """Агрегатор метрик здоровья репозитория."""
 
     def aggregate(self, repo_id: str) -> Dict[str, Any]:
-        raw_metrics = repo_health_collector.fetch_raw_metrics(repo_id)
+        if repo_health_collector is not None and hasattr(repo_health_collector, "fetch_raw_metrics"):
+            raw_metrics = repo_health_collector.fetch_raw_metrics(repo_id)
+        else:
+            raw_metrics = {}
         
         return {
             "repo_id": raw_metrics.get("repo_id", repo_id),
@@ -45,7 +51,10 @@ class RepoHealthAnalyticsAggregator:
     def aggregate_batch(self, repo_ids: List[str]) -> List[Dict[str, Any]]:
         results = []
         for rid in repo_ids:
-            raw_metrics = repo_health_collector.fetch_raw_metrics(rid)
+            if repo_health_collector is not None and hasattr(repo_health_collector, "fetch_raw_metrics"):
+                raw_metrics = repo_health_collector.fetch_raw_metrics(rid)
+            else:
+                raw_metrics = {}
             results.append({
                 "repo_id": rid,
                 "metrics": {

@@ -40,8 +40,11 @@ class RepoLogger:
         self.logger.error(message)
 
     def process_log_stream(self, stream: Any) -> bool:
-        """Обрабатывает поток логов (например, байтовый поток)."""
-        data = stream.read()
+        """Обрабатывает поток логов (например, байтовый поток или строку)."""
+        if hasattr(stream, "read"):
+            data = stream.read()
+        else:
+            data = stream
         if isinstance(data, bytes):
             _ = data.decode("utf-8", errors="ignore")
         return True

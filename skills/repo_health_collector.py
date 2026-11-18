@@ -18,32 +18,36 @@ class RepoHealthCollector:
 
         collected_data = {}
         if session_id:
-            for fname in os.listdir(repo_path):
-                if session_id in fname and fname.endswith(".log"):
-                    file_path = os.path.join(repo_path, fname)
-                    try:
+            try:
+                for fname in os.listdir(repo_path):
+                    if session_id in fname and fname.endswith(".log"):
+                        file_path = os.path.join(repo_path, fname)
                         with open(file_path, "r", encoding="utf-8") as f:
                             content = f.read()
                             collected_data["log_content"] = content
-                    except Exception as e:
-                        raise RepoHealthError(f"Ошибка чтения лог-файла: {e}")
+            except Exception as e:
+                if isinstance(e, RepoHealthError):
+                    raise
+                raise RepoHealthError(f"Ошибка при чтении лог-файлов: {e}")
 
-        report = {
+        result = {
             "status": "healthy",
-            "session_id": session_id,
             "repo_path": repo_path,
+            "session_id": session_id,
             "metrics": collected_data
         }
 
         if expected_threshold is not None:
-            report["threshold"] = expected_threshold
+            result["threshold"] = expected_threshold
 
         if session_id:
-            report_file_path = os.path.join(repo_path, f"report_{session_id}.json")
+            report_filename = os.path.join(repo_path, f"report_{session_id}.json")
             try:
-                with open(report_file_path, "w", encoding="utf-8") as f:
-                    json.dump(report, f)
+                with open(report_filename, "w", encoding="utf-8") as f:
+                    json.dump(result, f, ensure_ascii=False, indent=4)
             except Exception as e:
-                raise RepoHealthError(f"Ошибка записи файла отчета: {e}")
+                if isinstance(e, RepoHealthError):
+                    raise
+                raise RepoHealthError(f"Ошибка при записи отчета: {e}")
 
-        return report
+        return result

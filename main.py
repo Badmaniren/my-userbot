@@ -6,7 +6,6 @@ import uuid
 import base64
 import re
 import json
-import ssl
 import socket
 import struct
 import hashlib
@@ -23,7 +22,7 @@ from datetime import datetime, timezone
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
 # =====================================================================
-# 1. ИНИЦИАЛИЗАЦИЯ ОКРУЖЕНИЯ И НОВЫХ КЛЮЧЕЙ (СТАРЫЙ ТОКЕН СБРОШЕН)
+# 1. ИНИЦИАЛИЗАЦИЯ ОКРУЖЕНИЯ И НОВЫХ КЛЮЧЕЙ (v6)
 # =====================================================================
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "").strip()
 GITHUB_REPO = os.environ.get("GITHUB_REPO", "").strip()
@@ -35,13 +34,16 @@ RENDER_HOSTNAME = os.environ.get("RENDER_EXTERNAL_HOSTNAME", "").strip()
 if not RENDER_HOSTNAME and RENDER_EXTERNAL_URL:
     RENDER_HOSTNAME = urllib.parse.urlsplit(RENDER_EXTERNAL_URL).hostname or ""
 
-_SEED = f"{GITHUB_TOKEN}:{GITHUB_REPO}:{TG_TOKEN}:great_vpn_v5_verified"
+_SEED = f"{GITHUB_TOKEN}:{GITHUB_REPO}:{TG_TOKEN}:great_vpn_v6_golden"
 SUB_TOKEN = os.environ.get("SUB_TOKEN", hashlib.sha256(_SEED.encode()).hexdigest()[:16])
 WS_SECRET_PATH = f"/ws-{SUB_TOKEN}"
 VLESS_UUID = str(uuid.UUID(bytes=hashlib.md5(_SEED.encode()).digest()))
 VLESS_UUID_BYTES = uuid.UUID(VLESS_UUID).bytes
 
 SINGBOX_BIN = "/tmp/sing-box"
+MAX_ACCEPTABLE_MS = 1200  # Жёсткий порог отсечения тормозов (1.2 сек)
+GOLDEN_POOL_LIMIT = 45    # Максимум золотых серверов в копилке
+
 VPN_LOCK = threading.Lock()
 STATE_LOCK = threading.Lock()
 VPN_REFRESH_EVENT = threading.Event()
@@ -52,34 +54,35 @@ if GITHUB_TOKEN:
     GH_SESSION.headers.update({
         "Authorization": f"Bearer {GITHUB_TOKEN}",
         "Accept": "application/vnd.github+json",
-        "User-Agent": "GreatVPN-Verifier/5.0"
+        "User-Agent": "GreatVPN-Golden/6.0"
     })
 
 TG_SESSION = requests.Session()
 HTTP_SCRAPER = requests.Session()
 HTTP_SCRAPER.headers.update({
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/129.0.0.0 Safari/537.36"
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130.0.0.0 Safari/537.36"
 })
 
 GITHUB_BASE = "https://api.github.com/repos/"
 
 # =====================================================================
-# 2. ОТКРЫТЫЕ АГРЕГАТОРЫ И ФИЛЬТРЫ ШАБЛОНОВ
+# 2. ИСТОЧНИКИ СВЕЖИХ REALITY / HYSTERIA2 / TROJAN И ФИЛЬТРЫ
 # =====================================================================
 PUBLIC_AGGREGATORS = [
-    "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/Splitted-By-Protocol/vless.txt",
-    "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/Splitted-By-Protocol/trojan.txt",
-    "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/Splitted-By-Protocol/hy2.txt",
-    "https://raw.githubusercontent.com/Epodonios/v2ray-configs/main/Splitted-By-Protocol/vless.txt",
-    "https://raw.githubusercontent.com/Epodonios/v2ray-configs/main/Splitted-By-Protocol/trojan.txt",
     "https://raw.githubusercontent.com/yebekhe/TVC/main/subscriptions/xray/normal/reality",
     "https://raw.githubusercontent.com/yebekhe/TVC/main/subscriptions/xray/normal/vless",
     "https://raw.githubusercontent.com/yebekhe/TVC/main/subscriptions/xray/normal/trojan",
     "https://raw.githubusercontent.com/soroushmirzaei/telegram-configs-collector/main/protocols/reality",
-    "https://raw.githubusercontent.com/soroushmirzaei/telegram-configs-collector/main/protocols/vless",
     "https://raw.githubusercontent.com/soroushmirzaei/telegram-configs-collector/main/protocols/hysteria",
+    "https://raw.githubusercontent.com/soroushmirzaei/telegram-configs-collector/main/protocols/vless",
+    "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/Splitted-By-Protocol/vless.txt",
+    "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/Splitted-By-Protocol/hy2.txt",
+    "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/Splitted-By-Protocol/trojan.txt",
+    "https://raw.githubusercontent.com/Epodonios/v2ray-configs/main/Splitted-By-Protocol/vless.txt",
+    "https://raw.githubusercontent.com/Epodonios/v2ray-configs/main/Splitted-By-Protocol/trojan.txt",
     "https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/Eternity",
     "https://raw.githubusercontent.com/Pawdroid/Free-servers/main/sub",
+    "https://raw.githubusercontent.com/roosterkid/openproxylist/main/V2RAY_RAW.txt",
 ]
 
 DUMMY_HOSTS = {
@@ -99,7 +102,7 @@ DEFAULT_RU_WHITELIST_SNI = [
 ]
 
 VPN_STATE = {
-    "last_updated": "Инициализация ядра...",
+    "last_updated": "Запуск ядра v6...",
     "singbox_ready": False,
     "verified_nodes": [],
     "raw_uris": [],
@@ -113,10 +116,9 @@ VPN_STATE = {
 
 
 # =====================================================================
-# 3. УСТАНОВКА БОЕВОГО ЯДРА SING-BOX ДЛЯ РЕАЛЬНОЙ ПРОВЕРКИ ТРАФИКА
+# 3. УСТАНОВКА SING-BOX И ЗАГРУЗКА ЗОЛОТОГО ФОНДА ИЗ GITHUB
 # =====================================================================
 def ensure_singbox_binary() -> bool:
-    """Скачивает официальный релиз sing-box для Linux amd64 в /tmp для реального прогона трафика."""
     if os.path.isfile(SINGBOX_BIN) and os.access(SINGBOX_BIN, os.X_OK):
         with VPN_LOCK:
             VPN_STATE["singbox_ready"] = True
@@ -135,7 +137,7 @@ def ensure_singbox_binary() -> bool:
             return False
 
         tgz_path = "/tmp/sb.tar.gz"
-        with HTTP_SCRAPER.get(dl_url, stream=True, timeout=40) as resp:
+        with HTTP_SCRAPER.get(dl_url, stream=True, timeout=45) as resp:
             resp.raise_for_status()
             with open(tgz_path, "wb") as f:
                 for chunk in resp.iter_content(chunk_size=65536):
@@ -162,6 +164,23 @@ def ensure_singbox_binary() -> bool:
     except Exception as e:
         print(f"[!] Ошибка загрузки sing-box: {e}")
         return False
+
+
+def load_golden_pool_from_github() -> list:
+    """Подтягивает ранее найденные быстрые серверы из GitHub при старте контейнера."""
+    if not GITHUB_TOKEN or not GITHUB_REPO:
+        return []
+    try:
+        url = f"{GITHUB_BASE}{GITHUB_REPO}/contents/vpn/golden_pool.json?ref=main"
+        r = GH_SESSION.get(url, timeout=10)
+        if r.status_code == 200:
+            raw = base64.b64decode(r.json().get("content", "")).decode("utf-8", errors="ignore")
+            data = json.loads(raw)
+            if isinstance(data, list):
+                return data
+    except Exception:
+        pass
+    return []
 
 
 # =====================================================================
@@ -344,30 +363,41 @@ def handle_vless_websocket_tunnel(handler: BaseHTTPRequestHandler):
 
 
 # =====================================================================
-# 5. ПАРСЕР И РЕАЛЬНЫЙ ПРОГОН ТРАФИКА ЧЕРЕЗ SING-BOX
+# 5. ПАРСИНГ ХВОСТОВ АГРЕГАТОРОВ И ЩАДЯЩАЯ ПРОВЕРКА ЧЕРЕЗ SING-BOX
 # =====================================================================
-def _fetch_limited_lines(url: str, max_bytes: int = 300_000) -> list:
+def _fetch_tail_lines(url: str, tail_bytes: int = 350_000) -> list:
+    """
+    Читает хвост файла (самые свежие добавленные ключи внизу списка),
+    не перегружая 512 МБ RAM на Render.
+    """
     try:
-        with HTTP_SCRAPER.get(url, timeout=8, stream=True) as r:
-            if r.status_code != 200:
-                return []
-            buf = bytearray()
-            for chunk in r.iter_content(chunk_size=16384):
-                if chunk:
-                    buf.extend(chunk)
-                    if len(buf) >= max_bytes:
-                        break
-        text = bytes(buf).decode("utf-8", errors="ignore").strip()
+        r = HTTP_SCRAPER.get(url, timeout=8)
+        if r.status_code != 200:
+            return []
+        raw_bytes = r.content
+        if len(raw_bytes) > tail_bytes:
+            # Если файл не base64, берём именно свежий хвост
+            sample = raw_bytes[:100]
+            if b"://" in sample:
+                raw_bytes = raw_bytes[-tail_bytes:]
+            else:
+                raw_bytes = raw_bytes[:tail_bytes]
+
+        text = raw_bytes.decode("utf-8", errors="ignore").strip()
         if "://" not in text[:120]:
             try:
                 padded = text + "=" * ((4 - len(text) % 4) % 4)
                 text = base64.b64decode(padded).decode("utf-8", errors="ignore")
             except Exception:
                 pass
-        return [
+
+        lines = [
             l.strip() for l in text.splitlines()
             if any(l.strip().startswith(p) for p in ("vless://", "trojan://", "hysteria2://", "hy2://"))
         ]
+        # Возвращаем с конца (самые свежие первыми)
+        lines.reverse()
+        return lines
     except Exception:
         return []
 
@@ -501,11 +531,10 @@ def _node_to_singbox_outbound(node: dict, tag: str) -> dict:
 
 
 def _precheck_tcp_port(node: dict) -> bool:
-    """Быстрый отсев закрытых TCP-портов перед запуском sing-box (Hysteria2 пропускаем сразу в sing-box)."""
     if node["scheme"] == "hysteria2":
         return True
     try:
-        with socket.create_connection((node["host"], node["port"]), timeout=1.5):
+        with socket.create_connection((node["host"], node["port"]), timeout=1.2):
             return True
     except Exception:
         return False
@@ -513,13 +542,13 @@ def _precheck_tcp_port(node: dict) -> bool:
 
 def verify_batch_with_singbox(candidates: list, whitelist_snis: list) -> list:
     """
-    Запускает один общий экземпляр sing-box с индивидуальным локальным HTTP-прокси портом на каждый узел
-    и делает реальный запрос http://www.gstatic.com/generate_204 сквозь каждый узел.
+    Проверяет пачку до 20 узлов за раз волнами по 6 потоков (не перегружая 0.1 vCPU Render),
+    прогревает соединение и оставляет только узлы быстрее MAX_ACCEPTABLE_MS (1200 мс).
     """
     if not candidates or not ensure_singbox_binary():
         return []
 
-    base_port = random.randint(22000, 35000)
+    base_port = random.randint(23000, 38000)
     inbounds = []
     outbounds = []
     rules = []
@@ -564,7 +593,7 @@ def verify_batch_with_singbox(candidates: list, whitelist_snis: list) -> list:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
         )
-        time.sleep(1.5)  # Даём sing-box поднять локальные порты
+        time.sleep(1.2)
 
         def _probe_port(item):
             lport, node = item
@@ -572,43 +601,54 @@ def verify_batch_with_singbox(candidates: list, whitelist_snis: list) -> list:
                 "http": f"http://127.0.0.1:{lport}",
                 "https": f"http://127.0.0.1:{lport}"
             }
-            t0 = time.time()
             try:
-                resp = requests.get("http://www.gstatic.com/generate_204", proxies=proxies, timeout=4.5)
-                if resp.status_code in (200, 204):
+                with requests.Session() as sess:
+                    # 1. Прогрев хендшейка
+                    r1 = sess.get("http://www.gstatic.com/generate_204", proxies=proxies, timeout=2.8)
+                    if r1.status_code not in (200, 204):
+                        return {}
+                    # 2. Чистый замер скорости прогретого канала
+                    t0 = time.time()
+                    r2 = sess.get("http://www.gstatic.com/generate_204", proxies=proxies, timeout=2.0)
+                    if r2.status_code not in (200, 204):
+                        return {}
                     real_ms = int((time.time() - t0) * 1000)
-                    params = dict(node["params"])
-                    params["fp"] = "chrome"
-                    if node["security"] == "reality" and not params.get("sni"):
-                        params["sni"] = random.choice(whitelist_snis)
 
-                    badge = "REALITY" if node["security"] == "reality" else (
-                        "HY2" if node["scheme"] == "hysteria2" else node["scheme"].upper()
-                    )
-                    tag = f"✅ [{badge}] {node['host'][:16]}:{node['port']} ({real_ms}ms)"
-                    q_str = urllib.parse.urlencode(params, safe=":,/")
-                    mutated_uri = f"{node['scheme']}://{urllib.parse.quote(node['uuid_or_pass'])}@{node['host']}:{node['port']}?{q_str}#{urllib.parse.quote(tag)}"
+                if real_ms > MAX_ACCEPTABLE_MS:
+                    return {}
 
-                    out = dict(node)
-                    out.update({
-                        "latency_ms": real_ms,
-                        "tag": tag,
-                        "mutated_uri": mutated_uri
-                    })
-                    return out
+                params = dict(node["params"])
+                params["fp"] = "chrome"
+                if node["security"] == "reality" and not params.get("sni"):
+                    params["sni"] = random.choice(whitelist_snis)
+
+                badge = "REALITY" if node["security"] == "reality" else (
+                    "HY2" if node["scheme"] == "hysteria2" else node["scheme"].upper()
+                )
+                tag = f"⚡ [{badge}] {node['host'][:16]}:{node['port']} ({real_ms}ms)"
+                q_str = urllib.parse.urlencode(params, safe=":,/")
+                mutated_uri = f"{node['scheme']}://{urllib.parse.quote(node['uuid_or_pass'])}@{node['host']}:{node['port']}?{q_str}#{urllib.parse.quote(tag)}"
+
+                out = dict(node)
+                out.update({
+                    "latency_ms": real_ms,
+                    "tag": tag,
+                    "mutated_uri": mutated_uri
+                })
+                return out
             except Exception:
-                pass
-            return {}
+                return {}
 
         verified = []
-        with ThreadPoolExecutor(max_workers=20) as pool:
+        # 6 воркеров — оптимум для 0.1 vCPU бесплатного Render, не создаёт искусственных лагов
+        with ThreadPoolExecutor(max_workers=6) as pool:
             for res in pool.map(_probe_port, port_map.items()):
                 if res:
                     verified.append(res)
 
         proc.terminate()
         try:
-            proc.wait(timeout=3)
+            proc.wait(timeout=2)
         except Exception:
             proc.kill()
 
@@ -635,7 +675,7 @@ def build_singbox_profile(nodes: list) -> dict:
         })
         outbound_tags.append(self_tag)
 
-    for idx, n in enumerate(nodes[:25]):
+    for idx, n in enumerate(nodes[:GOLDEN_POOL_LIMIT]):
         tag = f"{n['tag']} #{idx + 1}"
         ob = _node_to_singbox_outbound(n, tag)
         if ob:
@@ -646,8 +686,8 @@ def build_singbox_profile(nodes: list) -> dict:
         outbound_tags = ["direct"]
 
     header = [
-        {"type": "selector", "tag": "🚀 ВЕЛИКИЙ ВПН (Проверено)", "outbounds": ["⚡ АВТО-ПИНГ"] + outbound_tags + ["direct"], "default": "⚡ АВТО-ПИНГ"},
-        {"type": "urltest", "tag": "⚡ АВТО-ПИНГ", "outbounds": outbound_tags, "url": "https://www.gstatic.com/generate_204", "interval": "2m", "tolerance": 60}
+        {"type": "selector", "tag": "🚀 ВЕЛИКИЙ ВПН (Турбо)", "outbounds": ["⚡ АВТО-ПИНГ"] + outbound_tags + ["direct"], "default": "⚡ АВТО-ПИНГ"},
+        {"type": "urltest", "tag": "⚡ АВТО-ПИНГ", "outbounds": outbound_tags, "url": "https://www.gstatic.com/generate_204", "interval": "2m", "tolerance": 50}
     ]
     tail = [{"type": "direct", "tag": "direct"}, {"type": "block", "tag": "block"}, {"type": "dns", "tag": "dns-out"}]
 
@@ -655,7 +695,7 @@ def build_singbox_profile(nodes: list) -> dict:
         "log": {"level": "warn", "timestamp": True},
         "dns": {
             "servers": [
-                {"tag": "dns-remote", "address": "https://1.1.1.1/dns-query", "address_resolver": "dns-direct", "detour": "🚀 ВЕЛИКИЙ ВПН (Проверено)"},
+                {"tag": "dns-remote", "address": "https://1.1.1.1/dns-query", "address_resolver": "dns-direct", "detour": "🚀 ВЕЛИКИЙ ВПН (Турбо)"},
                 {"tag": "dns-direct", "address": "77.88.8.8", "detour": "direct"}
             ],
             "rules": [{"domain_suffix": [".ru", ".su", ".xn--p1ai"], "server": "dns-direct"}],
@@ -670,7 +710,7 @@ def build_singbox_profile(nodes: list) -> dict:
                 {"ip_is_private": True, "outbound": "direct"},
                 {"domain_suffix": [".ru", ".su", ".xn--p1ai", "yandex.net", "vk.com", "userapi.com", "ozon.ru", "wb.ru", "sberbank.ru", "tbank.ru", "gosuslugi.ru"], "outbound": "direct"}
             ],
-            "final": "🚀 ВЕЛИКИЙ ВПН (Проверено)"
+            "final": "🚀 ВЕЛИКИЙ ВПН (Турбо)"
         }
     }
 
@@ -689,7 +729,7 @@ def push_vpn_backup_to_github(files_dict: dict):
         new_tree = GH_SESSION.post(f"{GITHUB_BASE}{GITHUB_REPO}/git/trees", json={"base_tree": base_tree, "tree": tree_items}, timeout=12).json()["sha"]
         new_commit = GH_SESSION.post(
             f"{GITHUB_BASE}{GITHUB_REPO}/git/commits",
-            json={"message": "🛡️ Обновление реально проверенных нод [skip ci]", "tree": new_tree, "parents": [head_sha]},
+            json={"message": "⚡ [Золотой фонд] Обновление быстрых нод [skip ci]", "tree": new_tree, "parents": [head_sha]},
             timeout=10
         ).json()["sha"]
         GH_SESSION.patch(ref_url, json={"sha": new_commit}, timeout=10)
@@ -697,7 +737,7 @@ def push_vpn_backup_to_github(files_dict: dict):
         pass
 
 
-def execute_verified_harvest(notify_tg: bool = False):
+def execute_turbo_harvest(notify_tg: bool = False):
     global HARVEST_RUNNING
     with STATE_LOCK:
         if HARVEST_RUNNING:
@@ -708,40 +748,53 @@ def execute_verified_harvest(notify_tg: bool = False):
         ensure_singbox_binary()
         with VPN_LOCK:
             snis = list(VPN_STATE["custom_sni"])
+            existing_golden = list(VPN_STATE["verified_nodes"])
 
-        feeds = random.sample(PUBLIC_AGGREGATORS, min(7, len(PUBLIC_AGGREGATORS)))
-        parsed_map = {}
+        if not existing_golden:
+            existing_golden = load_golden_pool_from_github()
+
+        # 1. Собираем свежие кандидаты с хвостов 10 случайных источников
+        feeds = random.sample(PUBLIC_AGGREGATORS, min(10, len(PUBLIC_AGGREGATORS)))
+        candidate_map = {}
+
+        # Сначала добавляем старый золотой фонд, чтобы перепроверить его актуальность
+        for g in existing_golden:
+            key = f"{g['host']}:{g['port']}"
+            candidate_map[key] = g
 
         with ThreadPoolExecutor(max_workers=6) as pool:
-            for lines in pool.map(_fetch_limited_lines, feeds):
-                random.shuffle(lines)
-                for uri in lines[:70]:
+            for lines in pool.map(_fetch_tail_lines, feeds):
+                for uri in lines[:60]:
                     p = parse_proxy_uri(uri)
                     if p:
-                        parsed_map[f"{p['host']}:{p['port']}"] = p
-                    if len(parsed_map) >= 180:
+                        key = f"{p['host']}:{p['port']}"
+                        if key not in candidate_map:
+                            candidate_map[key] = p
+                    if len(candidate_map) >= 260:
                         break
-                if len(parsed_map) >= 180:
+                if len(candidate_map) >= 260:
                     break
 
-        # 1. Быстрый TCP-фильтр
+        # 2. Быстрый TCP-фильтр в 30 потоков
         tcp_alive = []
-        with ThreadPoolExecutor(max_workers=25) as pool:
-            futures = {pool.submit(_precheck_tcp_port, n): n for n in parsed_map.values()}
+        with ThreadPoolExecutor(max_workers=30) as pool:
+            futures = {pool.submit(_precheck_tcp_port, n): n for n in candidate_map.values()}
             for fut in as_completed(futures):
                 if fut.result():
                     tcp_alive.append(futures[fut])
-                if len(tcp_alive) >= 80:
+                if len(tcp_alive) >= 100:
                     break
 
-        # 2. Реальный прогон HTTP generate_204 через sing-box батчами по 40 штук
-        verified = []
-        for i in range(0, len(tcp_alive), 40):
-            batch = tcp_alive[i:i + 40]
-            verified.extend(verify_batch_with_singbox(batch, snis))
+        # 3. Прогон через Sing-box небольшими батчами по 20 штук (бережем CPU)
+        verified_map = {}
+        for i in range(0, len(tcp_alive), 20):
+            batch = tcp_alive[i:i + 20]
+            for good in verify_batch_with_singbox(batch, snis):
+                verified_map[f"{good['host']}:{good['port']}"] = good
+            if len(verified_map) >= GOLDEN_POOL_LIMIT:
+                break
 
-        verified.sort(key=lambda x: x["latency_ms"])
-        top_nodes = verified[:25]
+        top_nodes = sorted(verified_map.values(), key=lambda x: x["latency_ms"])[:GOLDEN_POOL_LIMIT]
 
         uris = []
         if RENDER_HOSTNAME:
@@ -750,6 +803,7 @@ def execute_verified_harvest(notify_tg: bool = False):
 
         sub_b64 = base64.b64encode("\n".join(uris).encode("utf-8")).decode("ascii")
         sb_json = json.dumps(build_singbox_profile(top_nodes), indent=2, ensure_ascii=False)
+        golden_json = json.dumps(top_nodes, ensure_ascii=False)
         now_str = datetime.now(timezone.utc).strftime("%H:%M UTC")
 
         with VPN_LOCK:
@@ -763,17 +817,18 @@ def execute_verified_harvest(notify_tg: bool = False):
         push_vpn_backup_to_github({
             "vpn/sub_base64.txt": sub_b64,
             "vpn/sub_raw.txt": "\n".join(uris),
-            "vpn/singbox_verified.json": sb_json
+            "vpn/singbox_verified.json": sb_json,
+            "vpn/golden_pool.json": golden_json
         })
 
         if notify_tg:
             best = f"{top_nodes[0]['latency_ms']} ms" if top_nodes else "нет"
             send_tg(
-                f"✅ <b>Реальная проверка через Sing-box завершена!</b>\n━━━━━━━━━━━━━━━━━━━\n"
-                f"🧪 <b>Прогнано через туннель:</b> {len(tcp_alive)} узлов\n"
-                f"🟢 <b>Реально открывают интернет:</b> {len(top_nodes)}\n"
-                f"⚡ <b>Лучший реальный отклик:</b> {best}\n\n"
-                f"Жми <code>/vpn</code> за свежей подпиской."
+                f"⚡ <b>Турбо-охота завершена!</b>\n━━━━━━━━━━━━━━━━━━━\n"
+                f"🧪 <b>Прогнано через Sing-box:</b> {len(tcp_alive)} узлов\n"
+                f"🏆 <b>В Золотом фонде (&lt;{MAX_ACCEPTABLE_MS}ms):</b> {len(top_nodes)} шт.\n"
+                f"🚀 <b>Самый быстрый отклик:</b> {best}\n\n"
+                f"Жми <code>/vpn</code> — ссылки спрятаны под спойлер."
             )
     finally:
         with STATE_LOCK:
@@ -782,10 +837,10 @@ def execute_verified_harvest(notify_tg: bool = False):
 
 
 def run_harvester_daemon():
-    time.sleep(3)
+    time.sleep(2)
     while True:
         try:
-            execute_verified_harvest(notify_tg=False)
+            execute_turbo_harvest(notify_tg=False)
         except Exception as e:
             print(f"[!] Ошибка цикла проверки: {e}")
         VPN_REFRESH_EVENT.wait(timeout=1800)
@@ -835,7 +890,7 @@ class GreatVPNHTTPHandler(BaseHTTPRequestHandler):
 
         qs = dict(urllib.parse.parse_qsl(parsed.query))
         if parsed.path in ("/", "/health", "/ping"):
-            self._send_text(200, "GreatVPN Verifier Operational")
+            self._send_text(200, "GreatVPN Turbo v6 Operational")
             return
 
         if parsed.path in ("/sub", "/raw", "/singbox"):
@@ -848,7 +903,7 @@ class GreatVPNHTTPHandler(BaseHTTPRequestHandler):
                 raw_uris = "\n".join(VPN_STATE["raw_uris"])
                 sb_json = VPN_STATE["singbox_json"]
 
-            sub_headers = {"Profile-Title": base64.b64encode("🛡️ GreatVPN Verified".encode()).decode()}
+            sub_headers = {"Profile-Title": base64.b64encode("⚡ GreatVPN Turbo".encode()).decode()}
             if parsed.path == "/sub":
                 self._send_text(200, sub_b64 or base64.b64encode(get_self_vless_uri(RENDER_HOSTNAME).encode()).decode(), extra_headers=sub_headers)
             elif parsed.path == "/raw":
@@ -876,14 +931,14 @@ threading.Thread(target=run_harvester_daemon, daemon=True).start()
 
 
 # =====================================================================
-# 7. TELEGRAM ИНТЕРФЕЙС
+# 7. TELEGRAM ИНТЕРФЕЙС (ТОКЕНЫ ПОД СПОЙЛЕРОМ ДЛЯ БЕЗОПАСНЫХ СКРИНОВ)
 # =====================================================================
 def send_tg(text: str, buttons: list = None, keyboard: bool = False):
     if not TG_TOKEN or not TG_ADMIN_ID:
         return
     payload = {"chat_id": TG_ADMIN_ID, "text": text[:4000], "parse_mode": "HTML", "disable_web_page_preview": True}
     if keyboard:
-        payload["reply_markup"] = json.dumps({"keyboard": [["🛡️ /vpn", "👑 /myvless"], ["🔄 /check", "📊 /ping"]], "resize_keyboard": True})
+        payload["reply_markup"] = json.dumps({"keyboard": [["🛡️ /vpn", "👑 /myvless"], ["⚡ /check", "📊 /ping"]], "resize_keyboard": True})
     elif buttons:
         payload["reply_markup"] = json.dumps({"inline_keyboard": buttons})
     try:
@@ -896,9 +951,9 @@ def set_tg_commands():
     if not TG_TOKEN:
         return
     commands = [
-        {"command": "vpn", "description": "🛡️ Панель управления и проверенные подписки"},
+        {"command": "vpn", "description": "🛡️ Золотой фонд и скрытые ссылки подписки"},
         {"command": "myvless", "description": "👑 Личный VLESS-ключ на твоём Render"},
-        {"command": "check", "description": "🔄 Прогнать свежую пачку через Sing-box"},
+        {"command": "check", "description": "⚡ Добить Золотой фонд свежими нодами"},
         {"command": "ping", "description": "📊 Статус ядра и прокачанный трафик"},
     ]
     try:
@@ -918,20 +973,22 @@ def send_vpn_dashboard():
     sub_url = f"{base_url}/sub?token={SUB_TOKEN}"
     sb_url = f"{base_url}/singbox?token={SUB_TOKEN}"
 
-    top_preview = "\n".join(f"• <code>{html.escape(n['tag'])}</code>" for n in nodes[:6]) or "<i>Идёт загрузка ядра Sing-box и реальный тест трафика (~20 сек)...</i>"
+    top_preview = "\n".join(f"• <code>{html.escape(n['tag'])}</code>" for n in nodes[:7]) or "<i>Идёт загрузка ядра и отбор быстрых серверов (~25 сек)...</i>"
 
     text = (
-        f"🛡️ <b>Великий ВПН — Боевой режим (v5)</b>\n"
+        f"⚡ <b>Великий ВПН — Турбо v6 (Золотой фонд)</b>\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
-        f"⚙️ <b>Ядро проверки Sing-box:</b> {'🟢 Загружено' if sb_ok else '⏳ Скачивается...'}\n"
-        f"🕒 <b>Проверка:</b> {html.escape(upd)} (прогнано: {tested})\n"
-        f"💎 <b>Рабочих узлов (реальный HTTP 204):</b> {len(nodes)}\n\n"
-        f"🏆 <b>Топ-6 живых серверов:</b>\n{top_preview}\n\n"
-        f"🔗 <b>Подписка (Happ, v2rayNG, V2Box, Streisand):</b>\n<code>{html.escape(sub_url)}</code>\n\n"
-        f"📦 <b>Профиль Sing-box (с прямым роутингом .ru):</b>\n<code>{html.escape(sb_url)}</code>"
+        f"⚙️ <b>Ядро Sing-box:</b> {'🟢 Готово' if sb_ok else '⏳ Качается...'}\n"
+        f"🕒 <b>Обновлено:</b> {html.escape(upd)} (прогнано: {tested})\n"
+        f"🏆 <b>Быстрых узлов (&lt;{MAX_ACCEPTABLE_MS}ms):</b> {len(nodes)}\n\n"
+        f"🚀 <b>Топ-7 ракет:</b>\n{top_preview}\n\n"
+        f"🔗 <b>Подписка (Happ, v2rayNG, V2Box, Streisand) [нажми чтобы открыть]:</b>\n"
+        f"<tg-spoiler><code>{html.escape(sub_url)}</code></tg-spoiler>\n\n"
+        f"📦 <b>Профиль Sing-box (.ru напрямую) [нажми чтобы открыть]:</b>\n"
+        f"<tg-spoiler><code>{html.escape(sb_url)}</code></tg-spoiler>"
     )
     buttons = [[
-        {"text": "🔄 Запустить проверку", "callback_data": "run_check"},
+        {"text": "⚡ Пополнить фонд", "callback_data": "run_check"},
         {"text": "👑 Мой личный ключ", "callback_data": "get_myvless"}
     ]]
     send_tg(text, buttons=buttons)
@@ -942,7 +999,7 @@ def run_telegram_listener():
         return
     offset = 0
     set_tg_commands()
-    send_tg("🛡️ <b>Великий ВПН v5 запущен!</b>\nКачаю бинарник <code>sing-box</code> для реального прогона трафика. Подожди 20 секунд и жми <code>/vpn</code>.", keyboard=True)
+    send_tg("⚡ <b>Великий ВПН v6 (Турбо) запущен!</b>\nСобираю Золотой фонд быстрых нод (&lt;1200ms). Подожди ~25 секунд и жми <code>/vpn</code>.", keyboard=True)
 
     while True:
         try:
@@ -956,26 +1013,26 @@ def run_telegram_listener():
                         if str(cb.get("message", {}).get("chat", {}).get("id", "")) != TG_ADMIN_ID:
                             continue
                         if cb["data"] == "run_check":
-                            send_tg("🔄 <b>Запущен реальный тест узлов через Sing-box...</b>")
-                            threading.Thread(target=execute_verified_harvest, args=(True,), daemon=True).start()
+                            send_tg("⚡ <b>Запущен отбор быстрых нод (&lt;1200ms)...</b>")
+                            threading.Thread(target=execute_turbo_harvest, args=(True,), daemon=True).start()
                         elif cb["data"] == "get_myvless":
-                            send_tg(f"👑 <b>Твой личный VLESS на Render:</b>\n<code>{html.escape(get_self_vless_uri())}</code>")
+                            send_tg(f"👑 <b>Твой личный VLESS на Render:</b>\n<tg-spoiler><code>{html.escape(get_self_vless_uri())}</code></tg-spoiler>")
                         continue
 
                     msg = update.get("message", {})
                     if str(msg.get("chat", {}).get("id", "")) != TG_ADMIN_ID:
                         continue
-                    text = re.sub(r'^[🛡️👑🔄📊]\s*', '', msg.get("text", "").strip())
+                    text = re.sub(r'^[🛡️👑⚡🔄📊]\s*', '', msg.get("text", "").strip())
 
                     if text.startswith("/start"):
                         send_tg("Жми /vpn или /myvless", keyboard=True)
                     elif text.startswith("/vpn"):
                         send_vpn_dashboard()
                     elif text.startswith("/myvless"):
-                        send_tg(f"👑 <b>Твой личный VLESS на Render:</b>\n<code>{html.escape(get_self_vless_uri())}</code>")
+                        send_tg(f"👑 <b>Твой личный VLESS на Render:</b>\n<tg-spoiler><code>{html.escape(get_self_vless_uri())}</code></tg-spoiler>")
                     elif text.startswith("/check"):
-                        send_tg("🔄 <b>Прогоняю свежую пачку через Sing-box...</b>")
-                        threading.Thread(target=execute_verified_harvest, args=(True,), daemon=True).start()
+                        send_tg("⚡ <b>Запущен отбор быстрых нод (&lt;1200ms)...</b>")
+                        threading.Thread(target=execute_turbo_harvest, args=(True,), daemon=True).start()
                     elif text.startswith("/ping"):
                         with VPN_LOCK:
                             conns = VPN_STATE["relay_connections"]
@@ -985,7 +1042,7 @@ def run_telegram_listener():
                         send_tg(
                             f"📊 <b>Диагностика:</b>\n"
                             f"Ядро Sing-box: {'Готово' if sb_ok else 'Нет'}\n"
-                            f"Живых нод: {cnt}\n"
+                            f"В Золотом фонде: {cnt} быстрых нод\n"
                             f"Личный VLESS сессий: {conns} ({mb} МБ)"
                         )
         except Exception:
@@ -995,3 +1052,4 @@ def run_telegram_listener():
 
 if __name__ == "__main__":
     run_telegram_listener()
+
